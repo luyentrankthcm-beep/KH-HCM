@@ -524,6 +524,73 @@ function parseVietQrMnRawWorkbook(buffer) {
   return { sheetName, rows };
 }
 
+// Dan tay bang "Transactions" export cho BIDV7702/VietQR MN (copy tab-
+// separated truc tiep tu Excel/he thong roi dan vao 1 o textarea, khong can
+// upload file .xlsx moi lan) -- Luyen, 2026-07-16. Tra ve CUNG 1 SHAPE voi
+// parseVietQrMnRawWorkbook o tren ({ rows: [{vqrCode, maCuaHang, amount,
+// date, raw}] }) de tai su dung nguyen ven mergeRawRows/resolveGianGrossPrefix
+// ben doisoat-vietqr.js khong can sua gi them -- vqrCode o day la "Ma tham
+// chieu" (dedupe khi dan lai/dan cong don nhieu lan, giong upload file).
+function parseVietQrMnPastedText(text) {
+  const lines = String(text || "")
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter((l) => l.length > 0);
+  if (lines.length === 0) {
+    throw new Error("Chua dan du lieu nao.");
+  }
+  const splitRow = (line) => (line.includes("\t") ? line.split("\t") : line.split(/\s{2,}/));
+
+  // Neu dong dau la dong tieu de (co chua tu khoa quen thuoc), do cot theo
+  // ten; neu khong, gia dinh dung DUNG thu tu cot cua file "Transactions"
+  // export: STT, Thoi gian TT, So tien den, So tien di, Loai, Trang thai, Ma
+  // tham chieu, Ma don hang, Ma diem ban, Ma cua hang, Tai khoan nhan, Thoi
+  // gian tao, Noi dung TT, Ghi chu, Loai giao dich.
+  const firstCells = splitRow(lines[0]).map((c) => normText(c));
+  const looksLikeHeader = firstCells.some((c) => c.includes("thoi gian tt") || c.includes("so tien den"));
+  let cols;
+  let dataStart = 0;
+  if (looksLikeHeader) {
+    cols = {};
+    firstCells.forEach((c, i) => {
+      if (cols.thoiGian === undefined && c.includes("thoi gian tt")) cols.thoiGian = i;
+      if (cols.soTien === undefined && c.includes("so tien den")) cols.soTien = i;
+      if (cols.trangThai === undefined && c.includes("trang thai")) cols.trangThai = i;
+      if (cols.maCuaHang === undefined && c.includes("ma cua hang")) cols.maCuaHang = i;
+      if (cols.maThamChieu === undefined && c.includes("ma tham chieu")) cols.maThamChieu = i;
+      if (cols.noiDung === undefined && c.includes("noi dung tt")) cols.noiDung = i;
+    });
+    dataStart = 1;
+  } else {
+    cols = { thoiGian: 1, soTien: 2, trangThai: 5, maThamChieu: 6, maCuaHang: 9, noiDung: 12 };
+  }
+  if (cols.soTien === undefined || cols.maCuaHang === undefined) {
+    throw new Error(
+      'Khong nhan dien duoc cot "So tien den"/"Ma cua hang" -- nen dan CA dong tieu de (dong dau tien) khi copy tu Excel.'
+    );
+  }
+
+  const rows = [];
+  for (let i = dataStart; i < lines.length; i++) {
+    const row = splitRow(lines[i]);
+    const trangThai = cols.trangThai !== undefined ? row[cols.trangThai] : null;
+    if (trangThai && !/thanh cong/i.test(normText(trangThai))) continue;
+    const amount = cols.soTien !== undefined ? Number(String(row[cols.soTien] || "").replace(/[^\d-]/g, "")) || 0 : 0;
+    if (!amount) continue;
+    const maCuaHang = cols.maCuaHang !== undefined ? String(row[cols.maCuaHang] || "").trim() : "";
+    if (!maCuaHang) continue;
+    const thoiGianRaw = cols.thoiGian !== undefined ? row[cols.thoiGian] : null;
+    const date = parseVqrDate(thoiGianRaw);
+    const maThamChieu = cols.maThamChieu !== undefined ? String(row[cols.maThamChieu] || "").trim() : "";
+    const noiDung = cols.noiDung !== undefined ? String(row[cols.noiDung] || "").trim() : "";
+    rows.push({ vqrCode: maThamChieu || null, maCuaHang, amount, date, raw: noiDung || maThamChieu });
+  }
+  if (rows.length === 0) {
+    throw new Error("Khong doc duoc dong nao hop le tu du lieu da dan (kiem tra co du cot So tien den / Ma cua hang / Trang thai khong).");
+  }
+  return { rows };
+}
+
 // "Ma Cua Hang APP" sheet: STT | Ten cua hang | Ma cua hang | Ma diem ban |
 // Ten diem ban | Doanh thu ngay | So luong GD ngay | Ngay tao -- only "Ten
 // cua hang"/"Ma cua hang" matter here (matchText = Ten cua hang itself,
@@ -803,6 +870,7 @@ module.exports = {
   resolveGianGross,
   reconcileVietQr,
   parseVietQrMnRawWorkbook,
+  parseVietQrMnPastedText,
   parseMaCuaHangAppSheet,
   extractStorePrefix,
   buildGianPrefixMatcher,
