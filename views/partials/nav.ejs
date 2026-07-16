@@ -78,4 +78,7 @@
     updateTopbarHeight();
     window.addEventListener("resize", updateTopbarHeight);
     if (window.ResizeObserver && topbar) {
-      new ResizeObserver(updateTopbarHeig
+      new ResizeObserver(updateTopbarHeight).observe(topbar);
+    }
+  })();
+</script>
