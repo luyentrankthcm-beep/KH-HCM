@@ -14,7 +14,6 @@ const {
   resolveGianGross,
   reconcileVietQr,
   parseVietQrMnRawWorkbook,
-  parseVietQrMnPastedText,
   parseMaCuaHangAppSheet,
   resolveGianGrossPrefix,
   isoToDmy,
@@ -62,12 +61,24 @@ const CHANNEL_KEYS = Object.keys(CHANNELS);
 const TKCO_VALUES = ["131", "1388", "SKIP"];
 const UPDATED_NOTE = " Ket qua doi soat ben duoi da tu cap nhat theo du lieu moi.";
 
+// Full gian merge/rename (Luyen-confirmed 2026-07-16): "JP SC VIVO" la CUNG
+// 1 gian voi "SC VIVO KVCM", chia se doanh thu (CSE) tu dau -- hoa don ghi
+// "JP SC VIVO" cho cac ngay dau, roi doi sang ghi "SC VIVO KVCM"/"FUNFEST
+// SCVIVO" tu khoang 1-2 ngay sau (do do tre xuat hoa don). Merge permanent,
+// ap dung ca hoa don cu (con ghi "JP SC VIVO") lan hoa don moi ve sau.
+const GIAN_MERGE_DEFAULTS = {
+  "JP SC VIVO": { maCongTrinh: "SC VIVO KVCM", isCse: true },
+};
+
 function ensureChannelShape(store) {
   if (!store.viet_qr_raw_uploads) store.viet_qr_raw_uploads = {};
   if (!store.viet_qr_store_names) store.viet_qr_store_names = {};
   if (!store.viet_qr_invoices) store.viet_qr_invoices = {};
   if (!store.viet_qr_manual_matches) store.viet_qr_manual_matches = {};
   if (!store.viet_qr_gian_merge) store.viet_qr_gian_merge = {};
+  Object.keys(GIAN_MERGE_DEFAULTS).forEach((k) => {
+    if (!store.viet_qr_gian_merge[k]) store.viet_qr_gian_merge[k] = GIAN_MERGE_DEFAULTS[k];
+  });
   CHANNEL_KEYS.forEach((ch) => {
     if (!store.viet_qr_raw_uploads[ch]) store.viet_qr_raw_uploads[ch] = [];
     if (!store.viet_qr_store_names[ch]) store.viet_qr_store_names[ch] = {};
@@ -410,41 +421,6 @@ router.post("/doi-soat/vietqr/upload-raw/:channel", upload.single("file"), (req,
         encodeURIComponent(
           `Da nap "${parsed.sheetName}": ${parsed.rows.length} giao dich QR, ${Object.keys(storeMap).length} cua hang.${UPDATED_NOTE}`
         )
-    );
-  } catch (e) {
-    res.redirect("/doi-soat/vietqr?error=" + encodeURIComponent(e.message));
-  }
-});
-
-// ---------- Dan tay: bang "Transactions" export cho BIDV7702/VietQR MN
-// (copy tab-separated truc tiep tu Excel/he thong roi dan vao 1 o textarea,
-// khong can tai file .xlsx moi lan) -- Luyen, 2026-07-16. Gop CONG DON qua
-// nhieu lan dan (dedupe theo Ma tham chieu, dung chung co che mergeRawRows
-// voi upload file). Chi ap dung cho kenh co parseMode "mn" (hien tai la
-// bidv7702) vi dinh dang cot khop voi export "he thong" cua kenh nay.
-router.post("/doi-soat/vietqr/paste-raw/:channel", (req, res) => {
-  const store = load();
-  ensureChannelShape(store);
-  const channelKey = req.params.channel;
-  try {
-    if (!CHANNELS[channelKey]) throw new Error("Kenh khong hop le.");
-    if (CHANNELS[channelKey].parseMode !== "mn") {
-      throw new Error("Kenh nay chua ho tro dan du lieu truc tiep -- dung tai file nhu truoc.");
-    }
-    const { paste_text } = req.body;
-    if (!paste_text || !paste_text.trim()) throw new Error("Chua dan du lieu nao.");
-    const parsed = parseVietQrMnPastedText(paste_text);
-    store.viet_qr_raw_uploads[channelKey].push({
-      id: nextId(store, "viet_qr_raw_uploads_seq") || Date.now(),
-      uploaded_at: new Date().toISOString(),
-      file_name: "Dán tay",
-      sheetName: "Dán tay (Transactions)",
-      rows: parsed.rows,
-    });
-    save(store);
-    res.redirect(
-      "/doi-soat/vietqr?success=" +
-        encodeURIComponent(`Da nap ${parsed.rows.length} giao dich QR tu du lieu dan tay.${UPDATED_NOTE}`)
     );
   } catch (e) {
     res.redirect("/doi-soat/vietqr?error=" + encodeURIComponent(e.message));
