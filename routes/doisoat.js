@@ -118,6 +118,12 @@ function extractFirstExcelFromZip(buffer) {
 // Extracted so /cong-no and the Tong quan dashboard can reuse the EXACT same
 // reconciliation this page shows, instead of recomputing it separately (2
 // implementations of the same match logic would drift apart over time).
+function ensureGianHidden(store) {
+  if (!store.gian_hidden) store.gian_hidden = {};
+  if (!store.gian_hidden.kh_cu) store.gian_hidden.kh_cu = [];
+  if (!store.gian_hidden.kh_moi) store.gian_hidden.kh_moi = [];
+}
+
 function buildMomoReconciliation(store, companyKey) {
   const cfg = MOMO_CHANNELS[companyKey] || MOMO_CHANNELS.kh_cu;
   const grossUploads = store[cfg.grossKey] || [];
@@ -135,6 +141,20 @@ function buildMomoReconciliation(store, companyKey) {
     const invoiceData = { invoices };
     if (grossData.codes.length > 0) {
       reconciledAll = reconcileMomo(settlements, grossData, invoiceData, store.gian_mapping, store.invoice_diem_alias);
+      // An gian theo YEU CAU RIENG cua tung cong ty (vd 1 gian duoc gop nham
+      // vao file tai len cua cong ty nay, nhung se duoc xuat HD ben cong ty
+      // KIA -- Luyen, 2026-07-16: "KVC ESTELLA", "FARM LOTTE NHA TRANG",
+      // "FARM LOTTE PHAN THIET", "AE TAN AN KVC" o KH Moi). CHI an khoi
+      // HIEN THI cua cong ty dang xem (store.gian_hidden theo companyKey) --
+      // KHONG dong cham store.gian_mapping (van dung chung), nen cong ty KIA
+      // neu co cung ma van thay binh thuong. Loc TRUOC khi tinh allCodes de
+      // gian bi an cung bien mat khoi bang "TK Co" muc 3 luon, khong chi
+      // khoi bang ket qua muc 4.
+      ensureGianHidden(store);
+      const hiddenSet = new Set(store.gian_hidden[companyKey] || []);
+      if (hiddenSet.size > 0) {
+        reconciledAll = reconciledAll.map((r) => ({ ...r, lines: r.lines.filter((l) => !hiddenSet.has(l.code)) }));
+      }
       reconciledAll.forEach((r) => r.lines.forEach((l) => allCodes.add(l.code)));
     }
   } else {
@@ -169,6 +189,7 @@ function buildMomoReconciliation(store, companyKey) {
 
 router.get("/doi-soat/momo", (req, res) => {
   const store = load();
+  ensureGianHidden(store);
   const activeCompany = getCompany(req);
   const momoCfg = MOMO_CHANNELS[activeCompany];
   const built = buildMomoReconciliation(store, activeCompany);
@@ -197,6 +218,7 @@ router.get("/doi-soat/momo", (req, res) => {
     allCodes: Array.from(allCodes).sort(),
     invoiceDiemAlias: built.invoiceDiemAlias,
     unmatchedInvoiceCodes: built.unmatchedInvoiceCodes,
+    gianHidden: (store.gian_hidden && store.gian_hidden[activeCompany]) || [],
     error,
     success: req.query.success || null,
   });
@@ -385,6 +407,35 @@ router.post("/doi-soat/momo/diem-alias/delete", (req, res) => {
   if (store.invoice_diem_alias) delete store.invoice_diem_alias[sourceCode];
   save(store);
   res.redirect("/doi-soat/momo?success=" + encodeURIComponent("Da xoa anh xa ma diem."));
+});
+
+// ---------- An gian khoi trang doi soat cua CONG TY DANG XEM (vd doanh thu
+// cua 1 gian bi gop nham vao file "Tong Momo" cua cong ty nay, nhung gian do
+// se duoc xuat HD ben cong ty KIA -- Luyen, 2026-07-16: "KVC ESTELLA",
+// "FARM LOTTE NHA TRANG", "FARM LOTTE PHAN THIET", "AE TAN AN KVC" o KH
+// Moi). CHI an khoi HIEN THI cua cong ty dang xem (store.gian_hidden theo
+// company key) -- KHONG dong den store.gian_mapping (van dung chung), nen
+// cong ty KIA neu dung chung ma nay van thay binh thuong. ----------
+router.post("/doi-soat/momo/gian-hidden", (req, res) => {
+  const store = load();
+  ensureGianHidden(store);
+  const companyKey = getCompany(req);
+  const { code } = req.body;
+  if (code && !store.gian_hidden[companyKey].includes(code)) {
+    store.gian_hidden[companyKey].push(code);
+  }
+  save(store);
+  res.redirect("/doi-soat/momo?success=" + encodeURIComponent(`Da an gian "${code}" khoi trang nay.`));
+});
+
+router.post("/doi-soat/momo/gian-hidden/delete", (req, res) => {
+  const store = load();
+  ensureGianHidden(store);
+  const companyKey = getCompany(req);
+  const { code } = req.body;
+  store.gian_hidden[companyKey] = (store.gian_hidden[companyKey] || []).filter((c) => c !== code);
+  save(store);
+  res.redirect("/doi-soat/momo?success=" + encodeURIComponent(`Da hien lai gian "${code}".`));
 });
 
 router.delete("/doi-soat/momo/upload-tong/:id", (req, res) => {

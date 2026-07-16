@@ -13,6 +13,9 @@ const {
   buildGianCandidatesFromInvoices,
   resolveGianGross,
   reconcileVietQr,
+  parseVietQrMnRawWorkbook,
+  parseMaCuaHangAppSheet,
+  resolveGianGrossPrefix,
   isoToDmy,
   displayCode,
   FF_SUFFIX,
@@ -37,12 +40,21 @@ const CHANNELS = {
   bidv7704: { bankName: "BIDV7704", label: "BIDV 7704", tagPattern: /POSH\+JP\s*MB\s*\(7704\)/i, company: "kh_cu" },
   bidv77020: { bankName: "BIDV77020", label: "BIDV 77020", tagPattern: /POSH\+JP\s*MB\s*\(7020\)/i, company: "kh_cu" },
   mb11521268: { bankName: "MB11521268", label: "MB 11521268", tagPattern: /POSH\+JP\s*MB\s*\(268\)/i, company: "kh_cu" },
-  // Cong ty "KH Moi" (TNHH GIAI TRI K&H) -- tai khoan Viet QR BIDV7702. Chua
-  // biet the tag "POSH+JP MB (...)" cho kenh nay trong file hoa don MTT dung
-  // chung (chua co du lieu thuc te) -- de tam 1 pattern rieng, khop hoa don
-  // theo tag se ra 0 ket qua cho den khi Luyen xac nhan dung tag gi, khong
-  // lam vo trang (van hien dong sao ke, chi la chua co "Da khop HD").
-  bidv7702: { bankName: "BIDV7702", label: "BIDV 7702", tagPattern: /POSH\+JP\s*MB\s*\(7702\)/i, company: "kh_moi" },
+  // Cong ty "KH Moi" (TNHH GIAI TRI K&H) -- tai khoan Viet QR BIDV7702. Tag
+  // hoa don la "MTD MN" (xac nhan tu Luyen 2026-07-16, nam tren sheet "ke ds
+  // xuat HD MTT - 705" cua file MTT dung chung -- xem parseInvoiceWorkbookByTag
+  // trong utils/vietqrReconcile.js). parseMode: "mn" danh dau kenh nay dung
+  // rieng file export "VIETQR MN 7702.xlsx" (sheet "VIET QR" + "Ma Cua Hang
+  // APP", khong co cot "Noi dung TT"/token VQR nhu 3 kenh kia) va khop gian
+  // theo TIEN TO ten cua hang (vd "AMTP 01" -> "AMTP") thay vi fuzzy text,
+  // vi ten cua hang o day la chu viet tat cua chinh Ma cong trinh.
+  bidv7702: {
+    bankName: "BIDV7702",
+    label: "BIDV 7702",
+    tagPattern: /MTD\s*MN/i,
+    company: "kh_moi",
+    parseMode: "mn",
+  },
 };
 const CHANNEL_KEYS = Object.keys(CHANNELS);
 
@@ -192,7 +204,13 @@ function buildChannelReconciliation(store, channelKey) {
       }))
     );
   }
-  const resolved = resolveGianGross(rawRows, storeNames, gianCandidates);
+  // BIDV7702/VietQR MN: khop gian theo tien to ten cua hang (vd "AMTP 01"
+  // -> "AMTP" ung voi ma cong trinh "AM TP KVCM"), khong dung fuzzy text
+  // matcher nhu 3 kenh kia -- xem ghi chu tai CHANNELS.bidv7702 o tren.
+  const resolved =
+    cfg.parseMode === "mn"
+      ? resolveGianGrossPrefix(rawRows, storeNames, gianCandidates)
+      : resolveGianGross(rawRows, storeNames, gianCandidates);
 
   // Redirect each invoice's own "Ma diem tren misa thue" through the SAME
   // gianCandidates map (keyed by invoice's own "Ten diem xuat hoa don"),
@@ -367,8 +385,12 @@ router.post("/doi-soat/vietqr/upload-raw/:channel", upload.single("file"), (req,
     if (!CHANNELS[channelKey]) throw new Error("Kenh khong hop le.");
     if (!req.file) throw new Error("Vui long chon 1 file de tai len.");
 
-    const parsed = parseVietQrRawWorkbook(req.file.buffer);
-    const storeMap = parseCuaHangSheet(req.file.buffer);
+    // BIDV7702/VietQR MN dung dinh dang file rieng ("VIETQR MN 7702.xlsx":
+    // sheet "VIET QR" + "Ma Cua Hang APP") -- khong co cot "Noi dung TT"/
+    // token VQR nhu 3 kenh kia nen phai dung parser rieng.
+    const isMn = CHANNELS[channelKey].parseMode === "mn";
+    const parsed = isMn ? parseVietQrMnRawWorkbook(req.file.buffer) : parseVietQrRawWorkbook(req.file.buffer);
+    const storeMap = isMn ? parseMaCuaHangAppSheet(req.file.buffer) : parseCuaHangSheet(req.file.buffer);
 
     store.viet_qr_raw_uploads[channelKey].push({
       id: nextId(store, "viet_qr_raw_uploads_seq") || Date.now(),
