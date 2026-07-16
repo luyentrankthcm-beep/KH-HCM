@@ -124,11 +124,27 @@ function ensureGianHidden(store) {
   if (!store.gian_hidden.kh_moi) store.gian_hidden.kh_moi = [];
 }
 
+// KH Moi CHUA co tai khoan Momo rieng thuc su nhan tien ve (BIDV7701 con 0
+// giao dich thuc te tren he thong tinh den 2026-07-16) -- toan bo sao ke
+// ngan hang VA doanh thu "Tong Momo" (ca 2 cong ty) van dang chay CHUNG qua
+// 1 tai khoan cua KH Cu (BIDV123456). Theo yeu cau Luyen 2026-07-16: trang
+// KH Moi van doi soat tren CUNG nguon sao ke/doanh thu do (muon
+// MOMO_CHANNELS.kh_cu), nhung khop voi HOA DON RIENG cua KH Moi
+// (momo_moi_invoices) -- de xem trong CUNG 1 khoan tien ve do, gian nao da
+// co hoa don xuat duoi ten KH Moi. Neu sau nay KH Moi co tai khoan Momo
+// rieng thuc su (BIDV7701 bat dau co giao dich), bo doan nay di la tro lai
+// dung nguyen ban cu (moi cong ty tu doi soat rieng theo cfg cua minh).
+function momoSourceCfg(companyKey) {
+  return companyKey === "kh_moi" ? MOMO_CHANNELS.kh_cu : MOMO_CHANNELS[companyKey] || MOMO_CHANNELS.kh_cu;
+}
+
 function buildMomoReconciliation(store, companyKey) {
   const cfg = MOMO_CHANNELS[companyKey] || MOMO_CHANNELS.kh_cu;
-  const grossUploads = store[cfg.grossKey] || [];
+  const sourceCfg = momoSourceCfg(companyKey);
+  const usesSharedSource = sourceCfg !== cfg;
+  const grossUploads = store[sourceCfg.grossKey] || [];
   const invoices = store[cfg.invoicesKey] || [];
-  const bank = store.banks.find((b) => b.name === cfg.bankName);
+  const bank = store.banks.find((b) => b.name === sourceCfg.bankName);
 
   let reconciledAll = [];
   let error = null;
@@ -158,7 +174,7 @@ function buildMomoReconciliation(store, companyKey) {
       reconciledAll.forEach((r) => r.lines.forEach((l) => allCodes.add(l.code)));
     }
   } else {
-    error = `Chua co ngan hang "${cfg.bankName}" trong he thong.`;
+    error = `Chua co ngan hang "${sourceCfg.bankName}" trong he thong.`;
   }
 
   // Any invoice "Ma diem" that never lines up with a known gian code (and
@@ -184,6 +200,8 @@ function buildMomoReconciliation(store, companyKey) {
     error,
     invoiceDiemAlias,
     unmatchedInvoiceCodes: Array.from(unmatchedInvoiceCodesSet).sort(),
+    usesSharedSource,
+    sourceLabel: sourceCfg.label,
   };
 }
 
@@ -219,6 +237,8 @@ router.get("/doi-soat/momo", (req, res) => {
     invoiceDiemAlias: built.invoiceDiemAlias,
     unmatchedInvoiceCodes: built.unmatchedInvoiceCodes,
     gianHidden: (store.gian_hidden && store.gian_hidden[activeCompany]) || [],
+    usesSharedSource: built.usesSharedSource,
+    sourceLabel: built.sourceLabel,
     error,
     success: req.query.success || null,
   });
@@ -474,15 +494,28 @@ router.post("/doi-soat/momo/invoices/clear", (req, res) => {
 // imports into AMIS.
 router.get("/doi-soat/momo/export.xlsx", (req, res) => {
   const store = load();
-  const momoCfg = MOMO_CHANNELS[getCompany(req)];
-  const bank = store.banks.find((b) => b.name === momoCfg.bankName);
-  if (!bank) return res.status(400).send(`Chua co ngan hang ${momoCfg.bankName}.`);
+  const activeCompany = getCompany(req);
+  const momoCfg = MOMO_CHANNELS[activeCompany];
+  // KH Moi doi soat/xuat file tren CUNG nguon sao ke + doanh thu voi KH Cu
+  // (xem ghi chu tai momoSourceCfg/buildMomoReconciliation o tren) -- chi
+  // hoa don la rieng cua KH Moi.
+  const sourceCfg = momoSourceCfg(activeCompany);
+  const bank = store.banks.find((b) => b.name === sourceCfg.bankName);
+  if (!bank) return res.status(400).send(`Chua co ngan hang ${sourceCfg.bankName}.`);
 
   const txs = store.transactions.filter((t) => t.bank_id === bank.id);
   const settlements = extractMomoSettlements(txs);
-  const grossData = mergeGross(store[momoCfg.grossKey] || []);
+  const grossData = mergeGross(store[sourceCfg.grossKey] || []);
   const invoiceData = { invoices: store[momoCfg.invoicesKey] || [] };
-  const reconciled = reconcileMomo(settlements, grossData, invoiceData, store.gian_mapping, store.invoice_diem_alias);
+  let reconciled = reconcileMomo(settlements, grossData, invoiceData, store.gian_mapping, store.invoice_diem_alias);
+  // An gian theo yeu cau rieng cua cong ty dang xuat (dung 1 danh sach voi
+  // trang xem -- xem ensureGianHidden o tren), de khong xuat nham gian
+  // thuoc ve cong ty kia vao file MISA cua cong ty nay.
+  ensureGianHidden(store);
+  const hiddenSet = new Set(store.gian_hidden[activeCompany] || []);
+  if (hiddenSet.size > 0) {
+    reconciled = reconciled.map((r) => ({ ...r, lines: r.lines.filter((l) => !hiddenSet.has(l.code)) }));
+  }
 
   let startNo = parseInt(req.query.start || "1", 10);
   if (isNaN(startNo) || startNo < 1) startNo = 1;

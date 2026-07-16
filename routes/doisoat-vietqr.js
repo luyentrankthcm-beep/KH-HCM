@@ -14,6 +14,7 @@ const {
   resolveGianGross,
   reconcileVietQr,
   parseVietQrMnRawWorkbook,
+  parseVietQrMnPastedText,
   parseMaCuaHangAppSheet,
   resolveGianGrossPrefix,
   isoToDmy,
@@ -354,7 +355,7 @@ router.get("/doi-soat/vietqr", (req, res) => {
 
   res.render("doisoat-vietqr", {
     userName: req.session.userName,
-    channels: activeKeys.map((ch) => ({ key: ch, label: CHANNELS[ch].label })),
+    channels: activeKeys.map((ch) => ({ key: ch, label: CHANNELS[ch].label, parseMode: CHANNELS[ch].parseMode || null })),
     selectedChannel,
     rawUploads: activeKeys.reduce((acc, ch) => {
       acc[ch] = store.viet_qr_raw_uploads[ch];
@@ -409,6 +410,41 @@ router.post("/doi-soat/vietqr/upload-raw/:channel", upload.single("file"), (req,
         encodeURIComponent(
           `Da nap "${parsed.sheetName}": ${parsed.rows.length} giao dich QR, ${Object.keys(storeMap).length} cua hang.${UPDATED_NOTE}`
         )
+    );
+  } catch (e) {
+    res.redirect("/doi-soat/vietqr?error=" + encodeURIComponent(e.message));
+  }
+});
+
+// ---------- Dan tay: bang "Transactions" export cho BIDV7702/VietQR MN
+// (copy tab-separated truc tiep tu Excel/he thong roi dan vao 1 o textarea,
+// khong can tai file .xlsx moi lan) -- Luyen, 2026-07-16. Gop CONG DON qua
+// nhieu lan dan (dedupe theo Ma tham chieu, dung chung co che mergeRawRows
+// voi upload file). Chi ap dung cho kenh co parseMode "mn" (hien tai la
+// bidv7702) vi dinh dang cot khop voi export "he thong" cua kenh nay.
+router.post("/doi-soat/vietqr/paste-raw/:channel", (req, res) => {
+  const store = load();
+  ensureChannelShape(store);
+  const channelKey = req.params.channel;
+  try {
+    if (!CHANNELS[channelKey]) throw new Error("Kenh khong hop le.");
+    if (CHANNELS[channelKey].parseMode !== "mn") {
+      throw new Error("Kenh nay chua ho tro dan du lieu truc tiep -- dung tai file nhu truoc.");
+    }
+    const { paste_text } = req.body;
+    if (!paste_text || !paste_text.trim()) throw new Error("Chua dan du lieu nao.");
+    const parsed = parseVietQrMnPastedText(paste_text);
+    store.viet_qr_raw_uploads[channelKey].push({
+      id: nextId(store, "viet_qr_raw_uploads_seq") || Date.now(),
+      uploaded_at: new Date().toISOString(),
+      file_name: "Dán tay",
+      sheetName: "Dán tay (Transactions)",
+      rows: parsed.rows,
+    });
+    save(store);
+    res.redirect(
+      "/doi-soat/vietqr?success=" +
+        encodeURIComponent(`Da nap ${parsed.rows.length} giao dich QR tu du lieu dan tay.${UPDATED_NOTE}`)
     );
   } catch (e) {
     res.redirect("/doi-soat/vietqr?error=" + encodeURIComponent(e.message));
