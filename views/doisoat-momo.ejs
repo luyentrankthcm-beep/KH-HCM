@@ -104,11 +104,13 @@
       <h2>3. TK Có theo từng mã công trình (131 = thông thường, 1388 = doanh thu chia sẻ, "Chưa xuất MISA" = khách mới)</h2>
       <p class="muted">
         Chọn "Chưa xuất MISA (KH mới)" cho các gian là khách hàng mới chưa lên MISA — dòng đối soát vẫn hiện
-        trên trang này để theo dõi, nhưng sẽ KHÔNG được đưa vào file xuất Excel ở mục 4.
+        trên trang này để theo dõi, nhưng sẽ KHÔNG được đưa vào file xuất Excel ở mục 4. Nếu 1 gian thực ra
+        KHÔNG thuộc công ty đang xem (sẽ xuất hóa đơn ở công ty kia), bấm "Ẩn" ở cột cuối để gian đó không
+        hiện trên trang này nữa (chỉ ẩn ở công ty này, không ảnh hưởng công ty kia).
       </p>
       <form method="POST" action="/doi-soat/momo/mapping">
         <table class="table">
-          <thead><tr><th>Mã công trình</th><th>TK Có</th></tr></thead>
+          <thead><tr><th>Mã công trình</th><th>TK Có</th><th></th></tr></thead>
           <tbody>
             <% allCodes.forEach(function(code) { %>
             <tr>
@@ -120,12 +122,53 @@
                   <option value="SKIP" <%= gianMapping[code] === 'SKIP' ? 'selected' : '' %>>Chưa xuất MISA (KH mới)</option>
                 </select>
               </td>
+              <td></td>
             </tr>
             <% }) %>
           </tbody>
         </table>
         <button type="submit" class="btn btn-secondary">Lưu bảng TK Có</button>
       </form>
+    </section>
+    <% } %>
+
+    <% if ((allCodes.length > 0) || (gianHidden && gianHidden.length > 0)) { %>
+    <section class="panel">
+      <h2>3c. Ẩn gian không thuộc công ty này khỏi trang đối soát</h2>
+      <p class="muted">
+        Dùng khi doanh thu 1 gian bị gộp nhầm vào file tải lên của công ty đang xem, nhưng gian đó thực ra
+        thuộc công ty kia (sẽ xuất hóa đơn ở bên đó). Ẩn ở đây CHỈ ẩn khỏi trang này, không xóa dữ liệu, không
+        ảnh hưởng công ty kia nếu họ dùng chung mã.
+      </p>
+      <% if (allCodes.length > 0) { %>
+      <form method="POST" action="/doi-soat/momo/gian-hidden" class="form-inline">
+        <select name="code" required>
+          <option value="">-- Chọn mã công trình cần ẩn --</option>
+          <% allCodes.forEach(function(code) { %>
+          <option value="<%= code %>"><%= code.endsWith('__FF') ? code.replace('__FF', '') + ' (gian FF - chia sẻ)' : code %></option>
+          <% }) %>
+        </select>
+        <button type="submit" class="btn btn-secondary">Ẩn gian này</button>
+      </form>
+      <% } %>
+      <% if (gianHidden && gianHidden.length > 0) { %>
+      <table class="table" style="margin-top:12px;">
+        <thead><tr><th>Đã ẩn khỏi trang này</th><th></th></tr></thead>
+        <tbody>
+          <% gianHidden.forEach(function(code) { %>
+          <tr>
+            <td><%= code %></td>
+            <td>
+              <form method="POST" action="/doi-soat/momo/gian-hidden/delete" onsubmit="return confirm('Hiện lại gian này trên trang?');">
+                <input type="hidden" name="code" value="<%= code %>" />
+                <button type="submit" class="link-btn link-danger">Hiện lại</button>
+              </form>
+            </td>
+          </tr>
+          <% }) %>
+        </tbody>
+      </table>
+      <% } %>
     </section>
     <% } %>
 
