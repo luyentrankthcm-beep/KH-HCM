@@ -402,7 +402,22 @@ router.post("/doi-soat/vietqr/upload-raw/:channel", upload.single("file"), (req,
     // token VQR nhu 3 kenh kia nen phai dung parser rieng.
     const isMn = CHANNELS[channelKey].parseMode === "mn";
     const parsed = isMn ? parseVietQrMnRawWorkbook(req.file.buffer) : parseVietQrRawWorkbook(req.file.buffer);
-    const storeMap = isMn ? parseMaCuaHangAppSheet(req.file.buffer) : parseCuaHangSheet(req.file.buffer);
+    // QUAN TRONG (Luyen, 2026-07-16): file giao dich re-export hang ngay
+    // ("transactions_....xlsx") thuong CHI co sheet giao dich, KHONG kem sheet
+    // "Cua hang"/"Ma Cua Hang APP" (sheet do da nap rieng qua nut "Danh sach
+    // diem ban rieng" ben duoi, hoac tu 1 lan tai truoc). Truoc day
+    // parseMaCuaHangAppSheet/parseCuaHangSheet throw loi khi thieu sheet nay
+    // se lam HONG CA request -- 44xxx dong giao dich hop le cung bi mat theo,
+    // dung y het loi "Chua co du lieu de doi soat" du da bam Tai len nhieu
+    // lan. Bat loi rieng: thieu sheet cua hang thi chi coi la 0 cua hang MOI
+    // (giu nguyen danh sach cua hang da co), KHONG chan viec luu cac dong
+    // giao dich.
+    let storeMap = {};
+    try {
+      storeMap = isMn ? parseMaCuaHangAppSheet(req.file.buffer) : parseCuaHangSheet(req.file.buffer);
+    } catch (eStore) {
+      storeMap = {};
+    }
 
     store.viet_qr_raw_uploads[channelKey].push({
       id: nextId(store, "viet_qr_raw_uploads_seq") || Date.now(),
