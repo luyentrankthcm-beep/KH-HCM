@@ -273,20 +273,11 @@ function parseCuaHangSheet(buffer) {
 // needed here (unlike Momo/ZVP) to build the fuzzy-match candidate list
 // directly from invoices, since VietQR has no separate "gian hang xuat HD"
 // master sheet.
-function parseInvoiceWorkbookByTag(buffer, tagPattern) {
-  const tagRe = tagPattern instanceof RegExp ? tagPattern : new RegExp(tagPattern, "i");
-  const wbLite = XLSX.read(buffer, { type: "buffer", bookSheets: true });
-  const kdsCandidates = wbLite.SheetNames.filter((n) => /k.\s*ds\s*xu.t/i.test(n));
-  const sheetName =
-    kdsCandidates.find((n) => /989/.test(n)) ||
-    kdsCandidates[0] ||
-    wbLite.SheetNames.find((n) => {
-      const t = normText(n);
-      return t.includes("hoa don") || (t.includes("danh sach") && t.includes("don")) || t.includes("so hoa don");
-    });
-  if (!sheetName) {
-    throw new Error("Khong tim thay sheet danh sach hoa don trong file.");
-  }
+// Parses ONE candidate sheet (by name) into {sheetName, invoices} filtered
+// by tagRe, or returns null if this sheet doesn't even have the required
+// header columns (so the caller can just try the next candidate instead of
+// throwing).
+function parseInvoiceSheetByName(buffer, sheetName, tagRe) {
   const wb = XLSX.read(buffer, { type: "buffer", sheets: [sheetName] });
   const ws = wb.Sheets[sheetName];
   const grid = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: null });
@@ -302,11 +293,25 @@ function parseInvoiceWorkbookByTag(buffer, tagPattern) {
       if (idx.soHd === undefined && s.includes("so hd")) idx.soHd = c;
       if (idx.ngayHd === undefined && s.includes("ngay hd")) idx.ngayHd = c;
       if (idx.thang === undefined && s.includes("thang")) idx.thang = c;
-      if (idx.maDiem === undefined && s.includes("ma diem")) idx.maDiem = c;
+      // Ma diem / Ma cong trinh (cot MA ke toan thuc su): "Mã điểm trên misa
+      // thuế" (sheet KH Cu, "-989") hoac "Mã điểm ghi chú HT Misa" (sheet KH
+      // Moi, "-705"). Da kiem tra truc tiep tren file that ("MTT 16.07
+      // (1).xlsx", sheet "-705", cac dong tag "MTD MN"): cot "Mã điểm ghi
+      // chú HT Misa" chua CAC MA THAT (vd "ESTELLA PHN", "AM TP PHCM", "AE
+      // BD PHCM"...) dung 1-1 cho tung gian, con cot "Mã NCC HT Misa" ben
+      // canh no LUON LA HANG SO "KL" cho moi dong (khong phai ma rieng tung
+      // gian) nen KHONG dung duoc lam maDiem -- nguoc lai voi phong doan ban
+      // dau. Cot "Mã đối tượng nội bộ" (truoc do) moi la cot TEN mo ta (vd
+      // "Posh Estella", "AE Tân Phú ghế").
+      if (idx.maDiem === undefined && s.includes("ma diem tren")) idx.maDiem = c;
+      if (idx.maDiem === undefined && s.includes("ma diem ghi chu")) idx.maDiem = c;
       if (s.includes("tong tt hd") || (s.includes("tong") && s.includes("hd"))) idx.tongTt = c;
       if (idx.dichVuThuHo === undefined && s.includes("thu ho")) idx.dichVuThuHo = c;
       if (idx.hinhThuc === undefined && s.includes("hinh thuc hop tac")) idx.hinhThuc = c;
+      // Ten diem (cot TEN mo ta): "Tên điểm xuất hóa đơn" (KH Cu) hoac "Mã
+      // đối tượng nội bộ" (KH Moi -- xem giai thich o tren).
       if (idx.tenDiem === undefined && s.includes("ten diem xuat hoa don")) idx.tenDiem = c;
+      if (idx.tenDiem === undefined && s.includes("ma doi tuong noi bo")) idx.tenDiem = c;
     });
     if (idx.soHd !== undefined && idx.maDiem !== undefined) {
       headerRowIdx = r;
@@ -314,9 +319,7 @@ function parseInvoiceWorkbookByTag(buffer, tagPattern) {
       break;
     }
   }
-  if (headerRowIdx < 0) {
-    throw new Error('Khong doc duoc dong tieu de (can cot "So HD" va "Ma diem") trong sheet hoa don.');
-  }
+  if (headerRowIdx < 0) return null;
 
   const invoices = [];
   for (let r = headerRowIdx + 1; r < grid.length; r++) {
@@ -355,6 +358,44 @@ function parseInvoiceWorkbookByTag(buffer, tagPattern) {
   return { sheetName, invoices };
 }
 
+// Nhieu cong ty (KH Cu / KH Moi) dung CHUNG 1 file hoa don MTT nhung MOI
+// cong ty co sheet "ke ds xuat..." rieng theo ma khach hang (vd "-989" cho
+// KH Cu, "-705" cho KH Moi) -- chon sheet CHI theo TEN (uu tien "989") tung
+// lam BIDV7702/KH Moi (tag "MTD MN", chi co tren sheet "-705") luon ra 0 hoa
+// don vi luon bi doc nham sang sheet "-989". Fix: thu doc TUNG sheet ung
+// vien va DUNG sheet dau tien THUC SU co dong khop dung tagPattern cua kenh
+// nay, thay vi doan theo ten sheet -- chi fallback ve cach doan ten CU (uu
+// tien "989") neu KHONG sheet nao khop (giu nguyen hanh vi cu cho truong hop
+// chua tung gap).
+function parseInvoiceWorkbookByTag(buffer, tagPattern) {
+  const tagRe = tagPattern instanceof RegExp ? tagPattern : new RegExp(tagPattern, "i");
+  const wbLite = XLSX.read(buffer, { type: "buffer", bookSheets: true });
+  const kdsCandidates = wbLite.SheetNames.filter((n) => /k.\s*ds\s*xu.t/i.test(n));
+  const candidates =
+    kdsCandidates.length > 0
+      ? kdsCandidates
+      : wbLite.SheetNames.filter((n) => {
+          const t = normText(n);
+          return t.includes("hoa don") || (t.includes("danh sach") && t.includes("don")) || t.includes("so hoa don");
+        });
+  if (candidates.length === 0) {
+    throw new Error("Khong tim thay sheet danh sach hoa don trong file.");
+  }
+
+  for (const sheetName of candidates) {
+    const parsed = parseInvoiceSheetByName(buffer, sheetName, tagRe);
+    if (parsed && parsed.invoices.length > 0) return parsed;
+  }
+
+  // Fallback: khong sheet nao co dong khop -- giu hanh vi cu (uu tien "989")
+  // de khong lam doi ket qua cho truong hop chua gap (van co the tra ve 0
+  // hoa don, giong nhu truoc day, thay vi bao loi).
+  const legacyName = candidates.find((n) => /989/.test(n)) || candidates[0];
+  const legacyParsed = parseInvoiceSheetByName(buffer, legacyName, tagRe);
+  if (legacyParsed) return legacyParsed;
+  throw new Error('Khong doc duoc dong tieu de (can cot "So HD" va "Ma diem") trong sheet hoa don.');
+}
+
 // Builds the fuzzy-match candidate list directly from the invoice data
 // itself (deduped by maDiem), since VietQR has no separate "gian hang xuat
 // HD" master sheet the way Momo/ZVP's Online channel does.
@@ -384,6 +425,184 @@ function buildGianCandidatesFromInvoices(invoices) {
 // how much, so Luyen can decide whether it's worth tracking down.
 function resolveGianGross(rawRows, storeNameMap, gianCandidates) {
   const matcher = buildOnlineProductMatcher(gianCandidates);
+  const grossByCode = {};
+  const codes = new Set();
+  const unmappedAgg = new Map();
+  for (const row of rawRows) {
+    if (!row.date) continue;
+    const storeInfo = storeNameMap[row.maCuaHang];
+    const matchText = storeInfo ? storeInfo.matchText : row.maCuaHang;
+    const match = matcher(matchText);
+    if (!match) {
+      const isBlankCode = !row.maCuaHang || row.maCuaHang === "-";
+      const label = isBlankCode
+        ? "Giao dịch không có mã cửa hàng (ghi \"-\")"
+        : `${row.maCuaHang}${storeInfo ? " (" + storeInfo.matchText + ")" : ""}`;
+      const agg = unmappedAgg.get(label) || { count: 0, total: 0 };
+      agg.count += 1;
+      agg.total += row.amount;
+      unmappedAgg.set(label, agg);
+      continue;
+    }
+    const code = match.isCse ? match.maCongTrinh + FF_SUFFIX : match.maCongTrinh;
+    codes.add(code);
+    const key = `${row.date}|${code}`;
+    grossByCode[key] = (grossByCode[key] || 0) + row.amount;
+  }
+  const unmapped = Array.from(unmappedAgg.entries()).map(
+    ([label, agg]) => `${label}: ${agg.count} giao dịch, tổng ${agg.total.toLocaleString("vi-VN")}đ`
+  );
+  return { codes: Array.from(codes), grossByCode, unmapped };
+}
+
+// ---------- Viet QR MN (BIDV7702 / KH Moi's own "VIETQR MN 7702.xlsx"
+// export -- structurally different from the 3 bank exports above: no "Noi
+// dung TT"/VQR-token column at all, so there's no shared join token with a
+// bank statement description. Uses its own "Ma tham chieu" column (unique
+// per transaction) for de-dup instead, and its own "Ma Cua Hang APP" sheet
+// for store names -- bundled in the SAME workbook, unlike the other 3
+// channels' separate "Cua hang" tab. Store names here ("AMTP 01", "AMBD
+// 05" ...) are literal PREFIX abbreviations of the real Ma cong trinh code
+// ("AM TP KVCM", "AM BD KVCM"), not free-text site names, so matching uses
+// a PREFIX rule (buildGianPrefixMatcher) instead of the fuzzy text matcher
+// used above -- confirmed with Luyen 2026-07-16. ----------
+
+function findVietQrMnDataSheet(wbLite, buffer) {
+  const nameHinted = wbLite.SheetNames.filter((n) => normText(n).includes("viet qr"));
+  const ordered = [...nameHinted, ...wbLite.SheetNames.filter((n) => !nameHinted.includes(n))];
+  for (const sheetName of ordered) {
+    const wb = XLSX.read(buffer, { type: "buffer", sheets: [sheetName] });
+    const ws = wb.Sheets[sheetName];
+    const grid = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: null });
+    for (let r = 0; r < Math.min(grid.length, 10); r++) {
+      const row = grid[r] || [];
+      const idx = {};
+      row.forEach((v, c) => {
+        if (!v || typeof v !== "string") return;
+        const s = normText(v);
+        if (idx.thoiGian === undefined && s.includes("thoi gian tt")) idx.thoiGian = c;
+        if (idx.soTien === undefined && s.includes("so tien den")) idx.soTien = c;
+        if (idx.trangThai === undefined && s.includes("trang thai")) idx.trangThai = c;
+        if (idx.maCuaHang === undefined && s.includes("ma cua hang")) idx.maCuaHang = c;
+        if (idx.maThamChieu === undefined && s.includes("ma tham chieu")) idx.maThamChieu = c;
+      });
+      if (idx.soTien !== undefined && idx.maCuaHang !== undefined && idx.trangThai !== undefined) {
+        return { sheetName, grid, headerRowIdx: r, cols: idx };
+      }
+    }
+  }
+  return null;
+}
+
+// vqrCode field is filled with "Ma tham chieu" here (unique per giao dich)
+// instead of a real VQR token -- reuses the SAME field name on purpose so
+// doisoat-vietqr.js's mergeRawRows (de-dup by row.vqrCode across uploads)
+// works unchanged for this channel too.
+function parseVietQrMnRawWorkbook(buffer) {
+  const wbLite = XLSX.read(buffer, { type: "buffer", bookSheets: true });
+  const found = findVietQrMnDataSheet(wbLite, buffer);
+  if (!found) {
+    throw new Error('Khong doc duoc dong tieu de (can cot "So tien den", "Ma cua hang", "Trang thai") trong sheet "VIET QR".');
+  }
+  const { sheetName, grid, headerRowIdx, cols } = found;
+
+  const rows = [];
+  for (let r = headerRowIdx + 1; r < grid.length; r++) {
+    const row = grid[r] || [];
+    const trangThai = cols.trangThai !== undefined ? row[cols.trangThai] : null;
+    if (trangThai !== null && trangThai !== undefined && !/thanh cong/i.test(normText(String(trangThai)))) continue;
+    const amount = cols.soTien !== undefined ? Number(row[cols.soTien]) || 0 : 0;
+    if (!amount) continue;
+    const maCuaHang = cols.maCuaHang !== undefined ? String(row[cols.maCuaHang] || "").trim() : "";
+    if (!maCuaHang) continue;
+    const thoiGianRaw = cols.thoiGian !== undefined ? row[cols.thoiGian] : null;
+    const date = parseVqrDate(thoiGianRaw);
+    const maThamChieu = cols.maThamChieu !== undefined ? String(row[cols.maThamChieu] || "").trim() : "";
+    rows.push({ vqrCode: maThamChieu || null, maCuaHang, amount, date, raw: maThamChieu });
+  }
+
+  return { sheetName, rows };
+}
+
+// "Ma Cua Hang APP" sheet: STT | Ten cua hang | Ma cua hang | Ma diem ban |
+// Ten diem ban | Doanh thu ngay | So luong GD ngay | Ngay tao -- only "Ten
+// cua hang"/"Ma cua hang" matter here (matchText = Ten cua hang itself,
+// used directly by the prefix matcher below).
+function parseMaCuaHangAppSheet(buffer) {
+  const wbLite = XLSX.read(buffer, { type: "buffer", bookSheets: true });
+  const sheetName = wbLite.SheetNames.find((n) => normText(n).includes("ma cua hang"));
+  if (!sheetName) {
+    throw new Error('Khong tim thay sheet "Ma Cua Hang APP" trong file nay.');
+  }
+  const wb = XLSX.read(buffer, { type: "buffer", sheets: [sheetName] });
+  const ws = wb.Sheets[sheetName];
+  const grid = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: null });
+
+  let headerRowIdx = -1;
+  let cols = {};
+  for (let r = 0; r < Math.min(grid.length, 6); r++) {
+    const row = grid[r] || [];
+    const idx = {};
+    row.forEach((v, c) => {
+      if (!v || typeof v !== "string") return;
+      const s = normText(v);
+      if (idx.tenCuaHang === undefined && s.includes("ten cua hang")) idx.tenCuaHang = c;
+      if (idx.maCuaHang === undefined && s.includes("ma cua hang")) idx.maCuaHang = c;
+    });
+    if (idx.maCuaHang !== undefined && idx.tenCuaHang !== undefined) {
+      headerRowIdx = r;
+      cols = idx;
+      break;
+    }
+  }
+  if (headerRowIdx < 0) {
+    throw new Error('Khong doc duoc dong tieu de (can cot "Ten cua hang", "Ma cua hang") trong sheet "Ma Cua Hang APP".');
+  }
+
+  const map = {};
+  for (let r = headerRowIdx + 1; r < grid.length; r++) {
+    const row = grid[r] || [];
+    const maCuaHang = cols.maCuaHang !== undefined ? String(row[cols.maCuaHang] || "").trim() : "";
+    if (!maCuaHang) continue;
+    const tenCuaHang = cols.tenCuaHang !== undefined ? String(row[cols.tenCuaHang] || "").trim() : "";
+    if (!tenCuaHang) continue;
+    map[maCuaHang] = { tenCuaHang, tenDiemBan: "", matchText: tenCuaHang };
+  }
+  return map;
+}
+
+// "AMTP 01" -> "AMTP" (bo so chay + khoang trang/gach ngang cuoi cung).
+function extractStorePrefix(tenCuaHang) {
+  return String(tenCuaHang || "")
+    .trim()
+    .replace(/[\s-]*\d+\s*$/, "")
+    .trim();
+}
+
+// Khop tien to cua ten cua hang VietQR MN (vd "AMTP" tu "AMTP 01") voi ma
+// cong trinh cua TUNG gian ung vien (da chuan hoa, bo khoang trang -- vd "AM
+// TP KVCM" -> "amtpkvcm") -- CHI khop khi tien to la .startsWith() cua DUNG
+// 1 ung vien; mo ho (2+ ung vien) hoac khong ung vien nao tra ve null de
+// Luyen tu gan thu cong, thay vi doan sai theo Luyen yeu cau ro.
+function buildGianPrefixMatcher(gianCandidates) {
+  const normalized = gianCandidates.map((c) => ({
+    ...c,
+    normCode: normText(c.maCongTrinh).replace(/\s+/g, ""),
+  }));
+  return function matchByPrefix(tenCuaHang) {
+    const prefix = normText(extractStorePrefix(tenCuaHang)).replace(/\s+/g, "");
+    if (!prefix) return null;
+    const matches = normalized.filter((c) => c.normCode.startsWith(prefix));
+    if (matches.length !== 1) return null;
+    return matches[0];
+  };
+}
+
+// Song song voi resolveGianGross o tren nhung dung buildGianPrefixMatcher
+// thay vi buildOnlineProductMatcher (fuzzy text) -- dung cho kenh BIDV7702/
+// VietQR MN.
+function resolveGianGrossPrefix(rawRows, storeNameMap, gianCandidates) {
+  const matcher = buildGianPrefixMatcher(gianCandidates);
   const grossByCode = {};
   const codes = new Set();
   const unmappedAgg = new Map();
@@ -583,6 +802,11 @@ module.exports = {
   buildGianCandidatesFromInvoices,
   resolveGianGross,
   reconcileVietQr,
+  parseVietQrMnRawWorkbook,
+  parseMaCuaHangAppSheet,
+  extractStorePrefix,
+  buildGianPrefixMatcher,
+  resolveGianGrossPrefix,
   toIsoDate,
   isoToDmy,
   normCode,
