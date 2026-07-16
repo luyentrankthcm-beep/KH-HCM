@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <%- include('partials/head') %>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+</head>
+<body>
+  <%- include('partials/nav') %>
+  <main class="container">
+    <h1>Tổng quan</h1>
+
+    <% if (pwerror) { %><div class="alert alert-error"><%= pwerror %></div><% } %>
+    <% if (pwsuccess) { %><div class="alert alert-success">Đổi mật khẩu thành công.</div><% } %>
+
+    <section class="cards">
+      <div class="card">
+        <div class="card-label">Tổng số dư tất cả ngân hàng</div>
+        <div class="card-value"><%= totalBalance.toLocaleString('vi-VN') %> đ</div>
+      </div>
+      <div class="card card-thu">
+        <div class="card-label">Thu tháng này</div>
+        <div class="card-value"><%= monthSums.thu.toLocaleString('vi-VN') %> đ</div>
+      </div>
+      <div class="card card-chi">
+        <div class="card-label">Chi tháng này</div>
+        <div class="card-value"><%= monthSums.chi.toLocaleString('vi-VN') %> đ</div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Doanh thu theo kênh đối soát<% if (selectedGianMonth) { %> — tháng <%= selectedGianMonth %><% } %></h2>
+        <% if (gianMonths.length > 0) { %>
+        <form method="GET" class="form-inline-tight">
+          <select name="gianMonth" onchange="this.form.submit()">
+            <% gianMonths.forEach(function(m) { %>
+            <option value="<%= m %>" <%= m === selectedGianMonth ? 'selected' : '' %>><%= m %></option>
+            <% }) %>
+            <option value="" <%= selectedGianMonth === '' ? 'selected' : '' %>>Tất cả</option>
+          </select>
+        </form>
+        <% } %>
+      </div>
+      <% if (channelSummary.length === 0) { %>
+      <p class="muted">Chưa có dữ liệu đối soát nào cho tháng này.</p>
+      <% } else { %>
+      <div class="table-scroll">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Kênh</th>
+              <th>Tổng doanh thu</th>
+              <th>Đã khớp</th>
+              <th>Chưa có HĐ</th>
+              <th>Lệch</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <% channelSummary.forEach(function(s) { %>
+            <tr>
+              <td><%= s.channelLabel %></td>
+              <td class="num"><%= s.totalGross.toLocaleString('vi-VN') %> đ</td>
+              <td class="num text-pos"><%= s.totalMatched.toLocaleString('vi-VN') %> đ</td>
+              <td class="num <%= s.totalChuaCoHD > 0 ? 'text-warn' : '' %>"><%= s.totalChuaCoHD.toLocaleString('vi-VN') %> đ</td>
+              <td class="num <%= s.totalLech > 0 ? 'text-neg' : '' %>"><%= s.totalLech.toLocaleString('vi-VN') %> đ</td>
+              <td><a href="<%= s.drillUrl %>" class="link-btn">Xem chi tiết →</a></td>
+            </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+      <% } %>
+    </section>
+
+    <section class="panel">
+      <h2>Dòng tiền theo gian x ngân hàng<% if (selectedGianMonth) { %> — tháng <%= selectedGianMonth %><% } %></h2>
+      <% if (gianPivot.gianRows.length === 0) { %>
+      <p class="muted">Chưa có dữ liệu đối soát nào cho tháng này.</p>
+      <% } else { %>
+      <div class="table-scroll">
+        <table class="table table-pivot">
+          <thead>
+            <tr>
+              <th>Gian</th>
+              <% gianPivot.channels.forEach(function(ch) { %>
+              <th class="num"><%= ch.label %></th>
+              <% }) %>
+              <th class="num">Tổng</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% gianPivot.gianRows.forEach(function(row) { %>
+            <tr>
+              <td><%= row.gian %><% if (row.totalUnresolved > 0) { %><span class="badge badge-warn" title="<%= row.totalUnresolved %> dòng chưa khớp"><%= row.totalUnresolved %></span><% } %></td>
+              <% row.cells.forEach(function(cell) { %>
+              <td class="num">
+                <% if (cell) { %>
+                <a href="<%= cell.drillUrl %>" title="<%= cell.unresolvedCount %> dòng chưa khớp"><%= cell.gross.toLocaleString('vi-VN') %></a>
+                <% } else { %>
+                <span class="muted">-</span>
+                <% } %>
+              </td>
+              <% }) %>
+              <td class="num" style="font-weight:600"><%= row.totalGross.toLocaleString('vi-VN') %></td>
+            </tr>
+            <% }) %>
+          </tbody>
+          <tfoot>
+            <tr>
+              <td>Tổng</td>
+              <% gianPivot.totalsByChannel.forEach(function(t) { %>
+              <td class="num"><%= t.toLocaleString('vi-VN') %></td>
+              <% }) %>
+              <td class="num"><%= gianPivot.grandTotal.toLocaleString('vi-VN') %></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+      <% } %>
+    </section>
+
+    <section class="panel">
+      <h2>Số dư theo từng ngân hàng</h2>
+      <table class="table">
+        <thead>
+          <tr><th>Tên tài khoản</th><th>Khu vực</th><th>Ngân hàng</th><th>Số tài khoản</th><th>Số dư hiện tại</th></tr>
+        </thead>
+        <tbody>
+          <% banks.forEach(function(b) { %>
+          <tr>
+            <td><a href="/transactions?bank_id=<%= b.id %>"><%= b.name %></a></td>
+            <td><%= b.khu_vuc || '-' %></td>
+            <td><%= b.bank_name || '-' %></td>
+            <td><%= b.account_number || '-' %></td>
+            <td class="<%= b.balance < 0 ? 'text-neg' : '' %>"><%= b.balance.toLocaleString('vi-VN') %> đ</td>
+          </tr>
+          <% }) %>
+          <% if (banks.length === 0) { %>
+          <tr><td colspan="5" class="muted">Chưa có ngân hàng nào. <a href="/banks">Thêm ngay</a>.</td></tr>
+          <% } %>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="panel">
+      <h2>Thu / Chi 30 ngày gần nhất</h2>
+      <canvas id="chartThuChi" height="90"></canvas>
+    </section>
+
+    <section class="panel">
+      <h2>Giao dịch gần đây</h2>
+      <table class="table">
+        <thead>
+          <tr><th>Ngày</th><th>Ngân hàng</th><th>Diễn giải</th><th>Loại</th><th>Số tiền</th></tr>
+        </thead>
+        <tbody>
+          <% recent.forEach(function(t) { %>
+          <tr>
+            <td><%= t.date %></td>
+            <td><%= t.bank_label %></td>
+            <td class="desc-cell" title="<%= t.description %>"><%= t.description %></td>
+            <td><span class="badge badge-<%= t.type %>"><%= t.type === 'thu' ? 'Thu' : 'Chi' %></span></td>
+            <td class="<%= t.type === 'chi' ? 'text-neg' : 'text-pos' %>">
+              <%= t.type === 'chi' ? '-' : '+' %><%= t.amount.toLocaleString('vi-VN') %> đ
+            </td>
+          </tr>
+          <% }) %>
+          <% if (recent.length === 0) { %>
+          <tr><td colspan="5" class="muted">Chưa có giao dịch nào.</td></tr>
+          <% } %>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="panel">
+      <h2>Đổi mật khẩu</h2>
+      <form method="POST" action="/account/password" class="form-inline">
+        <input type="password" name="current_password" placeholder="Mật khẩu hiện tại" required />
+        <input type="password" name="new_password" placeholder="Mật khẩu mới" required />
+        <input type="password" name="confirm_password" placeholder="Xác nhận mật khẩu mới" required />
+        <button type="submit" class="btn btn-secondary">Đổi mật khẩu</button>
+      </form>
+    </section>
+  </main>
+
+  <script>
+    fetch('/api/summary?days=30')
+      .then(r => r.json())
+      .then(data => {
+        const labels = data.map(d => d.date.slice(5));
+        const thu = data.map(d => d.thu);
+        const chi = data.map(d => d.chi);
+        new Chart(document.getElementById('chartThuChi'), {
+          type: 'bar',
+          data: {
+            labels,
+            datasets: [
+              { label: 'Thu', data: thu, backgroundColor: '#2f9e44' },
+              { label: 'Chi', data: chi, backgroundColor: '#e03131' },
+            ],
+          },
+          options: {
+            responsive: true,
+            scales: { y: { beginAtZero: true } },
+          },
+        });
+      });
+  </script>
+</body>
+</html>

@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <%- include('partials/head') %>
+</head>
+<body>
+  <%- include('partials/nav') %>
+  <main class="container">
+    <h1>Công nợ</h1>
+    <p class="muted" style="margin-top:-10px;margin-bottom:20px;">
+      Các dòng đối soát <strong>chưa có hóa đơn</strong> hoặc <strong>còn lệch</strong> trên mọi kênh
+      (Momo, Zalo/VNPay/Payoo, Viet QR), xếp theo số ngày kể từ ngày giao dịch.
+    </p>
+
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+
+    <section class="cards">
+      <% aging.buckets.forEach(function(b) { %>
+      <a href="/cong-no?bucket=<%= encodeURIComponent(b.bucket) %><%= aging.selectedChannel ? '&channel=' + encodeURIComponent(aging.selectedChannel) : '' %>"
+         class="card card-bucket <%= aging.selectedBucket === b.bucket ? 'card-bucket-active' : '' %>">
+        <div class="card-label">Quá <%= b.bucket %> ngày</div>
+        <div class="card-value"><%= b.total.toLocaleString('vi-VN') %> đ</div>
+        <div class="muted"><%= b.count %> dòng</div>
+      </a>
+      <% }) %>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Danh sách chi tiết (<%= aging.rows.length %> dòng, tổng <%= aging.grandTotal.toLocaleString('vi-VN') %> đ)</h2>
+        <form method="GET" class="form-inline-tight">
+          <select name="channel" onchange="this.form.submit()">
+            <option value="">Tất cả kênh</option>
+            <% channelOptions.forEach(function(c) { %>
+            <option value="<%= c.key %>" <%= aging.selectedChannel === c.key ? 'selected' : '' %>><%= c.label %></option>
+            <% }) %>
+          </select>
+          <% if (aging.selectedBucket) { %>
+          <input type="hidden" name="bucket" value="<%= aging.selectedBucket %>" />
+          <span class="badge badge-warn">Lọc: quá <%= aging.selectedBucket %> ngày <a href="/cong-no<%= aging.selectedChannel ? '?channel=' + encodeURIComponent(aging.selectedChannel) : '' %>" style="color:inherit;margin-left:6px;">✕</a></span>
+          <% } %>
+        </form>
+      </div>
+      <div class="table-scroll">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Kênh</th>
+              <th>Gian</th>
+              <th>Ngày</th>
+              <th>Số ngày</th>
+              <th>Trạng thái</th>
+              <th>Số tiền</th>
+              <th>HĐ liên quan</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <% aging.rows.forEach(function(r) { %>
+            <tr>
+              <td><%= r.channelLabel %></td>
+              <td><%= r.gian %></td>
+              <td><%= r.settlementDate %></td>
+              <td class="num"><%= r.daysAged %></td>
+              <td><span class="badge <%= r.status === 'Lệch' ? 'badge-neg' : 'badge-warn' %>"><%= r.status %></span></td>
+              <td class="num"><%= r.amount.toLocaleString('vi-VN') %> đ</td>
+              <td><%= r.invoiceNumbers.length > 0 ? r.invoiceNumbers.join(', ') : '-' %></td>
+              <td><a href="<%= r.drillUrl %>" class="link-btn">Xem →</a></td>
+            </tr>
+            <% }) %>
+            <% if (aging.rows.length === 0) { %>
+            <tr><td colspan="8" class="muted">Không có dòng nào chưa khớp — mọi thứ đã đối soát xong.</td></tr>
+            <% } %>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

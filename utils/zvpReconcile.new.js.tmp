@@ -1,0 +1,705 @@
+// ---------- Doi soat Zalo App / VNPay (Online + Offline) / Payoo ----------
+// Same overall philosophy as utils/momoReconcile.js: parse whatever real
+// export files Luyen uploads, never guess a mapping silently -- anything
+// that can't be confidently matched is surfaced as "CHUA MAP: ..." so she
+// can fix it once, rather than misattributing revenue to the wrong Ma cong
+// trinh (which would produce wrong tax/accounting entries).
+//
+// Bank account: ACB31268 (so TK 12131268, sheet "NH1268" in her files).
+// On the bank statement this account receives 3 kinds of settlement, each
+// identifiable purely from the transaction description:
+//   - "...VNPAY ... DV CTT NGAY <ngay>"        -> Online (Zalo mini app checkout via VNPay)
+//   - "...VNPAY ... DV QR OFFLINE NGAY <ngay>" -> Offline (walk-up QR at a physical diem)
+//   - "...PAYOO ... TT TD NGAY <ngay>..."       -> Payoo (card + QR, may be 2 lines per ngay)
+// <ngay> is either a single date (dd.mm.yy) or an inclusive range
+// (dd-dd.mm.yy, dd.mm-dd.mm.yy, or dd.mm_dd.mm.yyyy for Payoo) -- weekends
+// commonly get consolidated into one multi-day settlement the following
+// business day, exactly like Momo.
+//
+// CSE handling: any gian tagged "CSE" in "Hinh thuc hop tac" (on the shared
+// "gian hang xuat HD" list, and mirrored on the invoice list's own "Hinh
+// thuc hop tac" column) is doanh thu chia se -> TK Co 1388, tracked as a
+// SEPARATE Ma cong trinh internally by appending momoReconcile's "__FF"
+// suffix -- exactly the same convention already used for FF SC VIVO under
+// Momo, just generalized here to any gian instead of one hardcoded parent.
+
+const XLSX = require("xlsx");
+const m = require("./momoReconcile");
+const toIsoDate = m.toIsoDate;
+const isoToDmy = m.isoToDmy;
+const normCode = m.normCode;
+const normText = m.normText;
+const dateRange = m.dateRange;
+const displayCode = m.displayCode;
+const FF_SUFFIX = m.FF_SUFFIX;
+
+// ---------- Settlement extraction from bank statement (ACB31268) ----------
+
+function pad2(s) {
+  return String(s).padStart(2, "0");
+}
+
+function parseVnpayNgayExpr(expr) {
+  let mm = expr.match(/^(\d{1,2})\.(\d{1,2})-(\d{1,2})\.(\d{1,2})\.(\d{2,4})$/);
+  if (mm) {
+    const [, d1, mo1, d2, mo2, yy] = mm;
+    const yyyy = yy.length === 2 ? "20" + yy : yy;
+    return { fromIso: `${yyyy}-${pad2(mo1)}-${pad2(d1)}`, toIso: `${yyyy}-${pad2(mo2)}-${pad2(d2)}` };
+  }
+  mm = expr.match(/^(\d{1,2})-(\d{1,2})\.(\d{1,2})\.(\d{2,4})$/);
+  if (mm) {
+    const [, d1, d2, mo, yy] = mm;
+    const yyyy = yy.length === 2 ? "20" + yy : yy;
+    return { fromIso: `${yyyy}-${pad2(mo)}-${pad2(d1)}`, toIso: `${yyyy}-${pad2(mo)}-${pad2(d2)}` };
+  }
+  mm = expr.match(/^(\d{1,2})\.(\d{1,2})\.(\d{2,4})$/);
+  if (mm) {
+    const [, d, mo, yy] = mm;
+    const yyyy = yy.length === 2 ? "20" + yy : yy;
+    const iso = `${yyyy}-${pad2(mo)}-${pad2(d)}`;
+    return { fromIso: iso, toIso: iso };
+  }
+  return null;
+}
+
+function parsePayooNgayExpr(expr) {
+  let mm = expr.match(/^(\d{1,2})\.(\d{1,2})_(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
+  if (mm) {
+    const [, d1, mo1, d2, mo2, yyyy] = mm;
+    return { fromIso: `${yyyy}-${pad2(mo1)}-${pad2(d1)}`, toIso: `${yyyy}-${pad2(mo2)}-${pad2(d2)}` };
+  }
+  mm = expr.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
+  if (mm) {
+    const [, d, mo, yyyy] = mm;
+    const iso = `${yyyy}-${pad2(mo)}-${pad2(d)}`;
+    return { fromIso: iso, toIso: iso };
+  }
+  return null;
+}
+
+function extractZvpSettlements(transactions) {
+  const online = [];
+  const offline = [];
+  const payooByRange = {};
+
+  for (const t of transactions) {
+    if (t.type !== "thu") continue;
+    const desc = t.description || "";
+    if (/VNPAY/i.test(desc)) {
+      const mCtt = desc.match(/DV\s+CTT\s+NGAY\s+([0-9.\-_]+)/i);
+      const mOff = desc.match(/DV\s+QR\s+OFFLINE\s+NGAY\s+([0-9.\-_]+)/i);
+      if (mCtt) {
+        const r = parseVnpayNgayExpr(mCtt[1]);
+        if (r) online.push({ id: t.id, date: t.date, amount: t.amount, fromIso: r.fromIso, toIso: r.toIso });
+        continue;
+      }
+      if (mOff) {
+        const r = parseVnpayNgayExpr(mOff[1]);
+        if (r) offline.push({ id: t.id, date: t.date, amount: t.amount, fromIso: r.fromIso, toIso: r.toIso });
+        continue;
+      }
+      continue;
+    }
+    if (/PAYOO/i.test(desc)) {
+      const mPayoo = desc.match(/NGAY\s+([0-9._]+)/i);
+      if (mPayoo) {
+        const cleaned = mPayoo[1].replace(/\.+$/, "");
+        const r = parsePayooNgayExpr(cleaned);
+        if (r) {
+          const key = `${r.fromIso}|${r.toIso}`;
+          if (!payooByRange[key]) {
+            payooByRange[key] = { date: t.date, amount: 0, fromIso: r.fromIso, toIso: r.toIso, txIds: [] };
+          }
+          payooByRange[key].amount += t.amount;
+          payooByRange[key].txIds.push(t.id);
+          if (t.date > payooByRange[key].date) payooByRange[key].date = t.date;
+        }
+      }
+    }
+  }
+
+  return { online, offline, payoo: Object.values(payooByRange) };
+}
+
+// Extract the day-list from a "Dich vu thu ho" cell. Unlike Momo's raw
+// format ("momo 11,12", digits immediately after the tag), the real Zalo/
+// VNPay/Payoo tags often have extra descriptive words in between, e.g.
+// "ZALO MINI APP 19", "VNPAY CƠ SỞ 22", "Payoo QR 11,12" -- so instead of
+// requiring digits right after the tag word, this scans the WHOLE string
+// for every run of digits (joined by "," "+" or "/") and takes the LAST
+// one, since the day list consistently appears at the end. Cells with no
+// digits at all ("Zalo", "Vnpay cs") have no day info and are left
+// unmatched (empty days) rather than guessed.
+function extractDayList(text) {
+  const groups = text.match(/\d+(?:\s*[,+\/]\s*\d+)*/g);
+  if (!groups || groups.length === 0) return [];
+  const lastGroup = groups[groups.length - 1];
+  if (lastGroup.includes("/")) {
+    // "23/04" style is a dd/mm cross-reference, not a day list -- only the
+    // day (first number) is meaningful here.
+    const d = parseInt(lastGroup.split("/")[0], 10);
+    return isNaN(d) ? [] : [d];
+  }
+  return lastGroup
+    .split(/[,+]/)
+    .map((x) => parseInt(x.trim(), 10))
+    .filter((x) => !isNaN(x));
+}
+
+function parseInvoiceWorkbookByTag(buffer, tag) {
+  const wbLite = XLSX.read(buffer, { type: "buffer", bookSheets: true });
+  const kdsCandidates = wbLite.SheetNames.filter((n) => /k.\s*ds\s*xu.t/i.test(n));
+  const sheetName =
+    kdsCandidates.find((n) => /989/.test(n)) ||
+    kdsCandidates[0] ||
+    wbLite.SheetNames.find((n) => {
+      const t = normText(n);
+      return t.includes("hoa don") || (t.includes("danh sach") && t.includes("don"));
+    });
+  if (!sheetName) {
+    throw new Error("Khong tim thay sheet danh sach hoa don trong file.");
+  }
+  const wb = XLSX.read(buffer, { type: "buffer", sheets: [sheetName] });
+  const ws = wb.Sheets[sheetName];
+  const grid = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: null });
+
+  let headerRowIdx = -1;
+  let cols = {};
+  for (let r = 0; r < Math.min(grid.length, 10); r++) {
+    const row = grid[r] || [];
+    const idx = {};
+    row.forEach((v, c) => {
+      if (!v || typeof v !== "string") return;
+      const s = normText(v);
+      if (idx.soHd === undefined && s.includes("so hd")) idx.soHd = c;
+      if (idx.ngayHd === undefined && s.includes("ngay hd")) idx.ngayHd = c;
+      if (idx.thang === undefined && s.includes("thang")) idx.thang = c;
+      if (idx.maDiem === undefined && s.includes("ma diem")) idx.maDiem = c;
+      if (s.includes("tong tt hd") || (s.includes("tong") && s.includes("hd"))) idx.tongTt = c;
+      if (idx.dichVuThuHo === undefined && s.includes("thu ho")) idx.dichVuThuHo = c;
+      if (idx.hinhThuc === undefined && s.includes("hinh thuc hop tac")) idx.hinhThuc = c;
+      if (idx.tenDiem === undefined && s.includes("ten diem xuat hoa don")) idx.tenDiem = c;
+    });
+    if (idx.soHd !== undefined && idx.maDiem !== undefined) {
+      headerRowIdx = r;
+      cols = idx;
+      break;
+    }
+  }
+  if (headerRowIdx < 0) {
+    throw new Error('Khong doc duoc dong tieu de (can cot "So HD" va "Ma diem") trong sheet hoa don.');
+  }
+
+  const invoices = [];
+  for (let r = headerRowIdx + 1; r < grid.length; r++) {
+    const row = grid[r] || [];
+    const dvth = cols.dichVuThuHo !== undefined ? row[cols.dichVuThuHo] : null;
+    if (!dvth || !new RegExp(tag, "i").test(String(dvth))) continue;
+    const days = extractDayList(String(dvth).trim());
+    const ngayHdRaw = cols.ngayHd !== undefined ? row[cols.ngayHd] : null;
+    let maDiem = normCode(cols.maDiem !== undefined ? row[cols.maDiem] : null);
+    const hinhThuc = cols.hinhThuc !== undefined ? String(row[cols.hinhThuc] || "").toUpperCase() : "";
+    if (hinhThuc.includes("CSE") && !maDiem.endsWith(FF_SUFFIX)) {
+      maDiem = maDiem + FF_SUFFIX;
+    }
+
+    invoices.push({
+      soHd: cols.soHd !== undefined ? row[cols.soHd] : null,
+      ngayHd: toIsoDate(ngayHdRaw),
+      thang: cols.thang !== undefined ? row[cols.thang] : null,
+      maDiem,
+      tongTt: cols.tongTt !== undefined ? Number(row[cols.tongTt]) || 0 : 0,
+      days,
+      raw: String(dvth).trim(),
+    });
+  }
+
+  return { sheetName, invoices };
+}
+
+function parseOfflineVnpayWorkbook(buffer) {
+  const wbLite = XLSX.read(buffer, { type: "buffer", bookSheets: true });
+  const sheetName =
+    wbLite.SheetNames.find((n) => /du\s*lieu.*vnpay/i.test(normText(n))) ||
+    wbLite.SheetNames.find((n) => normText(n).includes("du lieu"));
+  if (!sheetName) {
+    throw new Error('Khong tim thay sheet "du lieu VNpay co so ..." trong file.');
+  }
+  const wb = XLSX.read(buffer, { type: "buffer", sheets: [sheetName] });
+  const ws = wb.Sheets[sheetName];
+  const grid = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: null });
+
+  let headerRowIdx = -1;
+  let cols = {};
+  for (let r = 0; r < Math.min(grid.length, 6); r++) {
+    const row = grid[r] || [];
+    const idx = {};
+    row.forEach((v, c) => {
+      if (!v || typeof v !== "string") return;
+      const s = normText(v);
+      if (idx.grossCol === undefined && s.includes("so tien hach toan thu ho")) idx.grossCol = c;
+      if (idx.netCol === undefined && s.includes("so tien sau khi tru phi")) idx.netCol = c;
+      if (idx.dateCol === undefined && s.includes("ngay hach toan thu ho")) idx.dateCol = c;
+      if (s === "trang thai") idx.statusCol = c;
+      if (idx.diemCol === undefined && s.includes("ten diem xuat hoa don")) idx.diemCol = c;
+    });
+    if (idx.grossCol !== undefined && idx.dateCol !== undefined && idx.diemCol !== undefined) {
+      headerRowIdx = r;
+      cols = idx;
+      break;
+    }
+  }
+  if (headerRowIdx < 0) {
+    throw new Error('Khong doc duoc dong tieu de trong sheet du lieu VNpay offline.');
+  }
+
+  const dates = new Set();
+  const codes = new Set();
+  const grossByCode = {};
+  const netByCode = {};
+  let matched = 0;
+  for (let r = headerRowIdx + 1; r < grid.length; r++) {
+    const row = grid[r] || [];
+    const status = cols.statusCol !== undefined ? row[cols.statusCol] : null;
+    if (status !== null && !/thanh cong|th.nh c.ng/i.test(String(status))) continue;
+    const diem = cols.diemCol !== undefined ? String(row[cols.diemCol] || "").trim() : "";
+    if (!diem) continue;
+    const gross = cols.grossCol !== undefined ? Number(row[cols.grossCol]) || 0 : 0;
+    if (!gross) continue;
+    const net = cols.netCol !== undefined ? Number(row[cols.netCol]) || 0 : gross;
+    const dateRaw = cols.dateCol !== undefined ? row[cols.dateCol] : null;
+    const date = toIsoDate(dateRaw ? String(dateRaw).split(" ")[0] : null);
+    if (!date) continue;
+    matched++;
+    dates.add(date);
+    codes.add(diem);
+    const key = `${date}|${diem}`;
+    grossByCode[key] = (grossByCode[key] || 0) + gross;
+    netByCode[key] = (netByCode[key] || 0) + net;
+  }
+
+  return { sheetName, dates: Array.from(dates).sort(), codes: Array.from(codes), grossByCode, netByCode, rowsMatched: matched };
+}
+
+function parseDiemMappingSheet(buffer, sheetNameHint) {
+  const wbLite = XLSX.read(buffer, { type: "buffer", bookSheets: true });
+  const sheetName =
+    wbLite.SheetNames.find((n) => normText(n).includes(normText(sheetNameHint))) ||
+    wbLite.SheetNames.find((n) => /gian\s*hang/i.test(n));
+  if (!sheetName) return {};
+  const wb = XLSX.read(buffer, { type: "buffer", sheets: [sheetName] });
+  const ws = wb.Sheets[sheetName];
+  const grid = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: null });
+
+  let headerRowIdx = -1;
+  let cols = {};
+  for (let r = 0; r < Math.min(grid.length, 6); r++) {
+    const row = grid[r] || [];
+    const idx = {};
+    row.forEach((v, c) => {
+      if (!v || typeof v !== "string") return;
+      const s = normText(v);
+      if (idx.tenDiem === undefined && s.includes("ten diem xuat hoa don")) idx.tenDiem = c;
+      if (s.includes("ma diem tren misa") || s.includes("ma cong trinh")) idx.maCongTrinh = c;
+      if (idx.hinhThuc === undefined && s.includes("hinh thuc hop tac")) idx.hinhThuc = c;
+      if (s === "chi nhanh") idx.chiNhanh = c;
+    });
+    if (idx.tenDiem !== undefined && idx.maCongTrinh !== undefined) {
+      headerRowIdx = r;
+      cols = idx;
+      break;
+    }
+  }
+  if (headerRowIdx < 0) return {};
+
+  const map = {};
+  for (let r = headerRowIdx + 1; r < grid.length; r++) {
+    const row = grid[r] || [];
+    const joinKey =
+      cols.chiNhanh !== undefined
+        ? String(row[cols.chiNhanh] || "").trim()
+        : cols.tenDiem !== undefined
+        ? String(row[cols.tenDiem] || "").trim()
+        : "";
+    if (!joinKey) continue;
+    const maCongTrinh = normCode(cols.maCongTrinh !== undefined ? row[cols.maCongTrinh] : null);
+    if (!maCongTrinh) continue;
+    const hinhThuc = cols.hinhThuc !== undefined ? String(row[cols.hinhThuc] || "").toUpperCase() : "";
+    map[joinKey] = { maCongTrinh, isCse: hinhThuc.includes("CSE") };
+  }
+  return map;
+}
+
+function parsePayooWorkbook(buffer) {
+  const wbLite = XLSX.read(buffer, { type: "buffer", bookSheets: true });
+  const sheetName =
+    wbLite.SheetNames.find((n) => /du\s*lieu.*payoo/i.test(normText(n))) ||
+    wbLite.SheetNames.find((n) => normText(n).includes("payoo"));
+  if (!sheetName) {
+    throw new Error('Khong tim thay sheet "Du lieu Payoo ..." trong file.');
+  }
+  const wb = XLSX.read(buffer, { type: "buffer", sheets: [sheetName] });
+  const ws = wb.Sheets[sheetName];
+  const grid = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: null });
+
+  let headerRowIdx = -1;
+  let cols = {};
+  for (let r = 0; r < Math.min(grid.length, 6); r++) {
+    const row = grid[r] || [];
+    const idx = {};
+    row.forEach((v, c) => {
+      if (!v || typeof v !== "string") return;
+      const s = normText(v);
+      if (idx.grossCol === undefined && s.includes("so tien thanh toan")) idx.grossCol = c;
+      if (idx.netCol === undefined && s.includes("thanh tien")) idx.netCol = c;
+      if (s === "ngay giao dich") idx.dateCol = c;
+      if (idx.invalidCol === undefined && s.includes("ly do gd khong hop le")) idx.invalidCol = c;
+      if (s === "gian hang") idx.gianCol = c;
+      if (s === "cua hang" && idx.gianColFallback === undefined) idx.gianColFallback = c;
+    });
+    if (idx.grossCol !== undefined && idx.dateCol !== undefined && (idx.gianCol !== undefined || idx.gianColFallback !== undefined)) {
+      headerRowIdx = r;
+      cols = idx;
+      break;
+    }
+  }
+  if (headerRowIdx < 0) {
+    throw new Error('Khong doc duoc dong tieu de trong sheet du lieu Payoo.');
+  }
+  const gianCol = cols.gianCol !== undefined ? cols.gianCol : cols.gianColFallback;
+
+  const dates = new Set();
+  const codes = new Set();
+  const grossByCode = {};
+  const netByCode = {};
+  let matched = 0;
+  for (let r = headerRowIdx + 1; r < grid.length; r++) {
+    const row = grid[r] || [];
+    const invalidReason = cols.invalidCol !== undefined ? row[cols.invalidCol] : null;
+    if (invalidReason) continue;
+    const gian = gianCol !== undefined ? String(row[gianCol] || "").trim() : "";
+    if (!gian) continue;
+    const gross = cols.grossCol !== undefined ? Number(row[cols.grossCol]) || 0 : 0;
+    if (!gross) continue;
+    const net = cols.netCol !== undefined ? Number(row[cols.netCol]) || 0 : gross;
+    const dateRaw = cols.dateCol !== undefined ? row[cols.dateCol] : null;
+    const date = toIsoDate(dateRaw);
+    if (!date) continue;
+    matched++;
+    dates.add(date);
+    codes.add(gian);
+    const key = `${date}|${gian}`;
+    grossByCode[key] = (grossByCode[key] || 0) + gross;
+    netByCode[key] = (netByCode[key] || 0) + net;
+  }
+
+  return { sheetName, dates: Array.from(dates).sort(), codes: Array.from(codes), grossByCode, netByCode, rowsMatched: matched };
+}
+
+function parsePayooDiemMapping(buffer) {
+  const wbLite = XLSX.read(buffer, { type: "buffer", bookSheets: true });
+  const sheetName = wbLite.SheetNames.find((n) => /danh\s*muc.*ten\s*diem/i.test(normText(n)));
+  if (!sheetName) return {};
+  const wb = XLSX.read(buffer, { type: "buffer", sheets: [sheetName] });
+  const ws = wb.Sheets[sheetName];
+  const grid = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: null });
+
+  let headerRowIdx = -1;
+  let cols = {};
+  for (let r = 0; r < Math.min(grid.length, 15); r++) {
+    const row = grid[r] || [];
+    const idx = {};
+    row.forEach((v, c) => {
+      if (!v || typeof v !== "string") return;
+      const s = normText(v);
+      if (idx.tenDiem === undefined && s.includes("ten diem xuat hoa don")) idx.tenDiem = c;
+      if (idx.maCongTrinh === undefined && s.includes("ma diem tren misa")) idx.maCongTrinh = c;
+      if (s === "chi nhanh") idx.chiNhanh = c;
+    });
+    if (idx.chiNhanh !== undefined && idx.maCongTrinh !== undefined) {
+      headerRowIdx = r;
+      cols = idx;
+      break;
+    }
+  }
+  if (headerRowIdx < 0) return {};
+
+  const map = {};
+  for (let r = headerRowIdx + 1; r < grid.length; r++) {
+    const row = grid[r] || [];
+    const chiNhanh = cols.chiNhanh !== undefined ? String(row[cols.chiNhanh] || "").trim() : "";
+    if (!chiNhanh) continue;
+    const maCongTrinh = normCode(cols.maCongTrinh !== undefined ? row[cols.maCongTrinh] : null);
+    if (!maCongTrinh) continue;
+    map[chiNhanh] = { maCongTrinh };
+  }
+  return map;
+}
+
+// Her workbook may contain ONE "Doi soat Vnpay T<thang>" sheet per month
+// (e.g. "Đối soát Vnpay T6", "Đối soát Vnpay T7", ...) all in the SAME file
+// as she keeps adding months. Picking only the first match would silently
+// drop every other month's revenue, so all matching sheets are parsed and
+// merged together here.
+function parseOnlineVnpayWorkbook(buffer) {
+  const wbLite = XLSX.read(buffer, { type: "buffer", bookSheets: true });
+  let sheetNames = wbLite.SheetNames.filter((n) => /doi\s*soat.*vnpay/i.test(normText(n)));
+  if (sheetNames.length === 0) {
+    sheetNames = wbLite.SheetNames.filter((n) => normText(n).includes("vnpay"));
+  }
+  if (sheetNames.length === 0) {
+    throw new Error('Khong tim thay sheet "Doi soat Vnpay ..." trong file.');
+  }
+  const wb = XLSX.read(buffer, { type: "buffer", sheets: sheetNames });
+
+  const dates = new Set();
+  const products = new Set();
+  const grossByProduct = {};
+  const netByProduct = {};
+  let matched = 0;
+
+  for (const sheetName of sheetNames) {
+    const ws = wb.Sheets[sheetName];
+    const grid = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: null });
+
+    let headerRowIdx = -1;
+    let cols = {};
+    for (let r = 0; r < Math.min(grid.length, 6); r++) {
+      const row = grid[r] || [];
+      const idx = {};
+      row.forEach((v, c) => {
+        if (!v || typeof v !== "string") return;
+        const s = normText(v);
+        if (idx.grossCol === undefined && s.includes("so tien hach toan thu ho")) idx.grossCol = c;
+        if (idx.netCol === undefined && s.includes("so tien sau khi tru phi")) idx.netCol = c;
+        if (idx.dateCol === undefined && s.includes("ngay hach toan thu ho")) idx.dateCol = c;
+        if (s === "trang thai") idx.statusCol = c;
+        if (idx.productCol === undefined && s.includes("ten san pham vnpay")) idx.productCol = c;
+      });
+      if (idx.grossCol !== undefined && idx.dateCol !== undefined && idx.productCol !== undefined) {
+        headerRowIdx = r;
+        cols = idx;
+        break;
+      }
+    }
+    if (headerRowIdx < 0) continue;
+
+    for (let r = headerRowIdx + 1; r < grid.length; r++) {
+      const row = grid[r] || [];
+      const status = cols.statusCol !== undefined ? row[cols.statusCol] : null;
+      if (status !== null && !/thanh cong|th.nh c.ng/i.test(String(status))) continue;
+      const product = cols.productCol !== undefined ? String(row[cols.productCol] || "").trim() : "";
+      if (!product) continue;
+      const gross = cols.grossCol !== undefined ? Number(row[cols.grossCol]) || 0 : 0;
+      if (!gross) continue;
+      const net = cols.netCol !== undefined ? Number(row[cols.netCol]) || 0 : gross;
+      const dateRaw = cols.dateCol !== undefined ? row[cols.dateCol] : null;
+      const date = toIsoDate(dateRaw ? String(dateRaw).split(" ")[0] : null);
+      if (!date) continue;
+      matched++;
+      dates.add(date);
+      products.add(product);
+      const key = `${date}|${product}`;
+      grossByProduct[key] = (grossByProduct[key] || 0) + gross;
+      netByProduct[key] = (netByProduct[key] || 0) + net;
+    }
+  }
+  if (matched === 0) {
+    throw new Error('Khong doc duoc dong tieu de trong sheet Doi soat Vnpay (online).');
+  }
+
+  return {
+    sheetName: sheetNames.join(", "),
+    dates: Array.from(dates).sort(),
+    products: Array.from(products),
+    grossByProduct,
+    netByProduct,
+    rowsMatched: matched,
+  };
+}
+
+function buildOnlineProductMatcher(diemList) {
+  const entries = diemList.map((d) => ({ ...d, keywords: extractKeywords(d.tenDiem) }));
+  return function matchProduct(productTitle) {
+    const t = normText(productTitle);
+    let best = null;
+    for (const e of entries) {
+      for (const kw of e.keywords) {
+        if (kw.length >= 3 && t.includes(kw)) {
+          if (!best || kw.length > best.kwLen) best = { ...e, kwLen: kw.length };
+        }
+      }
+    }
+    return best;
+  };
+}
+
+function extractKeywords(name) {
+  const STOP = new Set([
+    "funzone", "tau", "kvc", "am", "ae", "sc", "farm", "lotte", "mall", "aeon",
+    "adventure", "combo", "ve", "khu", "vui", "choi", "giai", "tri", "the", "mn",
+  ]);
+  const t = normText(name);
+  return t.split(/[^a-z0-9]+/).filter((w) => w.length >= 3 && !STOP.has(w));
+}
+
+function parseGianXuatHdSheet(buffer) {
+  const wbLite = XLSX.read(buffer, { type: "buffer", bookSheets: true });
+  const sheetName = wbLite.SheetNames.find((n) => {
+    const t = normText(n);
+    return t.includes("gian hang") && (t.includes("xuat hd") || (t.includes("xuat") && t.includes("hd")));
+  });
+  if (!sheetName) return [];
+  const wb = XLSX.read(buffer, { type: "buffer", sheets: [sheetName] });
+  const ws = wb.Sheets[sheetName];
+  const grid = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: null });
+
+  let headerRowIdx = -1;
+  let cols = {};
+  for (let r = 0; r < Math.min(grid.length, 6); r++) {
+    const row = grid[r] || [];
+    const idx = {};
+    row.forEach((v, c) => {
+      if (!v || typeof v !== "string") return;
+      const s = normText(v);
+      if (idx.tenDiem === undefined && s.includes("ten diem xuat hoa don")) idx.tenDiem = c;
+      if (idx.maCongTrinh === undefined && s.includes("ma diem tren misa")) idx.maCongTrinh = c;
+      if (idx.hinhThuc === undefined && s.includes("hinh thuc hop tac")) idx.hinhThuc = c;
+    });
+    if (idx.tenDiem !== undefined && idx.maCongTrinh !== undefined) {
+      headerRowIdx = r;
+      cols = idx;
+      break;
+    }
+  }
+  if (headerRowIdx < 0) return [];
+
+  const out = [];
+  for (let r = headerRowIdx + 1; r < grid.length; r++) {
+    const row = grid[r] || [];
+    const tenDiem = cols.tenDiem !== undefined ? String(row[cols.tenDiem] || "").trim() : "";
+    if (!tenDiem) continue;
+    const maCongTrinh = normCode(cols.maCongTrinh !== undefined ? row[cols.maCongTrinh] : null);
+    if (!maCongTrinh) continue;
+    const hinhThuc = cols.hinhThuc !== undefined ? String(row[cols.hinhThuc] || "").toUpperCase() : "";
+    out.push({ tenDiem, maCongTrinh, isCse: hinhThuc.includes("CSE") });
+  }
+  return out;
+}
+
+function resolveDiemGross(parsed, diemMap) {
+  const grossByCode = {};
+  const netByCode = {};
+  const codes = new Set();
+  const unmapped = new Set();
+  for (const key of Object.keys(parsed.grossByCode)) {
+    const sep = key.indexOf("|");
+    const date = key.slice(0, sep);
+    const diemRaw = key.slice(sep + 1);
+    const mapped = diemMap[diemRaw];
+    if (!mapped) {
+      unmapped.add(diemRaw);
+      continue;
+    }
+    const code = mapped.isCse ? mapped.maCongTrinh + FF_SUFFIX : mapped.maCongTrinh;
+    codes.add(code);
+    const newKey = `${date}|${code}`;
+    grossByCode[newKey] = (grossByCode[newKey] || 0) + parsed.grossByCode[key];
+    netByCode[newKey] = (netByCode[newKey] || 0) + (parsed.netByCode[key] || 0);
+  }
+  return { dates: parsed.dates, codes: Array.from(codes), grossByCode, netByCode, unmapped: Array.from(unmapped) };
+}
+
+function resolveOnlineGross(parsed, gianList) {
+  const matcher = buildOnlineProductMatcher(gianList);
+  const grossByCode = {};
+  const netByCode = {};
+  const codes = new Set();
+  const unmapped = new Set();
+  for (const key of Object.keys(parsed.grossByProduct)) {
+    const sep = key.indexOf("|");
+    const date = key.slice(0, sep);
+    const product = key.slice(sep + 1);
+    const match = matcher(product);
+    if (!match) {
+      unmapped.add(product);
+      continue;
+    }
+    const code = match.isCse ? match.maCongTrinh + FF_SUFFIX : match.maCongTrinh;
+    codes.add(code);
+    const newKey = `${date}|${code}`;
+    grossByCode[newKey] = (grossByCode[newKey] || 0) + parsed.grossByProduct[key];
+    netByCode[newKey] = (netByCode[newKey] || 0) + (parsed.netByProduct[key] || 0);
+  }
+  return { dates: parsed.dates, codes: Array.from(codes), grossByCode, netByCode, unmapped: Array.from(unmapped) };
+}
+
+function reconcileZvpChannel(settlements, grossData, invoiceData, gianMapping) {
+  const invoicesByDiemDay = {};
+  for (const inv of invoiceData.invoices) {
+    if (!inv.ngayHd || !inv.days || inv.days.length === 0) continue;
+    const [invY, invMo, invD] = inv.ngayHd.split("-").map(Number);
+    for (const day of inv.days) {
+      let y = invY;
+      let mo = invMo;
+      if (day > 20 && invD <= 3) {
+        mo -= 1;
+        if (mo === 0) {
+          mo = 12;
+          y -= 1;
+        }
+      }
+      const iso = `${y}-${String(mo).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+      const key = `${inv.maDiem}|${iso}`;
+      if (!invoicesByDiemDay[key]) invoicesByDiemDay[key] = [];
+      invoicesByDiemDay[key].push(inv);
+    }
+  }
+
+  const results = [];
+  for (const s of settlements) {
+    const days = dateRange(s.fromIso, s.toIso);
+    const gianLines = {};
+    for (const day of days) {
+      for (const code of grossData.codes) {
+        const key = `${day}|${code}`;
+        const gross = grossData.grossByCode[key];
+        if (gross && gross > 0) {
+          if (!gianLines[code]) {
+            gianLines[code] = { code, gross: 0, net: 0, invoices: new Set(), days: new Set() };
+          }
+          gianLines[code].gross += gross;
+          gianLines[code].net += grossData.netByCode[key] || gross;
+          gianLines[code].days.add(day);
+          const invs = invoicesByDiemDay[`${code}|${day}`] || [];
+          for (const inv of invs) gianLines[code].invoices.add(inv.soHd);
+        }
+      }
+    }
+    const lines = Object.values(gianLines).map((g) => {
+      const invoiceList = Array.from(g.invoices);
+      const invoiceTotal = invoiceList.reduce((sum, soHd) => {
+        const inv = invoiceData.invoices.find((i) => i.soHd === soHd);
+        return sum + (inv ? inv.tongTt : 0);
+      }, 0);
+      return {
+        code: g.code,
+        maCongTrinh: displayCode(g.code),
+        tkCo: gianMapping[g.code] || (g.code.endsWith(FF_SUFFIX) ? "1388" : "131"),
+        gross: g.gross,
+        net: Math.round(g.net),
+        invoiceNumbers: invoiceList,
+        invoiceTotal,
+        diff: invoiceTotal - g.gross,
+        days: Array.from(g.days).sort(),
+        matched: invoiceList.length > 0 && Math.abs(invoiceTotal - g.gross) < 1,
+      };
+    });
+    const totalNet = lines.filter((l) => l.tkCo !== "SKIP").reduce((sum, l) => sum + l.net, 0);
+    results.push({
+      settlementDate: s.date,
+      from: s.fromIso,
+      to: s.toIso,
+      bankAmount: s.amount,
+      totalNetComputed: totalNet,
+      diffVsBank: totalNet - s.amount

@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <%- include('partials/head') %>
+</head>
+<body>
+  <%- include('partials/nav') %>
+  <main class="container">
+    <h1>Quản lý ngân hàng</h1>
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+
+    <section class="panel">
+      <h2>Thêm tài khoản ngân hàng</h2>
+      <form method="POST" action="/banks" class="form-grid">
+        <div>
+          <label>Tên hiển thị (VD: MTD40222)</label>
+          <input type="text" name="name" required />
+        </div>
+        <div>
+          <label>Ngân hàng</label>
+          <input type="text" name="bank_name" placeholder="VD: Vietcombank" />
+        </div>
+        <div>
+          <label>Số tài khoản</label>
+          <input type="text" name="account_number" />
+        </div>
+        <div>
+          <label>Khu vực</label>
+          <input type="text" name="khu_vuc" placeholder="VD: KVC MN" />
+        </div>
+        <div>
+          <label>Chi nhánh ngân hàng</label>
+          <input type="text" name="chi_nhanh" placeholder="VD: BIDV CN Vạn Phúc" />
+        </div>
+        <div>
+          <label>Trung gian thu hộ</label>
+          <input type="text" name="trung_gian_thu_ho" placeholder="VD: momo, VietQR..." />
+        </div>
+        <div>
+          <label>Số dư đầu kỳ</label>
+          <input type="number" step="any" name="opening_balance" value="0" />
+        </div>
+        <div>
+          <label>Ngày đầu kỳ</label>
+          <input type="date" name="opening_date" />
+        </div>
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary">Thêm ngân hàng</button>
+        </div>
+      </form>
+    </section>
+
+    <section class="panel">
+      <h2>Danh sách ngân hàng</h2>
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Tên</th><th>Ngân hàng</th><th>Số TK</th><th>Khu vực</th><th>Chi nhánh</th><th>Trung gian thu hộ</th><th>Số dư đầu kỳ</th><th>Số dư hiện tại</th><th></th>
+          </tr>
+        </thead>
+        <tbody>
+          <% banks.forEach(function(b) { %>
+          <tr>
+            <td><a href="/transactions?bank_id=<%= b.id %>"><%= b.name %></a></td>
+            <td><%= b.bank_name || '-' %></td>
+            <td><%= b.account_number || '-' %></td>
+            <td><%= b.khu_vuc || '-' %></td>
+            <td><%= b.chi_nhanh || '-' %></td>
+            <td><%= b.trung_gian_thu_ho || '-' %></td>
+            <td><%= b.opening_balance.toLocaleString('vi-VN') %> đ</td>
+            <td class="<%= b.balance < 0 ? 'text-neg' : '' %>"><%= b.balance.toLocaleString('vi-VN') %> đ</td>
+            <td>
+              <form method="POST" action="/banks/<%= b.id %>/delete" onsubmit="return confirm('Xoá ngân hàng này? Toàn bộ giao dịch liên quan cũng sẽ bị xoá.');">
+                <button type="submit" class="link-btn link-danger">Xoá</button>
+              </form>
+            </td>
+          </tr>
+          <% }) %>
+          <% if (banks.length === 0) { %>
+          <tr><td colspan="9" class="muted">Chưa có ngân hàng nào.</td></tr>
+          <% } %>
+        </tbody>
+      </table>
+    </section>
+  </main>
+</body>
+</html>

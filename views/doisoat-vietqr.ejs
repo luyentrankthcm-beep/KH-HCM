@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <%- include('partials/head') %>
+</head>
+<body>
+  <%- include('partials/nav') %>
+  <main class="container">
+    <h1>Đối soát Viet QR — <%= COMPANIES[activeCompany].label %> (<%= channels.map(function(c){ return c.label; }).join(' / ') %>)</h1>
+    <p class="muted">
+      Viet QR về ngân hàng từng giao dịch một (không gộp theo đợt như Momo/Zalo/VNPay), nên web đối soát theo TỪNG
+      NGÀY: cộng hết tiền QR về ngày đó, tách theo gian dựa vào file "Dữ liệu"/"Cửa hàng" bạn tải lên, rồi dò khớp
+      với danh sách hóa đơn dùng chung (gắn thẻ theo từng ngân hàng). Diễn giải khi xuất MISA luôn dùng đúng mẫu
+      "Thu tiền dịch vụ vui chơi giải trí theo HĐ ...".
+    </p>
+
+    <% if (error) { %><div class="alert alert-error" id="autohide-error"><%= error %></div><% } %>
+    <% if (success) { %><div class="alert alert-success" id="autohide-success"><%= success %></div><% } %>
+
+    <script>
+      // Tu an bot banner thanh cong / loi sau vai giay de trong cho,
+      // khong can bam tay - giong trang Doi soat Zalo/VNPay/Payoo.
+      (function () {
+        var ids = ["autohide-success", "autohide-error"];
+        ids.forEach(function (id) {
+          var el = document.getElementById(id);
+          if (!el) return;
+          setTimeout(function () {
+            el.style.transition = "opacity 0.6s ease, max-height 0.6s ease, margin 0.6s ease, padding 0.6s ease";
+            el.style.opacity = "0";
+            el.style.maxHeight = "0";
+            el.style.overflow = "hidden";
+            el.style.marginTop = "0";
+            el.style.marginBottom = "0";
+            el.style.paddingTop = "0";
+            el.style.paddingBottom = "0";
+          }, 3000);
+        });
+      })();
+    </script>
+
+    <% channels.forEach(function(chInfo) { var ch = chInfo.key; %>
+    <section class="panel">
+      <details>
+        <summary style="font-weight:700;color:#111;cursor:pointer;">Tải file dữ liệu Viet QR — <%= chInfo.label %></summary>
+        <div style="margin-top:12px;">
+      <p class="muted">File chứa sheet "Dữ liệu"/"Hệ thống" (giao dịch QR) + sheet "Cửa hàng" (tên điểm bán) trong cùng 1 file.</p>
+      <form method="POST" action="/doi-soat/vietqr/upload-raw/<%= ch %>" enctype="multipart/form-data" class="form-inline">
+        <input type="file" name="file" accept=".xlsx,.xls" required />
+        <button type="submit" class="btn btn-primary">Tải lên</button>
+      </form>
+      <% var qrUps = rawUploads[ch] || []; %>
+      <% var qrTotalRows = qrUps.reduce(function(s, u){ return s + (u.rows||[]).length; }, 0); %>
+      <details style="margin-top:12px;">
+        <summary class="muted" style="cursor:pointer;">
+          Đã tải <%= qrUps.length %> lần, tổng <%= qrTotalRows %> giao dịch (bấm để xem chi tiết)
+        </summary>
+        <table class="table" style="margin-top:10px;">
+          <thead><tr><th>File</th><th>Sheet</th><th>Số giao dịch</th><th>Lúc tải</th><th></th></tr></thead>
+          <tbody>
+            <% qrUps.forEach(function(u) { %>
+            <tr>
+              <td><%= u.file_name %></td>
+              <td><%= u.sheetName %></td>
+              <td><%= (u.rows || []).length %></td>
+              <td><%= new Date(u.uploaded_at).toLocaleString('vi-VN') %></td>
+              <td>
+                <form method="POST" action="/doi-soat/vietqr/upload-raw/<%= ch %>/<%= u.id %>/delete" onsubmit="return confirm('Xoá bảng dữ liệu QR này?');">
+                  <button type="submit" class="link-btn link-danger">Xoá</button>
+                </form>
+              </td>
+            </tr>
+            <% }) %>
+            <% if (qrUps.length === 0) { %>
+            <tr><td colspan="5" class="muted">Chưa tải file nào cho kênh này.</td></tr>
+            <% } %>
+          </tbody>
+        </table>
+      </details>
+
+      <div style="margin-top:16px; padding-top:12px; border-top:1px dashed #ddd;">
+        <p class="muted" style="margin-bottom:6px;">
+          Danh sách điểm bán riêng ("store_export") — nạp trước tên điểm bán mới nhất, không cần chờ có giao dịch QR.
+          Cộng dồn vào danh sách cũ; nếu có mã cửa hàng mới hoặc đổi tên điểm bán sẽ cảnh báo ngay.
+        </p>
+        <form method="POST" action="/doi-soat/vietqr/upload-store/<%= ch %>" enctype="multipart/form-data" class="form-inline">
+          <input type="file" name="file" accept=".xlsx,.xls" required />
+          <button type="submit" class="btn btn-secondary">Tải danh sách điểm bán</button>
+        </form>
+      </div>
+        </div>
+      </details>
+    </section>
+    <% }) %>
+
+    <section class="panel">
+      <details>
+        <summary style="font-weight:700;color:#111;cursor:pointer;">Tải danh sách hóa đơn đã xuất (file MTT, dùng chung cho cả 3 ngân hàng Viet QR)</summary>
+        <div style="margin-top:12px;">
+      <form method="POST" action="/doi-soat/vietqr/upload-hoadon" enctype="multipart/form-data" class="form-inline">
+        <input type="file" name="file" accept=".xlsx,.xls" required />
+        <button type="submit" class="btn btn-primary">Tải lên</button>
+      </form>
+      <p class="muted" style="margin-top:8px;">
+        Đã nạp:
+        <% channels.forEach(function(chInfo, i) { %><strong><%= chInfo.label %>: <%= invoiceCounts[chInfo.key] %> HĐ</strong><%= i < channels.length - 1 ? ', ' : '' %><% }) %>.
+        Tải file mới sẽ tự thêm dòng chưa có, không trùng lặp.
+      </p>
+      <% var totalInv = channels.reduce(function(s, c) { return s + invoiceCounts[c.key]; }, 0); %>
+      <% if (totalInv > 0) { %>
+      <form method="POST" action="/doi-soat/vietqr/invoices/clear" onsubmit="return confirm('Xoá toàn bộ hóa đơn Viet QR đã nạp (cả 3 kênh)?');">
+        <button type="submit" class="btn btn-secondary">Xoá hết hóa đơn đã nạp</button>
+      </form>
+      <% } %>
+        </div>
+      </details>
+    </section>
+
+    <% if (allCodes.length > 0) { %>
+    <section class="panel">
+      <h2>TK Có theo từng mã công trình (dùng chung với Momo/ZVP)</h2>
+      <form method="POST" action="/doi-soat/vietqr/mapping">
+        <table class="table">
+          <thead><tr><th>Mã công trình</th><th>TK Có</th></tr></thead>
+          <tbody>
+            <% allCodes.forEach(function(code) { %>
+            <tr>
+              <td><%= code.endsWith('__FF') ? code.replace('__FF', '') + ' (CSE - chia sẻ)' : code %></td>
+              <td>
+                <select name="tkco_<%= code %>">
+                  <option value="131" <%= (gianMapping[code] || '131') === '131' ? 'selected' : '' %>>131</option>
+                  <option value="1388" <%= gianMapping[code] === '1388' ? 'selected' : '' %>>1388 (chia sẻ)</option>
+                  <option value="SKIP" <%= gianMapping[code] === 'SKIP' ? 'selected' : '' %>>Chưa xuất MISA (KH mới)</option>
+                </select>
+              </td>
+            </tr>
+            <% }) %>
+          </tbody>
+        </table>
+        <button type="submit" class="btn btn-secondary">Lưu bảng TK Có</button>
+      </form>
+    </section>
+    <% } %>
+
+    <% var allUnmatched = []; var seenUnmatched = {};
+       channels.forEach(function(chInfo) {
+         ((built[chInfo.key] || {}).unmatchedInvoiceCodes || []).forEach(function(c) {
+           if (!seenUnmatched[c]) { seenUnmatched[c] = true; allUnmatched.push(c); }
+         });
+       });
+       var invoiceDiemAlias = (built[channels[0].key] || {}).invoiceDiemAlias || {};
+    %>
+    <% if (allUnmatched.length > 0 || Object.keys(invoiceDiemAlias).length > 0) { %>
+    <section class="panel">
+      <h2>Ánh xạ tên/mã điểm khác trên hóa đơn về đúng Mã công trình (dùng chung với Momo/ZVP)</h2>
+      <p class="muted">
+        Một số hóa đơn ghi "Mã điểm" khác với Mã công trình bên doanh thu — ánh xạ tên này về đúng Mã công trình
+        bên dưới, áp dụng ngay không cần tải lại hóa đơn.
+      </p>
+      <% if (allUnmatched.length > 0) { %>
+      <table class="table">
+        <thead><tr><th>Tên/Mã điểm trên hóa đơn (chưa khớp)</th><th>Ánh xạ về Mã công trình</th><th></th></tr></thead>
+        <tbody>
+          <% allUnmatched.forEach(function(code) { %>
+          <tr>
+            <td><%= code %></td>
+            <td colspan="2">
+              <form method="POST" action="/doi-soat/vietqr/diem-alias" class="form-inline">
+                <input type="hidden" name="sourceCode" value="<%= code %>" />
+                <select name="targetCode" required>
+                  <option value="">-- Chọn Mã công trình --</option>
+                  <% allCodes.forEach(function(c) { %>
+                  <option value="<%= c %>"><%= c.endsWith('__FF') ? c.replace('__FF', '') + ' (CSE - chia sẻ)' : c %></option>
+                  <% }) %>
+                </select>
+                <button type="submit" class="btn btn-secondary">Lưu ánh xạ</button>
+              </form>
+            </td>
+          </tr>
+          <% }) %>
+        </tbody>
+      </table>
+      <% } %>
+      <% if (Object.keys(invoiceDiemAlias).length > 0) { %>
+      <table class="table" style="margin-top:12px;">
+        <thead><tr><th>Đã ánh xạ</th><th></th><th></th></tr></thead>
+        <tbody>
+          <% Object.keys(invoiceDiemAlias).forEach(function(src) { %>
+          <tr>
+            <td><%= src %> → <%= invoiceDiemAlias[src] %></td>
+            <td>
+              <form method="POST" action="/doi-soat/vietqr/diem-alias/delete" onsubmit="return confirm('Xoá ánh xạ này?');">
+                <input type="hidden" name="sourceCode" value="<%= src %>" />
+                <button type="submit" class="link-btn link-danger">Xoá</button>
+              </form>
+            </td>
+          </tr>
+          <% }) %>
+        </tbody>
+      </table>
+      <% } %>
+    </section>
+    <% } %>
+
+    <section class="panel">
+      <h2>Xuất file MISA</h2>
+      <p class="muted" style="margin-bottom:14px;">
+        Xuất riêng từng ngân hàng. Các dòng "KH mới - chưa xuất MISA" sẽ tự động bị loại khỏi file xuất.
+      </p>
+      <div class="form-inline" style="margin-bottom:14px;">
+        <label style="margin:0;">Số chứng từ bắt đầu (NTTK...):</label>
+        <input type="number" id="startNo" value="1" min="1" style="width:100px;" />
+        <% channels.forEach(function(chInfo) { %>
+        <a class="btn btn-secondary export-btn" data-channel="<%= chInfo.key %>" href="/doi-soat/vietqr/export.xlsx?channel=<%= chInfo.key %>&start=1">Xuất <%= chInfo.label %></a>
+        <% }) %>
+      </div>
+      <script>
+        document.getElementById('startNo').addEventListener('input', function() {
+          var v = this.value || 1;
+          document.querySelectorAll('.export-btn').forEach(function(a) {
+            a.href = '/doi-soat/vietqr/export.xlsx?channel=' + a.dataset.channel + '&start=' + v;
+          });
+        });
+      </script>
+    </section>
+
+    <section class="panel">
+      <h2>Kết quả đối soát</h2>
+      <form method="GET" action="/doi-soat/vietqr" class="form-inline">
+        <label style="margin:0;">Chọn ngân hàng:</label>
+        <select name="channel" onchange="this.form.submit()">
+          <option value="" <%= selectedChannel === '' ? 'selected' : '' %>>-- Tất cả --</option>
+          <% channels.forEach(function(chInfo) { %>
+          <option value="<%= chInfo.key %>" <%= selectedChannel === chInfo.key ? 'selected' : '' %>><%= chInfo.label %></option>
+          <% }) %>
+        </select>
+        <% if (months.length > 0) { %>
+        <label style="margin:0 0 0 12px;">Chọn tháng:</label>
+        <select name="month" onchange="this.form.submit()">
+          <option value="" <%= selectedMonth === '' ? 'selected' : '' %>>-- Tất cả --</option>
+          <% months.forEach(function(m) { %>
+          <option value="<%= m %>" <%= selectedMonth === m ? 'selected' : '' %>><%= m %></option>
+          <% }) %>
+        </select>
+        <% } %>
+      </form>
+    </section>
+
+    <style>
+      .pivot-wrap { overflow-x: auto; }
+      .pivot-table { border-collapse: collapse; font-size: 12px; white-space: nowrap; }
+      .pivot-table th, .pivot-table td { border: 1px solid #e5e5e5; padding: 4px 6px; text-align: right; }
+      .pivot-table th { background: #fafbfc; text-align: center; }
+      .pivot-table td.pivot-label { text-align: left; position: sticky; left: 0; background: #fff; z-index: 1; }
+      .pivot-table th.pivot-label-head { position: sticky; left: 0; background: #fafbfc; z-index: 2; text-align: left; }
+      .pivot-cell { cursor: pointer; }
+      .pivot-ok { background: #e6f4ea; }
+      .pivot-diff { background: #fdecea; }
+      .pivot-missing { background: #fff8e1; }
+      .pivot-skip { background: #f0f0f0; color: #999; }
+      .pivot-empty { color: #ddd; cursor: default; }
+      .pivot-detail-panel { margin-top: 10px; padding: 10px 12px; background: #fafbfc; border: 1px solid #eee; border-radius: 6px; font-size: 13px; }
+    </style>
+    <script>
+      function vqrShowDetail(ch, rowIdx, colIdx) {
+        var pivot = window.__vqrPivot[ch];
+        var row = pivot.rows[rowIdx];
+        var cell = row.cells[colIdx];
+        var date = pivot.dates[colIdx];
+        var panel = document.getElementById('vqr-detail-' + ch);
+        if (!cell) {
+          panel.innerHTML = '<p class="muted">Không có dữ liệu ngày ' + date + ' cho gian "' + row.maCongTrinh + '".</p>';
+          return;
+        }
+        var statusHtml;
+        if (cell.tkCo === 'SKIP') statusHtml = '<span class="badge badge-chi">KH mới - chưa xuất MISA</span>';
+        else if (cell.manualOverride) statusHtml = '<span class="badge badge-thu">Khớp (bù thủ công)</span>';
+        else if (!cell.invoiceNumbers || cell.invoiceNumbers.length === 0) statusHtml = '<span class="badge badge-chi">Chưa có HĐ</span>';
+        else if (cell.matched) statusHtml = '<span class="badge badge-thu">Khớp</span>';
+        else statusHtml = '<span class="badge badge-chi">Lệch ' + cell.diff.toLocaleString('vi-VN') + ' đ</span>';
+        panel.innerHTML =
+          '<p style="margin:0 0 6px;"><strong>' + row.maCongTrinh + (row.isCse ? ' (CSE)' : '') + '</strong> — Ngày ' + date + '</p>' +
+          '<p style="margin:0;">TK Có: ' + (cell.tkCo === 'SKIP' ? '—' : cell.tkCo) +
+          ' &nbsp;|&nbsp; Doanh thu: ' + cell.gross.toLocaleString('vi-VN') + ' đ' +
+          ' &nbsp;|&nbsp; Tổng tiền HĐ: ' + cell.invoiceTotal.toLocaleString('vi-VN') + ' đ' +
+          ' &nbsp;|&nbsp; ' + statusHtml + '</p>' +
+          '<p style="margin:6px 0 0;">Số HĐ khớp: ' + ((cell.invoiceNumbers && cell.invoiceNumbers.join(', ')) || '-') + '</p>';
+      }
+    </script>
+
+    <% var displayChannels = selectedChannel ? channels.filter(function(c) { return c.key === selectedChannel; }) : channels; %>
+    <% displayChannels.forEach(function(chInfo) { var ch = chInfo.key; var pivot = pivotByChannel[ch] || { dates: [], rows: [] }; %>
+    <section class="panel">
+      <h2>Kết quả đối soát — <%= chInfo.label %></h2>
+
+      <script>
+        window.__vqrPivot = window.__vqrPivot || {};
+        window.__vqrPivot["<%= ch %>"] = <%- JSON.stringify(pivot).replace(/</g, '\\u003c') %>;
+      </script>
+
+      <% if (pivot.rows.length === 0) { %>
+        <p class="muted">Chưa có dữ liệu để đối soát kênh này (trong tháng đang chọn).</p>
+      <% } else { %>
+        <p class="muted" style="margin-bottom:8px;">Mỗi dòng 1 gian, mỗi cột 1 ngày — bấm vào 1 ô để xem chi tiết bên dưới bảng.</p>
+        <div class="pivot-wrap">
+          <table class="pivot-table">
+            <thead>
+              <tr>
+                <th class="pivot-label-head">Mã công trình</th>
+                <th>Tổng DT</th>
+                <th>Tổng lệch</th>
+                <% pivot.dates.forEach(function(d) { %><th><%= d.slice(5) %></th><% }) %>
+              </tr>
+            </thead>
+            <tbody>
+              <% pivot.rows.forEach(function(row, ri) { %>
+              <tr>
+                <td class="pivot-label"><%= row.maCongTrinh %><%= row.isCse ? ' (CSE)' : '' %></td>
+                <td><%= row.sumGross.toLocaleString('vi-VN') %></td>
+                <td class="<%= Math.abs(row.sumDiff) < 1000 ? 'text-pos' : 'text-neg' %>"><%= row.sumDiff.toLocaleString('vi-VN') %></td>
+                <% row.cells.forEach(function(cell, ci) { %>
+                <td
+                  class="pivot-cell <%= cell ? 'pivot-' + cell.status : 'pivot-empty' %>"
+                  <% if (cell) { %>onclick="vqrShowDetail('<%= ch %>', <%= ri %>, <%= ci %>)"<% } %>
+                  title="<%= cell ? row.maCongTrinh + ' - ' + pivot.dates[ci] : '' %>"
+                ><%= cell ? Math.round(cell.gross / 1000) + 'k' : '' %></td>
+                <% }) %>
+              </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+        <div class="pivot-detail-panel" id="vqr-detail-<%= ch %>">
+          <p class="muted" style="margin:0;">Bấm vào 1 ô trong bảng để xem chi tiết ngày đó.</p>
+        </div>
+      <% } %>
+
+      <details style="margin-top:16px;">
+        <summary style="cursor:pointer; font-weight:600;">Xem chi tiết theo từng ngày (bảng đầy đủ như trước)</summary>
+      <% var list = reconciled[ch] || []; %>
+      <% if (list.length === 0) { %>
+        <p class="muted">Chưa có dữ liệu để đối soát kênh này (trong tháng đang chọn).</p>
+      <% } else { %>
+        <% list.filter(function(r){ return r.lines.length > 0; }).forEach(function(r) { %>
+        <div class="panel" style="background:#fafbfc; box-shadow:none; border:1px solid #eee;">
+          <h2 style="display:flex; justify-content:space-between; font-size:14px;">
+            <span>Ngày <%= r.settlementDate %></span>
+            <span>
+              Ngân hàng: <strong><%= r.bankAmount.toLocaleString('vi-VN') %> đ</strong>
+              &nbsp;|&nbsp; Tính từ dữ liệu tải lên: <strong><%= r.totalNetComputed.toLocaleString('vi-VN') %> đ</strong>
+              &nbsp;|&nbsp;
+              <span class="<%= Math.abs(r.diffVsBank) < 1000 ? 'text-pos' : 'text-neg' %>">
+                Chênh lệch: <%= r.diffVsBank.toLocaleString('vi-VN') %> đ
+              </span>
+            </span>
+          </h2>
+          <table class="table">
+            <thead>
+              <tr><th>Mã công trình (gian)</th><th>TK Có</th><th>Doanh thu</th><th>Số HĐ khớp</th><th>Tổng tiền HĐ</th><th>Trạng thái</th></tr>
+            </thead>
+            <tbody>
+              <% r.lines.forEach(function(l) { %>
+              <tr<%= l.tkCo === 'SKIP' ? ' style="opacity:0.6;"' : '' %>>
+                <td><%= l.maCongTrinh %><%= l.code.endsWith('__FF') ? ' (CSE)' : '' %></td>
+                <td><%= l.tkCo === 'SKIP' ? '—' : l.tkCo %></td>
+                <td><%= l.gross.toLocaleString('vi-VN') %> đ</td>
+                <td><%= l.invoiceNumbers.join(', ') || '-' %></td>
+                <td><%= l.invoiceTotal.toLocaleString('vi-VN') %> đ</td>
+                <td>
+                  <% if (l.tkCo === 'SKIP') { %>
+                    <span class="badge badge-chi">KH mới - chưa xuất MISA</span>
+                  <% } else if (l.manualOverride) { %>
+                    <span class="badge badge-thu">Khớp (bù thủ công)</span>
+                    <form method="POST" action="/doi-soat/vietqr/manual-match/delete" style="display:inline;" onsubmit="return confirm('Xoá đánh dấu thủ công này?');">
+                      <input type="hidden" name="channel" value="<%= ch %>" />
+                      <input type="hidden" name="settlementDate" value="<%= r.settlementDate %>" />
+                      <input type="hidden" name="code" value="<%= l.code %>" />
+                      <button type="submit" class="link-btn link-danger" style="font-size:11px;">Xoá</button>
+                    </form>
+                    <% if (l.manualNote) { %><div class="muted" style="font-size:11px;"><%= l.manualNote %></div><% } %>
+                  <% } else if (l.invoiceNumbers.length === 0) { %>
+                    <span class="badge badge-chi">Chưa có HĐ</span>
+                    <form method="POST" action="/doi-soat/vietqr/manual-match" style="margin-top:6px;">
+                      <input type="hidden" name="channel" value="<%= ch %>" />
+                      <input type="hidden" name="settlementDate" value="<%= r.settlementDate %>" />
+                      <input type="hidden" name="code" value="<%= l.code %>" />
+                      <input type="text" name="invoiceNumbers" placeholder="Số HĐ bù" style="width:80px; font-size:11px;" />
+                      <input type="text" name="amount" placeholder="Số tiền" style="width:80px; font-size:11px;" />
+                      <input type="text" name="grossAdjustment" placeholder="+GD không mã" title="Cộng thêm vào doanh thu nếu dòng này bao gồm 1 GD QR không có mã cửa hàng" style="width:80px; font-size:11px;" />
+                      <button type="submit" class="link-btn" style="font-size:11px;" title="Đánh dấu đã có hóa đơn bù (vd xuất ngày hôm sau)">Đã có HĐ bù</button>
+                    </form>
+                  <% } else if (l.matched) { %>
+                    <span class="badge badge-thu">Khớp</span>
+                  <% } else { %>
+                    <span class="badge badge-chi">Lệch <%= l.diff.toLocaleString('vi-VN') %> đ</span>
+                    <form method="POST" action="/doi-soat/vietqr/manual-match" style="margin-top:6px;">
+                      <input type="hidden" name="channel" value="<%= ch %>" />
+                      <input type="hidden" name="settlementDate" value="<%= r.settlementDate %>" />
+                      <input type="hidden" name="code" value="<%= l.code %>" />
+                      <input type="text" name="invoiceNumbers" value="<%= l.invoiceNumbers.join(', ') %>" placeholder="Số HĐ" style="width:100px; font-size:11px;" />
+                      <input type="text" name="amount" value="<%= l.invoiceTotal %>" placeholder="Số tiền" style="width:80px; font-size:11px;" />
+                      <input type="text" name="grossAdjustment" placeholder="+GD không mã" title="Cộng thêm vào doanh thu nếu dòng này bao gồm 1 GD QR không có mã cửa hàng" style="width:80px; font-size:11px;" />
+                      <button type="submit" class="link-btn" style="font-size:11px;" title="Sửa/thêm số hóa đơn cho dòng lệch này">Sửa HĐ</button>
+                    </form>
+                  <% } %>
+                </td>
+              </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+        <% }) %>
+      <% } %>
+      </details>
+    </section>
+    <% }) %>
+  </main>
+</body>
+</html>

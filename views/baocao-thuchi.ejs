@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <%- include('partials/head') %>
+</head>
+<body>
+  <%- include('partials/nav') %>
+  <main class="container">
+    <h1>Thu/chi theo gian (tất cả ngân hàng)</h1>
+    <p class="muted">
+      Gộp chung mỗi khoản thu về ngân hàng (Momo + Zalo/VNPay/Payoo), tách theo từng gian, thành 1 dòng —
+      không cần vào từng trang đối soát riêng để xem.
+    </p>
+    <section class="panel">
+      <form method="GET" action="/bao-cao/thu-chi-theo-gian" class="form-inline" style="margin-bottom:12px;">
+        <label style="margin:0;">Lọc theo ngân hàng:</label>
+        <select name="bank" onchange="this.form.submit()">
+          <option value="">-- Tất cả --</option>
+          <% banks.forEach(function(b) { %>
+          <option value="<%= b %>" <%= bankFilter === b ? 'selected' : '' %>><%= b %></option>
+          <% }) %>
+        </select>
+        <% if (months.length > 0) { %>
+        <label style="margin:0;">Chọn tháng:</label>
+        <select name="month" onchange="this.form.submit()">
+          <option value="" <%= selectedMonth === '' ? 'selected' : '' %>>-- Tất cả --</option>
+          <% months.forEach(function(m) { %>
+          <option value="<%= m %>" <%= selectedMonth === m ? 'selected' : '' %>><%= m %></option>
+          <% }) %>
+        </select>
+        <% } %>
+      </form>
+      <a class="btn btn-secondary" href="/bao-cao/thu-chi-theo-gian/export.xlsx?bank=<%= encodeURIComponent(bankFilter) %>&month=<%= encodeURIComponent(selectedMonth) %>">Xuất Excel (theo bộ lọc đang chọn)</a>
+      <table class="table" style="margin-top:12px;">
+        <thead>
+          <tr><th>Ngân hàng</th><th>Kênh</th><th>Ngày về NH</th><th>Mã công trình (gian)</th><th>TK Có</th><th>Doanh thu gộp</th><th>Tiền về NH (net)</th><th>Số HĐ khớp</th><th>Trạng thái</th></tr>
+        </thead>
+        <tbody>
+          <% rows.forEach(function(r) { %>
+          <tr>
+            <td><%= r.bankName %></td>
+            <td><%= r.channel %></td>
+            <td><%= r.settlementDate %></td>
+            <td><%= r.maCongTrinh %></td>
+            <td><%= r.tkCo === 'SKIP' ? '—' : r.tkCo %></td>
+            <td><%= r.gross.toLocaleString('vi-VN') %> đ</td>
+            <td><%= r.net.toLocaleString('vi-VN') %> đ</td>
+            <td><%= r.invoiceNumbers || '-' %></td>
+            <td><%= r.trangThai %></td>
+          </tr>
+          <% }) %>
+          <% if (rows.length === 0) { %>
+          <tr><td colspan="9" class="muted">Chưa có dữ liệu.</td></tr>
+          <% } %>
+        </tbody>
+      </table>
+    </section>
+  </main>
+</body>
+</html>

@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <%- include('partials/head') %>
+</head>
+<body>
+  <%- include('partials/nav') %>
+  <main class="container">
+    <h1>Đối soát Zalo App / VNPay (Online + Offline) / Payoo (TK ACB31268)</h1>
+    <p class="muted">
+      Web tự lấy các khoản VNPay/Payoo đã về ngân hàng ACB31268, tách theo từng gian dựa trên các file
+      bạn tải lên, rồi dò khớp với danh sách hóa đơn dùng chung (gắn thẻ zalo/vnpay/payoo). Gian có đánh dấu
+      "CSE" trên sheet "gian hang xuất HĐ" được tự tách sang TK Có 1388 (doanh thu chia sẻ), giống Fun/Fest SC VIVO bên Momo.
+    </p>
+
+    <% if (error) { %><div class="alert alert-error" id="autohide-error"><%= error %></div><% } %>
+    <% if (success) { %><div class="alert alert-success" id="autohide-success"><%= success %></div><% } %>
+    <script>
+      // Tu an bot banner thanh cong / loi sau vai giay de trong cho,
+      // khong can bam tay - Luyen chi can luot doc qua 1 lan.
+      (function () {
+        ["autohide-success", "autohide-error"].forEach(function (id) {
+          var el = document.getElementById(id);
+          if (!el) return;
+          setTimeout(function () {
+            el.style.transition = "opacity 0.6s ease, max-height 0.6s ease, margin 0.6s ease, padding 0.6s ease";
+            el.style.opacity = "0";
+            el.style.maxHeight = "0";
+            el.style.overflow = "hidden";
+            el.style.marginTop = "0";
+            el.style.marginBottom = "0";
+            el.style.paddingTop = "0";
+            el.style.paddingBottom = "0";
+          }, 3000);
+        });
+      })();
+    </script>
+
+    <section class="panel">
+      <details>
+        <summary style="font-weight:700;color:#111;cursor:pointer;">0. Tải bảng gian tổng hợp hàng ngày (sheet "gian ")</summary>
+        <div style="margin-top:12px;">
+      <p class="muted">
+        Bảng gian dùng chung cho cả Momo/Viet QR/Zalo Mini App/VNPay cơ sở/Payoo: mã/tên trên hóa đơn → mã công
+        trình → thuộc kênh nào → có CSE (chia sẻ 1388) hay không. Tải lên mỗi ngày để cập nhật gian mới hoặc sửa
+        gian cũ — dữ liệu mới luôn được ưu tiên nếu trùng tên. Nếu 1 mã công trình có cả sản phẩm CSE và không CSE
+        (ví dụ Funzone Huế là CSE nhưng Ecokids/Snow Huế thì không), chỉ cần liệt kê đủ từng dòng ở đây — hệ
+        thống tự tách doanh thu thành 2 dòng riêng (131 và 1388) khi đối soát Online/Offline/Payoo.
+      </p>
+      <form method="POST" action="/doi-soat/zvp/upload-gian-master" enctype="multipart/form-data" class="form-inline">
+        <input type="file" name="file" accept=".xlsx,.xls" required />
+        <button type="submit" class="btn btn-primary">Tải lên</button>
+      </form>
+      <% if (gianMaster) { %>
+      <p class="muted" style="margin-top:8px;">
+        Đã nạp <strong><%= gianMaster.file_name %></strong> (sheet "<%= gianMaster.sheetName %>"):
+        <%= gianMaster.rows.length %> dòng, <%= gianMaster.rows.filter(function(r){return r.isCse}).length %> dòng CSE —
+        lúc <%= new Date(gianMaster.uploaded_at).toLocaleString('vi-VN') %>.
+      </p>
+      <% } else { %>
+      <p class="muted" style="margin-top:8px;">Chưa tải bảng gian tổng hợp nào.</p>
+      <% } %>
+      <p class="muted" style="margin-top:8px;">
+        <strong>Lưu ý:</strong> nếu gian ở mục 1/2/3 bên dưới đã có doanh thu tải lên từ trước, doanh thu đó KHÔNG
+        tự tách lại theo bảng gian mới — cần tải lại file doanh thu Online/Offline/Payoo tương ứng sau khi cập
+        nhật bảng gian này để phần tách CSE mới có hiệu lực với dữ liệu cũ.
+      </p>
+        </div>
+      </details>
+    </section>
+
+    <section class="panel">
+      <details>
+        <summary style="font-weight:700;color:#111;cursor:pointer;">1. Tải file "Tổng hợp Zalo App" (sheet "gian hàng xuất HĐ" + "Đối soát Vnpay T...")</summary>
+        <div style="margin-top:12px;">
+      <p class="muted">File này cung cấp danh sách gian (kèm đánh dấu CSE) và doanh thu Online theo từng sản phẩm Zalo.</p>
+      <form method="POST" action="/doi-soat/zvp/upload-online" enctype="multipart/form-data" class="form-inline">
+        <input type="file" name="file" accept=".xlsx,.xls" required />
+        <button type="submit" class="btn btn-primary">Tải lên</button>
+      </form>
+      <details style="margin-top:12px;">
+        <summary class="muted" style="cursor:pointer;">Đã tải <%= onlineUploads.length %> lần (bấm để xem chi tiết)</summary>
+        <table class="table" style="margin-top:10px;">
+          <thead><tr><th>File</th><th>Sheet</th><th>Khoảng ngày</th><th>Số mã công trình</th><th>Lúc tải</th><th></th></tr></thead>
+          <tbody>
+            <% onlineUploads.forEach(function(u) { %>
+            <tr>
+              <td><%= u.file_name %></td>
+              <td><%= u.sheetName %></td>
+              <td><%= u.dates[0] %> → <%= u.dates[u.dates.length-1] %></td>
+              <td><%= u.codes.length %></td>
+              <td><%= new Date(u.uploaded_at).toLocaleString('vi-VN') %></td>
+              <td>
+                <form method="POST" action="/doi-soat/zvp/upload-online/<%= u.id %>/delete" onsubmit="return confirm('Xoá bảng doanh thu online này?');">
+                  <button type="submit" class="link-btn link-danger">Xoá</button>
+                </form>
+              </td>
+            </tr>
+            <% }) %>
+            <% if (onlineUploads.length === 0) { %>
+            <tr><td colspan="6" class="muted">Chưa tải file Online nào.</td></tr>
+            <% } %>
+          </tbody>
+        </table>
+      </details>
+        </div>
+      </details>
+    </section>
+
+    <% if (pendingOnlineGian && pendingOnlineGian.length > 0) { %>
+    <section class="panel">
+      <h2>1b. Rà soát gian mới tự động ghi nhận (Online)</h2>
+      <p class="muted">
+        Các tên gian dưới đây chưa khớp được với gian có sẵn nên hệ thống tự tạo mã công trình riêng cho nó (doanh
+        thu vẫn đang được tính bình thường, không bị mất). Nếu đây thực ra là 1 sản phẩm của gian đã có (ví dụ
+        "SNOWFUN TÂN PHÚ" thực ra thuộc "AM TP KVCM"), gõ lại đúng Mã công trình bên dưới rồi lưu. Nếu đây đúng là
+        gian/mã mới thật thì không cần làm gì. <strong>Sau khi sửa, cần tải lại file "Tổng hợp Zalo App" ở mục 1 một
+        lần nữa để áp dụng cho doanh thu đã tải trước đó.</strong>
+      </p>
+      <table class="table">
+        <thead><tr><th>Tên gian (trên "Danh mục tên sản phẩm")</th><th>Mã công trình đúng</th><th>CSE?</th><th></th></tr></thead>
+        <tbody>
+          <% pendingOnlineGian.forEach(function(g) { %>
+          <tr>
+            <td><%= g.tenDiem %></td>
+            <td colspan="3">
+              <form method="POST" action="/doi-soat/zvp/online-gian-fix" class="form-inline">
+                <input type="hidden" name="tenDiem" value="<%= g.tenDiem %>" />
+                <input type="text" name="maCongTrinh" value="<%= g.maCongTrinh %>" style="width:160px;" />
+                <label style="font-size:13px;"><input type="checkbox" name="isCse" <%= g.isCse ? 'checked' : '' %> /> CSE (chia sẻ 1388)</label>
+                <button type="submit" class="btn btn-secondary">Lưu</button>
+              </form>
+            </td>
+          </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </section>
+    <% } %>
+
+    <section class="panel">
+      <details>
+        <summary style="font-weight:700;color:#111;cursor:pointer;">2. Tải file "VNPay thu hộ cơ sở" (Offline / QR)</summary>
+        <div style="margin-top:12px;">
+      <p class="muted">File chứa sheet "dữ liệu VNpay cơ sở KH..." + sheet mapping "gian hàng VNpay cơ sở KH...".</p>
+      <form method="POST" action="/doi-soat/zvp/upload-offline" enctype="multipart/form-data" class="form-inline">
+        <input type="file" name="file" accept=".xlsx,.xls" required />
+        <button type="submit" class="btn btn-primary">Tải lên</button>
+      </form>
+      <details style="margin-top:12px;">
+        <summary class="muted" style="cursor:pointer;">Đã tải <%= offlineUploads.length %> lần (bấm để xem chi tiết)</summary>
+        <table class="table" style="margin-top:10px;">
+          <thead><tr><th>File</th><th>Sheet</th><th>Khoảng ngày</th><th>Số mã công trình</th><th>Lúc tải</th><th></th></tr></thead>
+          <tbody>
+            <% offlineUploads.forEach(function(u) { %>
+            <tr>
+              <td><%= u.file_name %></td>
+              <td><%= u.sheetName %></td>
+              <td><%= u.dates[0] %> → <%= u.dates[u.dates.length-1] %></td>
+              <td><%= u.codes.length %></td>
+              <td><%= new Date(u.uploaded_at).toLocaleString('vi-VN') %></td>
+              <td>
+                <form method="POST" action="/doi-soat/zvp/upload-offline/<%= u.id %>/delete" onsubmit="return confirm('Xoá bảng doanh thu offline này?');">
+                  <button type="submit" class="link-btn link-danger">Xoá</button>
+                </form>
+              </td>
+            </tr>
+            <% }) %>
+            <% if (offlineUploads.length === 0) { %>
+            <tr><td colspan="6" class="muted">Chưa tải file Offline nào.</td></tr>
+            <% } %>
+          </tbody>
+        </table>
+      </details>
+        </div>
+      </details>
+    </section>
+
+    <section class="panel">
+      <details>
+        <summary style="font-weight:700;color:#111;cursor:pointer;">2b. Hoặc: tải nhanh 2 file thô từ cổng VNPay (gộp chung 1 lần, tự tách Online/Offline)</summary>
+        <div style="margin-top:12px;">
+      <p class="muted">
+        Không cần tự gộp vào file "Tổng hợp" nữa — chọn cả 2 file tải trực tiếp từ cổng VNPay/Zalo cùng lúc,
+        web tự lọc: "Điểm thu" = FUNZONE MINI APP → Online (Zalo Mini App), các điểm còn lại → Offline.
+        <% if (!hasGianList || !hasOfflineDiemMap) { %>
+          <strong>Cần tải file ở mục 1 (danh sách gian) và mục 2 (mapping điểm Offline) ít nhất 1 lần trước khi dùng mục này.</strong>
+        <% } %>
+      </p>
+      <form method="POST" action="/doi-soat/zvp/upload-combo" enctype="multipart/form-data">
+        <div class="form-inline" style="margin-bottom:8px;">
+          <label style="min-width:220px;">File "OrderDetails..." (.xls):</label>
+          <input type="file" name="fileOrders" accept=".xlsx,.xls" required />
+        </div>
+        <div class="form-inline" style="margin-bottom:8px;">
+          <label style="min-width:220px;">File "DuLieuBaoCaoPhiTheoGDThanhToan..." (.xlsx):</label>
+          <input type="file" name="fileFee" accept=".xlsx,.xls" required />
+        </div>
+        <button type="submit" class="btn btn-primary">Tải lên cả 2 file</button>
+      </form>
+        </div>
+      </details>
+    </section>
+
+    <section class="panel">
+      <details>
+        <summary style="font-weight:700;color:#111;cursor:pointer;">3. Tải file "Payoo thu hộ" (sheet "Dữ liệu Payoo cơ sở" + "Danh mục tên điểm")</summary>
+        <div style="margin-top:12px;">
+      <form method="POST" action="/doi-soat/zvp/upload-payoo" enctype="multipart/form-data" class="form-inline">
+        <input type="file" name="file" accept=".xlsx,.xls" required />
+        <button type="submit" class="btn btn-primary">Tải lên</button>
+      </form>
+      <details style="margin-top:12px;">
+        <summary class="muted" style="cursor:pointer;">Đã tải <%= payooUploads.length %> lần (bấm để xem chi tiết)</summary>
+        <table class="table" style="margin-top:10px;">
+          <thead><tr><th>File</th><th>Sheet</th><th>Khoảng ngày</th><th>Số mã công trình</th><th>Lúc tải</th><th></th></tr></thead>
+          <tbody>
+            <% payooUploads.forEach(function(u) { %>
+            <tr>
+              <td><%= u.file_name %></td>
+              <td><%= u.sheetName %></td>
+              <td><%= u.dates[0] %> → <%= u.dates[u.dates.length-1] %></td>
+              <td><%= u.codes.length %></td>
+              <td><%= new Date(u.uploaded_at).toLocaleString('vi-VN') %></td>
+              <td>
+                <form method="POST" action="/doi-soat/zvp/upload-payoo/<%= u.id %>/delete" onsubmit="return confirm('Xoá bảng doanh thu Payoo này?');">
+                  <button type="submit" class="link-btn link-danger">Xoá</button>
+                </form>
+              </td>
+            </tr>
+            <% }) %>
+            <% if (payooUploads.length === 0) { %>
+            <tr><td colspan="6" class="muted">Chưa tải file Payoo nào.</td></tr>
+            <% } %>
+          </tbody>
+        </table>
+      </details>
+        </div>
+      </details>
+    </section>
+
+    <section class="panel">
+      <details>
+        <summary style="font-weight:700;color:#111;cursor:pointer;">4. Tải danh sách hóa đơn đã xuất (file MTT, dùng chung cho cả Zalo/VNPay/Payoo)</summary>
+        <div style="margin-top:12px;">
+      <form method="POST" action="/doi-soat/zvp/upload-hoadon" enctype="multipart/form-data" class="form-inline">
+        <input type="file" name="file" accept=".xlsx,.xls" required />
+        <button type="submit" class="btn btn-primary">Tải lên</button>
+      </form>
+      <p class="muted" style="margin-top:8px;">
+        Đã nạp <strong><%= invoiceCounts.zalo %></strong> HĐ zalo, <strong><%= invoiceCounts.vnpay %></strong> HĐ vnpay,
+        <strong><%= invoiceCounts.payoo %></strong> HĐ payoo. Tải file mới sẽ tự thêm dòng chưa có, không trùng lặp.
+      </p>
+      <% if (invoiceCounts.zalo + invoiceCounts.vnpay + invoiceCounts.payoo > 0) { %>
+      <form method="POST" action="/doi-soat/zvp/invoices/clear" onsubmit="return confirm('Xoá toàn bộ hóa đơn zalo/vnpay/payoo đã nạp?');">
+        <button type="submit" class="btn btn-secondary">Xoá hết hóa đơn đã nạp</button>
+      </form>
+      <% } %>
+        </div>
+      </details>
+    </section>
+
+    <% if (allCodes.length > 0 || (unmatchedInvoiceCodes && unmatchedInvoiceCodes.length > 0) || (invoiceDiemAlias && Object.keys(invoiceDiemAlias).length > 0)) { %>
+    <section class="panel">
+      <h2>5. TK Có &amp; Ánh xạ mã điểm theo từng mã công trình (dùng chung với Momo)</h2>
+
+      <% if (allCodes.length > 0) { %>
+      <p class="muted">
+        Chọn "Chưa xuất MISA (KH mới)" cho các gian là khách hàng mới chưa lên MISA — dòng đối soát vẫn hiện
+        trên trang này để theo dõi, nhưng sẽ KHÔNG được đưa vào 2 file xuất Excel ở mục 6.
+      </p>
+      <form method="POST" action="/doi-soat/zvp/mapping">
+        <table class="table">
+          <thead><tr><th>Mã công trình</th><th>TK Có</th></tr></thead>
+          <tbody>
+            <% allCodes.forEach(function(code) { %>
+            <tr>
+              <td><%= code.endsWith('__FF') ? code.replace('__FF', '') + ' (CSE - chia sẻ)' : code %></td>
+              <td>
+                <select name="tkco_<%= code %>">
+                  <option value="131" <%= (gianMapping[code] || '131') === '131' ? 'selected' : '' %>>131</option>
+                  <option value="1388" <%= gianMapping[code] === '1388' ? 'selected' : '' %>>1388 (chia sẻ)</option>
+                  <option value="SKIP" <%= gianMapping[code] === 'SKIP' ? 'selected' : '' %>>Chưa xuất MISA (KH mới)</option>
+                </select>
+              </td>
+            </tr>
+            <% }) %>
+          </tbody>
+        </table>
+        <button type="submit" class="btn btn-secondary">Lưu bảng TK Có</button>
+      </form>
+      <% } %>
+
+      <% if ((unmatchedInvoiceCodes && unmatchedInvoiceCodes.length > 0) || (invoiceDiemAlias && Object.keys(invoiceDiemAlias).length > 0)) { %>
+      <div style="margin-top:20px; padding-top:16px; border-top:1px dashed #ddd;">
+        <h3 style="font-size:14px; margin:0 0 8px;">Ánh xạ tên/mã điểm khác trên hóa đơn về đúng Mã công trình</h3>
+        <p class="muted">
+          Một số hóa đơn ghi "Mã điểm" là tên riêng của 1 góc/thương hiệu con (vd "SNOWFUN TÂN PHÚ") thay vì đúng
+          Mã công trình bên doanh thu (vd "AM TP KVCM") — nên web không tự dò khớp được, khiến dòng "Lệch" hiện ra
+          dù tiền hóa đơn thực ra vẫn có. Ánh xạ tên này về đúng Mã công trình bên dưới, áp dụng ngay không cần tải lại hóa đơn.
+        </p>
+        <% if (unmatchedInvoiceCodes && unmatchedInvoiceCodes.length > 0) { %>
+        <table class="table">
+          <thead><tr><th>Tên/Mã điểm trên hóa đơn (chưa khớp)</th><th>Ánh xạ về Mã công trình</th><th></th></tr></thead>
+          <tbody>
+            <% unmatchedInvoiceCodes.forEach(function(code) { %>
+            <tr>
+              <td><%= code %></td>
+              <td colspan="2">
+                <form method="POST" action="/doi-soat/zvp/diem-alias" class="form-inline">
+                  <input type="hidden" name="sourceCode" value="<%= code %>" />
+                  <select name="targetCode" required>
+                    <option value="">-- Chọn Mã công trình --</option>
+                    <% allCodes.forEach(function(c) { %>
+                    <option value="<%= c %>"><%= c.endsWith('__FF') ? c.replace('__FF', '') + ' (CSE - chia sẻ)' : c %></option>
+                    <% }) %>
+                  </select>
+                  <button type="submit" class="btn btn-secondary">Lưu ánh xạ</button>
+                </form>
+              </td>
+            </tr>
+            <% }) %>
+          </tbody>
+        </table>
+        <% } %>
+        <% if (invoiceDiemAlias && Object.keys(invoiceDiemAlias).length > 0) { %>
+        <table class="table" style="margin-top:12px;">
+          <thead><tr><th>Đã ánh xạ</th><th></th><th></th></tr></thead>
+          <tbody>
+            <% Object.keys(invoiceDiemAlias).forEach(function(src) { %>
+            <tr>
+              <td><%= src %> → <%= invoiceDiemAlias[src] %></td>
+              <td>
+                <form method="POST" action="/doi-soat/zvp/diem-alias/delete" onsubmit="return confirm('Xoá ánh xạ này?');">
+                  <input type="hidden" name="sourceCode" value="<%= src %>" />
+                  <button type="submit" class="link-btn link-danger">Xoá</button>
+                </form>
+              </td>
+            </tr>
+            <% }) %>
+          </tbody>
+        </table>
+        <% } %>
+      </div>
+      <% } %>
+    </section>
+    <% } %>
+
+    <section class="panel">
+      <h2>6. Xuất file MISA</h2>
+      <p class="muted" style="margin-bottom:14px;">
+        Các dòng đánh dấu "KH mới - chưa xuất MISA" bên dưới sẽ tự động bị loại khỏi 2 file xuất. Payoo được gộp
+        chung vào file OFFLINE (theo cách xử lý đơn giản như VNPay Offline). File xuất luôn gồm TOÀN BỘ các khoản
+        chưa xuất, không chỉ tháng đang lọc xem ở mục 7 bên dưới.
+      </p>
+      <div class="form-inline" style="margin-bottom:14px;">
+        <label style="margin:0;">Số chứng từ bắt đầu (NTTK...):</label>
+        <input type="number" id="startNo" value="1" min="1" style="width:100px;" />
+        <a class="btn btn-secondary" id="exportOnlineBtn" href="/doi-soat/zvp/export-online.xlsx?start=1">Xuất MISATHuế (Online)</a>
+        <a class="btn btn-secondary" id="exportOfflineBtn" href="/doi-soat/zvp/export-offline.xlsx?start=1">Xuất MISAThue OFFLINE (Offline + Payoo)</a>
+      </div>
+      <script>
+        document.getElementById('startNo').addEventListener('input', function() {
+          var v = this.value || 1;
+          document.getElementById('exportOnlineBtn').href = '/doi-soat/zvp/export-online.xlsx?start=' + v;
+          document.getElementById('exportOfflineBtn').href = '/doi-soat/zvp/export-offline.xlsx?start=' + v;
+        });
+      </script>
+    </section>
+
+    <section class="panel">
+      <h2>7. Kết quả đối soát</h2>
+      <% if (months.length > 0) { %>
+      <form method="GET" action="/doi-soat/zvp" class="form-inline">
+        <label style="margin:0;">Chọn tháng:</label>
+        <select name="month" onchange="this.form.submit()">
+          <option value="" <%= selectedMonth === '' ? 'selected' : '' %>>-- Tất cả --</option>
+          <% months.forEach(function(m) { %>
+          <option value="<%= m %>" <%= selectedMonth === m ? 'selected' : '' %>><%= m %></option>
+          <% }) %>
+        </select>
+      </form>
+      <% } %>
+    </section>
+
+    <% ['online', 'offline', 'payoo'].forEach(function(ch) { %>
+    <section class="panel">
+      <h2>
+        <%= ch === 'online' ? 'Kết quả đối soát Online (VNPay CTT qua Zalo App)' :
+            ch === 'offline' ? 'Kết quả đối soát Offline (VNPay QR)' : 'Kết quả đối soát Payoo' %>
+      </h2>
+      <% var list = reconciled[ch] || []; %>
+      <% if (list.length === 0) { %>
+        <p class="muted">Chưa có dữ liệu để đối soát kênh này (trong tháng đang chọn).</p>
+      <% } else { %>
+        <% list.filter(function(r){ return r.lines.length > 0; }).forEach(function(r) { %>
+        <div class="panel" style="background:#fafbfc; box-shadow:none; border:1px solid #eee;">
+          <h2 style="display:flex; justify-content:space-between; font-size:14px;">
+            <span>Khoản về ngày <%= r.settlementDate %> (doanh thu <%= r.from %><%= r.from !== r.to ? ' → ' + r.to : '' %>)</span>
+            <span>
+              Ngân hàng: <strong><%= r.bankAmount.toLocaleString('vi-VN') %> đ</strong>
+              &nbsp;|&nbsp; Tính từ dữ liệu tải lên: <strong><%= r.totalNetComputed.toLocaleString('vi-VN') %> đ</strong>
+              &nbsp;|&nbsp;
+              <span class="<%= Math.abs(r.diffVsBank) < 1000 ? 'text-pos' : 'text-neg' %>">
+                Chênh lệch: <%= r.diffVsBank.toLocaleString('vi-VN') %> đ
+              </span>
+            </span>
+          </h2>
+          <table class="table">
+            <thead>
+              <tr><th>Mã công trình (gian)</th><th>TK Có</th><th>Doanh thu gộp</th><th>Tiền về NH (net)</th><th>Số HĐ khớp</th><th>Tổng tiền HĐ</th><th>Trạng thái</th></tr>
+            </thead>
+            <tbody>
+              <% r.lines.forEach(function(l) { %>
+              <tr<%= l.tkCo === 'SKIP' ? ' style="opacity:0.6;"' : '' %>>
+                <td><%= l.maCongTrinh %><%= l.code.endsWith('__FF') ? ' (CSE)' : '' %></td>
+                <td><%= l.tkCo === 'SKIP' ? '—' : l.tkCo %></td>
+                <td><%= l.gross.toLocaleString('vi-VN') %> đ</td>
+                <td><%= l.net.toLocaleString('vi-VN') %> đ</td>
+                <td><%= l.invoiceNumbers.join(', ') || '-' %></td>
+                <td><%= l.invoiceTotal.toLocaleString('vi-VN') %> đ</td>
+                <td>
+                  <% if (l.tkCo === 'SKIP') { %>
+                    <span class="badge badge-chi">KH mới - chưa xuất MISA</span>
+                  <% } else if (l.manualOverride) { %>
+                    <span class="badge badge-thu">Khớp (bù thủ công)</span>
+                    <form method="POST" action="/doi-soat/zvp/manual-match/delete" style="display:inline;" onsubmit="return confirm('Xoá đánh dấu thủ công này?');">
+                      <input type="hidden" name="channel" value="<%= ch %>" />
+                      <input type="hidden" name="settlementDate" value="<%= r.settlementDate %>" />
+                      <input type="hidden" name="code" value="<%= l.code %>" />
+                      <button type="submit" class="link-btn link-danger" style="font-size:11px;">Xoá</button>
+                    </form>
+                    <% if (l.manualNote) { %><div class="muted" style="font-size:11px;"><%= l.manualNote %></div><% } %>
+                  <% } else if (l.invoiceNumbers.length === 0) { %>
+                    <span class="badge badge-chi">Chưa có HĐ</span>
+                    <form method="POST" action="/doi-soat/zvp/manual-match" style="margin-top:6px;">
+                      <input type="hidden" name="channel" value="<%= ch %>" />
+                      <input type="hidden" name="settlementDate" value="<%= r.settlementDate %>" />
+                      <input type="hidden" name="code" value="<%= l.code %>" />
+                      <input type="text" name="invoiceNumbers" placeholder="Số HĐ bù" style="width:80px; font-size:11px;" />
+                      <input type="text" name="amount" placeholder="Số tiền" style="width:80px; font-size:11px;" />
+                      <button type="submit" class="link-btn" style="font-size:11px;" title="Đánh dấu đã có hóa đơn bù (vd xuất ngày hôm sau)">Đã có HĐ bù</button>
+                    </form>
+                  <% } else if (l.matched) { %>
+                    <span class="badge badge-thu">Khớp</span>
+                  <% } else { %>
+                    <span class="badge badge-chi">Lệch <%= l.diff.toLocaleString('vi-VN') %> đ</span>
+                    <form method="POST" action="/doi-soat/zvp/manual-match" style="margin-top:6px;">
+                      <input type="hidden" name="channel" value="<%= ch %>" />
+                      <input type="hidden" name="settlementDate" value="<%= r.settlementDate %>" />
+                      <input type="hidden" name="code" value="<%= l.code %>" />
+                      <input type="text" name="invoiceNumbers" value="<%= l.invoiceNumbers.join(', ') %>" placeholder="Số HĐ" style="width:100px; font-size:11px;" />
+                      <input type="text" name="amount" value="<%= l.invoiceTotal %>" placeholder="Số tiền" style="width:80px; font-size:11px;" />
+                      <button type="submit" class="link-btn" style="font-size:11px;" title="Sửa/thêm số hóa đơn cho dòng lệch này">Sửa HĐ</button>
+                    </form>
+                  <% } %>
+                </td>
+              </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+        <% }) %>
+      <% } %>
+    </section>
+    <% }) %>
+  </main>
+</body>
+</html>

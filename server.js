@@ -1,0 +1,77 @@
+require("dotenv").config();
+const express = require("express");
+const path = require("path");
+const cookieSession = require("cookie-session");
+
+require("./store"); // ensures data file + seed data exist before routes load
+
+const { COMPANIES, getCompany } = require("./utils/companies");
+const companyRoutes = require("./routes/company");
+const authRoutes = require("./routes/auth");
+const { router: bankRoutes } = require("./routes/banks");
+const transactionRoutes = require("./routes/transactions");
+const dashboardRoutes = require("./routes/dashboard");
+const doisoatRoutes = require("./routes/doisoat");
+const doisoatZvpRoutes = require("./routes/doisoat-zvp");
+const doisoatVietQrRoutes = require("./routes/doisoat-vietqr");
+const baocaoRoutes = require("./routes/baocao");
+const congnoRoutes = require("./routes/congno");
+const doisoatChiPhiRoutes = require("./routes/doisoat-chiphi");
+const backupRoutes = require("./routes/backup");
+
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+app.set("view engine", "ejs");
+app.set("views", path.join(__dirname, "views"));
+
+app.use(express.urlencoded({ extended: true }));
+app.use(express.json());
+app.use(express.static(path.join(__dirname, "public")));
+
+app.use(
+  cookieSession({
+    name: "kh_bank_session",
+    keys: [process.env.SESSION_SECRET || "doi-chuoi-bi-mat-nay-truoc-khi-deploy"],
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+  })
+);
+
+// Cong ty (KH Cu / KH Moi) dang duoc chon luu trong session -- dat vao
+// res.locals o day (khong phai tung route rieng le) de moi view (nav.ejs,
+// va sau nay cac trang khac neu can) tu dong co san activeCompany/COMPANIES
+// ma khong phai sua res.render() cua toan bo cac route hien co.
+app.use((req, res, next) => {
+  res.locals.activeCompany = getCompany(req);
+  res.locals.COMPANIES = COMPANIES;
+  res.locals.currentPath = req.originalUrl || req.path;
+  next();
+});
+
+// QUAN TRONG: authRoutes phai duoc dang ky TRUOC companyRoutes. companyRoutes
+// tu goi router.use(requireLogin) (giong moi router khac), va middleware do
+// chay cho MOI request di qua no bat ke co khop route nao ben trong hay
+// khong -- neu dat truoc authRoutes thi ngay ca GET /login (trang cong khai)
+// cung se bi requireLogin chan va redirect vong lai chinh /login, khong ai
+// dang nhap duoc. Dat sau authRoutes (cung vi tri nhu bankRoutes/... ben
+// duoi) de /login/logout luon duoc xu ly truoc, giong quy uoc san co.
+app.use("/", authRoutes);
+app.use("/", companyRoutes);
+app.use("/", bankRoutes);
+app.use("/", transactionRoutes);
+app.use("/", dashboardRoutes);
+app.use("/", doisoatRoutes);
+app.use("/", doisoatZvpRoutes);
+app.use("/", doisoatVietQrRoutes);
+app.use("/", baocaoRoutes);
+app.use("/", congnoRoutes);
+app.use("/", doisoatChiPhiRoutes);
+app.use("/", backupRoutes);
+
+app.use((req, res) => {
+  res.status(404).send("Khong tim thay trang.");
+});
+
+app.listen(PORT, () => {
+  console.log(`K&H Bank Tracker dang chay tai http://localhost:${PORT}`);
+});

@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <%- include('partials/head') %>
+</head>
+<body>
+  <%- include('partials/nav') %>
+  <main class="container">
+    <h1>Chuyển tiền nội bộ giữa các ngân hàng</h1>
+    <p class="muted">
+      Tự động lọc các giao dịch có gắn nhãn "CTNB" / "Chuyển tiền nội bộ" trên sao kê. Dòng có NH đối ứng xác định được
+      (khớp với 1 trong các ngân hàng của công ty) là chuyển tiền nội bộ đầy đủ; dòng còn lại có thể là chuyển đến 1
+      tài khoản ngoài công ty (vd trả nợ vay ngân hàng khác) — vẫn hiển thị để chị kiểm tra.
+    </p>
+    <section class="panel">
+      <p><strong>Tổng chuyển nội bộ đã xác định đầy đủ 2 chiều:</strong> <%= totalInternal.toLocaleString('vi-VN') %> đ</p>
+      <a class="btn btn-secondary" href="/bao-cao/chuyen-tien-noi-bo/export.xlsx">Xuất Excel</a>
+      <table class="table" style="margin-top:12px;">
+        <thead>
+          <tr><th>Ngày</th><th>Ngân hàng</th><th>Loại</th><th>Số tiền</th><th>NH đối ứng</th><th>Diễn giải</th></tr>
+        </thead>
+        <tbody>
+          <% rows.forEach(function(r) { %>
+          <tr<%= !r.isFullyInternal ? ' style="opacity:0.6;"' : '' %>>
+            <td><%= r.date %></td>
+            <td><%= r.bankName %></td>
+            <td><%= r.type === 'chi' ? 'Chi (đi)' : 'Thu (đến)' %></td>
+            <td><%= r.amount.toLocaleString('vi-VN') %> đ</td>
+            <td><%= r.otherBankName %></td>
+            <td style="font-size:12px; max-width:420px; word-break:break-all;"><%= r.description %></td>
+          </tr>
+          <% }) %>
+          <% if (rows.length === 0) { %>
+          <tr><td colspan="6" class="muted">Chưa phát hiện giao dịch chuyển tiền nội bộ nào.</td></tr>
+          <% } %>
+        </tbody>
+      </table>
+    </section>
+  </main>
+</body>
+</html>

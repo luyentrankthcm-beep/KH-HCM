@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <%- include('partials/head') %>
+</head>
+<body>
+  <%- include('partials/nav') %>
+  <main class="container">
+    <h1>Sao lưu / Phục hồi dữ liệu</h1>
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+    <% if (success) { %><div class="alert alert-success"><%= success %></div><% } %>
+
+    <section class="panel">
+      <h2>1. Tải bản sao lưu hiện tại</h2>
+      <p class="muted">
+        Tải xuống 1 file duy nhất chứa TOÀN BỘ dữ liệu đang có trên bản web này (ngân hàng, giao dịch, đối soát
+        Momo/VietQR/Chi phí, tài khoản đăng nhập...). Dùng file này để chuyển dữ liệu sang 1 bản web khác
+        (ví dụ từ máy đang chạy offline sang bản online), hoặc giữ làm bản dự phòng.
+      </p>
+      <a class="btn btn-primary" href="/he-thong/sao-luu/tai-xuong">Tải bản sao lưu (.json)</a>
+    </section>
+
+    <section class="panel">
+      <h2>2. Phục hồi dữ liệu từ file sao lưu</h2>
+      <p class="muted">
+        <strong>Cẩn thận:</strong> phục hồi sẽ THAY THẾ TOÀN BỘ dữ liệu hiện có trên bản web này bằng dữ liệu
+        trong file sao lưu đã chọn. Chỉ dùng khi chắc chắn (ví dụ đang đưa dữ liệu từ bản offline lên bản online
+        mới tạo, còn trống dữ liệu).
+      </p>
+      <form method="POST" action="/he-thong/sao-luu/phuc-hoi" enctype="multipart/form-data" class="form-inline"
+            onsubmit="return confirm('Phục hồi sẽ THAY THẾ toàn bộ dữ liệu hiện có trên bản web này. Chắc chắn tiếp tục?');">
+        <input type="file" name="file" accept=".json" required />
+        <button type="submit" class="btn btn-secondary">Phục hồi dữ liệu</button>
+      </form>
+    </section>
+  </main>
+</body>
+</html>

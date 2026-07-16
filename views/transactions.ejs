@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <%- include('partials/head') %>
+</head>
+<body>
+  <%- include('partials/nav') %>
+  <main class="container">
+    <h1>Giao dịch / Sao kê — <%= COMPANIES[activeCompany].label %></h1>
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+
+    <section class="panel">
+      <h2>Tải file sao kê tải trực tiếp từ ngân hàng (.xlsx/.xls)</h2>
+      <p class="muted">
+        Tải nguyên file sao kê bạn xuất/tải về từ ngân hàng (BIDV, ACB, MB...) lên đây — web tự nhận diện
+        cột Ngày giao dịch và Số dư, tự tính Thu/Chi, và tự bỏ qua các dòng đã có sẵn (nếu file mới có ngày trùng
+        với dữ liệu cũ) nên tải lại đè lên nhau vẫn an toàn.
+      </p>
+      <form method="POST" action="/transactions/upload-statement" enctype="multipart/form-data" class="form-inline">
+        <select name="bank_id" required>
+          <option value="">-- Chọn ngân hàng --</option>
+          <% banks.forEach(function(b) { %>
+          <option value="<%= b.id %>" <%= filters.bank_id == b.id ? 'selected' : '' %>><%= b.name %><%= b.khu_vuc ? ' - ' + b.khu_vuc : '' %></option>
+          <% }) %>
+        </select>
+        <input type="file" name="file" accept=".xlsx,.xls" required />
+        <button type="submit" class="btn btn-primary">Tải lên</button>
+      </form>
+
+      <% if (uploadResult) { %>
+      <div class="alert alert-success">
+        Đọc file (sheet "<%= uploadResult.sheetName %>"): <%= uploadResult.totalRows %> dòng giao dịch.
+        Đã thêm mới <strong><%= uploadResult.added %></strong> dòng, bỏ qua <strong><%= uploadResult.skipped %></strong> dòng đã có sẵn (trùng).
+      </div>
+      <% } %>
+    </section>
+
+    <section class="panel">
+      <h2>Dán sao kê ngân hàng (nhiều dòng)</h2>
+      <p class="muted">
+        Mỗi dòng: <strong>Ngày</strong>&nbsp;&nbsp;<strong>Diễn giải</strong>&nbsp;&nbsp;<strong>Số tiền</strong>&nbsp;&nbsp;<strong>Thu/Chi (tuỳ chọn)</strong> —
+        copy trực tiếp từ Excel (phân tách bằng Tab) rồi dán vào đây. Nếu không ghi Thu/Chi, số dương sẽ tính là Thu, số âm là Chi.
+      </p>
+      <form method="POST" action="/transactions/paste">
+        <label>Chọn ngân hàng</label>
+        <select name="bank_id" required>
+          <option value="">-- Chọn ngân hàng --</option>
+          <% banks.forEach(function(b) { %>
+          <option value="<%= b.id %>" <%= filters.bank_id == b.id ? 'selected' : '' %>><%= b.name %><%= b.khu_vuc ? ' - ' + b.khu_vuc : '' %></option>
+          <% }) %>
+        </select>
+        <label>Nội dung sao kê</label>
+        <textarea name="paste_text" rows="8" placeholder="20/07/2026&#9;Thu tien khach ABC&#9;1.500.000&#9;Thu"></textarea>
+        <button type="submit" class="btn btn-primary">Nhập sao kê</button>
+      </form>
+
+      <% if (pasteResult) { %>
+        <div class="alert alert-success">Đã nhập thành công <%= pasteResult.inserted %> dòng.</div>
+        <% if (pasteResult.errors.length > 0) { %>
+        <div class="alert alert-error">
+          Có <%= pasteResult.errors.length %> dòng bị bỏ qua:
+          <ul>
+            <% pasteResult.errors.forEach(function(e) { %><li><%= e %></li><% }) %>
+          </ul>
+        </div>
+        <% } %>
+      <% } %>
+    </section>
+
+    <section class="panel">
+      <h2>Nhập giao dịch đơn lẻ</h2>
+      <form method="POST" action="/transactions" class="form-grid">
+        <div>
+          <label>Ngân hàng</label>
+          <select name="bank_id" required>
+            <option value="">-- Chọn --</option>
+            <% banks.forEach(function(b) { %>
+            <option value="<%= b.id %>"><%= b.name %><%= b.khu_vuc ? ' - ' + b.khu_vuc : '' %></option>
+            <% }) %>
+          </select>
+        </div>
+        <div>
+          <label>Ngày</label>
+          <input type="date" name="date" required />
+        </div>
+        <div>
+          <label>Diễn giải</label>
+          <input type="text" name="description" />
+        </div>
+        <div>
+          <label>Số tiền</label>
+          <input type="text" name="amount" placeholder="1.500.000" required />
+        </div>
+        <div>
+          <label>Loại</label>
+          <select name="type" required>
+            <option value="thu">Thu</option>
+            <option value="chi">Chi</option>
+          </select>
+        </div>
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary">Thêm giao dịch</button>
+        </div>
+      </form>
+    </section>
+
+    <section class="panel">
+      <h2>Danh sách giao dịch</h2>
+      <form method="GET" action="/transactions" class="form-inline filter-bar">
+        <select name="bank_id">
+          <option value="">Tất cả ngân hàng</option>
+          <% banks.forEach(function(b) { %>
+          <option value="<%= b.id %>" <%= filters.bank_id == b.id ? 'selected' : '' %>><%= b.name %><%= b.khu_vuc ? ' - ' + b.khu_vuc : '' %></option>
+          <% }) %>
+        </select>
+        <input type="date" name="from" value="<%= filters.from %>" />
+        <input type="date" name="to" value="<%= filters.to %>" />
+        <button type="submit" class="btn btn-secondary">Lọc</button>
+        <a class="btn btn-secondary" href="/export.xlsx?bank_id=<%= filters.bank_id %>&from=<%= filters.from %>&to=<%= filters.to %>">Xuất Excel</a>
+      </form>
+
+      <table class="table">
+        <thead>
+          <tr><th>Ngày</th><th>Ngân hàng</th><th>Diễn giải</th><th>Loại</th><th>Số tiền</th><th></th></tr>
+        </thead>
+        <tbody>
+          <% rows.forEach(function(t) { %>
+          <tr>
+            <td><%= t.date %></td>
+            <td><%= t.bank_label %></td>
+            <td class="desc-cell" title="<%= t.description %>"><%= t.description %></td>
+            <td><span class="badge badge-<%= t.type %>"><%= t.type === 'thu' ? 'Thu' : 'Chi' %></span></td>
+            <td class="<%= t.type === 'chi' ? 'text-neg' : 'text-pos' %>">
+              <%= t.type === 'chi' ? '-' : '+' %><%= t.amount.toLocaleString('vi-VN') %> đ
+            </td>
+            <td>
+              <form method="POST" action="/transactions/<%= t.id %>/delete" onsubmit="return confirm('Xoá giao dịch này?');">
+                <button type="submit" class="link-btn link-danger">Xoá</button>
+              </form>
+            </td>
+          </tr>
+          <% }) %>
+          <% if (rows.length === 0) { %>
+          <tr><td colspan="6" class="muted">Không có giao dịch nào.</td></tr>
+          <% } %>
+        </tbody>
+      </table>
+    </section>
+  </main>
+</body>
+</html>

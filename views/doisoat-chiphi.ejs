@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <%- include('partials/head') %>
+</head>
+<body>
+  <%- include('partials/nav') %>
+  <main class="container">
+    <h1>Đối soát Chi phí — <%= COMPANIES[activeCompany].label %></h1>
+    <p class="muted" style="margin-top:-10px;margin-bottom:20px;">
+      Tiền chi ra cho nhà cung cấp / mặt bằng / lương... từ tài khoản chi phí (<%= channels.map(function(c){ return c.label; }).join(', ') %>).
+      Trang này phân loại theo NCC + gian (nếu xác định được), đối chiếu thêm danh sách hóa đơn HDDV và bảng lệnh chi UNC (mục 1b/1c) để tự điền Số hóa đơn + Diễn giải, rồi xuất file Misa.
+    </p>
+
+    <% if (error) { %><div class="alert alert-error" id="autohide-error"><%= error %></div><% } %>
+    <% if (success) { %><div class="alert alert-success" id="successBanner"><%= success %></div><% } %>
+
+    <% channels.forEach(function(ch) { %>
+    <% if (errorsByChannel[ch.key]) { %>
+    <div class="alert alert-error"><%= ch.label %>: <%= errorsByChannel[ch.key] %></div>
+    <% } %>
+    <% }) %>
+
+    <script>
+      // Tu an banner thanh cong / loi sau 3 giay, khong can bam tay.
+      (function () {
+        ["successBanner", "autohide-error"].forEach(function (id) {
+          var el = document.getElementById(id);
+          if (!el) return;
+          setTimeout(function () {
+            el.style.transition = "opacity 0.6s ease, max-height 0.6s ease, margin 0.6s ease, padding 0.6s ease";
+            el.style.opacity = "0";
+            el.style.maxHeight = "0";
+            el.style.overflow = "hidden";
+            el.style.marginTop = "0";
+            el.style.marginBottom = "0";
+            el.style.paddingTop = "0";
+            el.style.paddingBottom = "0";
+          }, 3000);
+        });
+      })();
+    </script>
+
+    <section class="panel">
+      <details>
+        <summary style="font-weight:700;color:#111;cursor:pointer;">1. Tải sao kê tài khoản chi phí</summary>
+        <div style="margin-top:12px;">
+      <form method="POST" action="/doi-soat/chi-phi/upload" enctype="multipart/form-data" class="form-inline">
+        <input type="file" name="file" accept=".xls,.xlsx" required />
+        <button type="submit" class="btn btn-primary">Tải lên (1 file, tự nhận diện cả 2 tài khoản theo tên sheet)</button>
+      </form>
+      <div class="table-scroll" style="margin-top:14px;">
+        <table class="table">
+          <thead><tr><th>Kênh</th><th></th></tr></thead>
+          <tbody>
+            <% channels.forEach(function(ch) { %>
+            <tr>
+              <td><strong><%= ch.label %></strong></td>
+              <td>
+                <a href="/doi-soat/chi-phi/export.xlsx?channel=<%= ch.key %>&start=1" class="btn btn-secondary">Xuất Misa <%= ch.label %></a>
+              </td>
+            </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+      <% channels.forEach(function(ch) { %>
+      <% var ups = uploadsByChannel[ch.key] || []; %>
+      <% if (ups.length > 0) { %>
+      <% var totalRows = ups.reduce(function(s, u){ return s + u.rows.length; }, 0); %>
+      <details style="margin-top:10px;">
+        <summary class="muted" style="cursor:pointer;">
+          <%= ch.label %> — đã tải <%= ups.length %> lần, tổng <%= totalRows %> dòng (bấm để xem chi tiết)
+        </summary>
+        <div style="margin-top:6px;">
+          <% ups.forEach(function(u) { %>
+          <span class="badge badge-thu" style="margin-right:6px;margin-bottom:6px;display:inline-block;" title="<%= u.uploaded_at %>"><%= u.file_name %> (<%= u.rows.length %> dòng)</span>
+          <% }) %>
+        </div>
+      </details>
+      <% } %>
+      <% }) %>
+        </div>
+      </details>
+    </section>
+
+    <section class="panel">
+      <details>
+        <summary style="font-weight:700;color:#111;cursor:pointer;">1b. Tải danh sách hóa đơn NCC (sheet "HDDV KH CŨ")</summary>
+        <div style="margin-top:12px;">
+      <p class="muted">
+        Đối chiếu Tên/MST người bán + Tổng tiền thanh toán với từng dòng chi phí để tự điền Số hóa đơn/Ngày hóa đơn khi xuất Misa.
+        Đã nạp <strong><%= invoiceCount %></strong> hóa đơn<% if (invoiceMeta) { %> — sheet "<%= invoiceMeta.sheetName %>", tải lúc <%= new Date(invoiceMeta.uploaded_at).toLocaleString('vi-VN') %>, file "<%= invoiceMeta.file_name %>"<% } %>.
+        Tải lại sẽ thay thế toàn bộ danh sách cũ.
+      </p>
+      <form method="POST" action="/doi-soat/chi-phi/upload-invoice" enctype="multipart/form-data" class="form-inline">
+        <input type="file" name="file" accept=".xls,.xlsx" required />
+        <button type="submit" class="btn btn-secondary">Cập nhật danh sách hóa đơn</button>
+      </form>
+        </div>
+      </details>
+    </section>
+
+    <section class="panel">
+      <details>
+        <summary style="font-weight:700;color:#111;cursor:pointer;">1c. Tải bảng lệnh chi UNC</summary>
+        <div style="margin-top:12px;">
+      <p class="muted">
+        Đối chiếu Tên công ty + Số tiền để lấy Diễn giải sạch từ "Nội dung UNC" thay cho nội dung sao kê ngân hàng.
+        Đã nạp <strong><%= uncCount %></strong> dòng<% if (uncMeta) { %> — sheet "<%= uncMeta.sheetName %>", tải lúc <%= new Date(uncMeta.uploaded_at).toLocaleString('vi-VN') %>, file "<%= uncMeta.file_name %>"<% } %>.
+        Tải lại sẽ thay thế toàn bộ danh sách cũ.
+      </p>
+      <form method="POST" action="/doi-soat/chi-phi/upload-unc" enctype="multipart/form-data" class="form-inline">
+        <input type="file" name="file" accept=".xls,.xlsx" required />
+        <button type="submit" class="btn btn-secondary">Cập nhật bảng lệnh chi UNC</button>
+      </form>
+        </div>
+      </details>
+    </section>
+
+    <section class="panel">
+      <details>
+        <summary style="font-weight:700;color:#111;cursor:pointer;">2. Danh sách NCC (nhà cung cấp)</summary>
+        <div style="margin-top:12px;">
+      <p class="muted">
+        Đang dùng <%= nccIsCustom ? 'danh sách chị đã tải lên' : 'danh sách gốc đi kèm app' %>: <%= nccCount %> NCC<% if (nccMeta) { %> — tải lúc <%= new Date(nccMeta.uploaded_at).toLocaleString('vi-VN') %>, file "<%= nccMeta.file_name %>"<% } %>.
+        Tải lại nếu chị có bản NCC mới hơn (thêm NCC, sửa tên, đổi mã...) — cần cột "Mã nhà cung cấp" và "Tên nhà cung cấp".
+      </p>
+      <form method="POST" action="/doi-soat/chi-phi/upload-ncc" enctype="multipart/form-data" class="form-inline">
+        <input type="file" name="file" accept=".xls,.xlsx" required />
+        <button type="submit" class="btn btn-secondary">Cập nhật danh sách NCC</button>
+      </form>
+        </div>
+      </details>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <h2>3. Danh sách chi tiết<% if (selectedMonth) { %> — tháng <%= selectedMonth %><% } %> (<%= lines.length %> dòng, tổng <%= totalAmount.toLocaleString('vi-VN') %> đ)</h2>
+        <form method="GET" class="form-inline-tight">
+          <select name="channel" onchange="this.form.submit()">
+            <option value="">Tất cả kênh</option>
+            <% channels.forEach(function(ch) { %>
+            <option value="<%= ch.key %>" <%= selectedChannel === ch.key ? 'selected' : '' %>><%= ch.label %></option>
+            <% }) %>
+          </select>
+          <select name="month" onchange="this.form.submit()">
+            <% months.forEach(function(m) { %>
+            <option value="<%= m %>" <%= m === selectedMonth ? 'selected' : '' %>><%= m %></option>
+            <% }) %>
+            <option value="" <%= selectedMonth === '' ? 'selected' : '' %>>Tất cả</option>
+          </select>
+        </form>
+      </div>
+      <div class="table-scroll">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Ngày</th><th>Kênh</th><th>NCC</th><th>Mã NCC</th><th>Diễn giải (sao kê)</th><th>Nội dung UNC</th><th>Số HĐ</th><th>Số tiền</th><th>TK Nợ</th><th>Gian</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% lines.forEach(function(l) { %>
+            <tr>
+              <td><%= l.date %></td>
+              <td><% var chLbl = channels.find(function(c){ return c.key === l.channelKey; }); %><%= chLbl ? chLbl.label : l.channelKey %></td>
+              <td>
+                <% if (l.vendorKnown) { %>
+                <%= l.vendor %>
+                <% } else { %>
+                <span class="badge badge-warn">Cần xác định</span>
+                <% } %>
+              </td>
+              <td>
+                <% if (l.maNCC) { %>
+                <%= l.maNCC %>
+                <% } else if (l.nccAmbiguous) { %>
+                <span class="badge badge-warn" title="Trùng tên với nhiều NCC">Trùng tên — cần chọn tay</span>
+                <% } else if (l.vendorKnown) { %>
+                <span class="badge badge-warn">Không có trong DS NCC</span>
+                <% } %>
+                <% if (l.vendorKnown) { %>
+                <form method="POST" action="/doi-soat/chi-phi/vendor-ncc" class="form-inline" style="margin-top:4px;">
+                  <input type="hidden" name="vendor" value="<%= l.vendor %>" />
+                  <input type="text" name="maNCC" placeholder="Mã NCC" value="<%= l.nccOverridden ? l.maNCC : '' %>" style="width:140px;" />
+                  <button type="submit" class="link-btn">Lưu</button>
+                </form>
+                <% } %>
+              </td>
+              <td class="desc-cell" title="<%= l.description %>"><%= l.description %></td>
+              <td class="desc-cell" title="<%= l.uncDienGiai %>">
+                <% if (l.uncDienGiai) { %>
+                <%= l.uncDienGiai %> <span class="badge badge-thu" title="Khớp bảng lệnh chi UNC theo Tên NCC + Số tiền">UNC</span>
+                <% } else { %>
+                <span class="muted">-</span>
+                <% } %>
+              </td>
+              <td>
+                <% if (l.invoiceMatch) { %>
+                <%= l.invoiceMatch.soHoaDon %> <span class="badge badge-thu" title="Khớp danh sách hóa đơn HDDV theo Tên/MST NCC + Số tiền">HĐ</span>
+                <% } else if (l.hdNumberFallback) { %>
+                <%= l.hdNumberFallback %> <span class="badge badge-warn" title="Trích từ diễn giải, chưa khớp danh sách hóa đơn">theo diễn giải</span>
+                <% } else { %>
+                <span class="muted">-</span>
+                <% } %>
+              </td>
+              <td class="num"><%= l.debit.toLocaleString('vi-VN') %> đ</td>
+              <td><%= l.tkNo || '-' %></td>
+              <td>
+                <% if (l.finalGian) { %>
+                <%= l.finalGian %>
+                <% } else if (l.siteFrag) { %>
+                <span class="badge badge-warn" title="Ứng viên: <%= l.gianCandidates.join(', ') || '(không khớp)' %>">"<%= l.siteFrag %>" — cần gán tay</span>
+                <% } %>
+                <form method="POST" action="/doi-soat/chi-phi/gian-override" class="form-inline" style="margin-top:4px;">
+                  <input type="hidden" name="key" value="<%= l.key %>" />
+                  <input type="text" name="maCongTrinh" placeholder="Mã công trình" value="<%= l.gianOverridden ? l.finalGian : '' %>" style="width:140px;" />
+                  <button type="submit" class="link-btn">Lưu</button>
+                </form>
+              </td>
+            </tr>
+            <% }) %>
+            <% if (lines.length === 0) { %>
+            <tr><td colspan="10" class="muted">Chưa có dữ liệu — tải sao kê ở mục 1.</td></tr>
+            <% } %>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>4. TK Nợ theo từng NCC</h2>
+      <p class="muted">Gán mã tài khoản Nợ (vd 331, 641, 642, 334...) cho từng NCC — dùng khi xuất file Misa. Bỏ trống nếu chưa rõ.</p>
+      <form method="POST" action="/doi-soat/chi-phi/vendor-tk">
+        <div class="table-scroll">
+          <table class="table">
+            <thead><tr><th>NCC</th><th>TK Nợ</th></tr></thead>
+            <tbody>
+              <% vendors.forEach(function(v) { %>
+              <tr>
+                <td><%= v.vendor %></td>
+                <td><input type="text" name="tkno_<%= encodeURIComponent(v.vendor) %>" value="<%= v.tkNo || '' %>" style="width:100px;" /></td>
+              </tr>
+              <% }) %>
+              <% if (vendors.length === 0) { %>
+              <tr><td colspan="2" class="muted">Chưa có NCC nào — tải sao kê ở mục 1.</td></tr>
+              <% } %>
+            </tbody>
+          </table>
+        </div>
+        <button type="submit" class="btn btn-primary">Lưu TK Nợ</button>
+      </form>
+    </section>
+  </main>
+</body>
+</html>

@@ -1,0 +1,81 @@
+<header class="topbar">
+  <div class="brand">
+    <span class="brand-name">K&amp;H Bank Tracker</span>
+    <span class="brand-sub"><%= COMPANIES[activeCompany].fullName %></span>
+  </div>
+  <!-- Nut chuyen cong ty: Doi soat Momo/Viet QR/Chi phi loc du lieu theo
+       cong ty dang chon o day (luu trong session, rieng cho tung nguoi
+       dung). Cac trang Tong quan/Bao cao/Cong no/Giao dich chua tach theo
+       cong ty -- van hien theo KH Cu nhu truoc gio. -->
+  <form method="POST" action="/chon-cong-ty" class="company-switch" title="Chuyển công ty đang xem cho Đối soát Momo / Viet QR / Chi phí">
+    <input type="hidden" name="redirectTo" value="<%= currentPath %>" />
+    <% Object.values(COMPANIES).forEach(function (c) { %>
+    <button type="submit" name="company" value="<%= c.key %>" class="company-btn <%= activeCompany === c.key ? 'is-active' : '' %>"><%= c.shortLabel %></button>
+    <% }) %>
+  </form>
+  <nav class="nav-links">
+    <a href="/">Tổng quan</a>
+    <a href="/transactions">Giao dịch / Sao kê</a>
+    <a href="/banks">Ngân hàng</a>
+    <a href="/doi-soat/momo">Đối soát Momo</a>
+    <% if (activeCompany === "kh_cu") { %>
+    <a href="/doi-soat/zvp">Đối soát Zalo/VNPay/Payoo</a>
+    <% } %>
+    <a href="/doi-soat/vietqr">Đối soát Viet QR</a>
+    <a href="/doi-soat/chi-phi">Đối soát Chi phí</a>
+    <a href="/bao-cao">Báo cáo</a>
+    <a href="/cong-no">Công nợ</a>
+    <a href="/he-thong/sao-luu">Sao lưu</a>
+  </nav>
+  <div class="nav-user">
+    <span><%= userName %></span>
+    <form method="POST" action="/logout" style="display:inline">
+      <button type="submit" class="link-btn">Đăng xuất</button>
+    </form>
+  </div>
+</header>
+
+<!-- Nút nổi hỗ trợ di chuyển trên trang dài: "Quay lại" (trang trước đó,
+     ẩn nếu đây là trang đầu tiên mở) và "Lên đầu trang" (hiện khi đã cuộn
+     xuống, để không che nội dung lúc mới vào trang). -->
+<div class="float-nav">
+  <button type="button" class="float-nav-btn" id="btnGoBack" title="Quay lại" onclick="history.back()">←</button>
+  <button type="button" class="float-nav-btn is-hidden" id="btnToTop" title="Lên đầu trang" onclick="window.scrollTo({top:0,behavior:'smooth'})">↑</button>
+</div>
+<script>
+  (function () {
+    var navLinks = Array.prototype.slice.call(document.querySelectorAll(".nav-links a"));
+    var path = window.location.pathname;
+    var best = null;
+    navLinks.forEach(function (a) {
+      var href = a.getAttribute("href");
+      if (href === "/" ? path === "/" : path.indexOf(href) === 0) {
+        if (!best || href.length > best.getAttribute("href").length) best = a;
+      }
+    });
+    if (best) {
+      best.style.opacity = "1";
+      best.style.borderBottomColor = "#024ad8";
+      best.style.background = "rgba(255,255,255,0.08)";
+    }
+
+    var toTopBtn = document.getElementById("btnToTop");
+    var goBackBtn = document.getElementById("btnGoBack");
+    if (goBackBtn && window.history.length <= 1) {
+      goBackBtn.classList.add("is-hidden");
+    }
+    window.addEventListener("scroll", function () {
+      if (!toTopBtn) return;
+      if (window.scrollY > 300) toTopBtn.classList.remove("is-hidden");
+      else toTopBtn.classList.add("is-hidden");
+    });
+
+    var topbar = document.querySelector(".topbar");
+    function updateTopbarHeight() {
+      if (!topbar) return;
+      document.documentElement.style.setProperty("--topbar-h", topbar.offsetHeight + "px");
+    }
+    updateTopbarHeight();
+    window.addEventListener("resize", updateTopbarHeight);
+    if (window.ResizeObserver && topbar) {
+      new ResizeObserver(updateTopbarHeig

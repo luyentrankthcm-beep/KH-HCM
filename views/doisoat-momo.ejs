@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <%- include('partials/head') %>
+</head>
+<body>
+  <%- include('partials/nav') %>
+  <main class="container">
+    <h1>Đối soát doanh thu Momo — <%= COMPANIES[activeCompany].label %> (<%= bankLabel %>)</h1>
+    <p class="muted">
+      Web tự lấy các khoản momo đã về ngân hàng (từ dữ liệu sao kê đã nhập), tách theo từng gian
+      dựa trên bảng "Tổng Momo tháng" bạn tải lên, rồi dò khớp với hóa đơn đã xuất (net = HĐ × 0,989).
+    </p>
+
+    <% if (error) { %><div class="alert alert-error" id="autohide-error"><%= error %></div><% } %>
+    <% if (success) { %><div class="alert alert-success" id="autohide-success"><%= success %></div><% } %>
+    <script>
+      // Tu an bot banner thanh cong / loi sau vai giay de trong cho, khong can bam tay.
+      (function () {
+        ["autohide-success", "autohide-error"].forEach(function (id) {
+          var el = document.getElementById(id);
+          if (!el) return;
+          setTimeout(function () {
+            el.style.transition = "opacity 0.6s ease, max-height 0.6s ease, margin 0.6s ease, padding 0.6s ease";
+            el.style.opacity = "0";
+            el.style.maxHeight = "0";
+            el.style.overflow = "hidden";
+            el.style.marginTop = "0";
+            el.style.marginBottom = "0";
+            el.style.paddingTop = "0";
+            el.style.paddingBottom = "0";
+          }, 3000);
+        });
+      })();
+    </script>
+
+    <section class="panel">
+      <details>
+        <summary style="font-weight:700;color:#111;cursor:pointer;">1. Tải dữ liệu doanh thu Momo</summary>
+        <div style="margin-top:12px;">
+      <p class="muted">
+        Có thể tải bảng "Tổng Momo tháng" (.xlsx/.xlsm) như trước, <strong>hoặc</strong> tải thẳng file
+        <strong>.zip</strong> báo cáo tải trực tiếp từ cổng MoMo (daily_report) — web tự giải nén và gộp
+        doanh thu theo từng gian, không cần đúng định dạng cũ.
+      </p>
+      <form method="POST" action="/doi-soat/momo/upload-tong" enctype="multipart/form-data" class="form-inline">
+        <input type="file" name="file" accept=".xlsx,.xlsm,.xls,.zip" required />
+        <button type="submit" class="btn btn-primary">Tải lên</button>
+      </form>
+      <% var momoTotalCodes = uploads.reduce(function(s, u){ return s + u.codes.length; }, 0); %>
+      <details style="margin-top:12px;">
+        <summary class="muted" style="cursor:pointer;">
+          Đã tải <%= uploads.length %> lần (bấm để xem chi tiết)
+        </summary>
+        <table class="table" style="margin-top:10px;">
+          <thead><tr><th>File</th><th>Sheet</th><th>Khoảng ngày</th><th>Số mã công trình</th><th>Lúc tải</th><th></th></tr></thead>
+          <tbody>
+            <% uploads.forEach(function(u) { %>
+            <tr>
+              <td><%= u.file_name %></td>
+              <td><%= u.sheetName %></td>
+              <td><%= u.dates[0] %> → <%= u.dates[u.dates.length-1] %></td>
+              <td><%= u.codes.length %></td>
+              <td><%= new Date(u.uploaded_at).toLocaleString('vi-VN') %></td>
+              <td>
+                <form method="POST" action="/doi-soat/momo/upload-tong/<%= u.id %>/delete" onsubmit="return confirm('Xoá bảng doanh thu này?');">
+                  <button type="submit" class="link-btn link-danger">Xoá</button>
+                </form>
+              </td>
+            </tr>
+            <% }) %>
+            <% if (uploads.length === 0) { %>
+            <tr><td colspan="6" class="muted">Chưa tải bảng Tổng Momo nào.</td></tr>
+            <% } %>
+          </tbody>
+        </table>
+      </details>
+        </div>
+      </details>
+    </section>
+
+    <section class="panel">
+      <details>
+        <summary style="font-weight:700;color:#111;cursor:pointer;">2. Tải danh sách hóa đơn đã xuất (file MTT có sheet "kê ds xuất HĐ...")</summary>
+        <div style="margin-top:12px;">
+      <form method="POST" action="/doi-soat/momo/upload-hoadon" enctype="multipart/form-data" class="form-inline">
+        <input type="file" name="file" accept=".xlsx,.xls" required />
+        <button type="submit" class="btn btn-primary">Tải lên</button>
+      </form>
+      <p class="muted" style="margin-top:8px;">
+        Đã nạp <strong><%= invoiceCount %></strong> dòng hóa đơn có gắn thẻ "momo". Tải file mới sẽ tự thêm dòng chưa có, không trùng lặp.
+      </p>
+      <% if (invoiceCount > 0) { %>
+      <form method="POST" action="/doi-soat/momo/invoices/clear" onsubmit="return confirm('Xoá toàn bộ hóa đơn momo đã nạp?');">
+        <button type="submit" class="btn btn-secondary">Xoá hết hóa đơn đã nạp</button>
+      </form>
+      <% } %>
+        </div>
+      </details>
+    </section>
+
+    <% if (allCodes.length > 0) { %>
+    <section class="panel">
+      <h2>3. TK Có theo từng mã công trình (131 = thông thường, 1388 = doanh thu chia sẻ, "Chưa xuất MISA" = khách mới)</h2>
+      <p class="muted">
+        Chọn "Chưa xuất MISA (KH mới)" cho các gian là khách hàng mới chưa lên MISA — dòng đối soát vẫn hiện
+        trên trang này để theo dõi, nhưng sẽ KHÔNG được đưa vào file xuất Excel ở mục 4.
+      </p>
+      <form method="POST" action="/doi-soat/momo/mapping">
+        <table class="table">
+          <thead><tr><th>Mã công trình</th><th>TK Có</th></tr></thead>
+          <tbody>
+            <% allCodes.forEach(function(code) { %>
+            <tr>
+              <td><%= code.endsWith('__FF') ? code.replace('__FF', '') + ' (gian FF - chia sẻ)' : code %></td>
+              <td>
+                <select name="tkco_<%= code %>">
+                  <option value="131" <%= (gianMapping[code] || '131') === '131' ? 'selected' : '' %>>131</option>
+                  <option value="1388" <%= gianMapping[code] === '1388' ? 'selected' : '' %>>1388 (chia sẻ)</option>
+                  <option value="SKIP" <%= gianMapping[code] === 'SKIP' ? 'selected' : '' %>>Chưa xuất MISA (KH mới)</option>
+                </select>
+              </td>
+            </tr>
+            <% }) %>
+          </tbody>
+        </table>
+        <button type="submit" class="btn btn-secondary">Lưu bảng TK Có</button>
+      </form>
+    </section>
+    <% } %>
+
+    <% if ((unmatchedInvoiceCodes && unmatchedInvoiceCodes.length > 0) || (invoiceDiemAlias && Object.keys(invoiceDiemAlias).length > 0)) { %>
+    <section class="panel">
+      <h2>3b. Ánh xạ tên/mã điểm khác trên hóa đơn về đúng Mã công trình</h2>
+      <p class="muted">
+        Một số hóa đơn ghi "Mã điểm" là tên riêng của 1 góc/thương hiệu con (vd "SNOWFUN TÂN PHÚ") thay vì đúng
+        Mã công trình bên doanh thu (vd "AM TP KVCM") — nên web không tự dò khớp được, khiến dòng "Lệch" hiện ra
+        dù tiền hóa đơn thực ra vẫn có. Ánh xạ tên này về đúng Mã công trình bên dưới, áp dụng ngay không cần tải lại hóa đơn.
+      </p>
+      <% if (unmatchedInvoiceCodes && unmatchedInvoiceCodes.length > 0) { %>
+      <table class="table">
+        <thead><tr><th>Tên/Mã điểm trên hóa đơn (chưa khớp)</th><th>Ánh xạ về Mã công trình</th><th></th></tr></thead>
+        <tbody>
+          <% unmatchedInvoiceCodes.forEach(function(code) { %>
+          <tr>
+            <td><%= code %></td>
+            <td colspan="2">
+              <form method="POST" action="/doi-soat/momo/diem-alias" class="form-inline">
+                <input type="hidden" name="sourceCode" value="<%= code %>" />
+                <select name="targetCode" required>
+                  <option value="">-- Chọn Mã công trình --</option>
+                  <% allCodes.forEach(function(c) { %>
+                  <option value="<%= c %>"><%= c.endsWith('__FF') ? c.replace('__FF', '') + ' (gian FF - chia sẻ)' : c %></option>
+                  <% }) %>
+                </select>
+                <button type="submit" class="btn btn-secondary">Lưu ánh xạ</button>
+              </form>
+            </td>
+          </tr>
+          <% }) %>
+        </tbody>
+      </table>
+      <% } %>
+      <% if (invoiceDiemAlias && Object.keys(invoiceDiemAlias).length > 0) { %>
+      <table class="table" style="margin-top:12px;">
+        <thead><tr><th>Đã ánh xạ</th><th></th><th></th></tr></thead>
+        <tbody>
+          <% Object.keys(invoiceDiemAlias).forEach(function(src) { %>
+          <tr>
+            <td><%= src %> → <%= invoiceDiemAlias[src] %></td>
+            <td>
+              <form method="POST" action="/doi-soat/momo/diem-alias/delete" onsubmit="return confirm('Xoá ánh xạ này?');">
+                <input type="hidden" name="sourceCode" value="<%= src %>" />
+                <button type="submit" class="link-btn link-danger">Xoá</button>
+              </form>
+            </td>
+          </tr>
+          <% }) %>
+        </tbody>
+      </table>
+      <% } %>
+    </section>
+    <% } %>
+
+    <section class="panel">
+      <h2>4. Kết quả đối soát theo từng khoản momo về ngân hàng</h2>
+      <% if (months.length > 0) { %>
+      <form method="GET" action="/doi-soat/momo" class="form-inline" style="margin-bottom:14px;">
+        <label style="margin:0;">Chọn tháng:</label>
+        <select name="month" onchange="this.form.submit()">
+          <option value="" <%= selectedMonth === '' ? 'selected' : '' %>>-- Tất cả --</option>
+          <% months.forEach(function(m) { %>
+          <option value="<%= m %>" <%= selectedMonth === m ? 'selected' : '' %>><%= m %></option>
+          <% }) %>
+        </select>
+      </form>
+      <% } %>
+      <% if (reconciled.length === 0) { %>
+        <p class="muted">Chưa có dữ liệu để đối soát — cần tải ít nhất 1 bảng "Tổng Momo tháng" ở bước 1.</p>
+      <% } else { %>
+      <div class="form-inline" style="margin-bottom:14px;">
+        <label style="margin:0;">Số chứng từ bắt đầu (NTTK...):</label>
+        <input type="number" id="startNo" value="1" min="1" style="width:100px;" />
+        <a class="btn btn-secondary" id="exportBtn" href="/doi-soat/momo/export.xlsx?start=1">Xuất Excel (định dạng AMIS)</a>
+      </div>
+      <p class="muted" style="margin-top:-8px; margin-bottom:14px;">
+        Các dòng đánh dấu "KH mới - chưa xuất MISA" bên dưới sẽ tự động bị loại khỏi file xuất Excel. File xuất luôn gồm TOÀN BỘ các khoản chưa xuất, không chỉ tháng đang lọc xem ở đây.
+      </p>
+      <script>
+        document.getElementById('startNo').addEventListener('input', function() {
+          document.getElementById('exportBtn').href = '/doi-soat/momo/export.xlsx?start=' + (this.value || 1);
+        });
+      </script>
+
+      <% reconciled.forEach(function(r) { %>
+      <div class="panel" style="background:#fafbfc; box-shadow:none; border:1px solid #eee;">
+        <h2 style="display:flex; justify-content:space-between; font-size:14px;">
+          <span>Khoản về ngày <%= r.settlementDate %> (doanh thu <%= r.from %><%= r.from !== r.to ? ' → ' + r.to : '' %>)</span>
+          <span>
+            Ngân hàng: <strong><%= r.bankAmount.toLocaleString('vi-VN') %> đ</strong>
+            &nbsp;|&nbsp; Tính từ Tổng Momo: <strong><%= r.totalNetComputed.toLocaleString('vi-VN') %> đ</strong>
+            &nbsp;|&nbsp;
+            <span class="<%= Math.abs(r.diffVsBank) < 1 ? 'text-pos' : 'text-neg' %>">
+              Chênh lệch: <%= r.diffVsBank.toLocaleString('vi-VN') %> đ
+            </span>
+          </span>
+        </h2>
+        <table class="table">
+          <thead>
+            <tr><th>Mã công trình (gian)</th><th>TK Có</th><th>Doanh thu gộp</th><th>Tiền về NH (net)</th><th>Số HĐ khớp</th><th>Tổng tiền HĐ</th><th>Trạng thái</th></tr>
+          </thead>
+          <tbody>
+            <% r.lines.forEach(function(l) { %>
+            <tr<%= l.tkCo === 'SKIP' ? ' style="opacity:0.6;"' : '' %>>
+              <td><%= l.label || l.code %></td>
+              <td><%= l.tkCo === 'SKIP' ? '—' : l.tkCo %></td>
+              <td><%= l.gross.toLocaleString('vi-VN') %> đ</td>
+              <td><%= l.net.toLocaleString('vi-VN') %> đ</td>
+              <td><%= l.invoiceNumbers.join(', ') || '-' %></td>
+              <td><%= l.invoiceTotal.toLocaleString('vi-VN') %> đ</td>
+              <td>
+                <% if (l.tkCo === 'SKIP') { %>
+                  <span class="badge badge-chi">KH mới - chưa xuất MISA</span>
+                <% } else if (l.invoiceNumbers.length === 0) { %>
+                  <span class="badge badge-chi">Chưa có HĐ</span>
+                <% } else if (l.matched) { %>
+                  <span class="badge badge-thu">Khớp</span>
+                <% } else { %>
+                  <span class="badge badge-chi">Lệch <%= l.diff.toLocaleString('vi-VN') %> đ</span>
+                <% } %>
+              </td>
+            </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+      <% }) %>
+      <% } %>
+    </section>
+  </main>
+</body>
+</html>

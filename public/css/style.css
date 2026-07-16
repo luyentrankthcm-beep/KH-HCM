@@ -1,0 +1,307 @@
+/* ---------- Design tokens (adapted from the "hp" design language via
+   npx getdesign@latest add hp -- HP Electric Blue accent, near-black ink,
+   soft-lift cards, sharp 4px buttons vs. soft 16px cards). Semantic colors
+   (success/danger/warning) are NOT part of HP's own palette -- an
+   accounting/reconciliation tool needs a clear, unambiguous green=thu,
+   red=chi/lech, amber=canh bao vocabulary, so those 3 are kept conventional
+   while every other surface (buttons, links, active nav state, card
+   accents) uses the HP tokens below. ---------- */
+:root {
+  --color-primary: #024ad8;
+  --color-primary-bright: #296ef9;
+  --color-primary-deep: #0e3191;
+  --color-primary-soft: #c9e0fc;
+  --color-ink: #1a1a1a;
+  --color-ink-soft: #292929;
+  --color-canvas: #ffffff;
+  --color-cloud: #f7f7f7;
+  --color-fog: #e8e8e8;
+  --color-steel: #c2c2c2;
+  --color-graphite: #636363;
+  --color-charcoal: #3d3d3d;
+  --color-hairline: #e8e8e8;
+
+  --color-success: #1d8a4a;
+  --color-success-bg: #e9f7ef;
+  --color-danger: #b3262b;
+  --color-danger-bg: #fdeceb;
+  --color-warning: #a6620a;
+  --color-warning-bg: #fdf1e0;
+
+  --radius-sm: 3px;
+  --radius-md: 4px;
+  --radius-lg: 8px;
+  --radius-xl: 16px;
+
+  --shadow-soft: 0 2px 8px rgba(26, 26, 26, 0.08);
+  --shadow-modal: 0 8px 24px rgba(26, 26, 26, 0.12);
+
+  --space-xs: 8px;
+  --space-sm: 12px;
+  --space-md: 16px;
+  --space-lg: 20px;
+  --space-xl: 24px;
+  --space-xxl: 32px;
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: "Inter", -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  background: var(--color-cloud);
+  color: var(--color-ink);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ---------- Top nav: dark-ink slab (HP's closing-rhythm color), Electric
+   Blue reserved for the active-page underline + hover state only. ---------- */
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--color-ink);
+  color: #fff;
+  padding: 14px 28px;
+  flex-wrap: wrap;
+  gap: 12px;
+  /* Cố định thanh điều khiển trên cùng khi cuộn trang, luôn nổi trên
+     dòng tiêu đề bảng (z-index cao hơn .table thead th). */
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+}
+.brand { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.brand-name {
+  font-weight: 600;
+  font-size: 18px;
+  margin-right: 4px;
+  position: relative;
+  padding-left: 14px;
+}
+/* Chevron nho truoc ten thuong hieu -- goi lai net dac trung cua HP (2
+   vach cheo xanh dien) nhung thu gon ve kich thuoc icon, khong lam ro rem
+   giao dien noi bo nhieu bang bieu. */
+.brand-name::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 2px;
+  width: 6px;
+  height: 14px;
+  background: var(--color-primary);
+  transform: skewX(-20deg);
+}
+.brand-sub { font-size: 12px; opacity: 0.75; letter-spacing: 0.2px; }
+.nav-links { display: flex; flex-wrap: wrap; }
+.nav-links a {
+  color: #fff;
+  text-decoration: none;
+  margin: 0 2px;
+  padding: 8px 12px;
+  font-size: 14px;
+  opacity: 0.82;
+  border-radius: var(--radius-md);
+  border-bottom: 2px solid transparent;
+  transition: opacity 0.15s, background 0.15s;
+}
+.nav-links a:hover { opacity: 1; background: rgba(255, 255, 255, 0.08); }
+.nav-user { display: flex; align-items: center; gap: 12px; font-size: 14px; opacity: 0.92; }
+
+/* Nut chuyen cong ty (KH Cu / KH Moi) tren topbar -- 2 nut dinh vao nhau
+   nhu 1 toggle, nut dang chon noi bat mau Electric Blue, nut con lai mo. */
+.company-switch {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-md);
+  padding: 2px;
+}
+.company-btn {
+  border: none;
+  background: transparent;
+  color: #fff;
+  opacity: 0.65;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 14px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background 0.15s ease, opacity 0.15s ease;
+}
+.company-btn:hover { opacity: 0.9; }
+.company-btn.is-active {
+  background: var(--color-primary);
+  opacity: 1;
+}
+
+.container { max-width: 1280px; margin: 0 auto; padding: 28px 24px; }
+.desc-cell {
+  max-width: 360px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: help;
+}
+h1 {
+  font-size: 26px;
+  font-weight: 500;
+  margin: 0 0 18px;
+  color: var(--color-ink);
+  letter-spacing: -0.2px;
+}
+h2 { font-size: 16px; font-weight: 600; margin: 0 0 14px; color: var(--color-ink); }
+
+/* ---------- Cards: soft-lift shadow + rounded-xl (HP's card-product spec) ---------- */
+.cards { display: flex; gap: var(--space-md); flex-wrap: wrap; margin-bottom: var(--space-xl); }
+.card {
+  flex: 1;
+  min-width: 220px;
+  background: var(--color-canvas);
+  border-radius: var(--radius-xl);
+  padding: 20px 22px;
+  box-shadow: var(--shadow-soft);
+  border-top: 3px solid var(--color-primary);
+}
+.card-thu { border-top-color: var(--color-success); }
+.card-chi { border-top-color: var(--color-danger); }
+.card-label { font-size: 13px; color: var(--color-graphite); margin-bottom: 6px; }
+.card-value { font-size: 23px; font-weight: 600; letter-spacing: -0.2px; }
+
+/* Cong no bucket cards double as filter buttons -- clickable, show an
+   active state when that bucket is the current filter. */
+a.card-bucket {
+  text-decoration: none;
+  color: var(--color-ink);
+  display: block;
+  border-top-color: var(--color-warning);
+  transition: box-shadow 0.15s, transform 0.15s;
+}
+a.card-bucket:hover { box-shadow: var(--shadow-modal); transform: translateY(-1px); }
+a.card-bucket.card-bucket-active {
+  border-top-color: var(--color-primary);
+  outline: 2px solid var(--color-primary-soft);
+}
+
+.panel {
+  background: var(--color-canvas);
+  border-radius: var(--radius-xl);
+  padding: var(--space-xl);
+  margin-bottom: var(--space-lg);
+  box-shadow: var(--shadow-soft);
+}
+.panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-md);
+}
+.panel-head h2 { margin: 0; }
+
+/* overflow-x:auto thoi thi thanh cuon o macOS/mot so trinh duyet mac dinh la
+   overlay mong, gan nhu vo hinh cho den khi ruoc chuot vao -- nhieu bang rong
+   (Doi soat Chi phi muc 3, cac bang doi soat khac) co cot bi cat ma khong ro
+   la co the cuon ngang duoc. Ve tuong minh 1 thanh cuon luon hien, mau ro
+   rang, thay vi phu thuoc scrollbar mac dinh cua he dieu hanh. */
+.table-scroll {
+  overflow-x: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-graphite) var(--color-hairline);
+}
+.table-scroll::-webkit-scrollbar { height: 10px; }
+.table-scroll::-webkit-scrollbar-track { background: var(--color-hairline); border-radius: 6px; }
+.table-scroll::-webkit-scrollbar-thumb { background: var(--color-graphite); border-radius: 6px; }
+.table-scroll::-webkit-scrollbar-thumb:hover { background: var(--color-ink); }
+
+.table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.table th, .table td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--color-hairline); }
+.table th { color: var(--color-graphite); font-weight: 600; font-size: 12.5px; text-transform: uppercase; letter-spacing: 0.3px; }
+.table td.num, .table th.num { text-align: right; font-variant-numeric: tabular-nums; }
+.table tfoot td { font-weight: 600; border-top: 2px solid var(--color-ink); border-bottom: none; }
+/* Cố định dòng tiêu đề bảng khi cuộn qua các bảng dài (đối soát Momo/ZVP,
+   giao dịch, báo cáo...) -- mỗi bảng tự dính khi đầu bảng chạm mép trên
+   trình duyệt, tự nhả khi cuộn qua bảng kế tiếp. Dính ngay dưới thanh điều
+   khiển trên cùng (--topbar-h, đo bằng JS trong partials/nav.ejs) chứ không
+   đè lên thanh đó. */
+.table thead th {
+  position: sticky;
+  top: var(--topbar-h, 0px);
+  background: var(--color-canvas);
+  z-index: 2;
+  box-shadow: 0 1px 0 var(--color-hairline);
+}
+.table-pivot td a { color: var(--color-primary); text-decoration: none; }
+.table-pivot td a:hover { text-decoration: underline; }
+
+/* Nút nổi "Lên đầu trang" / "Quay lại" -- luôn hiện ở góc dưới phải để dễ
+   di chuyển trên các trang dài (nhiều bảng đối soát xếp chồng). */
+.float-nav {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 50;
+}
+.float-nav-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--color-ink);
+  color: #fff;
+  border: none;
+  box-shadow: var(--shadow-modal);
+  cursor: pointer;
+  font-size: 18px;
+  text-decoration: none;
+  opacity: 0.9;
+}
+.float-nav-btn:hover { opacity: 1; background: var(--color-primary); }
+.float-nav-btn.is-hidden { display: none; }
+.muted { color: var(--color-graphite); font-size: 13px; }
+.text-neg { color: var(--color-danger); font-weight: 600; }
+.text-pos { color: var(--color-success); font-weight: 600; }
+.text-warn { color: var(--color-warning); font-weight: 600; }
+
+.badge { padding: 3px 10px; border-radius: var(--radius-lg); font-size: 12px; font-weight: 600; white-space: nowrap; }
+.badge-thu { background: var(--color-success-bg); color: var(--color-success); }
+.badge-chi { background: var(--color-danger-bg); color: var(--color-danger); }
+.badge-neg { background: var(--color-danger-bg); color: var(--color-danger); }
+.badge-warn { background: var(--color-warning-bg); color: var(--color-warning); }
+
+form label { display: block; font-size: 13px; color: var(--color-charcoal); margin: 10px 0 4px; }
+form input, form select, form textarea {
+  width: 100%;
+  padding: 9px 12px;
+  border: 1px solid var(--color-steel);
+  border-radius: var(--radius-md);
+  font-size: 14px;
+  font-family: inherit;
+  background: var(--color-canvas);
+  color: var(--color-ink);
+}
+form input:focus, form select:focus, form textarea:focus {
+  outline: none;
+  border-color: var(--color-ink);
+}
+form textarea { font-family: monospace; resize: vertical; }
+
+.form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 4px 16px; align-items: end; }
+.form-actions { display: flex; align-items: end; }
+.form-inline { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.form-inline input, .form-inline select { width: auto; }
+.form-inline-tight { display: flex; align-items: center; gap: 8px; }
+.form-inline-tight select { width: auto; padding: 6px 10px; font-size: 13px; }
+.filter-bar { margin-bottom: 14px; }
+
+/* ---------- Buttons: sharp rounded-md (HP's two-tier "sharp buttons / soft
+   cards" split). Uppercase + tracking matches HP's button-md typography. ---------- */
+.btn {
+  display: inl

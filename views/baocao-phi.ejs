@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <%- include('partials/head') %>
+</head>
+<body>
+  <%- include('partials/nav') %>
+  <main class="container">
+    <h1>Bảng phí VNPay / Momo theo tháng</h1>
+    <p class="muted">
+      Phí = Doanh thu gộp − Net (tiền thực về ngân hàng). VNPay Online/Offline/Payoo dùng số phí THẬT lấy từ dữ liệu đã tải lên.
+      Momo hiện chưa có dữ liệu phí thật theo từng giao dịch nên tạm dùng mức ước tính 1.1% (giống cách tính đang dùng ở trang đối soát Momo) — đánh dấu rõ "ước tính" để phân biệt.
+    </p>
+    <section class="panel">
+      <a class="btn btn-secondary" href="/bao-cao/phi/export.xlsx">Xuất Excel</a>
+      <table class="table" style="margin-top:12px;">
+        <thead>
+          <tr><th>Tháng</th><th>Kênh</th><th>Tổng doanh thu gộp</th><th>Tổng phí</th><th>% phí</th><th>Net (sau phí)</th></tr>
+        </thead>
+        <tbody>
+          <% rows.forEach(function(r) { %>
+          <tr>
+            <td><%= r.month %></td>
+            <td><%= r.channel %><% if (r.estimated) { %> <span class="badge badge-chi">ước tính</span><% } %></td>
+            <td><%= r.gross.toLocaleString('vi-VN') %> đ</td>
+            <td><%= r.fee.toLocaleString('vi-VN') %> đ</td>
+            <td><%= r.feePct.toFixed(2) %>%</td>
+            <td><%= r.net.toLocaleString('vi-VN') %> đ</td>
+          </tr>
+          <% }) %>
+          <% if (rows.length === 0) { %>
+          <tr><td colspan="6" class="muted">Chưa có dữ liệu.</td></tr>
+          <% } %>
+        </tbody>
+      </table>
+    </section>
+  </main>
+</body>
+</html>

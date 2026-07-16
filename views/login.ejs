@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <%- include('partials/head') %>
+</head>
+<body class="login-body">
+  <div class="login-card">
+    <h1>K&amp;H Bank Tracker</h1>
+    <p class="muted">CÔNG TY TNHH DỊCH VỤ VÀ GIẢI TRÍ K&amp;H</p>
+    <% if (error) { %>
+      <div class="alert alert-error"><%= error %></div>
+    <% } %>
+    <form method="POST" action="/login">
+      <label>Tên đăng nhập</label>
+      <input type="text" name="username" required autofocus />
+      <label>Mật khẩu</label>
+      <input type="password" name="password" required />
+      <button type="submit" class="btn btn-primary btn-full">Đăng nhập</button>
+    </form>
+  </div>
+</body>
+</html>
