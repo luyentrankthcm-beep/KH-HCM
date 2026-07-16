@@ -865,7 +865,10 @@ router.post("/doi-soat/zvp/manual-match/delete", (req, res) => {
 // ---------- Export: "MISATHuế" (Online) va "MISAThue OFFLINE" (Offline + Payoo) ----------
 // Same "Mau phieu thu tien gui de nhap vao AMIS Accounting" 28-column layout
 // as Momo's export. Gian mapped to "SKIP" are excluded from both files.
-function buildExportRows(reconciledList, startNo, lyDoThu) {
+// suffixKenh (Luyen, 2026-07-16): hau to phan biet kenh ngay tren Dien giai
+// cua file xuat Misa -- "VNP" cho Zalo App (Online) va VNPay offline, "PAYOO"
+// rieng cho Payoo (Momo dung "MM", Viet QR dung "QR" o 2 file route khac).
+function buildExportRows(reconciledList, startNo, lyDoThu, suffixKenh) {
   let seq = startNo;
   const rows = [];
   reconciledList
@@ -880,8 +883,8 @@ function buildExportRows(reconciledList, startNo, lyDoThu) {
       exportableLines.forEach((l) => {
         const hdText = l.invoiceNumbers.length > 0 ? l.invoiceNumbers.join(", ") : "";
         const dienGiai = hdText
-          ? `Thu tiền dịch vụ vui chơi giải trí theo HĐ ${hdText}`
-          : "Thu tiền dịch vụ vui chơi giải trí";
+          ? `Thu tiền dịch vụ vui chơi giải trí - ${suffixKenh} theo HĐ ${hdText}`
+          : `Thu tiền dịch vụ vui chơi giải trí - ${suffixKenh}`;
         rows.push({
           "Ngày hạch toán (*)": ngayDmy,
           "Ngày chứng từ (*)": ngayDmy,
@@ -929,7 +932,7 @@ router.get("/doi-soat/zvp/export-online.xlsx", (req, res) => {
 
   let startNo = parseInt(req.query.start || "1", 10);
   if (isNaN(startNo) || startNo < 1) startNo = 1;
-  const { rows } = buildExportRows(built.reconciled.online, startNo, "Thu tiền khách hàng qua Zalo App (VNPay Online)");
+  const { rows } = buildExportRows(built.reconciled.online, startNo, "Thu tiền khách hàng qua Zalo App (VNPay Online)", "VNP");
 
   const ws = XLSX.utils.json_to_sheet(rows);
   const wb2 = XLSX.utils.book_new();
@@ -950,8 +953,8 @@ router.get("/doi-soat/zvp/export-offline.xlsx", (req, res) => {
   // Offline VNPay + Payoo folded into the SAME file (per Luyen: Payoo duoc
   // xu ly don gian giong nhu Offline), continuing the same document-number
   // sequence across both channels.
-  const offlinePart = buildExportRows(built.reconciled.offline, startNo, "Thu tiền khách hàng qua QR offline (VNPay)");
-  const payooPart = buildExportRows(built.reconciled.payoo, offlinePart.nextSeq, "Thu tiền khách hàng qua Payoo");
+  const offlinePart = buildExportRows(built.reconciled.offline, startNo, "Thu tiền khách hàng qua QR offline (VNPay)", "VNP");
+  const payooPart = buildExportRows(built.reconciled.payoo, offlinePart.nextSeq, "Thu tiền khách hàng qua Payoo", "PAYOO");
   const rows = [...offlinePart.rows, ...payooPart.rows];
 
   const ws = XLSX.utils.json_to_sheet(rows);

@@ -449,9 +449,12 @@ router.get("/doi-soat/momo/export.xlsx", (req, res) => {
       const ngayDmy = isoToDmy(r.settlementDate);
       exportableLines.forEach((l) => {
         const hdText = l.invoiceNumbers.length > 0 ? l.invoiceNumbers.join(", ") : "";
+        // Hau to kenh (Luyen, 2026-07-16): "- MM" de phan biet doanh thu Momo
+        // voi cac kenh khac (VNPay/Zalo/Payoo la "- VNP"/"- PAYOO", Viet QR la
+        // "- QR") ngay tren file xuat Misa, dat truoc "theo HD ..." neu co.
         const dienGiai = hdText
-          ? `Thu tiền dịch vụ vui chơi giải trí theo HĐ ${hdText}`
-          : "Thu tiền dịch vụ vui chơi giải trí";
+          ? `Thu tiền dịch vụ vui chơi giải trí - MM theo HĐ ${hdText}`
+          : "Thu tiền dịch vụ vui chơi giải trí - MM";
         rows.push({
           "Ngày hạch toán (*)": ngayDmy,
           "Ngày chứng từ (*)": ngayDmy,
