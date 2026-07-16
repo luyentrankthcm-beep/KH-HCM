@@ -78,6 +78,19 @@
         </table>
       </details>
 
+      <% if (chInfo.parseMode === 'mn') { %>
+      <div style="margin-top:16px; padding-top:12px; border-top:1px dashed #ddd;">
+        <p class="muted" style="margin-bottom:6px;">
+          Hoặc dán trực tiếp dữ liệu bảng "Transactions" (copy từ Excel/hệ thống, giữ luôn dòng tiêu đề) —
+          không cần tải file mỗi lần. Dán cộng dồn được nhiều lần, dòng đã có (theo Mã tham chiếu) sẽ tự bỏ qua.
+        </p>
+        <form method="POST" action="/doi-soat/vietqr/paste-raw/<%= ch %>">
+          <textarea name="paste_text" rows="8" style="width:100%;" placeholder="STT&#9;Thời gian TT&#9;Số tiền đến (VND)&#9;Số tiền đi (VND)&#9;Loại&#9;Trạng thái&#9;Mã tham chiếu&#9;Mã đơn hàng&#9;Mã điểm bán&#9;Mã cửa hàng&#9;Tài khoản nhận&#9;Thời gian tạo&#9;Nội dung TT&#9;Ghi chú&#9;Loại giao dịch"></textarea>
+          <button type="submit" class="btn btn-secondary" style="margin-top:8px;">Đối soát dữ liệu đã dán</button>
+        </form>
+      </div>
+      <% } %>
+
       <div style="margin-top:16px; padding-top:12px; border-top:1px dashed #ddd;">
         <p class="muted" style="margin-bottom:6px;">
           Danh sách điểm bán riêng ("store_export") — nạp trước tên điểm bán mới nhất, không cần chờ có giao dịch QR.

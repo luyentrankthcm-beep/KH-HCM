@@ -34,6 +34,16 @@
       })();
     </script>
 
+    <% if (usesSharedSource) { %>
+    <section class="panel">
+      <p class="muted" style="margin:0;">
+        <strong>Lưu ý:</strong> KH Mới chưa có tài khoản Momo riêng thực sự nhận tiền, nên trang này đang đối soát
+        trên CÙNG sao kê ngân hàng và doanh thu "Tổng Momo" của <strong><%= sourceLabel %></strong> (KH Cũ) — không
+        cần tải lại doanh thu ở đây. Chỉ hóa đơn ở mục 2 bên dưới là riêng của KH Mới. Muốn xem/tải doanh thu gốc,
+        chuyển qua tab "Cũ" trên thanh trên cùng.
+      </p>
+    </section>
+    <% } else { %>
     <section class="panel">
       <details>
         <summary style="font-weight:700;color:#111;cursor:pointer;">1. Tải dữ liệu doanh thu Momo</summary>
@@ -78,6 +88,7 @@
         </div>
       </details>
     </section>
+    <% } %>
 
     <section class="panel">
       <details>

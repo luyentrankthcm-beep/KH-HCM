@@ -6,7 +6,7 @@
 <body>
   <%- include('partials/nav') %>
   <main class="container">
-    <h1>Quản lý ngân hàng</h1>
+    <h1>Quản lý ngân hàng — <%= COMPANIES[activeCompany].label %></h1>
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
 
     <section class="panel">
