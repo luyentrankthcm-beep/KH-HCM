@@ -206,15 +206,28 @@ a.card-bucket.card-bucket-active {
    (Doi soat Chi phi muc 3, cac bang doi soat khac) co cot bi cat ma khong ro
    la co the cuon ngang duoc. Ve tuong minh 1 thanh cuon luon hien, mau ro
    rang, thay vi phu thuoc scrollbar mac dinh cua he dieu hanh. */
+/* QUAN TRONG: KHONG dat overflow-x: auto (hay bat ky gia tri overflow nao
+   khac "visible") truc tiep tren .table-scroll nua -- da GO BO co y (Luyen
+   bao loi qua screenshot trang Cong no ngay 2026-07-16: dong tieu de bang
+   hien "chen" / "boi" lo lung giua cac dong du lieu khi cuon, thay vi dinh
+   gon o tren). Nguyen nhan xac nhan truc tiep tren production bang JS: CSS
+   spec buoc overflow-y tinh thanh "auto" bat cu khi nao overflow-x khac
+   "visible" ("auto axis" rule) -- dieu nay bien .table-scroll thanh 1 scroll
+   container, khien <thead th> ben duoi (position: sticky) tu dinh vao BEN
+   TRONG .table-scroll thay vi vao trang/viewport. Vi .table-scroll khong
+   bao gio thuc su cuon noi bo rieng (chieu cao no luon = dung chieu cao noi
+   dung, khong bi gioi han), Chrome khong con dong bo sticky theo scroll cua
+   TRANG nua -- ket qua dung y het bao cao: header "boi" sai vi tri khi cuon.
+   Da thu ca overflow-y: clip/visible rieng -- khong an thua, spec luon ep ve
+   "auto" tru khi bo han overflow tren .table-scroll (da kiem chung: bo di la
+   het bug ngay). Neu 1 bang nao do (vd Doi soat Chi phi muc 3, cot "Dien
+   giai" rong) rong hon khung trang, trang se tu cuon ngang binh thuong
+   (than/html) thay vi khung nay co rieng 1 thanh cuon -- danh doi chap nhan
+   duoc de sticky header hoat dong dung CHO CA TRANG. */
 .table-scroll {
-  overflow-x: auto;
   scrollbar-width: thin;
   scrollbar-color: var(--color-graphite) var(--color-hairline);
 }
-.table-scroll::-webkit-scrollbar { height: 10px; }
-.table-scroll::-webkit-scrollbar-track { background: var(--color-hairline); border-radius: 6px; }
-.table-scroll::-webkit-scrollbar-thumb { background: var(--color-graphite); border-radius: 6px; }
-.table-scroll::-webkit-scrollbar-thumb:hover { background: var(--color-ink); }
 
 .table { width: 100%; border-collapse: collapse; font-size: 14px; }
 .table th, .table td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--color-hairline); }
@@ -304,4 +317,54 @@ form textarea { font-family: monospace; resize: vertical; }
 /* ---------- Buttons: sharp rounded-md (HP's two-tier "sharp buttons / soft
    cards" split). Uppercase + tracking matches HP's button-md typography. ---------- */
 .btn {
-  display: inl
+  display: inline-block;
+  padding: 10px 20px;
+  border-radius: var(--radius-md);
+  border: none;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  cursor: pointer;
+  text-decoration: none;
+  margin-top: 10px;
+  transition: background 0.15s;
+}
+.btn-primary { background: var(--color-primary); color: #fff; }
+.btn-primary:hover { background: var(--color-primary-deep); }
+.btn-secondary { background: var(--color-fog); color: var(--color-ink); }
+.btn-secondary:hover { background: var(--color-steel); }
+.btn-full { width: 100%; }
+
+.link-btn {
+  background: none;
+  border: none;
+  color: var(--color-primary);
+  cursor: pointer;
+  font-size: 13px;
+  padding: 0;
+  text-decoration: none;
+}
+.link-btn:hover { text-decoration: underline; }
+.link-danger { color: var(--color-danger); }
+
+.alert { padding: 11px 16px; border-radius: var(--radius-md); margin-bottom: 14px; font-size: 14px; }
+.alert-error { background: var(--color-danger-bg); color: var(--color-danger); border: 1px solid #f3c6c4; }
+.alert-success { background: var(--color-success-bg); color: var(--color-success); border: 1px solid #bfe6cf; }
+
+.login-body {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  background: var(--color-cloud);
+}
+.login-card {
+  background: var(--color-canvas);
+  padding: 36px;
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-modal);
+  width: 100%;
+  max-width: 380px;
+}
+.login-card h1 { margin-bottom: 4px; }
