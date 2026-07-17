@@ -4,6 +4,8 @@ const { load } = require("../store");
 const { requireLogin } = require("../middleware/auth");
 const momo = require("../utils/momoReconcile");
 const zvp = require("../utils/zvpReconcile");
+const overviewAggregate = require("../utils/overviewAggregate");
+const { COMPANIES } = require("../utils/companies");
 
 const router = express.Router();
 router.use(requireLogin);
@@ -337,6 +339,61 @@ router.get("/bao-cao/thu-chi-theo-gian/export.xlsx", (req, res) => {
   res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
   res.setHeader("Content-Disposition", "attachment; filename=thu-chi-theo-gian.xlsx");
   res.send(buf);
+});
+
+// ---------- 4) Trang thai doi soat theo cong ty (bieu do tron) ----------
+// Luyen yeu cau 2026-07-17: bao cao rieng cho KH Cu / KH Moi, dang bieu do
+// tron/thong ke. Dung LAI ket qua doi soat cua tung kenh qua
+// utils/overviewAggregate.buildAllFlatLines (giong /cong-no) roi phan loai
+// tung dong theo cong ty dua vao truong "company" da gan san cho tung kenh
+// Viet QR trong routes/doisoat-vietqr.js (CHANNELS). Momo va Zalo/VNPay/
+// Payoo hien tai CHUA duoc tach rieng theo cong ty trong du lieu (van la
+// KH Cu, xem ghi chu trong views/partials/nav.ejs) nen mac dinh xep vao
+// "kh_cu" -- khi nao du lieu duoc tach that thi chi can sua ham
+// companyOfChannelKey nay, khong dung lai logic doi soat.
+function companyOfChannelKey(channelKey, vietqrChannels) {
+  if (channelKey.startsWith("vietqr_")) {
+    const rawKey = channelKey.slice("vietqr_".length);
+    const ch = vietqrChannels[rawKey];
+    return (ch && ch.company) || "kh_cu";
+  }
+  return "kh_cu";
+}
+
+function buildTrangThaiDoiSoat(store) {
+  // Require ngay trong ham (khong o dau file) de tranh vong lap require --
+  // giong cach utils/overviewAggregate.js da lam voi 3 module doi soat.
+  const vietqrRouter = require("./doisoat-vietqr");
+  const flat = overviewAggregate.buildAllFlatLines(store);
+
+  const blankStatus = () => ({
+    "Khớp": { count: 0, amount: 0 },
+    "Lệch": { count: 0, amount: 0 },
+    "Chưa có HĐ": { count: 0, amount: 0 },
+  });
+  const byCompany = { kh_cu: blankStatus(), kh_moi: blankStatus() };
+
+  flat.forEach((l) => {
+    const company = companyOfChannelKey(l.channelKey, vietqrRouter.VIETQR_CHANNELS);
+    const status = l.invoiceNumbers.length === 0 ? "Chưa có HĐ" : overviewAggregate.isResolved(l) ? "Khớp" : "Lệch";
+    byCompany[company][status].count++;
+    byCompany[company][status].amount += l.gross;
+  });
+
+  return byCompany;
+}
+
+router.get("/bao-cao/trang-thai-doi-soat", (req, res) => {
+  const store = load();
+  let error = null;
+  let stats = null;
+  try {
+    stats = buildTrangThaiDoiSoat(store);
+  } catch (e) {
+    error = e.message;
+    console.error("Loi tinh trang thai doi soat:", e);
+  }
+  res.render("baocao-trangthai", { userName: req.session.userName, stats, COMPANIES, error });
 });
 
 module.exports = router;
