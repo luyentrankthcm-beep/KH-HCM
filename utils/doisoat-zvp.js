@@ -90,9 +90,27 @@ function mergeResolvedGross(uploads) {
 function seedGianMappingDefaults(store, codes) {
   codes.forEach((c) => {
     if (!(c in store.gian_mapping)) {
-      store.gian_mapping[c] = c.endsWith(FF_SUFFIX) ? "1388" : "131";
+      // Luyen, 2026-07-17: "doi xuat ra 1388 thanh 131 het" -- TK Co 1388
+      // (doanh thu chia se/CSE) khong con duoc dung nua, moi gian moi deu
+      // mac dinh 131.
+      store.gian_mapping[c] = "131";
     }
   });
+}
+
+// Luyen, 2026-07-17: "doi xuat ra 1388 thanh 131 het" -- gian_mapping dung
+// chung voi trang Momo (routes/doisoat.js co cung 1 ham ten nay); lap lai o
+// day de trang nay tu sua duoc ngay ca khi duoc mo TRUOC trang Momo.
+function ensureNo1388(store) {
+  if (!store.gian_mapping) return false;
+  let changed = false;
+  for (const code of Object.keys(store.gian_mapping)) {
+    if (store.gian_mapping[code] === "1388") {
+      store.gian_mapping[code] = "131";
+      changed = true;
+    }
+  }
+  return changed;
 }
 
 // Rows from the daily master "gian " sheet (store.zvp_gian_master), filtered
@@ -118,6 +136,7 @@ function isDuplicateRecentUpload(uploadsList, fileName, grossByCode) {
 }
 
 function buildReconciliation(store) {
+  if (ensureNo1388(store)) save(store);
   const bank = store.banks.find((b) => b.name === ZVP_BANK_NAME);
   if (!bank) {
     return { error: `Chua co ngan hang "${ZVP_BANK_NAME}" (TK ${ZVP_BANK_ACCOUNT}) trong he thong.` };
