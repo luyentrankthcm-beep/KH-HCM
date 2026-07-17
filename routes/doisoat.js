@@ -94,6 +94,36 @@ function mergeGross(uploads) {
   return { codes: Array.from(codes), grossByCode };
 }
 
+const CHUA_MAP_PREFIX = "CHUA MAP: ";
+
+// "CHUA MAP: X" la 1 ma cua hang MOI xuat hien trong file zip cong MoMo ma
+// store.cua_hang_mapping chua tung biet toi (xem resolveRawPortalGross). Ap
+// dung anh xa TAI DAY (luc doc du lieu de hien thi/doi soat, KHONG phai luc
+// parse file) nen ke ca nhung ban ghi gross DA tai len TU TRUOC (voi ma
+// "CHUA MAP: X" cung) cung tu dong duoc gan lai dung Ma Cong Trinh ngay khi
+// Luyen dien anh xa 1 lan, khong can tai lai file zip cu. Dung CHUNG
+// store.cua_hang_mapping cho ca 2 cong ty (Luyen, 2026-07-17: "map o day cho
+// ca 2 KH") -- mot lan dien ap dung ngay cho ca trang KH Cu va KH Moi.
+function applyCuaHangAlias(grossData, cuaHangMapping) {
+  const resolve = (rawCode) => {
+    if (!rawCode.startsWith(CHUA_MAP_PREFIX)) return rawCode;
+    const rawMaCuaHang = rawCode.slice(CHUA_MAP_PREFIX.length);
+    const known = cuaHangMapping[rawMaCuaHang];
+    return known && known.code ? known.code : rawCode;
+  };
+  const codesOut = new Set();
+  const grossByCodeOut = {};
+  for (const rawCode of grossData.codes) codesOut.add(resolve(rawCode));
+  for (const [key, val] of Object.entries(grossData.grossByCode)) {
+    const sep = key.indexOf("|");
+    const date = key.slice(0, sep);
+    const targetCode = resolve(key.slice(sep + 1));
+    const newKey = `${date}|${targetCode}`;
+    grossByCodeOut[newKey] = (grossByCodeOut[newKey] || 0) + val;
+  }
+  return { ...grossData, codes: Array.from(codesOut), grossByCode: grossByCodeOut };
+}
+
 // Detect a .zip upload (either by extension or by the zip magic bytes "PK"),
 // unzip it in memory, and return the buffer of the first .xlsx/.xls entry
 // found inside. This is how the raw MoMo merchant-portal "daily_report" is
@@ -153,7 +183,7 @@ function buildMomoReconciliation(store, companyKey) {
   if (bank) {
     const txs = store.transactions.filter((t) => t.bank_id === bank.id);
     const settlements = extractMomoSettlements(txs);
-    const grossData = mergeGross(grossUploads);
+    const grossData = applyCuaHangAlias(mergeGross(grossUploads), store.cua_hang_mapping || {});
     const invoiceData = { invoices };
     if (grossData.codes.length > 0) {
       reconciledAll = reconcileMomo(settlements, grossData, invoiceData, store.gian_mapping, store.invoice_diem_alias);
@@ -220,9 +250,24 @@ router.get("/doi-soat/momo", (req, res) => {
   const monthSet = new Set(reconciledAll.map((r) => r.settlementDate.slice(0, 7)));
   const months = Array.from(monthSet).sort().reverse();
   const selectedMonth = req.query.month !== undefined ? req.query.month : months[0] || "";
-  const reconciled = selectedMonth
+  const reconciledMonth = selectedMonth
     ? reconciledAll.filter((r) => r.settlementDate.slice(0, 7) === selectedMonth)
     : reconciledAll;
+
+  // Loc dong hien thi o muc 4 theo DUNG cong ty dang xem cho de nhin (Luyen,
+  // 2026-07-17: "trang kh moi bo cac ma check tien ve kh cu di nguoc lai de
+  // no dep trang"). Trang KH Moi dang tam dung CHUNG sao ke/doanh thu voi KH
+  // Cu (xem momoSourceCfg) nen 1 khoan tien ve dang liet ke ca cac gian binh
+  // thuong (131/1388) cua KH Cu -- khong lien quan KH Moi. Chi AN bot cac
+  // dong KHONG thuoc cong ty dang xem (dua vao TK Co: SKIP = KH Moi, con lai
+  // = KH Cu); KHONG dong den tong Ngan hang/Chenh lech (van tinh tren toan
+  // bo du lieu nhu cu, dung nhu thiet ke muon).
+  const reconciled = reconciledMonth
+    .map((r) => ({
+      ...r,
+      lines: r.lines.filter((l) => (activeCompany === "kh_moi" ? l.tkCo === "SKIP" : l.tkCo !== "SKIP")),
+    }))
+    .filter((r) => r.lines.length > 0);
 
   res.render("doisoat-momo", {
     userName: req.session.userName,
@@ -429,6 +474,32 @@ router.post("/doi-soat/momo/diem-alias/delete", (req, res) => {
   res.redirect("/doi-soat/momo?success=" + encodeURIComponent("Da xoa anh xa ma diem."));
 });
 
+// ---------- Anh xa 1 ma cua hang MOI (chua tung xuat hien trong file "Tong
+// Momo Gop" nao, nen he thong khong biet Ma Cong Trinh tuong ung -- hien len
+// nhu "CHUA MAP: X" o muc 3a) ve dung Ma Cong Trinh. Luu vao
+// store.cua_hang_mapping (KHONG theo companyKey) vi day la 1 danh muc
+// gian/mat bang CHUNG, khong phai rieng cong ty nao -- ap dung ngay cho ca
+// trang KH Cu va KH Moi, khong can tai lai file zip (xem applyCuaHangAlias).
+router.post("/doi-soat/momo/cuahang-map", (req, res) => {
+  const store = load();
+  try {
+    const { rawCode, targetCode } = req.body;
+    if (!rawCode || !targetCode || !targetCode.trim()) {
+      throw new Error("Thieu ma cua hang hoac ma cong trinh de anh xa.");
+    }
+    if (!store.cua_hang_mapping) store.cua_hang_mapping = {};
+    const target = targetCode.trim();
+    store.cua_hang_mapping[rawCode] = { maCongTrinh: target, code: target, gian: target };
+    save(store);
+    res.redirect(
+      "/doi-soat/momo?success=" +
+        encodeURIComponent(`Da anh xa ma cua hang "${rawCode}" -> "${target}" (ap dung cho ca 2 cong ty).`)
+    );
+  } catch (e) {
+    res.redirect("/doi-soat/momo?error=" + encodeURIComponent(e.message));
+  }
+});
+
 // ---------- An gian khoi trang doi soat cua CONG TY DANG XEM (vd doanh thu
 // cua 1 gian bi gop nham vao file "Tong Momo" cua cong ty nay, nhung gian do
 // se duoc xuat HD ben cong ty KIA -- Luyen, 2026-07-16: "KVC ESTELLA",
@@ -505,7 +576,7 @@ router.get("/doi-soat/momo/export.xlsx", (req, res) => {
 
   const txs = store.transactions.filter((t) => t.bank_id === bank.id);
   const settlements = extractMomoSettlements(txs);
-  const grossData = mergeGross(store[sourceCfg.grossKey] || []);
+  const grossData = applyCuaHangAlias(mergeGross(store[sourceCfg.grossKey] || []), store.cua_hang_mapping || {});
   const invoiceData = { invoices: store[momoCfg.invoicesKey] || [] };
   let reconciled = reconcileMomo(settlements, grossData, invoiceData, store.gian_mapping, store.invoice_diem_alias);
   // An gian theo yeu cau rieng cua cong ty dang xuat (dung 1 danh sach voi
