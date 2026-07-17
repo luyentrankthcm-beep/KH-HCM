@@ -229,6 +229,7 @@ function buildMomoReconciliation(store, companyKey) {
   // co hieu luc NGAY trong lan render nay, khong phai doi lan tai trang sau.
   let needsSave = ensureGianHidden(store);
   if (ensureKnownInvoiceDiemAliases(store)) needsSave = true;
+  if (ensureNo1388(store)) needsSave = true;
   if (needsSave) save(store);
 
   let reconciledAll = [];
@@ -363,11 +364,28 @@ function isDuplicateRecentUpload(store, grossKey, fileName, grossByCode) {
 function seedGianMappingDefaults(store, codes) {
   codes.forEach((c) => {
     if (!(c in store.gian_mapping)) {
-      // The "SC VIVO KVCM" FF (chia se) gian defaults to 1388, everything
-      // else (including the normal SC VIVO KVCM line) defaults to 131.
-      store.gian_mapping[c] = c.endsWith("__FF") ? "1388" : "131";
+      // Luyen, 2026-07-17: "doi xuat ra 1388 thanh 131 het" -- TK Co 1388
+      // (doanh thu chia se/CSE) khong con duoc dung nua, moi gian moi (ke ca
+      // gian FF/chia se truoc day se la 1388) deu mac dinh 131.
+      store.gian_mapping[c] = "131";
     }
   });
+}
+
+// Luyen, 2026-07-17: "doi xuat ra 1388 thanh 131 het" -- ap dung cho CA HAI
+// cong ty (gian_mapping dung chung KH Cu/KH Moi). Tu dong sua BAT KY gian
+// nao con dang la 1388 (du la du lieu cu da co tu truoc) ve 131 moi lan
+// trang doi soat duoc mo, khong can Luyen tu vao tung dong sua tay.
+function ensureNo1388(store) {
+  if (!store.gian_mapping) return false;
+  let changed = false;
+  for (const code of Object.keys(store.gian_mapping)) {
+    if (store.gian_mapping[code] === "1388") {
+      store.gian_mapping[code] = "131";
+      changed = true;
+    }
+  }
+  return changed;
 }
 
 router.post("/doi-soat/momo/upload-tong", upload.single("file"), (req, res) => {
