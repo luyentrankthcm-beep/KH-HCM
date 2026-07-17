@@ -43,6 +43,69 @@
   <button type="button" class="float-nav-btn" id="btnGoBack" title="Quay lại" onclick="history.back()">←</button>
   <button type="button" class="float-nav-btn is-hidden" id="btnToTop" title="Lên đầu trang" onclick="window.scrollTo({top:0,behavior:'smooth'})">↑</button>
 </div>
+
+<!-- Heo mascot goc duoi trai -- bong thoai doi cau moi 10s (Luyen yeu cau
+     2026-07-17). Ve SVG tay ngay trong trang, khong can file anh rieng. -->
+<div class="pig-mascot" aria-hidden="true">
+  <div class="pig-bubble" id="pigBubble">Chào chị Nhẫn! 🐷</div>
+  <svg class="pig-mascot-face" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+    <ellipse cx="50" cy="56" rx="42" ry="38" fill="#ffb3c9"/>
+    <ellipse cx="18" cy="22" rx="14" ry="16" fill="#ffb3c9" transform="rotate(-20 18 22)"/>
+    <ellipse cx="82" cy="22" rx="14" ry="16" fill="#ffb3c9" transform="rotate(20 82 22)"/>
+    <ellipse cx="18" cy="24" rx="7" ry="9" fill="#ff8fab" transform="rotate(-20 18 24)"/>
+    <ellipse cx="82" cy="24" rx="7" ry="9" fill="#ff8fab" transform="rotate(20 82 24)"/>
+    <circle cx="22" cy="60" r="8" fill="#ff9ebd" opacity="0.6"/>
+    <circle cx="78" cy="60" r="8" fill="#ff9ebd" opacity="0.6"/>
+    <circle cx="36" cy="48" r="5" fill="#4a2b1f"/>
+    <circle cx="64" cy="48" r="5" fill="#4a2b1f"/>
+    <circle cx="38" cy="46" r="1.6" fill="#fff"/>
+    <circle cx="66" cy="46" r="1.6" fill="#fff"/>
+    <ellipse cx="50" cy="66" rx="18" ry="13" fill="#ff8fab"/>
+    <ellipse cx="43" cy="66" rx="3" ry="4" fill="#c9436a"/>
+    <ellipse cx="57" cy="66" rx="3" ry="4" fill="#c9436a"/>
+    <path d="M 40 79 Q 50 85 60 79" stroke="#c9436a" stroke-width="2" fill="none" stroke-linecap="round"/>
+  </svg>
+</div>
+<script>
+  (function () {
+    // Cau hoi tham / vui nhon doi moi 10 giay -- nhieu cau khac nhau, lap
+    // vong tron. Fade out/in nhe cho muot mat thay vi doi chu dot ngot.
+    var pigMessages = [
+      "Chào chị Nhẫn! 🐷",
+      "Hôm nay chị ăn gì chưa nè? 🍜",
+      "Ụt ụt~ chị nhớ uống nước nha!",
+      "Số liệu đối soát xong chưa chị ơi?",
+      "Chị cười lên nào, hôm nay đẹp trời ghê!",
+      "Ăn no rồi làm việc mới có sức chị ơi!",
+      "Em heo chúc chị một ngày làm việc suôn sẻ!",
+      "Đói bụng chưa chị? Em cũng đói nè 🐽",
+      "Nghỉ tay uống miếng nước đi chị!",
+      "Sổ sách khớp hết là em heo mừng lắm đó!",
+      "Chị làm việc chăm ghê, giỏi quá!",
+      "Trưa nay ăn gì chị nhỉ? Em heo tò mò ghê!",
+      "Chúc chị một ngày nhiều may mắn nha!",
+      "Đối soát mệt hong chị? Ráng lên nè!",
+      "Em heo ở đây hỗ trợ chị 24/7 nha!",
+      "Chị nhớ giữ sức khỏe, đừng thức khuya quá nha!",
+      "Ụt ịt, hôm nay chị vui không?",
+      "Ăn thêm chút trái cây cho khỏe chị ơi!",
+      "Xong việc rồi tự thưởng ly trà sữa nha chị!",
+      "Chị giỏi lắm, mọi lệnh đều đâu vào đó hết!"
+    ];
+    var pigIdx = 0;
+    var pigBubble = document.getElementById("pigBubble");
+    if (pigBubble) {
+      setInterval(function () {
+        pigBubble.classList.add("is-fading");
+        setTimeout(function () {
+          pigIdx = (pigIdx + 1) % pigMessages.length;
+          pigBubble.textContent = pigMessages[pigIdx];
+          pigBubble.classList.remove("is-fading");
+        }, 350);
+      }, 10000);
+    }
+  })();
+</script>
 <script>
   (function () {
     var navLinks = Array.prototype.slice.call(document.querySelectorAll(".nav-links a"));
