@@ -110,6 +110,41 @@
       </details>
     </section>
 
+    <% var unmappedCuaHangCodes = allCodes.filter(function(c){ return c.indexOf('CHUA MAP: ') === 0; }); %>
+    <% if (unmappedCuaHangCodes.length > 0) { %>
+    <section class="panel">
+      <h2>3a. Ánh xạ mã cửa hàng mới về đúng Mã công trình</h2>
+      <p class="muted">
+        Các mã dưới đây mới xuất hiện trong file báo cáo MoMo (.zip) mà web chưa từng thấy trong bảng
+        "Tổng Momo Gộp" nên chưa biết thuộc Mã công trình nào. Điền đúng Mã công trình cho từng mã —
+        áp dụng ngay cho <strong>cả 2 công ty</strong>, không cần tải lại file.
+      </p>
+      <table class="table">
+        <thead><tr><th>Mã cửa hàng (chưa nhận diện)</th><th colspan="2">Mã công trình đúng</th></tr></thead>
+        <tbody>
+          <% unmappedCuaHangCodes.forEach(function(code) { %>
+          <% var rawCode = code.slice('CHUA MAP: '.length); %>
+          <tr>
+            <td><%= rawCode %></td>
+            <td colspan="2">
+              <form method="POST" action="/doi-soat/momo/cuahang-map" class="form-inline">
+                <input type="hidden" name="rawCode" value="<%= rawCode %>" />
+                <input type="text" name="targetCode" list="congTrinhOptions" placeholder="vd AE TAN AN KVC" required />
+                <button type="submit" class="btn btn-secondary">Lưu ánh xạ</button>
+              </form>
+            </td>
+          </tr>
+          <% }) %>
+        </tbody>
+      </table>
+      <datalist id="congTrinhOptions">
+        <% allCodes.filter(function(c){ return c.indexOf('CHUA MAP: ') !== 0; }).forEach(function(c) { %>
+        <option value="<%= c.endsWith('__FF') ? c.replace('__FF', '') : c %>"></option>
+        <% }) %>
+      </datalist>
+    </section>
+    <% } %>
+
     <% if (allCodes.length > 0) { %>
     <section class="panel">
       <h2>3. TK Có theo từng mã công trình (131 = thông thường, 1388 = doanh thu chia sẻ, "Chưa xuất MISA" = khách mới)</h2>
