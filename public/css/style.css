@@ -1,25 +1,27 @@
-/* ---------- Design tokens (adapted from the "hp" design language via
-   npx getdesign@latest add hp -- HP Electric Blue accent, near-black ink,
-   soft-lift cards, sharp 4px buttons vs. soft 16px cards). Semantic colors
-   (success/danger/warning) are NOT part of HP's own palette -- an
-   accounting/reconciliation tool needs a clear, unambiguous green=thu,
-   red=chi/lech, amber=canh bao vocabulary, so those 3 are kept conventional
-   while every other surface (buttons, links, active nav state, card
-   accents) uses the HP tokens below. ---------- */
+/* ---------- Design tokens -- theme "hong de thuong" (Luyen yeu cau
+   2026-07-17: bo cuc de thuong, mau hong, heo chay qua lai tren topbar, nut
+   back chuyen nghiep hon). Doi tu bang mau HP Electric Blue/near-black cu
+   sang pastel hong xuyen suot (--color-primary va cac bien lien quan), giu
+   NGUYEN 3 mau ngu nghia thu/chi/canh bao (success/danger/warning) vi day la
+   cong cu ke toan/doi soat -- doi mau nay se lam mat nghia "xanh=thu,
+   do=chi/lech, cam=canh bao" da quen thuoc voi Luyen. Ban kinh bo tron tang
+   len (radius-*) va do bong chuyen sang tinh hong nhe de tao cam giac mem
+   mai, de thuong hon so voi phong cach "sac canh" truoc day. ---------- */
 :root {
-  --color-primary: #024ad8;
-  --color-primary-bright: #296ef9;
-  --color-primary-deep: #0e3191;
-  --color-primary-soft: #c9e0fc;
+  --color-primary: #ff5c93;
+  --color-primary-bright: #ff85b3;
+  --color-primary-deep: #d6316f;
+  --color-primary-soft: #ffdce9;
+  --color-topbar-bg: linear-gradient(120deg, #d6316f 0%, #ff5c93 55%, #ff86b3 100%);
   --color-ink: #1a1a1a;
   --color-ink-soft: #292929;
   --color-canvas: #ffffff;
-  --color-cloud: #f7f7f7;
-  --color-fog: #e8e8e8;
-  --color-steel: #c2c2c2;
-  --color-graphite: #636363;
-  --color-charcoal: #3d3d3d;
-  --color-hairline: #e8e8e8;
+  --color-cloud: #fff4f8;
+  --color-fog: #ffe6f0;
+  --color-steel: #e3b9cb;
+  --color-graphite: #8a6674;
+  --color-charcoal: #5a3d49;
+  --color-hairline: #ffdcea;
 
   --color-success: #1d8a4a;
   --color-success-bg: #e9f7ef;
@@ -28,13 +30,13 @@
   --color-warning: #a6620a;
   --color-warning-bg: #fdf1e0;
 
-  --radius-sm: 3px;
-  --radius-md: 4px;
-  --radius-lg: 8px;
-  --radius-xl: 16px;
+  --radius-sm: 8px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-xl: 22px;
 
-  --shadow-soft: 0 2px 8px rgba(26, 26, 26, 0.08);
-  --shadow-modal: 0 8px 24px rgba(26, 26, 26, 0.12);
+  --shadow-soft: 0 2px 10px rgba(214, 49, 111, 0.12);
+  --shadow-modal: 0 8px 26px rgba(214, 49, 111, 0.2);
 
   --space-xs: 8px;
   --space-sm: 12px;
@@ -59,7 +61,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: var(--color-ink);
+  background: var(--color-topbar-bg);
   color: #fff;
   padding: 14px 28px;
   flex-wrap: wrap;
@@ -69,7 +71,36 @@ body {
   position: sticky;
   top: 0;
   z-index: 100;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 2px 14px rgba(214, 49, 111, 0.35);
+  /* Vi tri neo cho .pig-runner (con heo chay qua lai) o duoi day --
+     .topbar da la sticky nen tu no la containing block cho phan tu con
+     position:absolute. KHONG dat overflow (hidden/auto...) tren .topbar --
+     bai hoc tu bug sticky-header 2026-07-16 (xem ghi chu o .table-scroll
+     ben duoi): dat overflow se tu clip luon box-shadow cua chinh .topbar.
+     Keyframe cua .pig-runner da duoc gioi han trong pham vi thanh topbar
+     nen khong can clip. */
+}
+
+/* Con heo chay qua lai tren dau trang (Luyen yeu cau 2026-07-17) -- chay tu
+   trai sang phai roi lat nguoi (scaleX) chay nguoc lai, lap vo han. Dat
+   aria-hidden + pointer-events:none vi day thuan decorative, khong can
+   nguoi dung bam vao va khong duoc may doc man hinh doc len. */
+.pig-runner {
+  position: absolute;
+  top: 8px;
+  font-size: 22px;
+  line-height: 1;
+  animation: pig-run 16s linear infinite;
+  pointer-events: none;
+  z-index: 1;
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.2));
+}
+@keyframes pig-run {
+  0% { left: 6px; transform: scaleX(1); }
+  47% { left: calc(100% - 30px); transform: scaleX(1); }
+  50% { left: calc(100% - 30px); transform: scaleX(-1); }
+  97% { left: 6px; transform: scaleX(-1); }
+  100% { left: 6px; transform: scaleX(1); }
 }
 .brand { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
 .brand-name {
@@ -89,7 +120,9 @@ body {
   top: 2px;
   width: 6px;
   height: 14px;
-  background: var(--color-primary);
+  /* Trang thay vi mau primary: tren nen topbar da doi sang gradient hong,
+     dung lai mau primary (cung la hong) se gan nhu vo hinh vi trung mau nen. */
+  background: rgba(255, 255, 255, 0.95);
   transform: skewX(-20deg);
 }
 .brand-sub { font-size: 12px; opacity: 0.75; letter-spacing: 0.2px; }
@@ -132,7 +165,10 @@ body {
 }
 .company-btn:hover { opacity: 0.9; }
 .company-btn.is-active {
-  background: var(--color-primary);
+  /* Nen trang + chu hong dam thay vi mau primary tren mau primary (topbar
+     gio la gradient hong) -- giu do tuong phan ro cho nut dang chon. */
+  background: #fff;
+  color: var(--color-primary-deep);
   opacity: 1;
 }
 
@@ -264,19 +300,26 @@ a.card-bucket.card-bucket-active {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 44px;
-  height: 44px;
+  width: 46px;
+  height: 46px;
   border-radius: 50%;
-  background: var(--color-ink);
+  background: var(--color-topbar-bg);
   color: #fff;
-  border: none;
+  border: 2px solid #fff;
   box-shadow: var(--shadow-modal);
   cursor: pointer;
   font-size: 18px;
+  font-weight: 600;
   text-decoration: none;
-  opacity: 0.9;
+  opacity: 0.95;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
 }
-.float-nav-btn:hover { opacity: 1; background: var(--color-primary); }
+.float-nav-btn:hover {
+  opacity: 1;
+  transform: translateY(-2px) scale(1.06);
+  box-shadow: 0 10px 22px rgba(214, 49, 111, 0.35);
+}
+.float-nav-btn:active { transform: translateY(0) scale(0.97); }
 .float-nav-btn.is-hidden { display: none; }
 .muted { color: var(--color-graphite); font-size: 13px; }
 .text-neg { color: var(--color-danger); font-weight: 600; }
