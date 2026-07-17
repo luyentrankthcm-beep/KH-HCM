@@ -12,7 +12,26 @@
       (Momo, Zalo/VNPay/Payoo, Viet QR), xếp theo số ngày kể từ ngày giao dịch.
     </p>
 
-    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+    <% if (error) { %><div class="alert alert-error" id="autohide-error"><%= error %></div><% } %>
+    <% if (success) { %><div class="alert alert-success" id="successBanner"><%= success %></div><% } %>
+    <script>
+      (function () {
+        ["successBanner", "autohide-error"].forEach(function (id) {
+          var el = document.getElementById(id);
+          if (!el) return;
+          setTimeout(function () {
+            el.style.transition = "opacity 0.6s ease, max-height 0.6s ease, margin 0.6s ease, padding 0.6s ease";
+            el.style.opacity = "0";
+            el.style.maxHeight = "0";
+            el.style.overflow = "hidden";
+            el.style.marginTop = "0";
+            el.style.marginBottom = "0";
+            el.style.paddingTop = "0";
+            el.style.paddingBottom = "0";
+          }, 3000);
+        });
+      })();
+    </script>
 
     <section class="cards">
       <% aging.buckets.forEach(function(b) { %>
@@ -72,6 +91,73 @@
             <tr><td colspan="8" class="muted">Không có dòng nào chưa khớp — mọi thứ đã đối soát xong.</td></tr>
             <% } %>
           </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Công nợ đã đối soát trước đây (nhập tay) — <%= manualEntries.length %> dòng, tổng <%= manualTotal.toLocaleString('vi-VN') %> đ</h2>
+      </div>
+      <p class="muted" style="margin-top:-8px;">
+        Dùng cho công nợ chị đã tự đối soát xong từ trước và đã có sẵn số hóa đơn theo từng gian — ghi lại đây để tra cứu,
+        KHÔNG cộng vào bảng "chưa khớp" phía trên (vì đã xong rồi).
+      </p>
+      <form method="POST" action="/cong-no/thu-cong" class="form-grid" style="margin-bottom:16px;">
+        <div>
+          <label>Gian</label>
+          <input type="text" name="gian" required placeholder="vd AM TP PHCM" />
+        </div>
+        <div>
+          <label>Ngày</label>
+          <input type="date" name="date" required />
+        </div>
+        <div>
+          <label>Số tiền</label>
+          <input type="text" name="amount" required placeholder="vd 1500000" />
+        </div>
+        <div>
+          <label>Số hóa đơn</label>
+          <input type="text" name="invoiceNumbers" placeholder="vd 8274, 8416" />
+        </div>
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary">Thêm</button>
+        </div>
+      </form>
+      <div class="table-scroll">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Gian</th>
+              <th>Ngày</th>
+              <th class="num">Số tiền</th>
+              <th>Số hóa đơn</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <% manualEntries.forEach(function(m) { %>
+            <tr>
+              <td><%= m.gian %></td>
+              <td><%= m.date %></td>
+              <td class="num"><%= m.amount.toLocaleString('vi-VN') %> đ</td>
+              <td><%= m.invoiceNumbers || '-' %></td>
+              <td>
+                <form method="POST" action="/cong-no/thu-cong/<%= m.id %>/delete" style="display:inline" onsubmit="return confirm('Xóa dòng công nợ này?')">
+                  <button type="submit" class="link-btn link-danger">Xóa</button>
+                </form>
+              </td>
+            </tr>
+            <% }) %>
+            <% if (manualEntries.length === 0) { %>
+            <tr><td colspan="5" class="muted">Chưa có công nợ nào nhập tay.</td></tr>
+            <% } %>
+          </tbody>
+          <% if (manualEntries.length > 0) { %>
+          <tfoot>
+            <tr><td colspan="2">Tổng</td><td class="num"><%= manualTotal.toLocaleString('vi-VN') %> đ</td><td colspan="2"></td></tr>
+          </tfoot>
+          <% } %>
         </table>
       </div>
     </section>

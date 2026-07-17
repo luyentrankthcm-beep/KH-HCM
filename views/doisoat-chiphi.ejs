@@ -150,13 +150,29 @@
             <% }) %>
             <option value="" <%= selectedMonth === '' ? 'selected' : '' %>>Tất cả</option>
           </select>
+          <select name="invoiceStatus" onchange="this.form.submit()" title="Lọc theo hóa đơn NCC của chính dòng chi phí">
+            <option value="" <%= selectedInvoiceStatus === '' ? 'selected' : '' %>>Hóa đơn: Tất cả</option>
+            <option value="co" <%= selectedInvoiceStatus === 'co' ? 'selected' : '' %>>Có hóa đơn</option>
+            <option value="khong" <%= selectedInvoiceStatus === 'khong' ? 'selected' : '' %>>Chưa có hóa đơn</option>
+          </select>
+          <select name="revenueStatus" onchange="this.form.submit()" title="Lọc theo trạng thái doanh thu của gian (Momo/ZVP/Viet QR) trong cùng tháng">
+            <option value="" <%= selectedRevenueStatus === '' ? 'selected' : '' %>>DT gian: Tất cả</option>
+            <option value="Đã hạch toán doanh thu" <%= selectedRevenueStatus === 'Đã hạch toán doanh thu' ? 'selected' : '' %>>Đã hạch toán doanh thu</option>
+            <option value="Chưa hạch toán doanh thu" <%= selectedRevenueStatus === 'Chưa hạch toán doanh thu' ? 'selected' : '' %>>Chưa hạch toán doanh thu</option>
+            <option value="Không có doanh thu ghi nhận" <%= selectedRevenueStatus === 'Không có doanh thu ghi nhận' ? 'selected' : '' %>>Không có doanh thu ghi nhận</option>
+            <option value="Không xác định gian" <%= selectedRevenueStatus === 'Không xác định gian' ? 'selected' : '' %>>Không xác định gian</option>
+          </select>
         </form>
       </div>
+      <p class="muted" style="margin-top:6px;">
+        <strong>Có hóa đơn</strong>: dòng chi phí này đã khớp hóa đơn NCC (mục 1b) hoặc rút được số HĐ từ diễn giải.
+        <strong>DT gian</strong>: doanh thu của GIAN gắn với dòng này, trong CÙNG THÁNG, đã khớp hóa đơn doanh thu (Momo/ZVP/Viet QR) hay chưa — lấy đúng dữ liệu bên trang Công nợ/Tổng quan, không tính riêng.
+      </p>
       <div class="table-scroll">
         <table class="table">
           <thead>
             <tr>
-              <th>Ngày</th><th>Kênh</th><th>NCC</th><th>Mã NCC</th><th>Diễn giải (sao kê)</th><th>Nội dung UNC</th><th>Số HĐ</th><th>Số tiền</th><th>TK Nợ</th><th>Gian</th>
+              <th>Ngày</th><th>Kênh</th><th>NCC</th><th>Mã NCC</th><th>Diễn giải (sao kê)</th><th>Nội dung UNC</th><th>Số HĐ</th><th>Số tiền</th><th>TK Nợ</th><th>Gian</th><th>Có hóa đơn</th><th>DT gian</th>
             </tr>
           </thead>
           <tbody>
@@ -218,10 +234,22 @@
                   <button type="submit" class="link-btn">Lưu</button>
                 </form>
               </td>
+              <td>
+                <span class="badge <%= l.coHoaDon.startsWith('Có') ? 'badge-thu' : 'badge-warn' %>"><%= l.coHoaDon %></span>
+              </td>
+              <td>
+                <% if (l.revenueStatus === 'Đã hạch toán doanh thu') { %>
+                <span class="badge badge-thu"><%= l.revenueStatus %></span>
+                <% } else if (l.revenueStatus === 'Chưa hạch toán doanh thu') { %>
+                <span class="badge badge-neg"><%= l.revenueStatus %></span>
+                <% } else { %>
+                <span class="badge badge-warn"><%= l.revenueStatus %></span>
+                <% } %>
+              </td>
             </tr>
             <% }) %>
             <% if (lines.length === 0) { %>
-            <tr><td colspan="10" class="muted">Chưa có dữ liệu — tải sao kê ở mục 1.</td></tr>
+            <tr><td colspan="12" class="muted">Chưa có dữ liệu — tải sao kê ở mục 1.</td></tr>
             <% } %>
           </tbody>
         </table>
