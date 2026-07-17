@@ -1170,7 +1170,10 @@ function reconcileZvpChannel(settlements, grossData, invoiceData, gianMapping, m
       const line = {
         code: g.code,
         maCongTrinh: displayCode(g.code),
-        tkCo: gianMapping[g.code] || (g.code.endsWith(FF_SUFFIX) ? "1388" : "131"),
+        // Luyen, 2026-07-17: "doi xuat ra 1388 thanh 131 het" -- khong con
+        // fallback ve 1388 cho gian FF/CSE nua, mac dinh 131 neu chua co trong
+        // gian_mapping.
+        tkCo: gianMapping[g.code] || "131",
         gross: g.gross,
         net: Math.round(g.net),
         invoiceNumbers: invoiceList,
