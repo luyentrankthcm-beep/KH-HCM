@@ -135,9 +135,27 @@ function mergeRawRows(uploads) {
 function seedGianMappingDefaults(store, codes) {
   codes.forEach((c) => {
     if (!(c in store.gian_mapping)) {
-      store.gian_mapping[c] = c.endsWith(FF_SUFFIX) ? "1388" : "131";
+      // Luyen, 2026-07-17: "doi xuat ra 1388 thanh 131 het" -- TK Co 1388
+      // (doanh thu chia se/CSE) khong con duoc dung nua, moi gian moi deu
+      // mac dinh 131.
+      store.gian_mapping[c] = "131";
     }
   });
+}
+
+// Luyen, 2026-07-17: "doi xuat ra 1388 thanh 131 het" -- gian_mapping dung
+// chung; lap lai o day de trang VietQR cung tu sua duoc du duoc mo truoc
+// trang Momo/ZVP.
+function ensureNo1388(store) {
+  if (!store.gian_mapping) return false;
+  let changed = false;
+  for (const code of Object.keys(store.gian_mapping)) {
+    if (store.gian_mapping[code] === "1388") {
+      store.gian_mapping[code] = "131";
+      changed = true;
+    }
+  }
+  return changed;
 }
 
 // Rows from the shared daily master "gian " sheet (uploaded on the Zalo/
@@ -158,6 +176,7 @@ function getMasterRowsForVietQrChannel(store, tagPattern) {
 
 function buildChannelReconciliation(store, channelKey) {
   ensureChannelShape(store);
+  if (ensureNo1388(store)) save(store);
   const cfg = CHANNELS[channelKey];
   const bank = store.banks.find((b) => b.name === cfg.bankName);
   if (!bank) {
