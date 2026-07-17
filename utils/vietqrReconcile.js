@@ -702,7 +702,9 @@ function reconcileVietQr(settlements, grossData, invoiceData, gianMapping, manua
       const line = {
         code: g.code,
         maCongTrinh: displayCode(effCode),
-        tkCo: gianMapping[effCode] || (effCode.endsWith(FF_SUFFIX) ? "1388" : "131"),
+        // Luyen, 2026-07-17: "doi xuat ra 1388 thanh 131 het" -- khong con
+        // fallback ve 1388 cho gian FF/CSE nua.
+        tkCo: gianMapping[effCode] || "131",
         gross: g.gross,
         net: g.gross,
         invoiceNumbers: invoiceList,
