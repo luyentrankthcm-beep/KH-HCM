@@ -1412,8 +1412,8 @@ function parseFeeReportWorkbook(buffer, orderMap) {
 // payoo) trong 1 lan -- khong can upload lai file nay tren tung trang rieng.
 // Dùng lai parseInvoiceWorkbook cua Momo (da on dinh, khong doi) cho tag momo,
 // va parseInvoiceWorkbookByTag (generic) cho 3 tag con lai.
-function parseSharedInvoiceWorkbook(buffer) {
-  const momoParsed = m.parseInvoiceWorkbook(buffer);
+function parseSharedInvoiceWorkbook(buffer, companyKey) {
+  const momoParsed = m.parseInvoiceWorkbook(buffer, companyKey);
   const zaloParsed = parseInvoiceWorkbookByTag(buffer, "zalo");
   const vnpayParsed = parseInvoiceWorkbookByTag(buffer, "vnpay");
   const payooParsed = parseInvoiceWorkbookByTag(buffer, "payoo");

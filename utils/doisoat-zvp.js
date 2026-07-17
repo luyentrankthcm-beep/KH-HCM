@@ -687,7 +687,7 @@ router.post("/doi-soat/zvp/upload-hoadon", upload.single("file"), (req, res) => 
   const store = load();
   try {
     if (!req.file) throw new Error("Vui long chon 1 file de tai len.");
-    const shared = parseSharedInvoiceWorkbook(req.file.buffer);
+    const shared = parseSharedInvoiceWorkbook(req.file.buffer, getCompany(req));
 
     const addedCounts = {};
     for (const key of ["zalo", "vnpay", "payoo"]) {

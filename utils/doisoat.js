@@ -148,10 +148,59 @@ function extractFirstExcelFromZip(buffer) {
 // Extracted so /cong-no and the Tong quan dashboard can reuse the EXACT same
 // reconciliation this page shows, instead of recomputing it separately (2
 // implementations of the same match logic would drift apart over time).
+// Tra ve true neu co thay doi thuc su (de goi noi con lai tu quyet dinh co
+// can save(store) hay khong).
 function ensureGianHidden(store) {
   if (!store.gian_hidden) store.gian_hidden = {};
   if (!store.gian_hidden.kh_cu) store.gian_hidden.kh_cu = [];
   if (!store.gian_hidden.kh_moi) store.gian_hidden.kh_moi = [];
+  let changed = false;
+  // Bat buoc dong bo, moi lan: bat ky gian nao dang bi an khoi trang KH Cu
+  // (nghia la doanh thu do THUC RA la cua KH Moi -- xem ghi chu o route
+  // /doi-soat/momo/gian-hidden ben duoi) phai luon co TK Co = SKIP trong
+  // store.gian_mapping, bat ke Luyen co nho vao muc 3 tu chinh lai hay khong.
+  // Neu khong dong bo, gian se "mat tich" khoi CA HAI trang (an ben Cu, nhung
+  // khong hien ben Moi vi tkCo != SKIP) -- day chinh la loi Luyen bao gap lai
+  // nhieu lan (2026-07-17: "1 loi ma sua nhieu lan"). Tu dong sua o day MOI
+  // LAN trang duoc mo nen tu dong ap dung ca cho nhung gian da bi an tu truoc
+  // (KVC ESTELLA, FARM LOTTE NHA TRANG, FARM LOTTE PHAN THIET, AE TAN AN KVC,
+  // CHUA MAP: KHEVENT2...), khong can Luyen tu vao muc 3 sua lai tung ma.
+  if (store.gian_mapping) {
+    (store.gian_hidden.kh_cu || []).forEach((code) => {
+      if (store.gian_mapping[code] !== "SKIP") {
+        store.gian_mapping[code] = "SKIP";
+        changed = true;
+      }
+    });
+  }
+  return changed;
+}
+
+// Ten diem ghi tren hoa don (sheet "ke ds xuat HD MTT - 705", tab KH Moi)
+// KHONG trung voi Ma Cong Trinh dung ben doanh thu cho 3 trong 4 gian KH Moi
+// dang biet (Luyen, 2026-07-17: xac nhan qua file MTT 17.07.xlsx) -- vi du
+// hoa don ghi "DIY ESTELLA KVC" nhung ben doanh thu/gian_mapping dung ma
+// "KVC ESTELLA". Day CHINH XAC la 4 gian rieng cua KH Moi (xem gian_hidden.
+// kh_cu o tren) -- ghi ro o day de khong bi lan voi ma nao ben KH Cu. Seed
+// san alias nay (chi khi chua co, khong ghi de neu Luyen da tu sua khac) de
+// hoa don tu dong khop ma khong can vao muc 3b tu tay them, dung tinh than
+// "tu hieu, tu luu" Luyen yeu cau (2026-07-17).
+const KNOWN_INVOICE_DIEM_ALIASES = {
+  "DIY ESTELLA KVC": "KVC ESTELLA",
+  "LM NHA TRANG KVC": "FARM LOTTE NHA TRANG",
+  "LM PHAN THIẾT KVC": "FARM LOTTE PHAN THIET",
+};
+
+function ensureKnownInvoiceDiemAliases(store) {
+  if (!store.invoice_diem_alias) store.invoice_diem_alias = {};
+  let changed = false;
+  for (const [raw, target] of Object.entries(KNOWN_INVOICE_DIEM_ALIASES)) {
+    if (!store.invoice_diem_alias[raw]) {
+      store.invoice_diem_alias[raw] = target;
+      changed = true;
+    }
+  }
+  return changed;
 }
 
 // KH Moi CHUA co tai khoan Momo rieng thuc su nhan tien ve (BIDV7701 con 0
@@ -176,6 +225,12 @@ function buildMomoReconciliation(store, companyKey) {
   const invoices = store[cfg.invoicesKey] || [];
   const bank = store.banks.find((b) => b.name === sourceCfg.bankName);
 
+  // Dong bo TRUOC khi tinh doi soat (khong phai sau) de ban ghi vua sua/seed
+  // co hieu luc NGAY trong lan render nay, khong phai doi lan tai trang sau.
+  let needsSave = ensureGianHidden(store);
+  if (ensureKnownInvoiceDiemAliases(store)) needsSave = true;
+  if (needsSave) save(store);
+
   let reconciledAll = [];
   let error = null;
   let allCodes = new Set();
@@ -196,7 +251,6 @@ function buildMomoReconciliation(store, companyKey) {
       // neu co cung ma van thay binh thuong. Loc TRUOC khi tinh allCodes de
       // gian bi an cung bien mat khoi bang "TK Co" muc 3 luon, khong chi
       // khoi bang ket qua muc 4.
-      ensureGianHidden(store);
       const hiddenSet = new Set(store.gian_hidden[companyKey] || []);
       if (hiddenSet.size > 0) {
         reconciledAll = reconciledAll.map((r) => ({ ...r, lines: r.lines.filter((l) => !hiddenSet.has(l.code)) }));
@@ -389,7 +443,7 @@ router.post("/doi-soat/momo/upload-hoadon", upload.single("file"), (req, res) =>
   if (!store[momoCfg.invoicesKey]) store[momoCfg.invoicesKey] = [];
   try {
     if (!req.file) throw new Error("Vui long chon 1 file de tai len.");
-    const shared = parseSharedInvoiceWorkbook(req.file.buffer);
+    const shared = parseSharedInvoiceWorkbook(req.file.buffer, activeCompany);
 
     const existingKeysMomo = new Set(store[momoCfg.invoicesKey].map((i) => `${i.soHd}|${i.ngayHd}|${i.maDiem}`));
     let addedMomo = 0;

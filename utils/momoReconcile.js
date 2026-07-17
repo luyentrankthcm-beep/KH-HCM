@@ -468,18 +468,22 @@ function resolveRawPortalGross(transactions, cuaHangMapping) {
 // "thu ho" containing "momo"). Also reads "Hinh thuc hop tac" + "Ten diem
 // xuat hoa don" to tell apart the 2 SC VIVO KVCM gian (see SPLIT_PARENT_CODE
 // above).
-function parseInvoiceWorkbook(buffer) {
+function parseInvoiceWorkbook(buffer, companyKey) {
   // See the comment in parseTongMomoWorkbook: cheap "names only" pass first,
   // then a targeted read of just the one sheet we need -- large real-world
   // workbooks (40+ MB, 15 sheets) parse far faster this way.
   const wbLite = XLSX.read(buffer, { type: "buffer", bookSheets: true });
   const kdsCandidates = wbLite.SheetNames.filter((n) => /k.\s*ds\s*xu.t/i.test(n));
   // Our bank data belongs to phap nhan "K&H Cu" (ma so thue ...4989) = code "989"
-  // in these workbooks. If several "ke ds xuat HD" sheets exist (one per phap
-  // nhan, e.g. "-705" vs "-989"), prefer the one tagged "989". If the sheet
-  // simply lists invoices for the whole company (no per-phap-nhan split),
-  // that's fine too -- the momo-tag filter below naturally scopes the result.
+  // in these workbooks. KH Moi (CONG TY TNHH GIAI TRI K&H, phap nhan khac) =
+  // code "705" -- Luyen, 2026-07-17: "KH moi la sheet 'ke ds xuat HD MTT -
+  // 705' con KH cu la sheet '... - 989'". If several "ke ds xuat HD" sheets
+  // exist (one per phap nhan), prefer the one tagged to match the company
+  // whose page this upload happened on; fall back to "989" (the old default)
+  // if that tag isn't found, so older files with only 1 sheet still work.
+  const preferredTag = companyKey === "kh_moi" ? "705" : "989";
   const sheetName =
+    kdsCandidates.find((n) => new RegExp(preferredTag).test(n)) ||
     kdsCandidates.find((n) => /989/.test(n)) ||
     kdsCandidates[0] ||
     wbLite.SheetNames.find((n) => {
