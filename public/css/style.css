@@ -411,3 +411,62 @@ form textarea { font-family: monospace; resize: vertical; }
   max-width: 380px;
 }
 .login-card h1 { margin-bottom: 4px; }
+
+/* ---------- Heo mascot goc duoi trai (Luyen yeu cau 2026-07-17): dung SVG
+   ve tay (khong dung file anh rieng vi chua co san trong repo) de giu dung
+   phong cach "de thuong" cua theme, dat o goc TRAI de khong dung voi
+   .float-nav (goc phai). Bong thoai doi cau moi 10s qua JS trong nav.ejs. ---------- */
+.pig-mascot {
+  position: fixed;
+  left: 18px;
+  bottom: 18px;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  pointer-events: none;
+}
+.pig-bubble {
+  position: relative;
+  max-width: 220px;
+  background: #fff;
+  color: var(--color-ink);
+  border: 2px solid var(--color-primary-soft);
+  border-radius: var(--radius-lg);
+  padding: 8px 12px;
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.4;
+  box-shadow: var(--shadow-modal);
+  opacity: 1;
+  transition: opacity 0.35s ease, transform 0.35s ease;
+  margin-left: 6px;
+}
+.pig-bubble.is-fading { opacity: 0; transform: translateY(4px); }
+.pig-bubble::after {
+  content: "";
+  position: absolute;
+  left: 18px;
+  bottom: -8px;
+  width: 14px;
+  height: 14px;
+  background: #fff;
+  border-right: 2px solid var(--color-primary-soft);
+  border-bottom: 2px solid var(--color-primary-soft);
+  transform: rotate(45deg);
+}
+.pig-mascot-face {
+  width: 56px;
+  height: 56px;
+  filter: drop-shadow(0 3px 6px rgba(214, 49, 111, 0.35));
+  animation: pig-bob 2.4s ease-in-out infinite;
+}
+@keyframes pig-bob {
+  0%, 100% { transform: translateY(0) rotate(-2deg); }
+  50% { transform: translateY(-5px) rotate(2deg); }
+}
+@media (max-width: 640px) {
+  .pig-mascot { left: 10px; bottom: 10px; }
+  .pig-bubble { max-width: 160px; font-size: 11.5px; }
+}
