@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <%- include('partials/head') %>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+</head>
+<body>
+  <%- include('partials/nav') %>
+  <main class="container">
+    <h1>🐷 Trạng thái đối soát theo công ty</h1>
+    <p class="muted" style="margin-top:-10px;margin-bottom:20px;">
+      Tổng hợp mọi dòng đối soát (Momo, Zalo/VNPay/Payoo, Viet QR) đang ở trạng thái <strong>Khớp</strong>,
+      <strong>Lệch</strong>, hay <strong>Chưa có hóa đơn</strong> — tách riêng cho KH Cũ và KH Mới.
+    </p>
+
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+
+    <% if (stats) { %>
+    <section class="cards" style="align-items:stretch;">
+      <% ['kh_cu', 'kh_moi'].forEach(function (companyKey) { %>
+      <% const s = stats[companyKey]; %>
+      <% const total = s['Khớp'].amount + s['Lệch'].amount + s['Chưa có HĐ'].amount; %>
+      <% const totalCount = s['Khớp'].count + s['Lệch'].count + s['Chưa có HĐ'].count; %>
+      <div class="panel" style="flex:1;min-width:340px;">
+        <div class="panel-head"><h2><%= COMPANIES[companyKey].label %> — <%= COMPANIES[companyKey].fullName %></h2></div>
+        <% if (totalCount === 0) { %>
+        <p class="muted">Chưa có dòng đối soát nào cho công ty này.</p>
+        <% } else { %>
+        <div style="display:flex;gap:24px;flex-wrap:wrap;align-items:center;">
+          <div style="width:200px;height:200px;flex-shrink:0;">
+            <canvas id="chart-<%= companyKey %>"></canvas>
+          </div>
+          <table class="table" style="flex:1;min-width:240px;">
+            <thead><tr><th>Trạng thái</th><th class="num">Số dòng</th><th class="num">Số tiền</th></tr></thead>
+            <tbody>
+              <tr><td><span class="badge badge-thu">Khớp</span></td><td class="num"><%= s['Khớp'].count %></td><td class="num"><%= s['Khớp'].amount.toLocaleString('vi-VN') %> đ</td></tr>
+              <tr><td><span class="badge badge-neg">Lệch</span></td><td class="num"><%= s['Lệch'].count %></td><td class="num"><%= s['Lệch'].amount.toLocaleString('vi-VN') %> đ</td></tr>
+              <tr><td><span class="badge badge-warn">Chưa có HĐ</span></td><td class="num"><%= s['Chưa có HĐ'].count %></td><td class="num"><%= s['Chưa có HĐ'].amount.toLocaleString('vi-VN') %> đ</td></tr>
+            </tbody>
+            <tfoot>
+              <tr><td>Tổng</td><td class="num"><%= totalCount %></td><td class="num"><%= total.toLocaleString('vi-VN') %> đ</td></tr>
+            </tfoot>
+          </table>
+        </div>
+        <% } %>
+      </div>
+      <% }) %>
+    </section>
+
+    <script>
+      (function () {
+        var data = <%- JSON.stringify(stats) %>;
+        var colors = { "Khớp": "#1d8a4a", "Lệch": "#b3262b", "Chưa có HĐ": "#a6620a" };
+        ["kh_cu", "kh_moi"].forEach(function (key) {
+          var el = document.getElementById("chart-" + key);
+          if (!el || typeof Chart === "undefined") return;
+          var labels = Object.keys(data[key]).filter(function (l) { return data[key][l].amount > 0 || data[key][l].count > 0; });
+          if (labels.length === 0) return;
+          var values = labels.map(function (l) { return data[key][l].amount; });
+          new Chart(el, {
+            type: "pie",
+            data: {
+              labels: labels,
+              datasets: [{ data: values, backgroundColor: labels.map(function (l) { return colors[l]; }), borderColor: "#fff", borderWidth: 2 }],
+            },
+            options: {
+              plugins: {
+                legend: { position: "bottom", labels: { boxWidth: 12, font: { size: 11 } } },
+                tooltip: {
+                  callbacks: {
+                    label: function (ctx) {
+                      var v = ctx.parsed || 0;
+                      return ctx.label + ": " + v.toLocaleString("vi-VN") + " đ";
+                    },
+                  },
+                },
+              },
+            },
+          });
+        });
+      })();
+    </script>
+    <% } %>
+  </main>
+</body>
+</html>
