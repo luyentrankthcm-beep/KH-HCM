@@ -70,6 +70,19 @@ const DESC_HEADER_PATTERNS = [
   "noi dung giao dich",
   "noi dung",
 ];
+// A per-row unique bank-assigned ID, when the export exposes one. This is
+// the ONLY reliable way to tell apart two genuinely distinct transactions
+// that share the same date + amount + type (extremely common for VietQR
+// fixed-price ticket sales: dozens/hundreds of same-day 20.000d/50.000d
+// transactions from different customers). "Ma giao dich"/"Trans.Code" is
+// deliberately excluded here -- on BIDV exports that column just holds a
+// transaction-type code like "DD" repeated on every row, not a unique ID.
+const REF_HEADER_PATTERNS = [
+  "so tham chieu",
+  "so chung tu",
+  "so ct",
+  "reference",
+];
 
 function findHeaderRow(grid) {
   for (let r = 0; r < Math.min(grid.length, 20); r++) {
@@ -77,15 +90,17 @@ function findHeaderRow(grid) {
     let dateCol = -1;
     let balCol = -1;
     let descCol = -1;
+    let refCol = -1;
     row.forEach((cell, c) => {
       if (cell === null || cell === undefined || typeof cell !== "string") return;
       const h = normHeader(cell);
       if (dateCol === -1 && DATE_HEADER_PATTERNS.some((p) => h.includes(p))) dateCol = c;
       if (balCol === -1 && BALANCE_HEADER_PATTERNS.some((p) => h.includes(p))) balCol = c;
       if (descCol === -1 && DESC_HEADER_PATTERNS.some((p) => h.includes(p))) descCol = c;
+      if (refCol === -1 && REF_HEADER_PATTERNS.some((p) => h.includes(p))) refCol = c;
     });
     if (dateCol !== -1 && balCol !== -1) {
-      return { headerRowIdx: r, dateCol, balCol, descCol };
+      return { headerRowIdx: r, dateCol, balCol, descCol, refCol };
     }
   }
   return null;
@@ -130,7 +145,7 @@ function parseBankStatement(buffer, sheetNameHint) {
       'Khong nhan dien duoc file sao ke: can co cot "Ngay giao dich" (hoac "Ngay hieu luc") va cot "So du".'
     );
   }
-  let { headerRowIdx, dateCol, balCol, descCol } = found;
+  let { headerRowIdx, dateCol, balCol, descCol, refCol } = found;
   const maxCol = (grid[headerRowIdx] || []).length;
   if (descCol === -1) {
     descCol = guessDescCol(grid, headerRowIdx, dateCol, balCol, maxCol);
@@ -150,7 +165,10 @@ function parseBankStatement(buffer, sheetNameHint) {
         .join(" ")
         .trim();
     }
-    rows.push({ date, balance: bal, description: String(desc || "").trim() });
+    const reference = refCol >= 0 && row[refCol] !== null && row[refCol] !== undefined
+      ? String(row[refCol]).trim()
+      : "";
+    rows.push({ date, balance: bal, description: String(desc || "").trim(), reference });
   }
 
   if (rows.length === 0) {
@@ -178,7 +196,13 @@ function computeThuChi(rows, priorBalance) {
       running = r.balance;
       continue; // no actual movement (delta ~ 0) -> skip
     }
-    out.push({ date: r.date, description: r.description, amount: Math.round(amount * 100) / 100, type });
+    out.push({
+      date: r.date,
+      description: r.description,
+      amount: Math.round(amount * 100) / 100,
+      type,
+      reference: r.reference || "",
+    });
     running = r.balance;
   }
   return out;
