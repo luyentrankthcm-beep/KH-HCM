@@ -23,6 +23,7 @@ const {
   DEFAULT_NCC_LIST,
 } = require("../utils/chiphiReconcile");
 const { getCompany } = require("../utils/companies");
+const overviewAggregate = require("../utils/overviewAggregate");
 
 const router = express.Router();
 router.use(requireLogin);
@@ -87,13 +88,41 @@ function mergeChiPhiUploads(uploads) {
   return Object.values(byKey);
 }
 
-function buildChannelChiPhi(store, channelKey) {
+// Luyen yeu cau 2026-07-17: moi dong Chi phi (gan voi 1 gian) can biet gian
+// DO da "hach toan doanh thu" (co hoa don khop -- Khop) hay "chua hach toan
+// doanh thu" (Chua co HD/Lech) trong cung thang, dua theo dung ket qua doi
+// soat doanh thu (Momo/ZVP/Viet QR) da co san qua utils/overviewAggregate --
+// KHONG tinh rieng, tranh lech so voi trang Cong no/Tong quan. Tinh 1 lan
+// cho ca request (goi lai o day thay vi trong buildChannelChiPhi) vi ham
+// nay duoc goi nhieu lan (moi kenh chi phi 1 lan) trong 1 request GET.
+function buildRevenueStatusMap(store) {
+  const flat = overviewAggregate.buildAllFlatLines(store);
+  const map = {};
+  flat.forEach((l) => {
+    if (!l.gian) return;
+    const key = `${l.gian}|${l.month}`;
+    if (!map[key]) map[key] = { matched: 0, total: 0 };
+    map[key].total++;
+    if (overviewAggregate.isResolved(l)) map[key].matched++;
+  });
+  return map;
+}
+
+function revenueStatusFor(gian, month, revenueStatusMap) {
+  if (!gian) return "Không xác định gian";
+  const info = revenueStatusMap[`${gian}|${month}`];
+  if (!info) return "Không có doanh thu ghi nhận";
+  return info.matched === info.total ? "Đã hạch toán doanh thu" : "Chưa hạch toán doanh thu";
+}
+
+function buildChannelChiPhi(store, channelKey, revenueStatusMap) {
   ensureShape(store);
   const cfg = CHANNELS[channelKey];
   const bank = store.banks.find((b) => b.name === cfg.bankName);
   if (!bank) {
     return { error: `Chua co ngan hang "${cfg.bankName}" trong he thong.`, lines: [] };
   }
+  const revMap = revenueStatusMap || buildRevenueStatusMap(store);
 
   const merged = mergeChiPhiUploads(store.chi_phi_raw_uploads[channelKey]);
   const vendorTkMap = store.chi_phi_vendor_tk_map || {};
@@ -170,6 +199,13 @@ function buildChannelChiPhi(store, channelKey) {
         uncDienGiai: uncMatch ? uncMatch.noiDungUnc : "",
         invoiceMatch,
         hdNumberFallback,
+        // Luyen yeu cau 2026-07-17: 2 trang thai them de loc/xem nhanh --
+        // "coHoaDon" la hoa don CHI PHI (NCC) cua chinh dong nay (da co san
+        // qua invoiceMatch/hdNumberFallback, chi lam ro thanh 1 nhan don);
+        // "revenueStatus" la trang thai DOANH THU cua GIAN nay trong THANG
+        // nay (doc lap, lay tu ket qua doi soat doanh thu Momo/ZVP/VietQR).
+        coHoaDon: invoiceMatch ? "Có" : hdNumberFallback ? "Có (theo diễn giải)" : "Không",
+        revenueStatus: revenueStatusFor(finalGian, r.date.slice(0, 7), revMap),
       };
     })
     .sort((a, b) => (a.date > b.date ? 1 : a.date < b.date ? -1 : 0));
@@ -188,9 +224,10 @@ router.get("/doi-soat/chi-phi", (req, res) => {
   const activeCompany = getCompany(req);
   const activeKeys = CHANNEL_KEYS.filter((ch) => CHANNELS[ch].company === activeCompany);
 
+  const revenueStatusMap = buildRevenueStatusMap(store);
   const built = {};
   activeKeys.forEach((ch) => {
-    built[ch] = buildChannelChiPhi(store, ch);
+    built[ch] = buildChannelChiPhi(store, ch, revenueStatusMap);
   });
 
   const allLines = activeKeys.flatMap((ch) => built[ch].lines || []);
@@ -198,10 +235,21 @@ router.get("/doi-soat/chi-phi", (req, res) => {
   const months = Array.from(monthSet).sort().reverse();
   const selectedMonth = req.query.month !== undefined ? req.query.month : months[0] || "";
   const selectedChannel = req.query.channel !== undefined ? req.query.channel : "";
+  // 2 bo loc them (Luyen yeu cau 2026-07-17): "coHoaDon" (Co/Khong -- hoa don
+  // NCC cua chinh dong chi phi) va "revenueStatus" (trang thai doanh thu cua
+  // GIAN trong thang -- doc lap voi hoa don NCC ben tren).
+  const selectedInvoiceStatus = req.query.invoiceStatus || "";
+  const selectedRevenueStatus = req.query.revenueStatus || "";
 
   let lines = allLines;
   if (selectedMonth) lines = lines.filter((l) => l.month === selectedMonth);
   if (selectedChannel) lines = lines.filter((l) => l.channelKey === selectedChannel);
+  if (selectedInvoiceStatus) {
+    lines = lines.filter((l) =>
+      selectedInvoiceStatus === "co" ? l.coHoaDon.startsWith("Có") : l.coHoaDon === "Không"
+    );
+  }
+  if (selectedRevenueStatus) lines = lines.filter((l) => l.revenueStatus === selectedRevenueStatus);
 
   const vendorSet = new Map();
   allLines.forEach((l) => {
@@ -229,6 +277,8 @@ router.get("/doi-soat/chi-phi", (req, res) => {
     months,
     selectedMonth,
     selectedChannel,
+    selectedInvoiceStatus,
+    selectedRevenueStatus,
     totalAmount,
     nccCount: activeNccList(store).length,
     nccIsCustom: !!(store.chi_phi_ncc_list && store.chi_phi_ncc_list.length),
