@@ -281,6 +281,171 @@ router.post("/phap-danh/hop-dong-thue-gian-hang/:id/delete", requireAdmin, (req,
   res.redirect("/phap-danh/hop-dong-thue-gian-hang?success=" + encodeURIComponent("Đã xóa hợp đồng."));
 });
 
+// Luyen, 2026-07-21 (lan 3): "làm luôn cho thuê gian hàng nhá" -- nut doc
+// thang tu CUNG Google Sheet "Tổng hợp HCM-HN" da dung cho Hop Dong NCC (dung
+// chung 1 link, khac o cho LOC NGUOC LAI: tat ca dong KHONG phai NCC -- tuc
+// isNccRow() === false -- la dong thue gian/mat bang, xem chu thich isNccRow
+// trong utils/hopDongHcmParser.js).
+//
+// Khac voi NCC (khoa ghep chinh xac la cap (diaDiem, congTy)), trang nay
+// KHONG co khoa ghep dang tin cay tuong tu voi cac gian DA CO san (52/67 gian
+// duoc ghep 1 LAN DUY NHAT qua ma diem rut gon + tu khoa dia diem -- viec lam
+// tay/xet doan, khong phai ham xac dinh). De AN TOAN, KHONG ghi de nham cac
+// truong Luyen tu nhap tay (benChoThue, thoiHanHopDong, tienThueThang, dieu
+// khoan thanh toan, hinh thuc thu tien...):
+//   - Khop lai voi gian DA CO qua khoa CHINH XAC "soHopDongHCM" (da duoc dien
+//     tu lan ghep dau tien) + congTy -- neu khop, CHI cap nhat cac truong lay
+//     tu sheet (ngay ky/bat dau/het han, tien coc, link hop dong...), tuyet
+//     doi khong dung vao cac truong nhap tay.
+//   - Khong khop duoc (soHopDong nay CHUA co gian nao luu) -- Luyen xac nhan
+//     qua AskUserQuestion "Thêm cả gian mới chưa có": tao THEM 1 dong MOI, chi
+//     dien cac truong lay tu sheet, de trong loaiHinh/benChoThue/thoiHanHopDong/
+//     tienThueThang... cho Luyen tu dien tay + doi ten "Gian" cho dung quy uoc
+//     hien dang dung (sheet ghi ten/ma tho, chua chac trung ten Luyen quen goi).
+//   - Dong khong co soHopDong (khong the khop/khong the tao moi an toan) --
+//     BO QUA, bao so luong trong thong bao ket qua.
+function thueGianGroupKey(diaDiem, congTy) {
+  return (diaDiem || "(không có địa điểm)") + "||" + (congTy || "");
+}
+
+function buildThueGianFieldsFromRows(diaDiem, groupRows, sourceLabel) {
+  const first = groupRows[0];
+  let ngayHetHanMax = "";
+  let baoHanCuaMax = "";
+  groupRows.forEach((r) => {
+    if (r.ngayHetHan && r.ngayHetHan > ngayHetHanMax) {
+      ngayHetHanMax = r.ngayHetHan;
+      baoHanCuaMax = r.baoHanHD;
+    }
+  });
+  const tienCocDamBao = groupRows.map((r) => r.tienCocDamBao).find((v) => v !== null && v !== undefined && v !== "");
+  const tienCocThiCong = groupRows.map((r) => r.tienCocThiCong).find((v) => v !== null && v !== undefined && v !== "");
+  let tongTienThueThangHCM = groupRows
+    .map((r) => r.tongTienThueThang)
+    .find((v) => v !== null && v !== undefined && v !== "");
+  // Cell dang "Số tiền" duoc dinh dang trong Google Sheet (vd " 397.200.000 ")
+  // xuat ra CSV van la CHUOI co khoang trang thua o 2 dau -- trim lai cho gon,
+  // KHONG ep ve so (giu nguyen dinh dang hien co cua truong tham khao nay).
+  if (typeof tongTienThueThangHCM === "string") tongTienThueThangHCM = tongTienThueThangHCM.trim();
+  return {
+    soHopDongHCM: first.soHopDong || "",
+    ngayKyHD: first.ngayKyHD || "",
+    ngayBatDauHD: first.ngayBatDauHD || "",
+    ngayHetHanHD: ngayHetHanMax || first.ngayHetHan || "",
+    baoHanHD: baoHanCuaMax || first.baoHanHD || "",
+    tienCocDamBao: tienCocDamBao !== undefined ? tienCocDamBao : "",
+    tienCocThiCong: tienCocThiCong !== undefined ? tienCocThiCong : "",
+    tongTienThueThangHCM: tongTienThueThangHCM !== undefined ? tongTienThueThangHCM : "",
+    linkHopDongDuDau: groupRows.map((r) => r.linkHDduDau).find((v) => v) || "",
+    linkHopDongChuaDuDau: groupRows.map((r) => r.linkHDchuaDuDau).find((v) => v) || "",
+    sheetHCMDiaDiemGoc: diaDiem,
+    sheetHCMThamKhao: `${sourceLabel}, ${groupRows.length} dòng nguồn`,
+  };
+}
+
+router.post("/phap-danh/hop-dong-thue-gian-hang/cap-nhat-tu-sheet", requireAdmin, async (req, res) => {
+  const store = load();
+  ensureShape(store);
+  try {
+    const resp = await fetch(NCC_SHEET_CSV_URL);
+    if (!resp.ok) {
+      throw new Error(
+        `Không đọc được Google Sheet (mã lỗi ${resp.status}). Kiểm tra lại sheet đã chia sẻ "Bất kỳ ai có link đều xem được" chưa, hoặc link/gid có bị đổi không.`
+      );
+    }
+    const buf = Buffer.from(await resp.arrayBuffer());
+    const { rows } = parseHopDongHcmWorkbook(buf);
+    const thueGianRows = rows.filter((r) => !isNccRow(r));
+    if (thueGianRows.length === 0) {
+      throw new Error('Không tìm thấy dòng nào không phải NCC (Thuộc BP khác "Khác"/"Mua bán vocher") trong Google Sheet.');
+    }
+
+    const groups = new Map();
+    let skippedNoSoHopDong = 0;
+    thueGianRows.forEach((r) => {
+      if (!r.soHopDong) {
+        skippedNoSoHopDong++;
+        return;
+      }
+      const key = thueGianGroupKey(r.diaDiem, r.congTy);
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(r);
+    });
+
+    // Khoa ghep AN TOAN voi gian da co: soHopDongHCM + congTy (KHONG dung ten
+    // gian/dia diem de tranh doan nham, xem chu thich phia tren).
+    const existingBySoHopDong = new Map();
+    store.phap_danh_hop_dong_thue.forEach((r) => {
+      if (r.soHopDongHCM) existingBySoHopDong.set(r.soHopDongHCM + "||" + (r.congTy || "kh_cu"), r);
+    });
+
+    const SOURCE_TAG = "GG Sheet " + new Date().toISOString().slice(0, 10);
+    let addedNew = 0;
+    let updatedExisting = 0;
+    const addedNames = [];
+    const updatedNames = [];
+
+    groups.forEach((groupRows) => {
+      const diaDiem = groupRows[0].diaDiem || "(không có địa điểm)";
+      const soHopDong = groupRows[0].soHopDong;
+      const congTy = groupRows.map((r) => r.congTy).find((v) => v) || "kh_cu";
+      const fields = buildThueGianFieldsFromRows(diaDiem, groupRows, SOURCE_TAG);
+      const matchKey = soHopDong + "||" + congTy;
+      const existing = existingBySoHopDong.get(matchKey);
+      if (existing) {
+        // Gian da co, khop dung qua soHopDongHCM -- CHI ghi de cac truong lay
+        // tu sheet, TUYET DOI khong dung vao cac truong Luyen tu nhap tay.
+        Object.assign(existing, fields);
+        updatedExisting++;
+        updatedNames.push(existing.gian || diaDiem);
+      } else {
+        // Chua co gian nao khop -- tao MOI, de trong cac truong can nhap tay
+        // (Luyen xac nhan qua AskUserQuestion 2026-07-21: "Thêm cả gian mới chưa có").
+        store.phap_danh_hop_dong_thue.push({
+          id: nextId(store, "phap_danh_hop_dong_thue_seq") || Date.now(),
+          loaiHinh: "",
+          congTy,
+          maDiemMisa: "",
+          tenDiemNoiBo: "",
+          khuVuc: "",
+          gian: diaDiem,
+          maCongTrinh: "",
+          maKH: "",
+          benChoThue: "",
+          mstBenChoThue: "",
+          hinhThucHopTac: "",
+          trangThaiHoatDong: "",
+          thoiHanHopDong: "",
+          tienThueThang: 0,
+          ghiChu: `Import tự động từ ${SOURCE_TAG} -- CHỊ CẦN TỰ ĐIỀN: Loại hình, Bên cho thuê, Thời hạn HĐ, Tiền thuê/tháng, và đổi lại tên "Gian" cho đúng quy ước (sheet ghi tên/mã thô).`,
+          dieuKhoanThanhToan: "",
+          hinhThucThuTien: "",
+          ...fields,
+          createdAt: new Date().toISOString(),
+          source: SOURCE_TAG,
+        });
+        addedNew++;
+        addedNames.push(diaDiem);
+      }
+    });
+
+    save(store);
+    let msg = `Đã đọc thẳng từ Google Sheet: ${thueGianRows.length} dòng thuê gian (${groups.size} địa điểm khớp được). `;
+    if (updatedExisting > 0) {
+      msg += `Đã cập nhật các trường từ sheet (ngày ký/hết hạn, tiền cọc, link...) cho ${updatedExisting} gian đã có: ${updatedNames.join(", ")}. `;
+    }
+    if (addedNew > 0) {
+      msg += `Thêm ${addedNew} gian MỚI (cần tự điền Loại hình/Bên cho thuê/Thời hạn/Tiền thuê, đổi tên Gian cho đúng): ${addedNames.join(", ")}. `;
+    }
+    if (skippedNoSoHopDong > 0) {
+      msg += `Bỏ qua ${skippedNoSoHopDong} dòng không có Số Hợp Đồng trong sheet (không đủ dữ liệu để ghép an toàn).`;
+    }
+    res.redirect("/phap-danh/hop-dong-thue-gian-hang?success=" + encodeURIComponent(msg));
+  } catch (e) {
+    res.redirect("/phap-danh/hop-dong-thue-gian-hang?error=" + encodeURIComponent(e.message));
+  }
+});
+
 // ---------- Hop Dong NCC ----------
 // Luyen, 2026-07-20: mo rong tu khung rong ban dau -- da import 48 hop dong
 // NCC that tu Google Sheet "THEO DOI HD HN-HCM" (cac dong co "Thuoc BP" =

@@ -271,6 +271,30 @@
     }
   })();
 </script>
+<script>
+  // Chi Nhan (2026-07-21): "thông báo hiện ba giây thôi rồi tắt đi, các
+  // trang trong web đều có" -- banner .alert-success/.alert-error (thong bao
+  // ket qua sau khi bam nut/luu form) tu dong mo dan roi an sau 3 giay, o
+  // TAT CA trang (dat trong nav.ejs vi partial nay duoc include o moi trang).
+  // Van giu nguyen noi dung HTML (khong xoa khoi DOM) -- chi ho bien mat khoi
+  // man hinh bang opacity/height, phong khi Luyen can doc lai (bam F5 la lai
+  // hien vi query ?success=... con nguyen tren URL).
+  (function () {
+    var alerts = document.querySelectorAll(".alert-success, .alert-error");
+    if (!alerts.length) return;
+    alerts.forEach(function (el) {
+      el.style.transition = "opacity .4s ease, max-height .4s ease, margin .4s ease, padding .4s ease";
+      el.style.overflow = "hidden";
+      setTimeout(function () {
+        el.style.opacity = "0";
+        el.style.maxHeight = "0";
+        el.style.marginBottom = "0";
+        el.style.paddingTop = "0";
+        el.style.paddingBottom = "0";
+      }, 3000);
+    });
+  })();
+</script>
 <% if (typeof isAdmin !== "undefined" && !isAdmin) { %>
 <script>
   // Chi Nhan (2026-07-21): tai khoan "chi xem" -- an bot moi form/nut thao

@@ -23,6 +23,25 @@
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
     <% if (success) { %><div class="alert alert-success"><%= success %></div><% } %>
 
+    <style>
+      .icon-upload-btn {
+        display: inline-flex; flex-direction: column; align-items: center; justify-content: center;
+        gap: 4px; cursor: pointer; border: 1px solid var(--color-hairline); border-radius: var(--radius-md);
+        padding: 12px 20px; background: #fff; transition: box-shadow .15s, transform .15s;
+      }
+      .icon-upload-btn:hover { box-shadow: 0 2px 8px rgba(0,0,0,.1); transform: translateY(-1px); }
+      .icon-upload-btn .icon-upload-btn-icon { font-size: 26px; line-height: 1; }
+      .icon-upload-btn .icon-upload-btn-label { font-size: 12px; font-weight: 600; white-space: nowrap; }
+    </style>
+    <div style="margin-bottom:16px;">
+      <form method="POST" action="/phap-danh/hop-dong-thue-gian-hang/cap-nhat-tu-sheet" style="display:inline-block;">
+        <button type="submit" class="icon-upload-btn" style="border:none;" title='Đọc thẳng từ Google Sheet "THEO DÕI HĐ HN-HCM" để cập nhật ngày ký/hết hạn/tiền cọc/link cho gian đã có (khớp qua Số HĐ) và thêm gian mới chưa có -- không đụng tới các trường chị tự nhập tay (bên cho thuê, thời hạn, tiền thuê...)'>
+          <span class="icon-upload-btn-icon">🏬</span>
+          <span class="icon-upload-btn-label">Cập nhật hợp đồng</span>
+        </button>
+      </form>
+    </div>
+
     <section class="panel">
       <h2>Thêm gian mới</h2>
       <form method="POST" action="/phap-danh/hop-dong-thue-gian-hang" class="form-grid">
