@@ -361,6 +361,135 @@ router.get("/phap-danh/hop-dong-ncc", (req, res) => {
 // biet co rui ro mat sua tay giua 2 lan sheet chua kip cap nhat. Van GIU
 // NGUYEN co che nhom theo CAP (diaDiem, congTy) (khong chi diaDiem) de tranh
 // lap lai chinh bug AMBD do (2 NCC KHAC NHAU trung ten dia diem o 2 cong ty).
+// Luyen, 2026-07-21: BUG FIX -- ban dau nhom/khop CHI theo diaDiem (tenNCC),
+// nhung du lieu goc co nhieu diaDiem TRUNG TEN nhung la 2 NCC KHAC NHAU
+// cho 2 cong ty (vd "Nguyen Phuoc" vua co hop dong rieng cho KH Moi vua
+// co hop dong rieng cho KH Cu). Neu chi khop theo diaDiem, Map se bi va
+// cham (ghi de) va co the gan nham/gop nham chi tiet cua cong ty nay vao
+// ho so cua cong ty kia -- da phat hien loi nay lam contaminate 7/9 ho so
+// trong lan chay dau tien (Nguyen Phuoc, Bluecom, Toan Phat, Lam Sang,
+// AIKIA, Tien Phat, Tra Sua Gia) va da revert thu cong ve dung du lieu
+// truoc do. Tu nay nhom/khop theo CAP (diaDiem, congTy) de tach rieng 2
+// cong ty ngay ca khi trung ten dia diem.
+function nccGroupKey(diaDiem, congTy) {
+  return (diaDiem || "(không có địa điểm)") + "||" + (congTy || "");
+}
+
+// Xay dung toan bo cac truong tong hop tu 1 nhom groupRows (dung chung
+// cho ca NCC moi va NCC da co, vi gio ca 2 truong hop deu GHI DE giong het
+// nhau -- chi khac o cho tao moi object hay ghi vao object da co san).
+function buildNccFieldsFromRows(diaDiem, groupRows) {
+  const first = groupRows[0];
+  let ngayHetHanMax = "";
+  let baoHanCuaMax = "";
+  groupRows.forEach((r) => {
+    if (r.ngayHetHan && r.ngayHetHan > ngayHetHanMax) {
+      ngayHetHanMax = r.ngayHetHan;
+      baoHanCuaMax = r.baoHanHD;
+    }
+  });
+  const soTienList = groupRows.map((r) => r.soTienHD).filter((v) => v !== null && v !== undefined && v !== "");
+  const giaTriHopDong = soTienList.reduce((sum, v) => (typeof v === "number" ? sum + v : sum), 0);
+  const linkHopDong = groupRows.map((r) => r.linkHDduDau).find((v) => v) || groupRows.map((r) => r.linkHDchuaDuDau).find((v) => v) || "";
+  const congTy = groupRows.map((r) => r.congTy).find((v) => v) || "";
+  return {
+    tenNCC: diaDiem,
+    tenDayDuNCC: first.tenKH,
+    mstNCC: first.mstKH,
+    diaChiNCC: first.diaChiKH,
+    congTy,
+    hangHoaMua: first.noiDungHD,
+    noiDung: first.noiDungHD,
+    phanLoaiHD: first.phanLoaiHD,
+    soHopDong: first.soHopDong,
+    ngayKy: first.ngayKyHD,
+    ngayBatDauHD: first.ngayBatDauHD,
+    ngayHetHan: ngayHetHanMax || first.ngayHetHan,
+    baoHanHD: baoHanCuaMax || first.baoHanHD,
+    giaTriHopDong,
+    giaTriHopDongRaw: soTienList.join(" | "),
+    linkHopDong,
+    soTKNH: groupRows.map((r) => r.soTKNHkhach).find((v) => v) || "",
+    khachMoTaiNH: groupRows.map((r) => r.khachMoTaiNH).find((v) => v) || "",
+    khuVuc: "HCM",
+    chiTiet: groupRows.map((r) => ({
+      noiDung: r.noiDungHD,
+      phanLoaiHD: r.phanLoaiHD,
+      soHopDong: r.soHopDong,
+      ngayKy: r.ngayKyHD,
+      ngayBatDau: r.ngayBatDauHD,
+      ngayHetHan: r.ngayHetHan,
+      baoHanHD: r.baoHanHD,
+      soTienHD: r.soTienHD,
+      tongTienThang: "",
+      link: r.linkHDduDau || r.linkHDchuaDuDau || "",
+    })),
+  };
+}
+
+// Luyen, 2026-07-21 (lan 2): "cập nhật LẠI TẤT CẢ các trường cho dòng cũ theo
+// sheet mới nhất" -- doi tu che do "chi append, khong bao gio ghi de" (ban
+// dau de tranh lap lai bug AMBD/Binh Duong khop nham) sang GHI DE TOAN BO cho
+// moi NCC/hop dong da co MOI LAN cap nhat (upload file hoac doc thang tu
+// sheet), vi Luyen xac nhan van muon the du biet co rui ro mat sua tay giua
+// 2 lan sheet chua kip cap nhat.
+// Luyen, 2026-07-21 (lan 3): tach logic nay thanh ham dung chung cho CA route
+// upload file VA route moi doc thang tu Google Sheet link (xem ben duoi) --
+// "muốn khi tôi nhấn cập nhật ... hợp đồng nó sẽ cập nhật từ gg sheet cho tôi".
+function applyNccRowsToStore(store, nccRows, sourceLabel) {
+  const groups = new Map();
+  nccRows.forEach((r) => {
+    const key = nccGroupKey(r.diaDiem, r.congTy);
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(r);
+  });
+
+  const existingByKey = new Map();
+  store.phap_danh_hop_dong_ncc.forEach((r) => existingByKey.set(nccGroupKey(r.tenNCC, r.congTy), r));
+
+  let addedNew = 0;
+  let updatedExisting = 0;
+  const addedNames = [];
+  const updatedNames = [];
+
+  groups.forEach((groupRows, key) => {
+    const diaDiem = groupRows[0].diaDiem || "(không có địa điểm)";
+    const existing = existingByKey.get(key);
+    const fields = buildNccFieldsFromRows(diaDiem, groupRows);
+    if (!existing) {
+      // NCC hoan toan moi
+      store.phap_danh_hop_dong_ncc.push({
+        id: nextId(store, "phap_danh_hop_dong_ncc_seq") || Date.now(),
+        ...fields,
+        ghiChu: `Import tự động từ ${sourceLabel} (Thuộc BP: Khác/Mua bán vocher), ${groupRows.length} dòng nguồn -- chị kiểm tra lại các trường tổng hợp, dữ liệu lấy tự động chưa qua rà soát tay như 48 hợp đồng ban đầu.`,
+        createdAt: new Date().toISOString(),
+        source: sourceLabel,
+      });
+      addedNew++;
+      addedNames.push(diaDiem);
+    } else {
+      // NCC da co -- Luyen xac nhan 2026-07-21 muon GHI DE lai toan bo cac
+      // truong (ke ca link/han/gia tri/chi tiet) theo dung sheet moi nhat
+      // moi lan bam "Cap nhat hop dong", giu nguyen id/createdAt goc.
+      Object.assign(existing, fields);
+      existing.ghiChu = `Đã cập nhật lại từ ${sourceLabel} (Thuộc BP: Khác/Mua bán vocher), ${groupRows.length} dòng nguồn.`;
+      existing.source = sourceLabel;
+      updatedExisting++;
+      updatedNames.push(diaDiem);
+    }
+  });
+
+  return { groupsSize: groups.size, addedNew, updatedExisting, addedNames, updatedNames };
+}
+
+function buildNccResultMessage(prefix, nccRowsLength, result) {
+  let msg = `${prefix} ${nccRowsLength} dòng NCC (${result.groupsSize} địa điểm). `;
+  if (result.addedNew > 0) msg += `Thêm ${result.addedNew} NCC mới: ${result.addedNames.join(", ")}. `;
+  if (result.updatedExisting > 0) msg += `Đã cập nhật lại ${result.updatedExisting} NCC đã có theo sheet mới nhất: ${result.updatedNames.join(", ")}. `;
+  if (result.addedNew === 0 && result.updatedExisting === 0) msg += "Không có gì mới so với dữ liệu hiện tại.";
+  return msg;
+}
+
 router.post("/phap-danh/hop-dong-ncc/upload", requireAdmin, upload.single("file"), (req, res) => {
   const store = load();
   ensureShape(store);
@@ -371,120 +500,47 @@ router.post("/phap-danh/hop-dong-ncc/upload", requireAdmin, upload.single("file"
     if (nccRows.length === 0) {
       throw new Error('Không tìm thấy dòng nào có "Thuộc BP" = Khác/Mua bán vocher trong file này.');
     }
-
-    // Luyen, 2026-07-21: BUG FIX -- ban dau nhom/khop CHI theo diaDiem (tenNCC),
-    // nhung du lieu goc co nhieu diaDiem TRUNG TEN nhung la 2 NCC KHAC NHAU
-    // cho 2 cong ty (vd "Nguyen Phuoc" vua co hop dong rieng cho KH Moi vua
-    // co hop dong rieng cho KH Cu). Neu chi khop theo diaDiem, Map se bi va
-    // cham (ghi de) va co the gan nham/gop nham chi tiet cua cong ty nay vao
-    // ho so cua cong ty kia -- da phat hien loi nay lam contaminate 7/9 ho so
-    // trong lan chay dau tien (Nguyen Phuoc, Bluecom, Toan Phat, Lam Sang,
-    // AIKIA, Tien Phat, Tra Sua Gia) va da revert thu cong ve dung du lieu
-    // truoc do. Tu nay nhom/khop theo CAP (diaDiem, congTy) de tach rieng 2
-    // cong ty ngay ca khi trung ten dia diem.
-    function groupKey(diaDiem, congTy) {
-      return (diaDiem || "(không có địa điểm)") + "||" + (congTy || "");
-    }
-    const groups = new Map();
-    nccRows.forEach((r) => {
-      const key = groupKey(r.diaDiem, r.congTy);
-      if (!groups.has(key)) groups.set(key, []);
-      groups.get(key).push(r);
-    });
-
-    const existingByKey = new Map();
-    store.phap_danh_hop_dong_ncc.forEach((r) => existingByKey.set(groupKey(r.tenNCC, r.congTy), r));
-
-    // Xay dung toan bo cac truong tong hop tu 1 nhom groupRows (dung chung
-    // cho ca NCC moi va NCC da co, vi gio ca 2 truong hop deu GHI DE giong het
-    // nhau -- chi khac o cho tao moi object hay ghi vao object da co san).
-    function buildFieldsFromRows(diaDiem, groupRows) {
-      const first = groupRows[0];
-      let ngayHetHanMax = "";
-      let baoHanCuaMax = "";
-      groupRows.forEach((r) => {
-        if (r.ngayHetHan && r.ngayHetHan > ngayHetHanMax) {
-          ngayHetHanMax = r.ngayHetHan;
-          baoHanCuaMax = r.baoHanHD;
-        }
-      });
-      const soTienList = groupRows.map((r) => r.soTienHD).filter((v) => v !== null && v !== undefined && v !== "");
-      const giaTriHopDong = soTienList.reduce((sum, v) => (typeof v === "number" ? sum + v : sum), 0);
-      const linkHopDong = groupRows.map((r) => r.linkHDduDau).find((v) => v) || groupRows.map((r) => r.linkHDchuaDuDau).find((v) => v) || "";
-      const congTy = groupRows.map((r) => r.congTy).find((v) => v) || "";
-      return {
-        tenNCC: diaDiem,
-        tenDayDuNCC: first.tenKH,
-        mstNCC: first.mstKH,
-        diaChiNCC: first.diaChiKH,
-        congTy,
-        hangHoaMua: first.noiDungHD,
-        noiDung: first.noiDungHD,
-        phanLoaiHD: first.phanLoaiHD,
-        soHopDong: first.soHopDong,
-        ngayKy: first.ngayKyHD,
-        ngayBatDauHD: first.ngayBatDauHD,
-        ngayHetHan: ngayHetHanMax || first.ngayHetHan,
-        baoHanHD: baoHanCuaMax || first.baoHanHD,
-        giaTriHopDong,
-        giaTriHopDongRaw: soTienList.join(" | "),
-        linkHopDong,
-        soTKNH: groupRows.map((r) => r.soTKNHkhach).find((v) => v) || "",
-        khachMoTaiNH: groupRows.map((r) => r.khachMoTaiNH).find((v) => v) || "",
-        khuVuc: "HCM",
-        chiTiet: groupRows.map((r) => ({
-          noiDung: r.noiDungHD,
-          phanLoaiHD: r.phanLoaiHD,
-          soHopDong: r.soHopDong,
-          ngayKy: r.ngayKyHD,
-          ngayBatDau: r.ngayBatDauHD,
-          ngayHetHan: r.ngayHetHan,
-          baoHanHD: r.baoHanHD,
-          soTienHD: r.soTienHD,
-          tongTienThang: "",
-          link: r.linkHDduDau || r.linkHDchuaDuDau || "",
-        })),
-      };
-    }
-
-    let addedNew = 0;
-    let updatedExisting = 0;
-    const addedNames = [];
-    const updatedNames = [];
     const UPLOAD_TAG = "upload " + req.file.originalname + " " + new Date().toISOString().slice(0, 10);
-
-    groups.forEach((groupRows, key) => {
-      const diaDiem = groupRows[0].diaDiem || "(không có địa điểm)";
-      const existing = existingByKey.get(key);
-      const fields = buildFieldsFromRows(diaDiem, groupRows);
-      if (!existing) {
-        // NCC hoan toan moi
-        store.phap_danh_hop_dong_ncc.push({
-          id: nextId(store, "phap_danh_hop_dong_ncc_seq") || Date.now(),
-          ...fields,
-          ghiChu: `Import tự động từ ${UPLOAD_TAG} (Thuộc BP: Khác/Mua bán vocher), ${groupRows.length} dòng nguồn -- chị kiểm tra lại các trường tổng hợp, dữ liệu lấy tự động chưa qua rà soát tay như 48 hợp đồng ban đầu.`,
-          createdAt: new Date().toISOString(),
-          source: UPLOAD_TAG,
-        });
-        addedNew++;
-        addedNames.push(diaDiem);
-      } else {
-        // NCC da co -- Luyen xac nhan 2026-07-21 muon GHI DE lai toan bo cac
-        // truong (ke ca link/han/gia tri/chi tiet) theo dung sheet moi nhat
-        // moi lan bam "Cap nhat hop dong", giu nguyen id/createdAt goc.
-        Object.assign(existing, fields);
-        existing.ghiChu = `Đã cập nhật lại từ ${UPLOAD_TAG} (Thuộc BP: Khác/Mua bán vocher), ${groupRows.length} dòng nguồn.`;
-        existing.source = UPLOAD_TAG;
-        updatedExisting++;
-        updatedNames.push(diaDiem);
-      }
-    });
-
+    const result = applyNccRowsToStore(store, nccRows, UPLOAD_TAG);
     save(store);
-    let msg = `Đã quét ${nccRows.length} dòng NCC từ "${req.file.originalname}" (${groups.size} địa điểm). `;
-    if (addedNew > 0) msg += `Thêm ${addedNew} NCC mới: ${addedNames.join(", ")}. `;
-    if (updatedExisting > 0) msg += `Đã cập nhật lại ${updatedExisting} NCC đã có theo sheet mới nhất: ${updatedNames.join(", ")}. `;
-    if (addedNew === 0 && updatedExisting === 0) msg += "Không có gì mới so với dữ liệu hiện tại.";
+    const msg = buildNccResultMessage(`Đã quét từ "${req.file.originalname}":`, nccRows.length, result);
+    res.redirect("/phap-danh/hop-dong-ncc?success=" + encodeURIComponent(msg));
+  } catch (e) {
+    res.redirect("/phap-danh/hop-dong-ncc?error=" + encodeURIComponent(e.message));
+  }
+});
+
+// Luyen, 2026-07-21 (lan 3): "muốn khi tôi nhấn cập nhật ... hợp đồng nó sẽ
+// cập nhật từ gg sheet cho tôi á" -- doc THANG tu Google Sheet qua export CSV
+// (khong can tai file ve roi tai len nua). Luyen da dong y doi quyen chia se
+// sheet "THEO DÕI HĐ HN-HCM" sang "Bất kỳ ai có link đều xem được" de server
+// doc duoc ma khong can dang nhap Google. Neu Luyen doi sang sheet/gid khac
+// sau nay, chi can dat bien moi truong HOP_DONG_NCC_SHEET_CSV_URL tren
+// Railway (khong can sua code).
+const NCC_SHEET_CSV_URL =
+  process.env.HOP_DONG_NCC_SHEET_CSV_URL ||
+  "https://docs.google.com/spreadsheets/d/1Kh_IDjW580UFwyrB1ESqdAZvMLLe5sffLrjRUxjS-DI/export?format=csv&gid=299256887";
+
+router.post("/phap-danh/hop-dong-ncc/cap-nhat-tu-sheet", requireAdmin, async (req, res) => {
+  const store = load();
+  ensureShape(store);
+  try {
+    const resp = await fetch(NCC_SHEET_CSV_URL);
+    if (!resp.ok) {
+      throw new Error(
+        `Không đọc được Google Sheet (mã lỗi ${resp.status}). Kiểm tra lại sheet đã chia sẻ "Bất kỳ ai có link đều xem được" chưa, hoặc link/gid có bị đổi không.`
+      );
+    }
+    const buf = Buffer.from(await resp.arrayBuffer());
+    const { rows } = parseHopDongHcmWorkbook(buf);
+    const nccRows = rows.filter(isNccRow);
+    if (nccRows.length === 0) {
+      throw new Error('Không tìm thấy dòng nào có "Thuộc BP" = Khác/Mua bán vocher trong Google Sheet.');
+    }
+    const SOURCE_TAG = "GG Sheet " + new Date().toISOString().slice(0, 10);
+    const result = applyNccRowsToStore(store, nccRows, SOURCE_TAG);
+    save(store);
+    const msg = buildNccResultMessage("Đã đọc thẳng từ Google Sheet:", nccRows.length, result);
     res.redirect("/phap-danh/hop-dong-ncc?success=" + encodeURIComponent(msg));
   } catch (e) {
     res.redirect("/phap-danh/hop-dong-ncc?error=" + encodeURIComponent(e.message));

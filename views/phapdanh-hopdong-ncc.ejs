@@ -27,12 +27,11 @@
       .icon-upload-btn .icon-upload-btn-label { font-size: 12px; font-weight: 600; white-space: nowrap; }
     </style>
     <div style="margin-bottom:16px;">
-      <form method="POST" action="/phap-danh/hop-dong-ncc/upload" enctype="multipart/form-data" style="display:inline-block;">
-        <label class="icon-upload-btn" title='Chọn lại file xuất từ Google Sheet "THEO DÕI HĐ HN-HCM" để dò NCC mới và phụ lục mới cho NCC đã có (không mất dữ liệu đã có)'>
-          <input type="file" name="file" accept=".xlsx,.xls" style="display:none;" onchange="this.form.submit()" />
+      <form method="POST" action="/phap-danh/hop-dong-ncc/cap-nhat-tu-sheet" style="display:inline-block;">
+        <button type="submit" class="icon-upload-btn" style="border:none;" title='Đọc thẳng từ Google Sheet "THEO DÕI HĐ HN-HCM" để dò NCC mới và phụ lục mới cho NCC đã có (không cần tải file lên nữa)'>
           <span class="icon-upload-btn-icon">🐷</span>
           <span class="icon-upload-btn-label">Cập nhật hợp đồng</span>
-        </label>
+        </button>
       </form>
     </div>
 
