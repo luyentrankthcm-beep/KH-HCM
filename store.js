@@ -264,6 +264,39 @@ function nextId(store, collection) {
     );
   }
 
+  // Luyen (2026-07-21): "quen mat khau, khong con dang nhap o dau ca" -- mat
+  // khau duoc ma hoa 1 chieu nen KHONG the xem lai/khoi phuc, chi co the DAT
+  // LAI. Co che "break-glass" nay cho phep tu dat lai mat khau 1 tai khoan MA
+  // KHONG CAN dang nhap truoc: dat 2 bien moi truong RESET_PASSWORD_USERNAME
+  // + RESET_PASSWORD_NEW (vd tren Railway: Settings > Variables), roi khoi
+  // dong lai server (Railway tu redeploy khi luu bien moi) -- lan khoi dong
+  // ke tiep se dat lai dung mat khau do (tao moi tai khoan Quan tri neu ten
+  // dang nhap chua ton tai). BAT BUOC xoa 2 bien nay ngay sau khi dang nhap
+  // lai duoc, neu khong moi lan server khoi dong lai se tiep tuc dat lai ve
+  // dung mat khau do (khong an toan de lau dai).
+  const resetUsername = (process.env.RESET_PASSWORD_USERNAME || "").trim();
+  const resetPassword = process.env.RESET_PASSWORD_NEW || "";
+  if (resetUsername && resetPassword) {
+    let user = store.users.find((u) => u.username === resetUsername);
+    if (!user) {
+      user = {
+        id: nextId(store, "users"),
+        username: resetUsername,
+        name: "Quan tri vien (tao qua RESET_PASSWORD)",
+        role: "admin",
+        created_at: new Date().toISOString(),
+      };
+      store.users.push(user);
+    }
+    user.password_hash = bcrypt.hashSync(resetPassword, 10);
+    if (!user.role) user.role = "admin";
+    changed = true;
+    console.log(
+      "[reset] Da dat lai mat khau cho tai khoan '" + resetUsername + "' theo bien moi truong RESET_PASSWORD_USERNAME/RESET_PASSWORD_NEW. " +
+        "NHO XOA 2 BIEN NAY NGAY SAU KHI DANG NHAP LAI DUOC."
+    );
+  }
+
   if (store.banks.length === 0) {
     store.banks.push({
       id: nextId(store, "banks"),
