@@ -99,8 +99,19 @@ function normCongTy(v) {
   return "";
 }
 
+// Luyen, 2026-07-21 (lan 3): BUG FIX -- khi doc CSV export tu Google Sheet
+// (nut "Cập nhật hợp đồng" doc thang tu link, khong qua upload file .xlsx
+// nua), XLSX.read(buffer, {type:"buffer"}) doan sai encoding cho CSV thuan
+// text (khong co header ZIP nhu file .xlsx that), lam mat dau tieng Viet
+// kieu mojibake (vd "Khác" bi doc thanh "KhÃ¡c" -- 2 byte UTF-8 cua "á" bi
+// hieu nham thanh 2 ky tu rieng). File .xlsx that luon bat dau bang chu ky
+// ZIP "PK" nen van doc dung binh thuong qua nhanh "buffer". Voi CSV (khong
+// co "PK" o dau), tu giai ma bang Buffer.toString("utf8") TRUOC roi moi dua
+// cho XLSX duoi dang "string" -- tranh hoan toan buoc doan sai encoding cua
+// XLSX cho truong hop nay.
 function parseHopDongHcmWorkbook(buffer) {
-  const wb = XLSX.read(buffer, { type: "buffer" });
+  const isZip = Buffer.isBuffer(buffer) && buffer.length > 1 && buffer[0] === 0x50 && buffer[1] === 0x4b;
+  const wb = isZip ? XLSX.read(buffer, { type: "buffer" }) : XLSX.read(buffer.toString("utf8"), { type: "string" });
   const sheetName = wb.SheetNames.includes(SHEET_NAME) ? SHEET_NAME : wb.SheetNames[0];
   const ws = wb.Sheets[sheetName];
   const grid = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: null });
