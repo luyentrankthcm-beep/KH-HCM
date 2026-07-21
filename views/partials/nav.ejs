@@ -274,8 +274,10 @@
 <script>
   // Chi Nhan (2026-07-21): "thông báo hiện ba giây thôi rồi tắt đi, các
   // trang trong web đều có" -- banner .alert-success/.alert-error (thong bao
-  // ket qua sau khi bam nut/luu form) tu dong mo dan roi an sau 3 giay, o
-  // TAT CA trang (dat trong nav.ejs vi partial nay duoc include o moi trang).
+  // ket qua sau khi bam nut/luu form) tu dong mo dan roi an sau 1 khoang thoi
+  // gian, o TAT CA trang (dat trong nav.ejs vi partial nay duoc include o moi
+  // trang). Chi Nhan doi lai thanh 5 giay ngay sau do ("cái thông báo hiển
+  // thị năm giây thôi rồi tắt đi").
   // Van giu nguyen noi dung HTML (khong xoa khoi DOM) -- chi ho bien mat khoi
   // man hinh bang opacity/height, phong khi Luyen can doc lai (bam F5 la lai
   // hien vi query ?success=... con nguyen tren URL).
@@ -291,7 +293,7 @@
         el.style.marginBottom = "0";
         el.style.paddingTop = "0";
         el.style.paddingBottom = "0";
-      }, 3000);
+      }, 5000);
     });
   })();
 </script>
