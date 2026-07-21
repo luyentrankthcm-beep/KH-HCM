@@ -1,0 +1,101 @@
+// Luyen, 2026-07-21: "từ cái nội dung với 2 chi 2 ngân hàng này á bạn sẽ liên
+// kết qua cái bên file chi phí á có thanh toán kh cũ và kh mới của gian nào á
+// note lại chi ngày mấy ngân hàng nào bên chi phí cho tôi nhá cập nhật hàng
+// ngày cho tôi luôn nhá" -- doc giao dich "Chi" (tien thue gian) tren cac tai
+// khoan ngan hang da co san trong he thong, tu tach ten gian tu dien giai, doi
+// chieu voi danh sach gian (phap_danh_hop_dong_thue) de biet dung cong ty +
+// gian nao, roi tao dong Chi Phi tuong ung (an toan: CHI tao khi khop chac
+// chan 1 gian duy nhat, con lai bao cao de Luyen tu xu ly, khong doan bua).
+function removeDiacritics(s) {
+  return String(s)
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/đ/gi, (m) => (m === "đ" ? "d" : "D"));
+}
+
+const PAYER_RE = /^(?:CTY|C\.?ty|CONG TY|Cong ty)\.?\s*(?:TNHH\s*)?(?:DICH VU VA\s*)?(?:GIAI TRI\s*)?K\s*(?:VA|V\s*A|&)?\s*H\.?\s*/i;
+const VERB_RE = /^(?:TT|tt|THANH TOAN|Thanh toan|thanh toan|NOP TIEN|Nop tien|nop tien)\s*/;
+const CATEGORY_RE = /(tien thue ghe|tien thue)\s*(.*)$/i;
+
+// Tach ten gian tho tu 1 dong dien giai giao dich ngan hang. Tra ve null neu
+// khong nhan dien duoc mau "CTY K&H (tt) tien thue ..." ro rang -- CHU DINH
+// bo qua nhung dong mo ho (tien hang, tien dien, luong, phi ngan hang, CTNB
+// chuyen noi bo...) thay vi doan sai.
+// Nhieu giao dich (chuyen khoan lien ngan hang) co tien to boilerplate cua
+// ngan hang truoc noi dung thuc su, vd "BDR-TKThe :xxx| tai SCB VN. ND  CTY
+// K VA H TT ..." -- bo tien to nay truoc khi tim PAYER_RE (von can nam o dau
+// chuoi), neu khong se bi coi la "khong nhan dien duoc" oan.
+const BANK_BOILERPLATE_RE = /^(?:BDR-TKThe\s*:[^|]*\|\s*tai\s+[^.]*\.\s*ND\s*)/i;
+
+function extractGianRentText(descRaw) {
+  let s = removeDiacritics(descRaw || "").trim().replace(/\s+/g, " ");
+  s = s.replace(BANK_BOILERPLATE_RE, "").trim();
+  const afterPayer = s.replace(PAYER_RE, "");
+  if (afterPayer === s) return null; // khong phai giao dich do K&H tu chi (vd BDR- tien ngan hang khac, CTNB...)
+  let rest = afterPayer.replace(VERB_RE, "");
+  const catMatch = rest.match(CATEGORY_RE);
+  if (!catMatch) return null;
+  let gian = catMatch[2].trim();
+  gian = gian.replace(/\s*theo[\s\S]*$/i, "");
+  gian = gian.replace(/^\s*(?:mat bang|vi tri)?\s*\d{1,2}\.\d{2,4}\s*/i, "");
+  gian = gian.replace(/\s*(?:t\d{1,2}\.\d{2,4}|thang\s*\d{1,2}[.\/]\d{2,4}(?:\s*-\s*\d{1,2}[.\/]\d{2,4})?)\s*$/i, "");
+  gian = gian.replace(/\s*(?:tu\s+\d{1,2}[-.]\d{1,2}[\s\S]*)$/i, "");
+  gian = gian.replace(/\s*-\s*(?:cong ty|cty|chi nhanh)[\s\S]*$/i, "");
+  gian = gian.replace(/\s*hd\s*(?:so)?\s*[\w\-\/]+$/i, "");
+  gian = gian.replace(/\s*ctlnhido\d+[\s\S]*$/i, "");
+  gian = gian.replace(/[\s\-]+$/, "");
+  gian = gian.trim();
+  if (!gian || /^(nha|van phong|mat bang)$/i.test(gian)) return null;
+  return gian;
+}
+
+// "posh"/"jp"/"aeon"/"mall" xuat hien qua nhieu gian nen bo qua (chi gay
+// loang diem, khong giup phan biet). NGUOC LAI "tutu"/"fz"/"farm"/"pinball"
+// la ten thuong hieu rieng, PHAI GIU LAI de phan biet cac gian CHUNG 1 mat
+// bang (vd "tàu Lotte Gò Vấp" khac "FZ MN VR Lotte mart Gò Vấp") -- bo qua
+// nham 2 tu nay tung lam 2 gian nay bi diem hoa lam 1, khong the phan biet.
+const STOPWORDS = new Set(["mn", "ghe", "gian", "kvc", "p", "tang", "1", "2", "3", "posh", "jp", "aeon", "mall"]);
+
+function tokenize(s) {
+  return removeDiacritics(s)
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .split(/\s+/)
+    .filter((w) => w.length >= 2 && !STOPWORDS.has(w));
+}
+
+// Doi chieu ten gian tho (tu extractGianRentText) voi danh sach gian hien co
+// (store.phap_danh_hop_dong_thue) -- so sanh ca 2 truong "gian" (ten diem
+// xuat hoa don) va "tenDiemNoiBo" (ten noi bo). Diem = ty le token cua chuoi
+// giao dich xuat hien trong ten gian. Chi coi la KHOP CHAC CHAN khi diem cao
+// nhat >= 0.6 VA vuot han (>=0.15) diem cao thu nhi -- neu khong ro rang, tra
+// ve null (khong doan) de Luyen tu xu ly.
+function matchGianRecord(rentText, gianList) {
+  const queryTokens = tokenize(rentText);
+  if (queryTokens.length === 0) return null;
+  const queryTokenSet = new Set(queryTokens);
+  const scored = gianList.map((r) => {
+    const targetText = `${r.gian || ""} ${r.tenDiemNoiBo || ""}`;
+    const targetTokensArr = tokenize(targetText);
+    const targetTokens = new Set(targetTokensArr);
+    const hits = queryTokens.filter((t) => targetTokens.has(t)).length;
+    // Giao dich ngan hang thuong co nhieu chu thua ("vuot doanh thu",
+    // "theo hop dong"...) quanh ten gian that -- dung MIN(so token cua ben
+    // NGAN hon) lam mau so, de 1 cai ten ngan (vd "sc vivo") xuat hien tron
+    // ven trong 1 dong dai van tinh la khop hoan toan, thay vi bi pha loang
+    // diem vi qua nhieu tu thua ben con lai.
+    const denom = Math.min(queryTokenSet.size, targetTokens.size) || 1;
+    const score = hits / denom;
+    return { record: r, score };
+  });
+  scored.sort((a, b) => b.score - a.score);
+  if (scored.length === 0) return null;
+  const best = scored[0];
+  const second = scored[1] || { score: 0 };
+  if (best.score >= 0.6 && best.score - second.score >= 0.15) {
+    return best.record;
+  }
+  return null;
+}
+
+module.exports = { extractGianRentText, matchGianRecord, removeDiacritics };

@@ -90,9 +90,27 @@ function mergeResolvedGross(uploads) {
 function seedGianMappingDefaults(store, codes) {
   codes.forEach((c) => {
     if (!(c in store.gian_mapping)) {
-      store.gian_mapping[c] = c.endsWith(FF_SUFFIX) ? "1388" : "131";
+      // Luyen, 2026-07-17: "doi xuat ra 1388 thanh 131 het" -- TK Co 1388
+      // (doanh thu chia se/CSE) khong con duoc dung nua, moi gian moi deu
+      // mac dinh 131.
+      store.gian_mapping[c] = "131";
     }
   });
+}
+
+// Luyen, 2026-07-17: "doi xuat ra 1388 thanh 131 het" -- gian_mapping dung
+// chung voi trang Momo (routes/doisoat.js co cung 1 ham ten nay); lap lai o
+// day de trang nay tu sua duoc ngay ca khi duoc mo TRUOC trang Momo.
+function ensureNo1388(store) {
+  if (!store.gian_mapping) return false;
+  let changed = false;
+  for (const code of Object.keys(store.gian_mapping)) {
+    if (store.gian_mapping[code] === "1388") {
+      store.gian_mapping[code] = "131";
+      changed = true;
+    }
+  }
+  return changed;
 }
 
 // Rows from the daily master "gian " sheet (store.zvp_gian_master), filtered
@@ -118,6 +136,7 @@ function isDuplicateRecentUpload(uploadsList, fileName, grossByCode) {
 }
 
 function buildReconciliation(store) {
+  if (ensureNo1388(store)) save(store);
   const bank = store.banks.find((b) => b.name === ZVP_BANK_NAME);
   if (!bank) {
     return { error: `Chua co ngan hang "${ZVP_BANK_NAME}" (TK ${ZVP_BANK_ACCOUNT}) trong he thong.` };
@@ -228,8 +247,30 @@ function buildReconciliation(store) {
     (g) => normText(g.tenDiem) === normText(g.maCongTrinh)
   );
 
+  // "Khoa so" -- Luyen, 2026-07-21: "TẤT CẢ CÁC TRANG ĐIỀU CÓ KHÓA SỔ CHO TÔI
+  // NHÁ", ap dung cung 1 co che da lam cho VietQR/Momo: 1 ngay khoa duy nhat
+  // cho ca trang (chi 1 cong ty/1 tai khoan ngan hang), ap dung cho CA 3 kenh
+  // online/offline/payoo (chung 1 mo hinh dong tien "tien ve ngan hang" gop 1
+  // TK). Moi ngay settlementDate <= ngay khoa duoc coi la "locked" -- dua diff
+  // ve 0, giu nguyen gross/invoiceTotal de tra cuu.
+  const lockDate = store.zvp_lock_date || "";
+  if (lockDate) {
+    ["online", "offline", "payoo"].forEach((ch) => {
+      (reconciled[ch] || []).forEach((r) => {
+        if (r.settlementDate <= lockDate) {
+          r.locked = true;
+          r.lines.forEach((l) => {
+            l.locked = true;
+            l.diff = 0;
+          });
+        }
+      });
+    });
+  }
+
   return {
     reconciled,
+    lockDate,
     allCodes: Array.from(allCodes).sort(),
     unmappedWarnings,
     invoiceDiemAlias,
@@ -254,11 +295,30 @@ router.get("/doi-soat/zvp", (req, res) => {
   const months = Array.from(monthSet).sort().reverse();
   const selectedMonth = req.query.month !== undefined ? req.query.month : months[0] || "";
 
-  const reconciled = { online: [], offline: [], payoo: [] };
+  const monthFiltered = { online: [], offline: [], payoo: [] };
   ["online", "offline", "payoo"].forEach((ch) => {
-    reconciled[ch] = selectedMonth
+    monthFiltered[ch] = selectedMonth
       ? (reconciledAll[ch] || []).filter((r) => r.settlementDate.slice(0, 7) === selectedMonth)
       : reconciledAll[ch] || [];
+  });
+
+  // Luyen, 2026-07-20: "chon ngay cua no nha" -- ngoai loc theo thang, them
+  // loc theo TUNG NGAY cu the de nhay thang toi dung ngay can xem, khong phai
+  // cuon qua het ca thang. Danh sach ngay chi tinh trong pham vi thang dang
+  // chon (rong hon neu dang "Tat ca") de dropdown ngay luon khop voi du lieu
+  // dang hien.
+  const daySet = new Set();
+  ["online", "offline", "payoo"].forEach((ch) => {
+    monthFiltered[ch].forEach((r) => daySet.add(r.settlementDate));
+  });
+  const days = Array.from(daySet).sort().reverse();
+  const selectedDay = req.query.day || "";
+
+  const reconciled = { online: [], offline: [], payoo: [] };
+  ["online", "offline", "payoo"].forEach((ch) => {
+    reconciled[ch] = selectedDay
+      ? monthFiltered[ch].filter((r) => r.settlementDate === selectedDay)
+      : monthFiltered[ch];
   });
 
   res.render("doisoat-zvp", {
@@ -277,15 +337,35 @@ router.get("/doi-soat/zvp", (req, res) => {
     reconciled,
     months,
     selectedMonth,
+    days,
+    selectedDay,
     gianMapping: store.gian_mapping,
     allCodes: built.allCodes || [],
     unmappedWarnings: built.unmappedWarnings || [],
     invoiceDiemAlias: built.invoiceDiemAlias || {},
     unmatchedInvoiceCodes: built.unmatchedInvoiceCodes || [],
     pendingOnlineGian: built.pendingOnlineGian || [],
+    lockDate: built.lockDate || "",
     error: built.error || req.query.error || null,
     success: req.query.success || null,
   });
+});
+
+// ---------- Khoa so (giong VietQR/Momo) -- gui lockDate rong de mo khoa lai. ----------
+router.post("/doi-soat/zvp/khoa-so", (req, res) => {
+  const store = load();
+  try {
+    const lockDate = (req.body.lockDate || "").trim();
+    if (lockDate && !/^\d{4}-\d{2}-\d{2}$/.test(lockDate)) throw new Error("Ngay khoa khong hop le (dang YYYY-MM-DD).");
+    store.zvp_lock_date = lockDate;
+    save(store);
+    const msg = lockDate
+      ? `Da khoa so den het ngay ${lockDate}. Cac ngay tu do tro ve truoc se khong con hien canh bao lech nua.`
+      : "Da mo khoa so.";
+    res.redirect("/doi-soat/zvp?success=" + encodeURIComponent(msg));
+  } catch (e) {
+    res.redirect("/doi-soat/zvp?error=" + encodeURIComponent(e.message));
+  }
 });
 
 // ---------- Sua ma gian tren "Danh muc ten san pham" (Online) ----------
@@ -687,7 +767,7 @@ router.post("/doi-soat/zvp/upload-hoadon", upload.single("file"), (req, res) => 
   const store = load();
   try {
     if (!req.file) throw new Error("Vui long chon 1 file de tai len.");
-    const shared = parseSharedInvoiceWorkbook(req.file.buffer);
+    const shared = parseSharedInvoiceWorkbook(req.file.buffer, getCompany(req));
 
     const addedCounts = {};
     for (const key of ["zalo", "vnpay", "payoo"]) {
@@ -822,7 +902,7 @@ router.post("/doi-soat/zvp/invoices/clear", (req, res) => {
 router.post("/doi-soat/zvp/manual-match", (req, res) => {
   const store = load();
   try {
-    const { channel, settlementDate, code, invoiceNumbers, amount, note } = req.body;
+    const { channel, settlementDate, code, invoiceNumbers, amount, grossAdjustment, note } = req.body;
     if (!["online", "offline", "payoo"].includes(channel)) throw new Error("Kenh khong hop le.");
     if (!settlementDate || !code) throw new Error("Thieu thong tin dong can danh dau.");
     if (!store.zvp_manual_matches) store.zvp_manual_matches = { online: {}, offline: {}, payoo: {} };
@@ -832,10 +912,12 @@ router.post("/doi-soat/zvp/manual-match", (req, res) => {
       .split(/[,\s]+/)
       .map((s) => s.trim())
       .filter(Boolean);
-    const amt = amount ? Number(String(amount).replace(/[^\d]/g, "")) : null;
+    const amt = amount ? Number(String(amount).replace(/[^\d-]/g, "")) : null;
+    const grossAdj = grossAdjustment ? Number(String(grossAdjustment).replace(/[^\d-]/g, "")) : 0;
     store.zvp_manual_matches[channel][key] = {
       invoiceNumbers: invoiceList,
       amount: amt,
+      grossAdjustment: grossAdj,
       note: note || "",
       created_at: new Date().toISOString(),
     };
@@ -865,7 +947,14 @@ router.post("/doi-soat/zvp/manual-match/delete", (req, res) => {
 // ---------- Export: "MISATHuế" (Online) va "MISAThue OFFLINE" (Offline + Payoo) ----------
 // Same "Mau phieu thu tien gui de nhap vao AMIS Accounting" 28-column layout
 // as Momo's export. Gian mapped to "SKIP" are excluded from both files.
-function buildExportRows(reconciledList, startNo, lyDoThu) {
+// suffixKenh (Luyen, 2026-07-16): hau to phan biet kenh ngay tren Dien giai
+// cua file xuat Misa -- "VNP" cho Zalo App (Online) va VNPay offline, "PAYOO"
+// rieng cho Payoo (Momo dung "MM", Viet QR dung "QR" o 2 file route khac).
+// maDoiTuong (Luyen, 2026-07-20): "KL" (Khach le) mac dinh cho Zalo App/Payoo,
+// rieng kenh VNPay offline dung "VN PAY0102182292" -- xem 2 lan goi ham nay o
+// duoi (export-online/export-offline) de biet kenh nao truyen gi.
+function buildExportRows(reconciledList, startNo, lyDoThu, suffixKenh, maDoiTuong) {
+  const doiTuong = maDoiTuong || "KL";
   let seq = startNo;
   const rows = [];
   reconciledList
@@ -880,13 +969,13 @@ function buildExportRows(reconciledList, startNo, lyDoThu) {
       exportableLines.forEach((l) => {
         const hdText = l.invoiceNumbers.length > 0 ? l.invoiceNumbers.join(", ") : "";
         const dienGiai = hdText
-          ? `Thu tiền dịch vụ vui chơi giải trí theo HĐ ${hdText}`
-          : "Thu tiền dịch vụ vui chơi giải trí";
+          ? `Thu tiền dịch vụ vui chơi giải trí - ${suffixKenh} theo HĐ ${hdText}`
+          : `Thu tiền dịch vụ vui chơi giải trí - ${suffixKenh}`;
         rows.push({
           "Ngày hạch toán (*)": ngayDmy,
           "Ngày chứng từ (*)": ngayDmy,
           "Số chứng từ (*)": soCt,
-          "Mã đối tượng": "KL",
+          "Mã đối tượng": doiTuong,
           "Tên đối tượng": "",
           "Địa chỉ": "",
           "Nộp vào TK": ZVP_BANK_ACCOUNT,
@@ -895,10 +984,10 @@ function buildExportRows(reconciledList, startNo, lyDoThu) {
           "Diễn giải lý do thu": dienGiai,
           "Mã nhân viên thu": "",
           "Diễn giải (hạch toán)": dienGiai,
-          "TK Nợ (*)": 112,
+          "TK Nợ (*)": 1121,
           "TK Có (*)": l.tkCo,
           "Số tiền": l.net,
-          "Mã đối tượng (hạch toán)": "KL",
+          "Mã đối tượng (hạch toán)": doiTuong,
           "Số khế ước đi vay": "",
           "Số khế ước cho vay": "",
           "Mã khoản mục chi phí": "",
@@ -929,7 +1018,10 @@ router.get("/doi-soat/zvp/export-online.xlsx", (req, res) => {
 
   let startNo = parseInt(req.query.start || "1", 10);
   if (isNaN(startNo) || startNo < 1) startNo = 1;
-  const { rows } = buildExportRows(built.reconciled.online, startNo, "Thu tiền khách hàng qua Zalo App (VNPay Online)");
+  // Luyen, 2026-07-21: "lý do thu là Thu tiền khách hàng (không theo hóa đơn)
+  // đổi hết các file xuất misa nhá" -- dung 1 cau CO DINH giong het Momo, bo
+  // cau rieng theo tung kenh nhu truoc.
+  const { rows } = buildExportRows(built.reconciled.online, startNo, "Thu tiền khách hàng (không theo hóa đơn)", "VNP");
 
   const ws = XLSX.utils.json_to_sheet(rows);
   const wb2 = XLSX.utils.book_new();
@@ -950,8 +1042,19 @@ router.get("/doi-soat/zvp/export-offline.xlsx", (req, res) => {
   // Offline VNPay + Payoo folded into the SAME file (per Luyen: Payoo duoc
   // xu ly don gian giong nhu Offline), continuing the same document-number
   // sequence across both channels.
-  const offlinePart = buildExportRows(built.reconciled.offline, startNo, "Thu tiền khách hàng qua QR offline (VNPay)");
-  const payooPart = buildExportRows(built.reconciled.payoo, offlinePart.nextSeq, "Thu tiền khách hàng qua Payoo");
+  const offlinePart = buildExportRows(
+    built.reconciled.offline,
+    startNo,
+    "Thu tiền khách hàng (không theo hóa đơn)",
+    "VNP",
+    "VN PAY0102182292"
+  );
+  const payooPart = buildExportRows(
+    built.reconciled.payoo,
+    offlinePart.nextSeq,
+    "Thu tiền khách hàng (không theo hóa đơn)",
+    "PAYOO"
+  );
   const rows = [...offlinePart.rows, ...payooPart.rows];
 
   const ws = XLSX.utils.json_to_sheet(rows);

@@ -17,6 +17,9 @@ const doisoatVietQrRoutes = require("./routes/doisoat-vietqr");
 const baocaoRoutes = require("./routes/baocao");
 const congnoRoutes = require("./routes/congno");
 const doisoatChiPhiRoutes = require("./routes/doisoat-chiphi");
+const congnoNccRoutes = require("./routes/congno-ncc");
+const phapDanhRoutes = require("./routes/phap-danh");
+const chiPhiRoutes = require("./routes/chi-phi");
 const backupRoutes = require("./routes/backup");
 
 const app = express();
@@ -65,7 +68,10 @@ app.use("/", doisoatZvpRoutes);
 app.use("/", doisoatVietQrRoutes);
 app.use("/", baocaoRoutes);
 app.use("/", congnoRoutes);
+app.use("/", congnoNccRoutes);
 app.use("/", doisoatChiPhiRoutes);
+app.use("/", phapDanhRoutes);
+app.use("/", chiPhiRoutes);
 app.use("/", backupRoutes);
 
 app.use((req, res) => {

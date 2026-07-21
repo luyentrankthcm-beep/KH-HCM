@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <%- include('partials/head') %>
+</head>
+<body>
+  <%- include('partials/nav') %>
+  <main class="container">
+    <h1>Chi Phí</h1>
+    <p class="muted" style="margin-top:-10px;margin-bottom:20px;">
+      Sổ ghi chi phí — lấy từ Google Sheet "ĐI ỦY NHIỆM CHI KVC + MTĐ MN" (tab THÁNG 7.2026 + TT TIỀN MẶT), tách theo
+      công ty đang chọn (nút Cũ/Mới góc trên trái). Tổng công ty: <%= totalForCompany %> khoản chi (<%= chuaHachToanCount %> chưa hạch toán, <%= chuaSoHoaDonCount %> chưa có số hóa đơn).
+      Đang hiển thị: <%= rows.length %> khoản, <%= tongTien.toLocaleString('vi-VN') %> đ.
+    </p>
+
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+    <% if (success) { %><div class="alert alert-success"><%= success %></div><% } %>
+
+    <style>
+      .icon-upload-btn {
+        display: inline-flex; flex-direction: column; align-items: center; justify-content: center;
+        gap: 4px; cursor: pointer; border: 1px solid var(--color-hairline); border-radius: var(--radius-md);
+        padding: 12px 20px; background: #fff; transition: box-shadow .15s, transform .15s;
+      }
+      .icon-upload-btn:hover { box-shadow: 0 2px 8px rgba(0,0,0,.1); transform: translateY(-1px); }
+      .icon-upload-btn .icon-upload-btn-icon { font-size: 26px; line-height: 1; }
+      .icon-upload-btn .icon-upload-btn-label { font-size: 12px; font-weight: 600; white-space: nowrap; }
+    </style>
+    <div style="margin-bottom:16px; display:flex; gap:12px;">
+      <form method="POST" action="/chi-phi/upload" enctype="multipart/form-data" style="display:inline-block;">
+        <label class="icon-upload-btn" title='Chọn lại file "ĐI ỦY NHIỆM CHI KVC + MTĐ MN" xuất từ Google Sheet để nạp thêm khoản chi mới (không mất dữ liệu đã có)'>
+          <input type="file" name="file" accept=".xlsx,.xls" style="display:none;" onchange="this.form.submit()" />
+          <span class="icon-upload-btn-icon">📥</span>
+          <span class="icon-upload-btn-label">Cập nhật chi phí</span>
+        </label>
+      </form>
+      <form method="POST" action="/chi-phi/quet-ngan-hang" style="display:inline-block;">
+        <button type="submit" class="icon-upload-btn" style="border:1px solid var(--color-hairline);" title="Tự động quét các giao dịch Chi (tiền thuê gian) trong tháng hiện tại trên tất cả tài khoản ngân hàng, khớp gian hàng và tạo khoản chi phí mới (không tạo trùng). Chạy hàng ngày để tự cập nhật.">
+          <span class="icon-upload-btn-icon">🏦</span>
+          <span class="icon-upload-btn-label">Quét ngân hàng</span>
+        </button>
+      </form>
+    </div>
+
+    <section class="panel">
+      <h2>Thêm khoản chi mới (nhập tay)</h2>
+      <form method="POST" action="/chi-phi" class="form-grid">
+        <label>Ngày chi <input type="date" name="ngay" required /></label>
+        <label>Gian/Cơ sở <input type="text" name="gian" /></label>
+        <label>NCC <input type="text" name="ncc" /></label>
+        <label>Số hóa đơn <input type="text" name="soHoaDon" /></label>
+        <label>Số UNC <input type="text" name="soUNC" placeholder="vd UNC 01/7" /></label>
+        <label>Số chứng từ liên quan <input type="text" name="soChungTuLienQuan" placeholder="vd số hợp đồng thuê" /></label>
+        <label>Loại chi phí <input type="text" name="loaiChiPhi" placeholder="vd tiền điện, văn phòng phẩm..." required /></label>
+        <label>Số tiền <input type="text" name="soTien" placeholder="vd 500000" /></label>
+        <label style="grid-column: 1 / -1;">Diễn giải <input type="text" name="dienGiai" /></label>
+        <label style="grid-column: 1 / -1;">Link hóa đơn <input type="text" name="linkHoaDon" /></label>
+        <label style="grid-column: 1 / -1;">Ghi chú <input type="text" name="ghiChu" /></label>
+        <button type="submit" class="btn btn-primary">Lưu</button>
+      </form>
+    </section>
+
+    <section class="panel">
+      <h2>Danh sách (<%= rows.length %> khoản chi)</h2>
+      <div class="form-grid" style="margin-bottom:10px;">
+        <label style="grid-column: 1 / -1;">
+          Tìm nhanh (gian, NCC, số hóa đơn, số UNC, chứng từ, diễn giải...)
+          <input type="text" id="cpSearchBox" placeholder="Gõ để tìm..." oninput="filterCpRows()" />
+        </label>
+        <label>
+          Lọc hạch toán
+          <select id="cpHachToanFilter" onchange="cpApplyFilters()">
+            <option value="" <%= hachToanFilter === "" ? "selected" : "" %>>Tất cả</option>
+            <option value="0" <%= hachToanFilter === "0" ? "selected" : "" %>>Chưa hạch toán</option>
+            <option value="1" <%= hachToanFilter === "1" ? "selected" : "" %>>Đã hạch toán</option>
+          </select>
+        </label>
+        <label>
+          Lọc theo tháng
+          <select id="cpThangFilter" onchange="cpApplyFilters()">
+            <option value="" <%= thangFilter === "" ? "selected" : "" %>>Tất cả các tháng</option>
+            <% availableMonths.forEach(function(m) { %>
+            <option value="<%= m %>" <%= thangFilter === m ? "selected" : "" %>>Tháng <%= Number(m.slice(5,7)) %>/<%= m.slice(0,4) %></option>
+            <% }) %>
+          </select>
+        </label>
+        <label>
+          Lọc số hóa đơn
+          <select id="cpHoaDonFilter" onchange="cpApplyFilters()">
+            <option value="" <%= hoaDonFilter === "" ? "selected" : "" %>>Tất cả</option>
+            <option value="0" <%= hoaDonFilter === "0" ? "selected" : "" %>>Chưa có số hóa đơn</option>
+            <option value="1" <%= hoaDonFilter === "1" ? "selected" : "" %>>Đã có số hóa đơn</option>
+          </select>
+        </label>
+      </div>
+      <div class="table-scroll">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Ngày</th><th>Gian</th><th>NCC</th><th>Số hóa đơn</th><th>Số UNC</th><th>Chứng từ liên quan</th><th>Diễn giải</th>
+              <th>Số tiền</th><th>Link hóa đơn</th><th>Đã hạch toán</th>
+            </tr>
+          </thead>
+          <tbody id="cpTableBody">
+            <% rows.forEach(function(r) { %>
+            <tr class="cp-row" id="cp-<%= r.id %>" data-search="<%= (r.gian + ' ' + r.ncc + ' ' + r.soHoaDon + ' ' + r.soUNC + ' ' + r.soChungTuLienQuan + ' ' + r.dienGiai + ' ' + r.loaiChiPhi).toLowerCase().replace(/\"/g,'&quot;') %>">
+              <td><%= r.ngay %></td>
+              <td><%= r.gian %></td>
+              <td><%= r.ncc %></td>
+              <td>
+                <form method="POST" action="/chi-phi/<%= r.id %>/so-hoa-don" class="form-inline" style="gap:4px;">
+                  <input type="hidden" name="hachToan" value="<%= hachToanFilter %>" />
+                  <input type="hidden" name="thang" value="<%= thangFilter %>" />
+                  <input type="hidden" name="hoaDon" value="<%= hoaDonFilter %>" />
+                  <input type="text" name="soHoaDon" value="<%= r.soHoaDon %>" placeholder="Nhập số HĐ" style="width:80px; font-size:12px; padding:2px 4px;" />
+                  <button type="submit" class="link-btn" style="font-size:11px;" title="Lưu số hóa đơn">Lưu</button>
+                </form>
+              </td>
+              <td><%= r.soUNC %></td>
+              <td>
+                <% if (r.chungTuLienQuanLink) { %><a href="<%= r.chungTuLienQuanLink %>" target="_blank" rel="noopener"><%= r.soChungTuLienQuan %></a>
+                <% } else { %><%= r.soChungTuLienQuan %><% } %>
+              </td>
+              <td style="max-width:320px;">
+                <%= r.dienGiai || r.loaiChiPhi %>
+                <% if (r.trangThaiHoaDon) { %><br/><span class="muted" style="font-size:11px;"><%= r.trangThaiHoaDon %></span><% } %>
+                <% if (r.soTienHoaDonGoc && r.soTienHoaDonGoc !== r.soTien) { %>
+                  <br/><span class="text-neg" style="font-size:11px;">⚠ Số tiền trên hóa đơn gốc: <%= r.soTienHoaDonGoc.toLocaleString('vi-VN') %> đ (khác số trong sheet)</span>
+                <% } %>
+              </td>
+              <td><%= (r.soTien || 0).toLocaleString('vi-VN') %> đ</td>
+              <td>
+                <% if (r.linkHoaDon) { %><a href="<%= r.linkHoaDon %>" target="_blank" rel="noopener">Xem hóa đơn</a>
+                <% } else { %><span class="muted">Không có</span>
+                <% } %>
+              </td>
+              <td>
+                <form method="POST" action="/chi-phi/<%= r.id %>/hach-toan" style="display:inline;">
+                  <input type="hidden" name="daHachToan" value="<%= r.daHachToan ? '0' : '1' %>" />
+                  <input type="hidden" name="hachToan" value="<%= hachToanFilter %>" />
+                  <input type="hidden" name="thang" value="<%= thangFilter %>" />
+                  <input type="hidden" name="hoaDon" value="<%= hoaDonFilter %>" />
+                  <button type="submit" class="link-btn" title="Bấm để đổi trạng thái" style="font-size:16px;">
+                    <%= r.daHachToan ? '☑' : '☐' %>
+                  </button>
+                </form>
+              </td>
+            </tr>
+            <% }) %>
+            <% if (rows.length === 0) { %>
+            <tr><td colspan="10" class="muted">Chưa có khoản chi nào.</td></tr>
+            <% } %>
+          </tbody>
+        </table>
+      </div>
+      <div id="cpPagination" style="display:flex; align-items:center; gap:10px; justify-content:center; margin-top:12px;">
+        <button type="button" class="link-btn" id="cpPrevBtn" onclick="cpChangePage(-1)">&larr; Trang trước</button>
+        <span id="cpPageInfo" class="muted"></span>
+        <button type="button" class="link-btn" id="cpNextBtn" onclick="cpChangePage(1)">Trang sau &rarr;</button>
+      </div>
+    </section>
+  </main>
+  <script>
+    (function () {
+      var PAGE_SIZE = 20;
+      var page = 1;
+      window.filterCpRows = function () {
+        page = 1;
+        render();
+      };
+      window.cpApplyFilters = function () {
+        var hachToan = document.getElementById('cpHachToanFilter').value;
+        var thang = document.getElementById('cpThangFilter').value;
+        var hoaDon = document.getElementById('cpHoaDonFilter').value;
+        var url = new URL(window.location.href);
+        if (hachToan) url.searchParams.set('hachToan', hachToan);
+        else url.searchParams.delete('hachToan');
+        // thang: luon set (ke ca rong) de override gia tri mac dinh (thang 7) tren server.
+        url.searchParams.set('thang', thang);
+        if (hoaDon) url.searchParams.set('hoaDon', hoaDon);
+        else url.searchParams.delete('hoaDon');
+        window.location.href = url.toString();
+      };
+      window.cpChangePage = function (delta) {
+        page += delta;
+        render();
+      };
+      function render() {
+        var q = (document.getElementById('cpSearchBox').value || '').toLowerCase().trim();
+        var allRows = Array.prototype.slice.call(document.querySelectorAll('#cpTableBody tr.cp-row'));
+        var matched = allRows.filter(function (tr) {
+          return !q || tr.getAttribute('data-search').indexOf(q) !== -1;
+        });
+        var totalPages = Math.max(1, Math.ceil(matched.length / PAGE_SIZE));
+        if (page > totalPages) page = totalPages;
+        if (page < 1) page = 1;
+        var start = (page - 1) * PAGE_SIZE;
+        var end = start + PAGE_SIZE;
+        allRows.forEach(function (tr) { tr.style.display = 'none'; });
+        matched.slice(start, end).forEach(function (tr) { tr.style.display = ''; });
+        var info = document.getElementById('cpPageInfo');
+        info.textContent = matched.length === 0
+          ? 'Không có khoản chi phù hợp'
+          : 'Trang ' + page + '/' + totalPages + ' (' + matched.length + ' khoản chi)';
+        document.getElementById('cpPrevBtn').disabled = page <= 1;
+        document.getElementById('cpNextBtn').disabled = page >= totalPages;
+      }
+      render();
+    })();
+  </script>
+</body>
+</html>

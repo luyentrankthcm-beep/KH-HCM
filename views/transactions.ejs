@@ -31,7 +31,39 @@
       <div class="alert alert-success">
         Đọc file (sheet "<%= uploadResult.sheetName %>"): <%= uploadResult.totalRows %> dòng giao dịch.
         Đã thêm mới <strong><%= uploadResult.added %></strong> dòng, bỏ qua <strong><%= uploadResult.skipped %></strong> dòng đã có sẵn (trùng).
+        <% if (uploadResult.healedRemoved > 0) { %>
+        Đã tự động dọn <strong><%= uploadResult.healedRemoved %></strong> dòng cũ bị gộp nhầm (do lỗi trùng lặp trước đây) trong đúng khoảng ngày của file này trước khi nạp lại đầy đủ.
+        <% } %>
       </div>
+      <% } %>
+    </section>
+
+    <section class="panel">
+      <h2>Tải danh sách Mã công trình chuẩn — <%= COMPANIES[activeCompany].label %></h2>
+      <p class="muted">
+        Tải file "Danh sách công trình" (mỗi công ty 1 file riêng, vì KH Cũ/KH Mới là 2 pháp nhân khác nhau nên mã
+        công trình khác nhau). Danh sách này dùng làm nguồn chuẩn để sau này đối chiếu/chuẩn hóa tên gian ở các
+        trang khác: tên khớp chính xác thì lấy mã tương ứng, không khớp tuyệt đối thì tự tìm tên gần giống nhất
+        trong danh sách và đổi về đúng mã công trình chuẩn đó.
+      </p>
+      <form method="POST" action="/transactions/upload-ma-cong-trinh" enctype="multipart/form-data" class="form-inline">
+        <input type="file" name="file" accept=".xlsx,.xls" required />
+        <button type="submit" class="btn btn-primary">Tải lên</button>
+      </form>
+
+      <% if (maCongTrinhResult) { %>
+      <div class="alert alert-success">
+        Đã nạp "<%= maCongTrinhResult.fileName %>" (sheet "<%= maCongTrinhResult.sheetName %>"): <strong><%= maCongTrinhResult.count %></strong> mã công trình cho <%= COMPANIES[activeCompany].label %>.
+      </div>
+      <% } %>
+
+      <% if (maCongTrinhMaster) { %>
+      <p class="muted" style="margin-top:10px;">
+        Đang lưu: <strong><%= maCongTrinhMaster.rows.length %></strong> mã công trình (file "<%= maCongTrinhMaster.file_name %>",
+        tải lúc <%= new Date(maCongTrinhMaster.uploaded_at).toLocaleString('vi-VN') %>).
+      </p>
+      <% } else { %>
+      <p class="muted" style="margin-top:10px;">Chưa có danh sách mã công trình nào cho <%= COMPANIES[activeCompany].label %>.</p>
       <% } %>
     </section>
 
@@ -119,13 +151,21 @@
         <a class="btn btn-secondary" href="/export.xlsx?bank_id=<%= filters.bank_id %>&from=<%= filters.from %>&to=<%= filters.to %>">Xuất Excel</a>
       </form>
 
+      <p class="muted" style="margin:6px 0 10px;">
+        Mẹo: giữ <strong>Ctrl</strong> (hoặc <strong>Cmd</strong> trên Mac) rồi bấm vào nhiều dòng để cộng tổng số tiền các dòng đã chọn.
+      </p>
+      <div id="txSelectionBar" style="display:none; margin-bottom:10px; padding:8px 12px; background:#eef6ff; border:1px solid #cfe3fb; border-radius:8px; font-size:13px;">
+        Đã chọn <strong id="txSelCount">0</strong> dòng — Tổng: <strong id="txSelTotal">0 đ</strong>
+        <button type="button" class="link-btn" onclick="txClearSelection()" style="margin-left:10px;">Bỏ chọn</button>
+      </div>
+
       <table class="table">
         <thead>
-          <tr><th>Ngày</th><th>Ngân hàng</th><th>Diễn giải</th><th>Loại</th><th>Số tiền</th><th></th></tr>
+          <tr><th>Ngày</th><th>Ngân hàng</th><th>Diễn giải</th><th>Loại</th><th>Số tiền</th><th>Số dư</th></tr>
         </thead>
         <tbody>
           <% rows.forEach(function(t) { %>
-          <tr>
+          <tr class="tx-row" data-id="<%= t.id %>" data-amount="<%= t.amount %>" data-type="<%= t.type %>" onclick="txRowClick(event, this)" style="cursor:pointer;">
             <td><%= t.date %></td>
             <td><%= t.bank_label %></td>
             <td class="desc-cell" title="<%= t.description %>"><%= t.description %></td>
@@ -133,11 +173,7 @@
             <td class="<%= t.type === 'chi' ? 'text-neg' : 'text-pos' %>">
               <%= t.type === 'chi' ? '-' : '+' %><%= t.amount.toLocaleString('vi-VN') %> đ
             </td>
-            <td>
-              <form method="POST" action="/transactions/<%= t.id %>/delete" onsubmit="return confirm('Xoá giao dịch này?');">
-                <button type="submit" class="link-btn link-danger">Xoá</button>
-              </form>
-            </td>
+            <td><%= t.balance != null ? t.balance.toLocaleString('vi-VN') + ' đ' : '-' %></td>
           </tr>
           <% }) %>
           <% if (rows.length === 0) { %>
@@ -147,5 +183,52 @@
       </table>
     </section>
   </main>
+  <style>
+    .tx-row-selected { background: #fff6d8 !important; }
+  </style>
+  <script>
+    (function () {
+      var selected = new Set();
+      window.txRowClick = function (e, tr) {
+        var id = tr.getAttribute('data-id');
+        if (!e.ctrlKey && !e.metaKey) {
+          if (selected.size === 1 && selected.has(id)) selected.clear();
+          else {
+            selected.clear();
+            selected.add(id);
+          }
+        } else if (selected.has(id)) {
+          selected.delete(id);
+        } else {
+          selected.add(id);
+        }
+        render();
+      };
+      window.txClearSelection = function () {
+        selected.clear();
+        render();
+      };
+      function render() {
+        document.querySelectorAll('.tx-row').forEach(function (tr) {
+          tr.classList.toggle('tx-row-selected', selected.has(tr.getAttribute('data-id')));
+        });
+        var bar = document.getElementById('txSelectionBar');
+        if (selected.size === 0) {
+          bar.style.display = 'none';
+          return;
+        }
+        bar.style.display = '';
+        var total = 0;
+        selected.forEach(function (id) {
+          var tr = document.querySelector('.tx-row[data-id="' + id + '"]');
+          if (!tr) return;
+          var amt = Number(tr.getAttribute('data-amount')) || 0;
+          total += tr.getAttribute('data-type') === 'chi' ? -amt : amt;
+        });
+        document.getElementById('txSelCount').textContent = selected.size;
+        document.getElementById('txSelTotal').textContent = total.toLocaleString('vi-VN') + ' đ';
+      }
+    })();
+  </script>
 </body>
 </html>

@@ -12,7 +12,15 @@ const XLSX = require("xlsx");
 // ourselves using plain integer arithmetic (no timezone involved at all).
 
 function excelSerialToIso(serial) {
-  const days = Math.round(serial); // Excel date serials for whole days are integers
+  // Momo's own exports use whole-day integer serials, so Math.floor and
+  // Math.round give identical results there -- but Payoo's raw transaction
+  // export (utils/zvpReconcile.js reuses this same helper) carries a real
+  // time-of-day fraction per row (e.g. 46215.9 = ~21:30). Rounding that
+  // pushes every afternoon/evening transaction into the NEXT calendar day,
+  // which silently moved ~18tr/settlement of revenue onto the wrong date
+  // and made the Payoo bank-vs-data reconciliation mismatch. Floor (=
+  // truncate the time-of-day) always yields the correct calendar day.
+  const days = Math.floor(serial);
   const utcMillis = (days - 25569) * 86400 * 1000; // 25569 = days between 1899-12-30 and 1970-01-01
   return new Date(utcMillis).toISOString().slice(0, 10);
 }
@@ -468,18 +476,22 @@ function resolveRawPortalGross(transactions, cuaHangMapping) {
 // "thu ho" containing "momo"). Also reads "Hinh thuc hop tac" + "Ten diem
 // xuat hoa don" to tell apart the 2 SC VIVO KVCM gian (see SPLIT_PARENT_CODE
 // above).
-function parseInvoiceWorkbook(buffer) {
+function parseInvoiceWorkbook(buffer, companyKey) {
   // See the comment in parseTongMomoWorkbook: cheap "names only" pass first,
   // then a targeted read of just the one sheet we need -- large real-world
   // workbooks (40+ MB, 15 sheets) parse far faster this way.
   const wbLite = XLSX.read(buffer, { type: "buffer", bookSheets: true });
   const kdsCandidates = wbLite.SheetNames.filter((n) => /k.\s*ds\s*xu.t/i.test(n));
   // Our bank data belongs to phap nhan "K&H Cu" (ma so thue ...4989) = code "989"
-  // in these workbooks. If several "ke ds xuat HD" sheets exist (one per phap
-  // nhan, e.g. "-705" vs "-989"), prefer the one tagged "989". If the sheet
-  // simply lists invoices for the whole company (no per-phap-nhan split),
-  // that's fine too -- the momo-tag filter below naturally scopes the result.
+  // in these workbooks. KH Moi (CONG TY TNHH GIAI TRI K&H, phap nhan khac) =
+  // code "705" -- Luyen, 2026-07-17: "KH moi la sheet 'ke ds xuat HD MTT -
+  // 705' con KH cu la sheet '... - 989'". If several "ke ds xuat HD" sheets
+  // exist (one per phap nhan), prefer the one tagged to match the company
+  // whose page this upload happened on; fall back to "989" (the old default)
+  // if that tag isn't found, so older files with only 1 sheet still work.
+  const preferredTag = companyKey === "kh_moi" ? "705" : "989";
   const sheetName =
+    kdsCandidates.find((n) => new RegExp(preferredTag).test(n)) ||
     kdsCandidates.find((n) => /989/.test(n)) ||
     kdsCandidates[0] ||
     wbLite.SheetNames.find((n) => {
@@ -630,9 +642,24 @@ function reconcileMomo(settlements, grossData, invoiceData, gianMapping, diemAli
         const key = `${day}|${code}`;
         const val = grossData.grossByCode[key];
         if (val && val > 0) {
-          if (!gianLines[code]) gianLines[code] = { code, gross: 0, invoices: new Set(), days: new Set() };
+          if (!gianLines[code]) {
+            gianLines[code] = { code, gross: 0, netOverride: 0, hasNetOverride: false, invoices: new Set(), days: new Set() };
+          }
           gianLines[code].gross += val;
           gianLines[code].days.add(day);
+          // Luyen, 2026-07-21: "Phi MoMo KH moi: Vi MoMo*1%, Vi tra sau*1,2%,
+          // con lai*0,3%" -- khac han muc phi co dinh 1,1% (he so 0.989) dang
+          // dung cho KH Cu. Thay vi doan mot he so chung cho ca 2 cong ty,
+          // file "Tong Momo KH Moi" chi da tu tinh san so tien NET thuc te ve
+          // ngan hang moi ma/ngay (xem grossData.netByCode, doc tu block "momo
+          // tra ve ngan hang" cua file) -- neu co, dung THANG so nay lam net,
+          // KHONG nhan lai voi 0.989 (se sai/lech kep). Khong co (nhu du lieu
+          // KH Cu cu) thi giu nguyen cach tinh cu.
+          const netVal = grossData.netByCode && grossData.netByCode[key];
+          if (netVal !== undefined && netVal !== null) {
+            gianLines[code].netOverride += netVal;
+            gianLines[code].hasNetOverride = true;
+          }
           const invKey = `${code}|${day}`;
           const invs = invoicesByDiemDay[invKey] || [];
           for (const inv of invs) gianLines[code].invoices.add(inv.soHd);
@@ -640,8 +667,41 @@ function reconcileMomo(settlements, grossData, invoiceData, gianMapping, diemAli
       }
     }
     const lines = Object.values(gianLines).map((g) => {
-      const net = Math.round(g.gross * 0.989);
-      const invoiceList = Array.from(g.invoices);
+      const net = g.hasNetOverride ? Math.round(g.netOverride) : Math.round(g.gross * 0.989);
+      let invoiceList = Array.from(g.invoices);
+      // Luyen, 2026-07-17: gian "AE TAN AN KVC" nhan 2 loai HD cung ngay --
+      // 1 HD alias tu "TUTU MN AEON MALL TÂN AN" (doanh thu Momo THAT), va 1
+      // HD ghi thang ma "AE TAN AN KVC" (thuong la tien cua hang truong nop
+      // vao, KHONG phai doanh thu Momo -- nhung thinh thoang ngay do lai la
+      // doanh thu Momo that, vd 17/7/2026 HD 9701: TUTU (HD 9700) mot minh
+      // KHONG du khop doanh thu ngay do, can ca 900k cua HD "AE TAN AN KVC"
+      // moi khop dung). Thay vi lien co dinh tung so HD (de sai, phai sua tay
+      // tung lan nhu 9701), tu dong quyet dinh: neu CHI rieng cac HD alias
+      // (khong phai raw "AE TAN AN KVC") da du khop doanh thu ngay do roi,
+      // thi cac HD raw "AE TAN AN KVC" la du/tien cua hang truong -- loai
+      // khoi invoiceTotal. Neu KHONG du (thieu doanh thu), la HD that -- GIU
+      // lai. Tu ap dung dung cho moi ky trong tuong lai, khong can sua tay.
+      if (g.code === "AE TAN AN KVC") {
+        const rawDirect = invoiceList.filter((soHd) => {
+          const inv = invoiceData.invoices.find((i) => i.soHd === soHd);
+          return inv && inv.maDiem === "AE TAN AN KVC";
+        });
+        if (rawDirect.length > 0) {
+          const otherTotal = invoiceList
+            .filter((soHd) => !rawDirect.includes(soHd))
+            .reduce((sum, soHd) => {
+              const inv = invoiceData.invoices.find((i) => i.soHd === soHd);
+              return sum + (inv ? inv.tongTt : 0);
+            }, 0);
+          if (otherTotal >= g.gross - 1) {
+            // Cac HD "khac" (alias tu TUTU) da du khop doanh thu -- HD raw
+            // "AE TAN AN KVC" la du, coi la tien cua hang truong, loai ra.
+            invoiceList = invoiceList.filter((soHd) => !rawDirect.includes(soHd));
+          }
+          // Nguoc lai (otherTotal < gross): HD raw can thiet de khop du
+          // doanh thu -- giu nguyen invoiceList, khong loai.
+        }
+      }
       const invoiceTotal = invoiceList.reduce((sum, soHd) => {
         const inv = invoiceData.invoices.find((i) => i.soHd === soHd);
         return sum + (inv ? inv.tongTt : 0);

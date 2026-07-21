@@ -18,7 +18,24 @@ const XLSX = require("xlsx");
 // (2026-07-16, file "Chi phi KH NCC T7 2026.xlsx") follows the SAME
 // safe-by-default rule: chi gan khi ten doi ung khop DUNG 1 NCC trong danh
 // sach, con lai de trong cho gan tay.
-const NCC_LIST = require("../data/chi-phi-ncc-list.json");
+// data/chi-phi-ncc-list.json chi la danh sach NCC MAC DINH ban dau (import tu
+// file Excel "Chi phi KH NCC T7 2026.xlsx") -- danh sach NCC THAT, cap nhat
+// lien tuc, nam trong store.chi_phi_ncc_list (file store.json, xem
+// routes/doisoat-chiphi.js). Thu muc data/ khong duoc dua len Git (chua du
+// lieu tai chinh thuc), nen tren moi may/moi ban deploy moi (chua tung chay
+// qua) file nay co the chua ton tai -- doc an toan bang try/catch, fallback
+// ve mang rong, de app khong bi crash luc khoi dong. Sau khi phuc hoi du lieu
+// thuc qua trang "Sao luu" (store.chi_phi_ncc_list), danh sach nay khong con
+// duoc dung nua (chi la fallback khi store rong).
+let NCC_LIST = [];
+try {
+  NCC_LIST = require("../data/chi-phi-ncc-list.json");
+} catch (e) {
+  console.error(
+    "[chiphiReconcile] Khong tim thay data/chi-phi-ncc-list.json -- dung danh sach NCC mac dinh RONG. " +
+      "Se duoc thay the boi du lieu thuc sau khi phuc hoi ban sao luu qua trang Sao luu."
+  );
+}
 
 function removeDiacritics(s) {
   return String(s)

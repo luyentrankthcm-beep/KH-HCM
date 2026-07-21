@@ -8,6 +8,10 @@
   <main class="container">
     <h1>Chuyển tiền nội bộ giữa các ngân hàng</h1>
     <p class="muted">
+      Đang xem: <strong><%= COMPANIES[activeCompany].label %></strong> — chỉ tính ngân hàng thuộc công ty này.
+      Đổi công ty ở nút "Cũ/Mới" trên đầu trang nếu muốn xem công ty kia.
+    </p>
+    <p class="muted">
       Tự động lọc các giao dịch có gắn nhãn "CTNB" / "Chuyển tiền nội bộ" trên sao kê. Dòng có NH đối ứng xác định được
       (khớp với 1 trong các ngân hàng của công ty) là chuyển tiền nội bộ đầy đủ; dòng còn lại có thể là chuyển đến 1
       tài khoản ngoài công ty (vd trả nợ vay ngân hàng khác) — vẫn hiển thị để chị kiểm tra.

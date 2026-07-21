@@ -4,6 +4,8 @@ const { load } = require("../store");
 const { requireLogin } = require("../middleware/auth");
 const momo = require("../utils/momoReconcile");
 const zvp = require("../utils/zvpReconcile");
+const overviewAggregate = require("../utils/overviewAggregate");
+const { COMPANIES, getCompany } = require("../utils/companies");
 
 const router = express.Router();
 router.use(requireLogin);
@@ -129,9 +131,20 @@ function findBankByToken(banks, token) {
   return banks.find((b) => String(b.account_number).endsWith(digits)) || null;
 }
 
-function detectInternalTransfers(store) {
+// Loc theo cong ty dang chon -- cung quy uoc voi routes/banks.js's
+// companyBanks() (bank khong co field "company" thi mac dinh coi la kh_cu).
+// Luyen bao 2026-07-20: chon "KH Moi" nhung trang nay van hien TK123456/1268
+// (tai khoan cua KH Cu) vi truoc gio chua loc gi ca -- fix bang cach chi xet
+// giao dich cua cac ngan hang THUOC cong ty dang xem, va chi doi chieu voi
+// cac ngan hang KHAC cung cong ty do (khong con bat cheo qua TK cong ty kia).
+function companyBanks(store, company) {
+  return store.banks.filter((b) => (b.company || "kh_cu") === company);
+}
+
+function detectInternalTransfers(store, company) {
+  const banks = companyBanks(store, company);
   const bankById = {};
-  store.banks.forEach((b) => (bankById[b.id] = b));
+  banks.forEach((b) => (bankById[b.id] = b));
 
   const rows = [];
   for (const t of store.transactions) {
@@ -143,8 +156,8 @@ function detectInternalTransfers(store) {
     const m = desc.match(/CTNB[^A-Za-z0-9]{0,6}([A-Za-z]*\d{3,10})\s*-\s*([A-Za-z]*\d{3,10})/i);
     let otherBank = null;
     if (m) {
-      const candA = findBankByToken(store.banks, m[1]);
-      const candB = findBankByToken(store.banks, m[2]);
+      const candA = findBankByToken(banks, m[1]);
+      const candB = findBankByToken(banks, m[2]);
       if (candA && candA.id !== ownBank.id) otherBank = candA;
       if (candB && candB.id !== ownBank.id) otherBank = candB;
     }
@@ -166,14 +179,16 @@ function detectInternalTransfers(store) {
 
 router.get("/bao-cao/chuyen-tien-noi-bo", (req, res) => {
   const store = load();
-  const rows = detectInternalTransfers(store);
+  const activeCompany = getCompany(req);
+  const rows = detectInternalTransfers(store, activeCompany);
   const totalInternal = rows.filter((r) => r.isFullyInternal).reduce((s, r) => s + r.amount, 0);
   res.render("baocao-noibo", { userName: req.session.userName, rows, totalInternal });
 });
 
 router.get("/bao-cao/chuyen-tien-noi-bo/export.xlsx", (req, res) => {
   const store = load();
-  const rows = detectInternalTransfers(store).map((r) => ({
+  const activeCompany = getCompany(req);
+  const rows = detectInternalTransfers(store, activeCompany).map((r) => ({
     "Ngày": r.date,
     "Ngân hàng": r.bankName,
     "Loại": r.type === "chi" ? "Chi (đi)" : "Thu (đến)",
@@ -337,6 +352,61 @@ router.get("/bao-cao/thu-chi-theo-gian/export.xlsx", (req, res) => {
   res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
   res.setHeader("Content-Disposition", "attachment; filename=thu-chi-theo-gian.xlsx");
   res.send(buf);
+});
+
+// ---------- 4) Trang thai doi soat theo cong ty (bieu do tron) ----------
+// Luyen yeu cau 2026-07-17: bao cao rieng cho KH Cu / KH Moi, dang bieu do
+// tron/thong ke. Dung LAI ket qua doi soat cua tung kenh qua
+// utils/overviewAggregate.buildAllFlatLines (giong /cong-no) roi phan loai
+// tung dong theo cong ty dua vao truong "company" da gan san cho tung kenh
+// Viet QR trong routes/doisoat-vietqr.js (CHANNELS). Momo va Zalo/VNPay/
+// Payoo hien tai CHUA duoc tach rieng theo cong ty trong du lieu (van la
+// KH Cu, xem ghi chu trong views/partials/nav.ejs) nen mac dinh xep vao
+// "kh_cu" -- khi nao du lieu duoc tach that thi chi can sua ham
+// companyOfChannelKey nay, khong dung lai logic doi soat.
+function companyOfChannelKey(channelKey, vietqrChannels) {
+  if (channelKey.startsWith("vietqr_")) {
+    const rawKey = channelKey.slice("vietqr_".length);
+    const ch = vietqrChannels[rawKey];
+    return (ch && ch.company) || "kh_cu";
+  }
+  return "kh_cu";
+}
+
+function buildTrangThaiDoiSoat(store) {
+  // Require ngay trong ham (khong o dau file) de tranh vong lap require --
+  // giong cach utils/overviewAggregate.js da lam voi 3 module doi soat.
+  const vietqrRouter = require("./doisoat-vietqr");
+  const flat = overviewAggregate.buildAllFlatLines(store);
+
+  const blankStatus = () => ({
+    "Khớp": { count: 0, amount: 0 },
+    "Lệch": { count: 0, amount: 0 },
+    "Chưa có HĐ": { count: 0, amount: 0 },
+  });
+  const byCompany = { kh_cu: blankStatus(), kh_moi: blankStatus() };
+
+  flat.forEach((l) => {
+    const company = companyOfChannelKey(l.channelKey, vietqrRouter.VIETQR_CHANNELS);
+    const status = l.invoiceNumbers.length === 0 ? "Chưa có HĐ" : overviewAggregate.isResolved(l) ? "Khớp" : "Lệch";
+    byCompany[company][status].count++;
+    byCompany[company][status].amount += l.gross;
+  });
+
+  return byCompany;
+}
+
+router.get("/bao-cao/trang-thai-doi-soat", (req, res) => {
+  const store = load();
+  let error = null;
+  let stats = null;
+  try {
+    stats = buildTrangThaiDoiSoat(store);
+  } catch (e) {
+    error = e.message;
+    console.error("Loi tinh trang thai doi soat:", e);
+  }
+  res.render("baocao-trangthai", { userName: req.session.userName, stats, COMPANIES, error });
 });
 
 module.exports = router;

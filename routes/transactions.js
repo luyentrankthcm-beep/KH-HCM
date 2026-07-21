@@ -6,6 +6,7 @@ const { requireLogin } = require("../middleware/auth");
 const { parsePastedTransactions, parseAmount, parseDate } = require("../utils/parse");
 const { parseBankStatement, computeThuChi } = require("../utils/bankStatementParser");
 const { getCompany } = require("../utils/companies");
+const { parseMaCongTrinhSheet } = require("../utils/maCongTrinh");
 
 const router = express.Router();
 router.use(requireLogin);
@@ -14,6 +15,10 @@ const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 80 * 1024 * 1024 },
 });
+
+function maCongTrinhMasterFor(store, company) {
+  return (store.ma_cong_trinh_master && store.ma_cong_trinh_master[company]) || null;
+}
 
 function withBankLabel(store, tx) {
   const bank = store.banks.find((b) => b.id === tx.bank_id);
@@ -54,13 +59,50 @@ function bankBalanceBefore(store, bankId, beforeDate) {
   return bal;
 }
 
+// Luyen, 2026-07-21: "ngân hàng hk có xóa đâu, thay vào đó hiện số dư cuối kì
+// cho tôi đi" -- moi dong giao dich hien so du LUY KE (giong sao ke ngan
+// hang that, cot "Số dư tham chiếu"/"Running Balance" -- xem file
+// AccountStmt Luyen gui). Tinh theo THU TU THOI GIAN THAT cua tung ngan hang
+// rieng (ngay tang dan, cung ngay thi theo id tang dan -- id la thu tu nhap/
+// import, gan dung thu tu thuc te trong pham vi 1 ngay), bat dau tu
+// opening_balance -- HOAN TOAN doc lap voi thu tu hien thi tren bang (thuong
+// la moi nhat truoc). Tra ve Map<transactionId, soDuSauGiaoDichDo>, tinh 1
+// lan cho MOI ngan hang trong bankIds (khong phai toan bo store.transactions)
+// de khong tinh du lieu cua ngan hang khong lien quan.
+function buildBalanceMap(store, bankIds) {
+  const map = new Map();
+  const ids = bankIds instanceof Set ? bankIds : new Set(bankIds || []);
+  ids.forEach((bankId) => {
+    const bank = store.banks.find((b) => b.id === bankId);
+    if (!bank) return;
+    const txs = store.transactions
+      .filter((t) => t.bank_id === bankId)
+      .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : a.id - b.id));
+    let bal = bank.opening_balance || 0;
+    for (const t of txs) {
+      bal += t.type === "thu" ? t.amount : -t.amount;
+      map.set(t.id, bal);
+    }
+  });
+  return map;
+}
+
+// filterTransactions + gan them so du luy ke (t.balance) cho tung dong, dung
+// chung cho moi cho render danh sach giao dich (thay vi lap lai buildBalanceMap
+// o tung route).
+function filterTransactionsWithBalance(store, opts) {
+  const rows = filterTransactions(store, opts);
+  const balanceMap = buildBalanceMap(store, opts.bankIds);
+  return rows.map((t) => ({ ...t, balance: balanceMap.has(t.id) ? balanceMap.get(t.id) : null }));
+}
+
 router.get("/transactions", (req, res) => {
   const store = load();
   const activeCompany = getCompany(req);
   const banks = companyBanks(store, activeCompany);
   const { bank_id, from, to } = req.query;
 
-  const rows = filterTransactions(store, {
+  const rows = filterTransactionsWithBalance(store, {
     bank_id,
     from,
     to,
@@ -74,6 +116,8 @@ router.get("/transactions", (req, res) => {
     userName: req.session.userName,
     pasteResult: null,
     uploadResult: null,
+    maCongTrinhMaster: maCongTrinhMasterFor(store, activeCompany),
+    maCongTrinhResult: null,
     error: null,
   });
 });
@@ -114,6 +158,8 @@ router.post("/transactions/paste", (req, res) => {
       userName: req.session.userName,
       pasteResult: null,
       uploadResult: null,
+      maCongTrinhMaster: maCongTrinhMasterFor(store, activeCompany),
+      maCongTrinhResult: null,
       error: "Vui long chon ngan hang truoc khi dan sao ke.",
     });
   }
@@ -134,7 +180,7 @@ router.post("/transactions/paste", (req, res) => {
   }
   if (rows.length > 0) save(store);
 
-  const currentRows = filterTransactions(store, {
+  const currentRows = filterTransactionsWithBalance(store, {
     bank_id,
     bankIds: companyBankIds(store, activeCompany),
   }).slice(0, 500);
@@ -146,20 +192,28 @@ router.post("/transactions/paste", (req, res) => {
     userName: req.session.userName,
     pasteResult: { inserted: rows.length, errors },
     uploadResult: null,
+    maCongTrinhMaster: maCongTrinhMasterFor(store, activeCompany),
+    maCongTrinhResult: null,
     error: null,
   });
 });
 
 // Upload a raw statement file exported directly from the bank (.xlsx/.xls).
 // Auto-detects the "Ngay giao dich" + "So du" columns, derives Thu/Chi from
-// the balance delta, and skips any row that already exists for this bank
-// (matched by date + amount + type) so re-uploading an overlapping date
-// range is safe. Description is intentionally NOT part of the dedup key:
-// different statement exports (and the original historical bulk import,
-// which used a different column layout per bank) can produce slightly
-// different description text for the exact same transaction, and amount is
-// always derived the same reliable way (balance delta), so it is the
-// trustworthy match key.
+// the balance delta, and skips any row that already exists for this bank so
+// re-uploading an overlapping date range is safe.
+//
+// Dedup key: prefer the bank's own per-transaction reference number ("So
+// tham chieu" / "So chung tu"), when the export exposes one. This is
+// required because many same-day, same-amount transactions from DIFFERENT
+// customers are completely normal for VietQR fixed-price ticket sales
+// (20.000d / 50.000d / 100.000d recurring hundreds of times a day) -- a key
+// of just date+amount+type would collapse all of them into "duplicates" and
+// silently drop the rest, which is exactly what happened before this fix.
+// When no reference column is detected (older/other bank formats), fall
+// back to date+amount+type as before -- description is intentionally still
+// excluded from that fallback key, since different statement exports can
+// render slightly different description text for the same transaction.
 router.post("/transactions/upload-statement", upload.single("file"), (req, res) => {
   const store = load();
   const activeCompany = getCompany(req);
@@ -169,7 +223,7 @@ router.post("/transactions/upload-statement", upload.single("file"), (req, res) 
   const renderError = (message) =>
     res.render("transactions", {
       banks,
-      rows: filterTransactions(store, {
+      rows: filterTransactionsWithBalance(store, {
         bank_id: bank_id || "",
         bankIds: companyBankIds(store, activeCompany),
       }).slice(0, 500),
@@ -177,6 +231,8 @@ router.post("/transactions/upload-statement", upload.single("file"), (req, res) 
       userName: req.session.userName,
       pasteResult: null,
       uploadResult: null,
+      maCongTrinhMaster: maCongTrinhMasterFor(store, activeCompany),
+      maCongTrinhResult: null,
       error: message,
     });
 
@@ -195,24 +251,56 @@ router.post("/transactions/upload-statement", upload.single("file"), (req, res) 
   }
 
   const firstDate = parsed.rows[0].date;
+  const lastDate = parsed.rows[parsed.rows.length - 1].date;
   const priorBalance = bankBalanceBefore(store, bankIdNum, firstDate);
   const candidates = computeThuChi(parsed.rows, priorBalance);
 
+  // Self-heal: if this statement format exposes a real per-row reference
+  // number (only known for formats where the header-based detection in
+  // bankStatementParser finds one -- e.g. BIDV's "So chung tu"/"So tham
+  // chieu"), then any OLDER rows for this bank+date-range that have no
+  // `reference` were inserted by the pre-fix dedup logic (date+amount+type
+  // only), which silently collapsed distinct same-day/same-amount
+  // transactions into a single row. Since we're about to re-derive the full,
+  // authoritative transaction list for this exact range straight from the
+  // bank's own file, it is safe to drop those old collapsed rows first so
+  // the fresh parse can fully repopulate the range. This is scoped tightly
+  // (bank + exact covered date range + only rows lacking a reference) and is
+  // a no-op for statement formats without a detected reference column, so it
+  // never touches banks/uploads unaffected by this bug.
+  const candidatesHaveRef = candidates.some((c) => c.reference);
+  let healedRemoved = 0;
+  if (candidatesHaveRef) {
+    const before = store.transactions.length;
+    store.transactions = store.transactions.filter(
+      (t) => !(t.bank_id === bankIdNum && !t.reference && t.date >= firstDate && t.date <= lastDate)
+    );
+    healedRemoved = before - store.transactions.length;
+  }
+
+  const bankTx = store.transactions.filter((t) => t.bank_id === bankIdNum);
+  const existingRefs = new Set(bankTx.filter((t) => t.reference).map((t) => t.reference));
   const existingKeys = new Set(
-    store.transactions
-      .filter((t) => t.bank_id === bankIdNum)
-      .map((t) => `${t.date}|${t.amount}|${t.type}`)
+    bankTx.filter((t) => !t.reference).map((t) => `${t.date}|${t.amount}|${t.type}`)
   );
 
   let added = 0;
   let skipped = 0;
   for (const c of candidates) {
-    const key = `${c.date}|${c.amount}|${c.type}`;
-    if (existingKeys.has(key)) {
-      skipped++;
-      continue;
+    if (c.reference) {
+      if (existingRefs.has(c.reference)) {
+        skipped++;
+        continue;
+      }
+      existingRefs.add(c.reference);
+    } else {
+      const key = `${c.date}|${c.amount}|${c.type}`;
+      if (existingKeys.has(key)) {
+        skipped++;
+        continue;
+      }
+      existingKeys.add(key);
     }
-    existingKeys.add(key);
     store.transactions.push({
       id: nextId(store, "transactions"),
       bank_id: bankIdNum,
@@ -220,14 +308,15 @@ router.post("/transactions/upload-statement", upload.single("file"), (req, res) 
       description: c.description,
       amount: c.amount,
       type: c.type,
+      reference: c.reference || "",
       created_at: new Date().toISOString(),
       created_by: req.session.userName || "",
     });
     added++;
   }
-  if (added > 0) save(store);
+  if (added > 0 || healedRemoved > 0) save(store);
 
-  const currentRows = filterTransactions(store, {
+  const currentRows = filterTransactionsWithBalance(store, {
     bank_id,
     bankIds: companyBankIds(store, activeCompany),
   }).slice(0, 500);
@@ -242,24 +331,72 @@ router.post("/transactions/upload-statement", upload.single("file"), (req, res) 
       totalRows: parsed.rows.length,
       added,
       skipped,
+      healedRemoved,
     },
+    maCongTrinhMaster: maCongTrinhMasterFor(store, activeCompany),
+    maCongTrinhResult: null,
     error: null,
   });
 });
 
-router.post("/transactions/:id/delete", (req, res) => {
+// Upload danh sach "Ma cong trinh" chuan (rieng theo tung cong ty dang chon).
+// Luyen, 2026-07-20: file "DANH SACH CONG TRINH" tu phan mem quan ly cong
+// trinh -- dung lam nguon chuan de sau nay doi chieu/chuan hoa cac ten
+// gian/cong trinh xuat hien o cac trang khac (vd Chi Phi). Moi lan tai len
+// THAY THE toan bo danh sach cua dung cong ty dang chon (KH Cu / KH Moi
+// khong dung chung 1 danh sach vi la 2 phap nhan khac nhau).
+router.post("/transactions/upload-ma-cong-trinh", upload.single("file"), (req, res) => {
   const store = load();
-  const id = Number(req.params.id);
-  store.transactions = store.transactions.filter((t) => t.id !== id);
-  save(store);
-  res.redirect("back");
+  const activeCompany = getCompany(req);
+  const banks = companyBanks(store, activeCompany);
+  const rowsForList = filterTransactionsWithBalance(store, {
+    bankIds: companyBankIds(store, activeCompany),
+  }).slice(0, 500);
+
+  const renderWith = (maCongTrinhResult, error) =>
+    res.render("transactions", {
+      banks,
+      rows: rowsForList,
+      filters: { bank_id: "", from: "", to: "" },
+      userName: req.session.userName,
+      pasteResult: null,
+      uploadResult: null,
+      maCongTrinhMaster: maCongTrinhMasterFor(store, activeCompany),
+      maCongTrinhResult,
+      error: error || null,
+    });
+
+  try {
+    if (!req.file) throw new Error("Vui long chon 1 file de tai len.");
+    const { sheetName, rows } = parseMaCongTrinhSheet(req.file.buffer);
+    if (!sheetName || rows.length === 0) {
+      throw new Error(
+        'Khong doc duoc danh sach ma cong trinh tu file nay (can co cot "Ma công trình").'
+      );
+    }
+    if (!store.ma_cong_trinh_master) store.ma_cong_trinh_master = {};
+    store.ma_cong_trinh_master[activeCompany] = {
+      uploaded_at: new Date().toISOString(),
+      file_name: req.file.originalname,
+      sheetName,
+      rows,
+    };
+    save(store);
+    return renderWith({ sheetName, count: rows.length, fileName: req.file.originalname });
+  } catch (e) {
+    return renderWith(null, e.message);
+  }
 });
 
+// Luyen, 2026-07-21: "ngân hàng hk có xóa đâu" -- bo nut/route Xoa giao dich
+// (khong con dung tu UI), thay bang cot "So du" (buildBalanceMap o tren).
+// Route xuat Excel cung them cot "So du" tuong ung, dong bo voi bang tren
+// man hinh (giong sao ke ngan hang that co cot "Số dư tham chiếu").
 router.get("/export.xlsx", (req, res) => {
   const store = load();
   const activeCompany = getCompany(req);
   const { bank_id, from, to } = req.query;
-  const rows = filterTransactions(store, {
+  const rows = filterTransactionsWithBalance(store, {
     bank_id,
     from,
     to,
@@ -273,6 +410,7 @@ router.get("/export.xlsx", (req, res) => {
       "Dien giai": t.description,
       "So tien": t.amount,
       Loai: t.type,
+      "So du": t.balance,
     }));
 
   const ws = XLSX.utils.json_to_sheet(rows);

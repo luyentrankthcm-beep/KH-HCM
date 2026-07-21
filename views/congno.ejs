@@ -6,17 +6,36 @@
 <body>
   <%- include('partials/nav') %>
   <main class="container">
-    <h1>Công nợ</h1>
+    <h1>Công Nợ Khách Hàng</h1>
     <p class="muted" style="margin-top:-10px;margin-bottom:20px;">
       Các dòng đối soát <strong>chưa có hóa đơn</strong> hoặc <strong>còn lệch</strong> trên mọi kênh
       (Momo, Zalo/VNPay/Payoo, Viet QR), xếp theo số ngày kể từ ngày giao dịch.
     </p>
 
-    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+    <% if (error) { %><div class="alert alert-error" id="autohide-error"><%= error %></div><% } %>
+    <% if (success) { %><div class="alert alert-success" id="successBanner"><%= success %></div><% } %>
+    <script>
+      (function () {
+        ["successBanner", "autohide-error"].forEach(function (id) {
+          var el = document.getElementById(id);
+          if (!el) return;
+          setTimeout(function () {
+            el.style.transition = "opacity 0.6s ease, max-height 0.6s ease, margin 0.6s ease, padding 0.6s ease";
+            el.style.opacity = "0";
+            el.style.maxHeight = "0";
+            el.style.overflow = "hidden";
+            el.style.marginTop = "0";
+            el.style.marginBottom = "0";
+            el.style.paddingTop = "0";
+            el.style.paddingBottom = "0";
+          }, 3000);
+        });
+      })();
+    </script>
 
     <section class="cards">
       <% aging.buckets.forEach(function(b) { %>
-      <a href="/cong-no?bucket=<%= encodeURIComponent(b.bucket) %><%= aging.selectedChannel ? '&channel=' + encodeURIComponent(aging.selectedChannel) : '' %>"
+      <a href="/cong-no/khach-hang?bucket=<%= encodeURIComponent(b.bucket) %><%= aging.selectedChannel ? '&channel=' + encodeURIComponent(aging.selectedChannel) : '' %>"
          class="card card-bucket <%= aging.selectedBucket === b.bucket ? 'card-bucket-active' : '' %>">
         <div class="card-label">Quá <%= b.bucket %> ngày</div>
         <div class="card-value"><%= b.total.toLocaleString('vi-VN') %> đ</div>
@@ -37,7 +56,7 @@
           </select>
           <% if (aging.selectedBucket) { %>
           <input type="hidden" name="bucket" value="<%= aging.selectedBucket %>" />
-          <span class="badge badge-warn">Lọc: quá <%= aging.selectedBucket %> ngày <a href="/cong-no<%= aging.selectedChannel ? '?channel=' + encodeURIComponent(aging.selectedChannel) : '' %>" style="color:inherit;margin-left:6px;">✕</a></span>
+          <span class="badge badge-warn">Lọc: quá <%= aging.selectedBucket %> ngày <a href="/cong-no/khach-hang<%= aging.selectedChannel ? '?channel=' + encodeURIComponent(aging.selectedChannel) : '' %>" style="color:inherit;margin-left:6px;">✕</a></span>
           <% } %>
         </form>
       </div>
@@ -74,6 +93,143 @@
           </tbody>
         </table>
       </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Công nợ đã đối soát trước đây (nhập tay) — <%= manualEntries.length %> dòng, tổng <%= manualTotal.toLocaleString('vi-VN') %> đ</h2>
+      </div>
+      <p class="muted" style="margin-top:-8px;">
+        Dùng cho công nợ chị đã tự đối soát xong từ trước và đã có sẵn số hóa đơn theo từng gian — ghi lại đây để tra cứu,
+        KHÔNG cộng vào bảng "chưa khớp" phía trên (vì đã xong rồi).
+      </p>
+      <form method="POST" action="/cong-no/thu-cong" class="form-grid" style="margin-bottom:16px;">
+        <div>
+          <label>Gian</label>
+          <input type="text" name="gian" required placeholder="vd AM TP PHCM" />
+        </div>
+        <div>
+          <label>Ngày</label>
+          <input type="date" name="date" required />
+        </div>
+        <div>
+          <label>Số tiền</label>
+          <input type="text" name="amount" required placeholder="vd 1500000" />
+        </div>
+        <div>
+          <label>Số hóa đơn</label>
+          <input type="text" name="invoiceNumbers" placeholder="vd 8274, 8416" />
+        </div>
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary">Thêm</button>
+        </div>
+      </form>
+      <div class="table-scroll">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Gian</th>
+              <th>Ngày</th>
+              <th class="num">Số tiền</th>
+              <th>Số hóa đơn</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <% manualEntries.forEach(function(m) { %>
+            <tr>
+              <td><%= m.gian %></td>
+              <td><%= m.date %></td>
+              <td class="num"><%= m.amount.toLocaleString('vi-VN') %> đ</td>
+              <td><%= m.invoiceNumbers || '-' %></td>
+              <td>
+                <form method="POST" action="/cong-no/thu-cong/<%= m.id %>/delete" style="display:inline" onsubmit="return confirm('Xóa dòng công nợ này?')">
+                  <button type="submit" class="link-btn link-danger">Xóa</button>
+                </form>
+              </td>
+            </tr>
+            <% }) %>
+            <% if (manualEntries.length === 0) { %>
+            <tr><td colspan="5" class="muted">Chưa có công nợ nào nhập tay.</td></tr>
+            <% } %>
+          </tbody>
+          <% if (manualEntries.length > 0) { %>
+          <tfoot>
+            <tr><td colspan="2">Tổng</td><td class="num"><%= manualTotal.toLocaleString('vi-VN') %> đ</td><td colspan="2"></td></tr>
+          </tfoot>
+          <% } %>
+        </table>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Đối soát MISA (công nợ 131) vs Ngân hàng</h2>
+      </div>
+      <p class="muted" style="margin-top:-8px;">
+        Tải file MISA "Sổ chi tiết công nợ phải thu theo công trình" (TK 131). File có thể gồm rất nhiều công trình
+        toàn công ty — chị chỉ cần chọn công trình MISA tương ứng cho từng <strong>gian</strong> app đang theo dõi
+        (tên gọi 2 bên khác nhau nên cần chọn tay 1 lần, lần tải file MISA sau không cần chọn lại).
+      </p>
+      <form method="POST" action="/cong-no/upload-misa" enctype="multipart/form-data" class="form-inline" style="margin-bottom:16px;">
+        <input type="file" name="file" accept=".xlsx,.xls" required />
+        <button type="submit" class="btn btn-primary">Tải file MISA</button>
+      </form>
+      <% if (misaInfo) { %>
+      <p class="muted" style="margin-top:-8px;">
+        Đã tải: <strong><%= misaInfo.fileName %></strong> lúc <%= new Date(misaInfo.uploadedAt).toLocaleString('vi-VN') %>
+        — <%= misaInfo.order.length %> công trình.
+      </p>
+      <% } else { %>
+      <p class="muted" style="margin-top:-8px;">Chưa tải file MISA nào.</p>
+      <% } %>
+
+      <form method="POST" action="/cong-no/misa-mapping">
+        <div class="table-scroll">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Gian (app)</th>
+                <th class="num">Chưa thu (Ngân hàng)</th>
+                <th>Công trình MISA tương ứng</th>
+                <th class="num">Dư nợ MISA</th>
+                <th class="num">Chênh lệch</th>
+                <th>Trạng thái</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% misaComparison.forEach(function(row) { %>
+              <tr>
+                <td>
+                  <%= row.gian %>
+                  <input type="hidden" name="gian" value="<%= row.gian %>" />
+                </td>
+                <td class="num"><%= row.chuaThu.toLocaleString('vi-VN') %> đ</td>
+                <td>
+                  <select name="congtrinh">
+                    <option value="">-- chọn công trình --</option>
+                    <% misaCongTrinhOptions.forEach(function(ct) { %>
+                    <option value="<%= ct %>" <%= row.mappedCongTrinh === ct ? 'selected' : '' %>><%= ct %></option>
+                    <% }) %>
+                  </select>
+                </td>
+                <td class="num"><%= row.soDuMisa === null ? '-' : row.soDuMisa.toLocaleString('vi-VN') + ' đ' %></td>
+                <td class="num"><%= row.chenhLech === null ? '-' : row.chenhLech.toLocaleString('vi-VN') + ' đ' %></td>
+                <td>
+                  <span class="badge <%= row.trangThai === 'Khớp' ? 'badge-thu' : (row.trangThai === 'Lệch' ? 'badge-neg' : 'badge-warn') %>">
+                    <%= row.trangThai %>
+                  </span>
+                </td>
+              </tr>
+              <% }) %>
+              <% if (misaComparison.length === 0) { %>
+              <tr><td colspan="6" class="muted">Chưa có dữ liệu để đối soát.</td></tr>
+              <% } %>
+            </tbody>
+          </table>
+        </div>
+        <button type="submit" class="btn btn-secondary" style="margin-top:10px;">Lưu ánh xạ Gian ↔ Công trình MISA</button>
+      </form>
     </section>
   </main>
 </body>

@@ -6,7 +6,7 @@
 <body>
   <%- include('partials/nav') %>
   <main class="container">
-    <h1>Đối soát Chi phí — <%= COMPANIES[activeCompany].label %></h1>
+    <h1>Tài khoản Chi — <%= COMPANIES[activeCompany].label %></h1>
     <p class="muted" style="margin-top:-10px;margin-bottom:20px;">
       Tiền chi ra cho nhà cung cấp / mặt bằng / lương... từ tài khoản chi phí (<%= channels.map(function(c){ return c.label; }).join(', ') %>).
       Trang này phân loại theo NCC + gian (nếu xác định được), đối chiếu thêm danh sách hóa đơn HDDV và bảng lệnh chi UNC (mục 1b/1c) để tự điền Số hóa đơn + Diễn giải, rồi xuất file Misa.
@@ -135,6 +135,25 @@
     </section>
 
     <section class="panel">
+      <p class="muted" style="margin-bottom:6px;">
+        🔒 Khóa sổ: các dòng có Ngày từ đầu đến ngày khóa (bao gồm ngày đó) sẽ không còn hiện các badge cảnh báo
+        ("Cần xác định", "Trùng tên", "chưa khớp hóa đơn"...) nữa — dữ liệu gốc vẫn giữ nguyên, chỉ ẩn cảnh báo
+        cho các dòng đã chốt xong.
+        <% if (lockDate) { %><strong>Đang khóa đến hết ngày <%= lockDate %>.</strong><% } else { %><em>Chưa khóa.</em><% } %>
+      </p>
+      <form method="POST" action="/doi-soat/chi-phi/khoa-so" class="form-inline">
+        <input type="date" name="lockDate" value="<%= lockDate %>" required />
+        <button type="submit" class="btn btn-secondary">Khóa đến ngày này</button>
+      </form>
+      <% if (lockDate) { %>
+      <form method="POST" action="/doi-soat/chi-phi/khoa-so" class="form-inline" style="margin-top:6px;">
+        <input type="hidden" name="lockDate" value="" />
+        <button type="submit" class="btn btn-secondary" onclick="return confirm('Mở khóa sổ?');">Mở khóa</button>
+      </form>
+      <% } %>
+    </section>
+
+    <section class="panel">
       <div class="panel-head">
         <h2>3. Danh sách chi tiết<% if (selectedMonth) { %> — tháng <%= selectedMonth %><% } %> (<%= lines.length %> dòng, tổng <%= totalAmount.toLocaleString('vi-VN') %> đ)</h2>
         <form method="GET" class="form-inline-tight">
@@ -150,17 +169,49 @@
             <% }) %>
             <option value="" <%= selectedMonth === '' ? 'selected' : '' %>>Tất cả</option>
           </select>
+          <select name="invoiceStatus" onchange="this.form.submit()" title="Lọc theo hóa đơn NCC của chính dòng chi phí">
+            <option value="" <%= selectedInvoiceStatus === '' ? 'selected' : '' %>>Hóa đơn: Tất cả</option>
+            <option value="co" <%= selectedInvoiceStatus === 'co' ? 'selected' : '' %>>Có hóa đơn</option>
+            <option value="khong" <%= selectedInvoiceStatus === 'khong' ? 'selected' : '' %>>Chưa có hóa đơn</option>
+          </select>
+          <select name="revenueStatus" onchange="this.form.submit()" title="Lọc theo trạng thái doanh thu của gian (Momo/ZVP/Viet QR) trong cùng tháng">
+            <option value="" <%= selectedRevenueStatus === '' ? 'selected' : '' %>>DT gian: Tất cả</option>
+            <option value="Đã hạch toán doanh thu" <%= selectedRevenueStatus === 'Đã hạch toán doanh thu' ? 'selected' : '' %>>Đã hạch toán doanh thu</option>
+            <option value="Chưa hạch toán doanh thu" <%= selectedRevenueStatus === 'Chưa hạch toán doanh thu' ? 'selected' : '' %>>Chưa hạch toán doanh thu</option>
+            <option value="Không có doanh thu ghi nhận" <%= selectedRevenueStatus === 'Không có doanh thu ghi nhận' ? 'selected' : '' %>>Không có doanh thu ghi nhận</option>
+            <option value="Không xác định gian" <%= selectedRevenueStatus === 'Không xác định gian' ? 'selected' : '' %>>Không xác định gian</option>
+          </select>
         </form>
       </div>
+      <p class="muted" style="margin-top:6px;">
+        <strong>Có hóa đơn</strong>: dòng chi phí này đã khớp hóa đơn NCC (mục 1b) hoặc rút được số HĐ từ diễn giải.
+        <strong>DT gian</strong>: doanh thu của GIAN gắn với dòng này, trong CÙNG THÁNG, đã khớp hóa đơn doanh thu (Momo/ZVP/Viet QR) hay chưa — lấy đúng dữ liệu bên trang Công nợ/Tổng quan, không tính riêng.
+      </p>
       <div class="table-scroll">
         <table class="table">
           <thead>
             <tr>
-              <th>Ngày</th><th>Kênh</th><th>NCC</th><th>Mã NCC</th><th>Diễn giải (sao kê)</th><th>Nội dung UNC</th><th>Số HĐ</th><th>Số tiền</th><th>TK Nợ</th><th>Gian</th>
+              <th>Ngày</th><th>Kênh</th><th>NCC</th><th>Mã NCC</th><th>Diễn giải (sao kê)</th><th>Nội dung UNC</th><th>Số HĐ</th><th>Số tiền</th><th>TK Nợ</th><th>Gian</th><th>Có hóa đơn</th><th>DT gian</th>
             </tr>
           </thead>
           <tbody>
             <% lines.forEach(function(l) { %>
+            <% if (l.locked) { %>
+            <tr style="opacity:0.6;">
+              <td><%= l.date %> 🔒</td>
+              <td><% var chLbl2 = channels.find(function(c){ return c.key === l.channelKey; }); %><%= chLbl2 ? chLbl2.label : l.channelKey %></td>
+              <td><%= l.vendorKnown ? l.vendor : '-' %></td>
+              <td><%= l.maNCC || '-' %></td>
+              <td class="desc-cell" title="<%= l.description %>"><%= l.description %></td>
+              <td class="desc-cell" title="<%= l.uncDienGiai %>"><%= l.uncDienGiai || '-' %></td>
+              <td><%= (l.invoiceMatch && l.invoiceMatch.soHoaDon) || l.hdNumberFallback || '-' %></td>
+              <td class="num"><%= l.debit.toLocaleString('vi-VN') %> đ</td>
+              <td><%= l.tkNo || '-' %></td>
+              <td><%= l.finalGian || l.siteFrag || '-' %></td>
+              <td><span class="badge" title="Đã khóa sổ, không còn cảnh báo">🔒 Đã khóa sổ</span></td>
+              <td class="muted"><%= l.revenueStatus %></td>
+            </tr>
+            <% } else { %>
             <tr>
               <td><%= l.date %></td>
               <td><% var chLbl = channels.find(function(c){ return c.key === l.channelKey; }); %><%= chLbl ? chLbl.label : l.channelKey %></td>
@@ -218,10 +269,23 @@
                   <button type="submit" class="link-btn">Lưu</button>
                 </form>
               </td>
+              <td>
+                <span class="badge <%= l.coHoaDon.startsWith('Có') ? 'badge-thu' : 'badge-warn' %>"><%= l.coHoaDon %></span>
+              </td>
+              <td>
+                <% if (l.revenueStatus === 'Đã hạch toán doanh thu') { %>
+                <span class="badge badge-thu"><%= l.revenueStatus %></span>
+                <% } else if (l.revenueStatus === 'Chưa hạch toán doanh thu') { %>
+                <span class="badge badge-neg"><%= l.revenueStatus %></span>
+                <% } else { %>
+                <span class="badge badge-warn"><%= l.revenueStatus %></span>
+                <% } %>
+              </td>
             </tr>
+            <% } %>
             <% }) %>
             <% if (lines.length === 0) { %>
-            <tr><td colspan="10" class="muted">Chưa có dữ liệu — tải sao kê ở mục 1.</td></tr>
+            <tr><td colspan="12" class="muted">Chưa có dữ liệu — tải sao kê ở mục 1.</td></tr>
             <% } %>
           </tbody>
         </table>

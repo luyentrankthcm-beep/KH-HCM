@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <%- include('partials/head') %>
+</head>
+<body>
+  <%- include('partials/nav') %>
+  <main class="container">
+    <h1>Công Nợ NCC</h1>
+    <p class="muted" style="margin-top:-10px;margin-bottom:20px;">
+      Công nợ phải trả cho nhà cung cấp (NCC) — Tổng hóa đơn (từ danh sách hóa đơn NCC đã tải ở Tài khoản Chi)
+      trừ Tổng đã chi (các giao dịch chi đã gán đúng mã NCC, cả 3 ngân hàng chi phí). Còn nợ dương = còn thiếu NCC,
+      âm = đã chi vượt hóa đơn/tạm ứng.
+    </p>
+
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+    <% if (result.errors && result.errors.length > 0) { %>
+    <div class="alert alert-error">
+      <% result.errors.forEach(function(e) { %><div><%= e %></div><% }) %>
+    </div>
+    <% } %>
+
+    <section class="cards">
+      <div class="card">
+        <div class="card-label">Tổng hóa đơn NCC</div>
+        <div class="card-value"><%= result.grandTotalHoaDon.toLocaleString('vi-VN') %> đ</div>
+      </div>
+      <div class="card">
+        <div class="card-label">Tổng đã chi (khớp mã NCC)</div>
+        <div class="card-value"><%= result.grandTotalDaChi.toLocaleString('vi-VN') %> đ</div>
+      </div>
+      <div class="card">
+        <div class="card-label">Còn nợ NCC</div>
+        <div class="card-value"><%= result.grandTotalConNo.toLocaleString('vi-VN') %> đ</div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Chi tiết theo NCC (<%= result.rows.length %> nhà cung cấp)</h2>
+      </div>
+      <p class="muted">
+        Chỉ hiện NCC có ít nhất 1 hóa đơn hoặc 1 giao dịch chi đã khớp. NCC chưa có hóa đơn trong hệ thống sẽ
+        không tính được "Tổng hóa đơn" (hiện 0đ) dù đã có chi — phần này cần tải thêm hóa đơn NCC ở Tài khoản Chi.
+      </p>
+      <div class="table-scroll">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Mã NCC</th>
+              <th>Tên NCC</th>
+              <th>MST</th>
+              <th>Tổng hóa đơn</th>
+              <th>Đã chi (số GD)</th>
+              <th>Còn nợ</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% result.rows.forEach(function(r) { %>
+            <tr>
+              <td><%= r.maNCC %></td>
+              <td><%= r.tenNCC %></td>
+              <td><%= r.mst %></td>
+              <td><%= r.tongHoaDon.toLocaleString('vi-VN') %> đ</td>
+              <td><%= r.daChi.toLocaleString('vi-VN') %> đ <span class="muted">(<%= r.soGiaoDich %>)</span></td>
+              <td class="<%= Math.abs(r.conNo) < 1000 ? 'text-pos' : 'text-neg' %>"><%= r.conNo.toLocaleString('vi-VN') %> đ</td>
+            </tr>
+            <% }) %>
+            <% if (result.rows.length === 0) { %>
+            <tr><td colspan="6" class="muted">Chưa có dữ liệu — cần tải hóa đơn NCC và/hoặc gán mã NCC cho giao dịch chi ở trang Tài khoản Chi trước.</td></tr>
+            <% } %>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <%- include('partials/head') %>
+</head>
+<body>
+  <%- include('partials/nav') %>
+  <main class="container">
+    <h1>Hợp Đồng Thuê Gian Hàng</h1>
+    <p class="muted" style="margin-top:-10px;margin-bottom:6px;">
+      Danh sách vị trí/gian mà công ty thuê để đặt gian hàng (khu vui chơi, máy tự động) tại các mặt bằng đối tác
+      (TTTM, siêu thị, bệnh viện...). Đang xem: <strong><%= COMPANIES[activeCompany].label %></strong>
+      (<%= totalForCompany %> gian). Đổi công ty ở nút "Cũ/Mới" trên đầu trang nếu muốn xem công ty kia.
+    </p>
+    <p class="muted" style="margin-bottom:20px;">
+      67 gian đầu tiên được nạp sẵn từ file MTD MN.xlsx / KVC MN.xlsx Luyến gửi 2026-07-20. 52 gian trong đó đã khớp
+      thêm được số hợp đồng, ngày ký/hết hạn, tiền cọc, tiền thuê và link hợp đồng từ Google Sheet "THEO DÕI HĐ HN-HCM"
+      (sheet HCM) — bấm "Xem HĐ" ở cột cuối mỗi dòng để xem. 15 gian còn lại chưa dò khớp được tự động (tên gọi trên
+      sheet khác quá nhiều so với tên nội bộ), chị xem cột "Tên điểm nội bộ" rồi cho em biết tên tương ứng bên sheet
+      để em dò tiếp.
+    </p>
+
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+    <% if (success) { %><div class="alert alert-success"><%= success %></div><% } %>
+
+    <section class="panel">
+      <h2>Thêm gian mới</h2>
+      <form method="POST" action="/phap-danh/hop-dong-thue-gian-hang" class="form-grid">
+        <label>Loại hình
+          <select name="loaiHinh">
+            <option value="">-- chọn --</option>
+            <option value="Khu vui chơi">Khu vui chơi</option>
+            <option value="Máy tự động">Máy tự động</option>
+          </select>
+        </label>
+        <label>Gian (tên điểm xuất hóa đơn) <input type="text" name="gian" required placeholder="vd AE Bình Tân ghế" /></label>
+        <label>Tên điểm nội bộ <input type="text" name="tenDiemNoiBo" placeholder="vd POSH MN AEON MALL BÌNH TÂN" /></label>
+        <label>Mã công trình <input type="text" name="maCongTrinh" /></label>
+        <label>Mã KH <input type="text" name="maKH" placeholder="vd KH705MTDMN0001" /></label>
+        <label>Bên cho thuê (NCC) <input type="text" name="benChoThue" /></label>
+        <label>MST bên cho thuê <input type="text" name="mstBenChoThue" /></label>
+        <label>Hình thức hợp tác <input type="text" name="hinhThucHopTac" placeholder="vd Tiền thuê / CSE" /></label>
+        <label>Trạng thái hoạt động <input type="text" name="trangThaiHoatDong" placeholder="vd đang hoạt động" /></label>
+        <label>Thời hạn hợp đồng <input type="text" name="thoiHanHopDong" placeholder="vd 1/1/26-31/12/27" /></label>
+        <label>Tiền thuê/tháng <input type="text" name="tienThueThang" placeholder="vd 20000000" /></label>
+        <label style="grid-column: 1 / -1;">Link hợp đồng (chưa có dấu) <input type="text" name="linkHopDongChuaDuDau" placeholder="link Google Drive bản chưa có dấu" /></label>
+        <label style="grid-column: 1 / -1;">Ghi chú <input type="text" name="ghiChu" /></label>
+        <button type="submit" class="btn btn-primary">Lưu (vào <%= COMPANIES[activeCompany].label %>)</button>
+      </form>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Danh sách (<%= rows.length %> gian)</h2>
+        <div>
+          <a class="btn btn-secondary <%= !loaiFilter ? 'is-active' : '' %>" href="/phap-danh/hop-dong-thue-gian-hang<%= thangFilter ? '?thang=' + thangFilter : '' %>">Tất cả (<%= totalForCompany %>)</a>
+          <a class="btn btn-secondary <%= loaiFilter === 'Khu vui chơi' ? 'is-active' : '' %>" href="/phap-danh/hop-dong-thue-gian-hang?loai=<%= encodeURIComponent('Khu vui chơi') %><%= thangFilter ? '&thang=' + thangFilter : '' %>">Khu vui chơi (<%= counts['Khu vui chơi'] %>)</a>
+          <a class="btn btn-secondary <%= loaiFilter === 'Máy tự động' ? 'is-active' : '' %>" href="/phap-danh/hop-dong-thue-gian-hang?loai=<%= encodeURIComponent('Máy tự động') %><%= thangFilter ? '&thang=' + thangFilter : '' %>">Máy tự động (<%= counts['Máy tự động'] %>)</a>
+          <a class="btn btn-primary" href="/phap-danh/hop-dong-thue-gian-hang/export.xlsx<%= loaiFilter || thangFilter ? '?' : '' %><%= loaiFilter ? 'loai=' + encodeURIComponent(loaiFilter) : '' %><%= loaiFilter && thangFilter ? '&' : '' %><%= thangFilter ? 'thang=' + thangFilter : '' %>">📊 Xuất Excel</a>
+        </div>
+      </div>
+      <form method="GET" action="/phap-danh/hop-dong-thue-gian-hang" style="display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-bottom:14px;">
+        <% if (loaiFilter) { %><input type="hidden" name="loai" value="<%= loaiFilter %>" /><% } %>
+        <label style="font-size:13px;">Xem hợp đồng còn hiệu lực trong tháng
+          <input type="month" name="thang" value="<%= thangFilter %>" style="margin-left:6px;" />
+        </label>
+        <button type="submit" class="btn btn-secondary">Lọc theo tháng</button>
+        <% if (thangFilter) { %><a class="link-btn" href="/phap-danh/hop-dong-thue-gian-hang<%= loaiFilter ? '?loai=' + encodeURIComponent(loaiFilter) : '' %>">Bỏ lọc tháng</a><% } %>
+        <input type="text" id="ganSearchBox" placeholder="🔎 Tìm theo tên gian / tên điểm nội bộ..." style="margin-left:auto; min-width:260px; padding:8px 12px; border:1px solid var(--color-hairline); border-radius:var(--radius-md);" oninput="filterGianRows(this.value)" />
+      </form>
+      <div class="table-scroll">
+        <table class="table" id="gianTable">
+          <thead>
+            <tr>
+              <th>Loại hình</th><th>Gian</th><th>Tên điểm nội bộ</th><th>Mã công trình</th><th>Mã KH</th>
+              <th>Bên cho thuê (NCC)</th><th>Hình thức HT</th><th>Hình thức thu tiền</th><th>Trạng thái HĐ</th><th>Thời hạn hợp đồng</th>
+              <th>Tiền thuê/tháng</th><th>Ghi chú</th><th>Hợp đồng (sheet HCM)</th><th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <% rows.forEach(function(r) { %>
+            <tr data-search="<%= (r.gian + ' ' + r.tenDiemNoiBo + ' ' + r.maCongTrinh).toLowerCase() %>">
+              <td><%= r.loaiHinh %></td>
+              <td><strong><%= r.gian %></strong></td>
+              <td><%= r.tenDiemNoiBo %></td>
+              <td><%= r.maCongTrinh %></td>
+              <td><%= r.maKH %></td>
+              <td style="max-width:260px;"><%= r.benChoThue %></td>
+              <td><%= r.hinhThucHopTac %></td>
+              <td style="font-size:12px; max-width:200px;">
+                <% if (r.hinhThucThuTien) { %><span class="badge badge-chi" title="<%= r.hinhThucThuTien %>">Mall giữ tiền</span><% } %>
+              </td>
+              <td>
+                <% if (r.trangThaiHD === 'Còn hoạt động') { %><span class="badge badge-thu">Còn hoạt động</span>
+                <% } else if (r.trangThaiHD === 'Hết hạn') { %><span class="badge badge-chi">Hết hạn</span>
+                <% } else { %><span class="muted" style="font-size:12px;">Không rõ</span>
+                <% } %>
+              </td>
+              <td style="font-size:12px; max-width:220px; white-space:pre-line;"><%= r.thoiHanHopDong %></td>
+              <td><%= (r.tienThueThang || 0).toLocaleString('vi-VN') %> đ</td>
+              <td style="max-width:160px; font-size:12px;">
+                <% if (r.ghiChu && r.ghiChu.length > 40) { %>
+                <details>
+                  <summary style="cursor:pointer;"><%= r.ghiChu.slice(0, 40) %>…</summary>
+                  <div style="white-space:pre-line; margin-top:4px;"><%= r.ghiChu %></div>
+                </details>
+                <% } else { %><%= r.ghiChu %><% } %>
+              </td>
+              <td style="min-width:220px;">
+                <% if (r.soHopDongHCM || r.tienCocDamBao || r.linkHopDongDuDau || r.linkHopDongChuaDuDau) { %>
+                <details>
+                  <summary style="cursor:pointer; font-size:12px;">
+                    Cọc: <%= r.tienCocDamBao ? (typeof r.tienCocDamBao === 'number' ? r.tienCocDamBao.toLocaleString('vi-VN') + ' đ' : r.tienCocDamBao) : '(chưa rõ)' %>
+                    — Xem HĐ
+                  </summary>
+                  <div style="font-size:12px; margin-top:6px; line-height:1.5; max-width:320px; white-space:pre-line;">
+                    <div><strong>Số HĐ:</strong> <%= r.soHopDongHCM || '(không có)' %></div>
+                    <div><strong>Ngày ký:</strong> <%= r.ngayKyHD || '?' %> — <strong>Bắt đầu:</strong> <%= r.ngayBatDauHD || '?' %> — <strong>Hết hạn:</strong> <%= r.ngayHetHanHD || '?' %><% if (r.baoHanHD) { %> (<%= r.baoHanHD %>)<% } %></div>
+                    <div><strong>Tiền cọc thi công:</strong> <%= r.tienCocThiCong ? (typeof r.tienCocThiCong === 'number' ? r.tienCocThiCong.toLocaleString('vi-VN') + ' đ' : r.tienCocThiCong) : '(không có)' %></div>
+                    <div><strong>Tiền thuê/tháng:</strong> <%= r.tongTienThueThangHCM || '(không có)' %></div>
+                    <% if (r.linkHopDongDuDau) { %><div><a href="<%= r.linkHopDongDuDau %>" target="_blank" rel="noopener">Link HĐ đủ dấu ↗</a></div><% } %>
+                    <% if (r.linkHopDongChuaDuDau) { %><div><a href="<%= r.linkHopDongChuaDuDau %>" target="_blank" rel="noopener">Link HĐ chưa đủ dấu ↗</a></div><% } %>
+                    <% if (r.dieuKhoanThanhToan) { %>
+                    <div style="margin-top:6px; padding-top:6px; border-top:1px dashed var(--color-hairline);">
+                      <strong>Điều khoản thanh toán (từ hợp đồng):</strong><br /><%= r.dieuKhoanThanhToan %>
+                    </div>
+                    <% } %>
+                    <div class="muted" style="margin-top:6px;"><%= r.sheetHCMThamKhao %> (địa điểm ghi "<%= r.sheetHCMDiaDiemGoc %>")</div>
+                  </div>
+                </details>
+                <% } else { %>
+                <span class="muted" style="font-size:12px;">chưa khớp</span>
+                <% } %>
+              </td>
+              <td>
+                <form method="POST" action="/phap-danh/hop-dong-thue-gian-hang/<%= r.id %>/delete" onsubmit="return confirm('Xóa gian này?');">
+                  <button type="submit" class="link-btn link-danger">Xóa</button>
+                </form>
+              </td>
+            </tr>
+            <% }) %>
+            <% if (rows.length === 0) { %>
+            <tr><td colspan="15" class="muted">Chưa có gian nào.</td></tr>
+            <% } %>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+  <script>
+    // Luyen, 2026-07-20: tim theo ten gian/ten diem noi bo, loc ngay tren
+    // trinh duyet (khong reload trang) -- danh sach chi vai chuc dong nen
+    // khong can goi lai server.
+    function filterGianRows(q) {
+      var needle = (q || "").trim().toLowerCase();
+      document.querySelectorAll("#gianTable tbody tr[data-search]").forEach(function (tr) {
+        tr.style.display = !needle || tr.getAttribute("data-search").indexOf(needle) !== -1 ? "" : "none";
+      });
+    }
+  </script>
+</body>
+</html>

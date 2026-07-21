@@ -7,12 +7,32 @@
   <%- include('partials/nav') %>
   <main class="container">
     <h1>Báo cáo</h1>
-    <section class="panel">
-      <ul>
-        <li><a href="/bao-cao/phi">Bảng phí VNPay / Momo theo tháng</a></li>
-        <li><a href="/bao-cao/chuyen-tien-noi-bo">Chuyển tiền nội bộ giữa các ngân hàng</a></li>
-        <li><a href="/bao-cao/thu-chi-theo-gian">Thu/chi theo gian (tất cả ngân hàng)</a></li>
-      </ul>
+    <p class="muted" style="margin-top:-10px;margin-bottom:20px;">Chọn 1 báo cáo bên dưới để xem chi tiết.</p>
+    <section class="report-grid">
+      <a href="/bao-cao/trang-thai-doi-soat" class="report-tile accent-pie">
+        <div class="report-tile-icon">📊</div>
+        <div class="report-tile-title">Trạng thái đối soát theo công ty</div>
+        <div class="report-tile-desc">Biểu đồ tròn theo dõi tiến độ đối soát KH Cũ / KH Mới.</div>
+        <span class="report-tile-go">Xem báo cáo →</span>
+      </a>
+      <a href="/bao-cao/phi" class="report-tile accent-fee">
+        <div class="report-tile-icon">💳</div>
+        <div class="report-tile-title">Bảng phí VNPay / Momo</div>
+        <div class="report-tile-desc">Tổng hợp phí giao dịch theo tháng cho từng kênh thanh toán.</div>
+        <span class="report-tile-go">Xem báo cáo →</span>
+      </a>
+      <a href="/bao-cao/chuyen-tien-noi-bo" class="report-tile accent-transfer">
+        <div class="report-tile-icon">🔄</div>
+        <div class="report-tile-title">Chuyển tiền nội bộ</div>
+        <div class="report-tile-desc">Các khoản chuyển tiền giữa những ngân hàng đang theo dõi.</div>
+        <span class="report-tile-go">Xem báo cáo →</span>
+      </a>
+      <a href="/bao-cao/thu-chi-theo-gian" class="report-tile accent-gian">
+        <div class="report-tile-icon">🏪</div>
+        <div class="report-tile-title">Thu/chi theo gian hàng</div>
+        <div class="report-tile-desc">Tổng thu và tổng chi từng gian, gộp tất cả ngân hàng.</div>
+        <span class="report-tile-go">Xem báo cáo →</span>
+      </a>
     </section>
   </main>
 </body>

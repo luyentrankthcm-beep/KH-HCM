@@ -1,25 +1,29 @@
-/* ---------- Design tokens (adapted from the "hp" design language via
-   npx getdesign@latest add hp -- HP Electric Blue accent, near-black ink,
-   soft-lift cards, sharp 4px buttons vs. soft 16px cards). Semantic colors
-   (success/danger/warning) are NOT part of HP's own palette -- an
-   accounting/reconciliation tool needs a clear, unambiguous green=thu,
-   red=chi/lech, amber=canh bao vocabulary, so those 3 are kept conventional
-   while every other surface (buttons, links, active nav state, card
-   accents) uses the HP tokens below. ---------- */
+/* ---------- Design tokens -- theme "thuy cung xanh duong" (Luyen yeu cau
+   2026-07-17: doi tu theme hong de thuong sang phong cach thuy cung/dai
+   duong sinh dong hon, mau xanh duong chu dao, co bong bong noi, song bien
+   duoi thanh dieu huong, ca boi thay heo chay). Giu NGUYEN 3 mau ngu nghia
+   thu/chi/canh bao (success/danger/warning) vi day la cong cu ke toan/doi
+   soat -- doi mau nay se lam mat nghia "xanh la=thu, do=chi/lech,
+   cam=canh bao" da quen thuoc voi Luyen. Them lop --color-abyss/--color-foam
+   rieng cho cac hieu ung trang tri (bong bong, song) de khong dung cham den
+   --color-primary dung cho nut/link. ---------- */
 :root {
-  --color-primary: #024ad8;
-  --color-primary-bright: #296ef9;
-  --color-primary-deep: #0e3191;
-  --color-primary-soft: #c9e0fc;
-  --color-ink: #1a1a1a;
-  --color-ink-soft: #292929;
+  --color-primary: #0096c7;
+  --color-primary-bright: #48cae4;
+  --color-primary-deep: #023e8a;
+  --color-primary-soft: #caf0f8;
+  --color-topbar-bg: linear-gradient(120deg, #023e8a 0%, #0096c7 55%, #48cae4 100%);
+  --color-abyss: #012a4a;
+  --color-foam: #ade8f4;
+  --color-ink: #0b2545;
+  --color-ink-soft: #16324a;
   --color-canvas: #ffffff;
-  --color-cloud: #f7f7f7;
-  --color-fog: #e8e8e8;
-  --color-steel: #c2c2c2;
-  --color-graphite: #636363;
-  --color-charcoal: #3d3d3d;
-  --color-hairline: #e8e8e8;
+  --color-cloud: #eaf7fb;
+  --color-fog: #d9f1f8;
+  --color-steel: #a9d6e5;
+  --color-graphite: #4f7d95;
+  --color-charcoal: #204261;
+  --color-hairline: #d3edf5;
 
   --color-success: #1d8a4a;
   --color-success-bg: #e9f7ef;
@@ -28,13 +32,13 @@
   --color-warning: #a6620a;
   --color-warning-bg: #fdf1e0;
 
-  --radius-sm: 3px;
-  --radius-md: 4px;
-  --radius-lg: 8px;
-  --radius-xl: 16px;
+  --radius-sm: 8px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-xl: 22px;
 
-  --shadow-soft: 0 2px 8px rgba(26, 26, 26, 0.08);
-  --shadow-modal: 0 8px 24px rgba(26, 26, 26, 0.12);
+  --shadow-soft: 0 2px 10px rgba(2, 62, 138, 0.12);
+  --shadow-modal: 0 8px 26px rgba(2, 62, 138, 0.22);
 
   --space-xs: 8px;
   --space-sm: 12px;
@@ -53,13 +57,40 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* ---------- Top nav: dark-ink slab (HP's closing-rhythm color), Electric
-   Blue reserved for the active-page underline + hover state only. ---------- */
+/* ---------- Lop bong bong trang tri nen thuy cung -- co dinh toan man
+   hinh, KHONG chan click (pointer-events:none), nam DUOI noi dung
+   (z-index thap). Cac trang deu boc noi dung chinh trong <main
+   class="container"> hoac tuong duong -- dat z-index:1 cho .container de
+   noi dung luon noi tren lop bong bong nay. ---------- */
+.aqua-bg {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  z-index: 0;
+  pointer-events: none;
+}
+.aqua-bg .bubble {
+  position: absolute;
+  bottom: -80px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 32% 28%, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0.18) 55%, rgba(255, 255, 255, 0) 72%);
+  animation: bubble-rise linear infinite;
+  opacity: 0;
+}
+@keyframes bubble-rise {
+  0% { transform: translateY(0) translateX(0); opacity: 0; }
+  8% { opacity: 0.75; }
+  92% { opacity: 0.45; }
+  100% { transform: translateY(-115vh) translateX(24px); opacity: 0; }
+}
+
+/* ---------- Top nav: gradient dai duong (navy -> aqua), song bien +
+   bong bong lam diem nhan "thuy cung sinh dong". ---------- */
 .topbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: var(--color-ink);
+  background: var(--color-topbar-bg);
   color: #fff;
   padding: 14px 28px;
   flex-wrap: wrap;
@@ -69,8 +100,79 @@ body {
   position: sticky;
   top: 0;
   z-index: 100;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 2px 14px rgba(2, 62, 138, 0.35);
+  /* Vi tri neo cho .swim-runner (ca boi qua lai) o duoi day -- .topbar da
+     la sticky nen tu no la containing block cho phan tu con
+     position:absolute. KHONG dat overflow (hidden/auto...) tren .topbar --
+     bai hoc tu bug sticky-header 2026-07-16 (xem ghi chu o .table-scroll
+     ben duoi): dat overflow se tu clip luon box-shadow cua chinh .topbar.
+     Keyframe cua .swim-runner da duoc gioi han trong pham vi thanh topbar
+     nen khong can clip. */
 }
+
+/* Ca boi qua lai tren dau trang (thay cho heo chay cua theme cu, Luyen yeu
+   cau doi sang phong cach thuy cung 2026-07-17) -- boi tu trai sang phai
+   roi lat nguoi (scaleX) boi nguoc lai, lap vo han. Dat aria-hidden +
+   pointer-events:none vi day thuan decorative. */
+.swim-runner {
+  position: absolute;
+  top: 8px;
+  font-size: 22px;
+  line-height: 1;
+  animation: swim-run 16s linear infinite;
+  pointer-events: none;
+  z-index: 1;
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.2));
+}
+@keyframes swim-run {
+  0% { left: 6px; transform: scaleX(1); }
+  47% { left: calc(100% - 30px); transform: scaleX(1); }
+  50% { left: calc(100% - 30px); transform: scaleX(-1); }
+  97% { left: 6px; transform: scaleX(-1); }
+  100% { left: 6px; transform: scaleX(1); }
+}
+
+/* Dai song bien ngay duoi thanh dieu huong -- 2 lop song lech pha tao cam
+   giac chieu sau/3D nhe, chuyen dong cham (khong gay roi mat khi doc bang
+   so lieu ben duoi). Thuan trang tri, khong chan click. */
+.wave-divider {
+  position: relative;
+  width: 100%;
+  height: 34px;
+  line-height: 0;
+  z-index: 40;
+  pointer-events: none;
+  margin-bottom: -1px;
+}
+.wave-divider svg { width: 100%; height: 100%; display: block; }
+.wave-back { fill: rgba(255, 255, 255, 0.4); animation: wave-drift 9s ease-in-out infinite; }
+.wave-front { fill: var(--color-cloud); animation: wave-drift 6s ease-in-out infinite reverse; }
+@keyframes wave-drift {
+  0%, 100% { transform: translateX(0); }
+  50% { transform: translateX(-26px); }
+}
+/* Nut "Quay lai" hinh con heo ngay dau topbar -- Luyen bao nut float-nav goc
+   duoi phai kho thay, xin 1 nut quay lai luon hien ngay ngay khi vao trang,
+   khong can cuon xuong. */
+.topbar-back-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.14);
+  border: 2px solid rgba(255, 255, 255, 0.8);
+  color: #fff;
+  font-size: 19px;
+  line-height: 1;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+.topbar-back-btn:hover { background: rgba(255, 255, 255, 0.26); transform: translateY(-1px) scale(1.06); }
+.topbar-back-btn:active { transform: translateY(0) scale(0.96); }
+
 .brand { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
 .brand-name {
   font-weight: 600;
@@ -89,7 +191,9 @@ body {
   top: 2px;
   width: 6px;
   height: 14px;
-  background: var(--color-primary);
+  /* Trang thay vi mau primary: tren nen topbar da doi sang gradient hong,
+     dung lai mau primary (cung la hong) se gan nhu vo hinh vi trung mau nen. */
+  background: rgba(255, 255, 255, 0.95);
   transform: skewX(-20deg);
 }
 .brand-sub { font-size: 12px; opacity: 0.75; letter-spacing: 0.2px; }
@@ -132,11 +236,84 @@ body {
 }
 .company-btn:hover { opacity: 0.9; }
 .company-btn.is-active {
-  background: var(--color-primary);
+  /* Nen trang + chu xanh dam thay vi mau primary tren mau primary (topbar
+     gio la gradient xanh duong) -- giu do tuong phan ro cho nut dang chon. */
+  background: #fff;
+  color: var(--color-primary-deep);
   opacity: 1;
 }
 
-.container { max-width: 1280px; margin: 0 auto; padding: 28px 24px; }
+/* Luyen, 2026-07-19: gop cac trang lien quan ngan hang (Giao dich/Sao ke,
+   Ngan hang, 3 trang Doi soat) vao 1 khung tha xuong "Ngan hang" thay vi
+   nam rai rac tren thanh menu chinh -- bam/hover vao hien 1 list, tach 2
+   nhom KH Cu / KH Moi cho cac trang doi soat co phan biet cong ty. Dung
+   position:relative/absolute (khong dua vao <details> de tranh xung dot
+   voi cac <details> khac tren trang) + JS toggle o nav.ejs. */
+.nav-dropdown { position: relative; }
+.nav-dropdown-toggle {
+  color: #fff;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  text-decoration: none;
+  margin: 0 2px;
+  padding: 8px 12px;
+  font-size: 14px;
+  opacity: 0.82;
+  border-radius: var(--radius-md);
+  border-bottom: 2px solid transparent;
+  transition: opacity 0.15s, background 0.15s;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: inherit;
+}
+.nav-dropdown-toggle:hover,
+.nav-dropdown.is-open .nav-dropdown-toggle { opacity: 1; background: rgba(255, 255, 255, 0.08); }
+.nav-dropdown-toggle .caret { font-size: 10px; transition: transform 0.15s; }
+.nav-dropdown.is-open .nav-dropdown-toggle .caret { transform: rotate(180deg); }
+.nav-dropdown-menu {
+  display: none;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 6px;
+  background: #fff;
+  border-radius: var(--radius-md);
+  box-shadow: 0 8px 24px rgba(2, 62, 138, 0.28);
+  min-width: 240px;
+  padding: 6px;
+  z-index: 110;
+}
+.nav-dropdown.is-open .nav-dropdown-menu { display: block; }
+.nav-dropdown-menu a,
+.nav-dropdown-menu button.nav-dropdown-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  color: var(--color-ink, #1a2b4a);
+  text-decoration: none;
+  background: transparent;
+  border: none;
+  font-size: 13px;
+  font-family: inherit;
+  padding: 7px 10px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.nav-dropdown-menu a:hover,
+.nav-dropdown-menu button.nav-dropdown-item:hover { background: rgba(2, 62, 138, 0.08); }
+.nav-dropdown-group-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: #8a95a6;
+  padding: 8px 10px 2px;
+}
+.nav-dropdown-divider { height: 1px; background: #eee; margin: 4px 2px; }
+
+.container { max-width: 1280px; margin: 0 auto; padding: 28px 24px; position: relative; z-index: 1; }
 .desc-cell {
   max-width: 360px;
   white-space: nowrap;
@@ -158,7 +335,11 @@ h2 { font-size: 16px; font-weight: 600; margin: 0 0 14px; color: var(--color-ink
 .card {
   flex: 1;
   min-width: 220px;
-  background: var(--color-canvas);
+  /* Nen "kinh nuoc" nhe -- gradient trang xuong xanh nhat cuc mo, tao chieu
+     sau nhe (3D) thay vi phang mot mau, van giu du tuong phan de doc so
+     lieu. */
+  background: linear-gradient(160deg, #ffffff 0%, #f2fbfe 100%);
+  border: 1px solid rgba(169, 214, 229, 0.5);
   border-radius: var(--radius-xl);
   padding: 20px 22px;
   box-shadow: var(--shadow-soft);
@@ -184,8 +365,76 @@ a.card-bucket.card-bucket-active {
   outline: 2px solid var(--color-primary-soft);
 }
 
+/* Luyen, 2026-07-19: trang Bao cao trc gio chi la 1 <ul> danh sach lien ket
+   tro tro, Luyen che "ky lam" -- doi thanh luoi the (tile) mau sac, co icon
+   tron noi 3D nhe (radial highlight + shadow), hover nhac len. Moi tile 1
+   mau accent rieng (--report-accent) de phan biet nhanh 4 bao cao. */
+.report-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: var(--space-lg);
+}
+a.report-tile {
+  --report-accent: var(--color-primary);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  text-decoration: none;
+  color: var(--color-ink);
+  background: linear-gradient(160deg, #ffffff 0%, #f2fbfe 100%);
+  border: 1px solid rgba(169, 214, 229, 0.4);
+  border-radius: var(--radius-xl);
+  padding: var(--space-lg);
+  box-shadow: var(--shadow-soft);
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+  position: relative;
+  overflow: hidden;
+}
+a.report-tile::before {
+  content: "";
+  position: absolute;
+  top: -40px;
+  right: -40px;
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  background: var(--report-accent);
+  opacity: 0.1;
+}
+a.report-tile:hover {
+  transform: translateY(-4px) scale(1.015);
+  box-shadow: 0 14px 30px rgba(2, 62, 138, 0.22);
+}
+.report-tile-icon {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  background: radial-gradient(circle at 32% 28%, color-mix(in srgb, var(--report-accent) 55%, white), var(--report-accent));
+  box-shadow: 0 6px 14px color-mix(in srgb, var(--report-accent) 45%, transparent);
+}
+.report-tile-title { font-size: 15px; font-weight: 600; letter-spacing: -0.1px; }
+.report-tile-desc { font-size: 13px; color: var(--color-graphite); line-height: 1.4; flex-grow: 1; }
+.report-tile-go {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--report-accent);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+a.report-tile:hover .report-tile-go { gap: 8px; }
+a.report-tile.accent-pie { --report-accent: #023e8a; }
+a.report-tile.accent-fee { --report-accent: #a6620a; }
+a.report-tile.accent-transfer { --report-accent: #0096c7; }
+a.report-tile.accent-gian { --report-accent: #1d8a4a; }
+
 .panel {
-  background: var(--color-canvas);
+  background: linear-gradient(160deg, #ffffff 0%, #f2fbfe 100%);
+  border: 1px solid rgba(169, 214, 229, 0.4);
   border-radius: var(--radius-xl);
   padding: var(--space-xl);
   margin-bottom: var(--space-lg);
@@ -206,15 +455,28 @@ a.card-bucket.card-bucket-active {
    (Doi soat Chi phi muc 3, cac bang doi soat khac) co cot bi cat ma khong ro
    la co the cuon ngang duoc. Ve tuong minh 1 thanh cuon luon hien, mau ro
    rang, thay vi phu thuoc scrollbar mac dinh cua he dieu hanh. */
+/* QUAN TRONG: KHONG dat overflow-x: auto (hay bat ky gia tri overflow nao
+   khac "visible") truc tiep tren .table-scroll nua -- da GO BO co y (Luyen
+   bao loi qua screenshot trang Cong no ngay 2026-07-16: dong tieu de bang
+   hien "chen" / "boi" lo lung giua cac dong du lieu khi cuon, thay vi dinh
+   gon o tren). Nguyen nhan xac nhan truc tiep tren production bang JS: CSS
+   spec buoc overflow-y tinh thanh "auto" bat cu khi nao overflow-x khac
+   "visible" ("auto axis" rule) -- dieu nay bien .table-scroll thanh 1 scroll
+   container, khien <thead th> ben duoi (position: sticky) tu dinh vao BEN
+   TRONG .table-scroll thay vi vao trang/viewport. Vi .table-scroll khong
+   bao gio thuc su cuon noi bo rieng (chieu cao no luon = dung chieu cao noi
+   dung, khong bi gioi han), Chrome khong con dong bo sticky theo scroll cua
+   TRANG nua -- ket qua dung y het bao cao: header "boi" sai vi tri khi cuon.
+   Da thu ca overflow-y: clip/visible rieng -- khong an thua, spec luon ep ve
+   "auto" tru khi bo han overflow tren .table-scroll (da kiem chung: bo di la
+   het bug ngay). Neu 1 bang nao do (vd Doi soat Chi phi muc 3, cot "Dien
+   giai" rong) rong hon khung trang, trang se tu cuon ngang binh thuong
+   (than/html) thay vi khung nay co rieng 1 thanh cuon -- danh doi chap nhan
+   duoc de sticky header hoat dong dung CHO CA TRANG. */
 .table-scroll {
-  overflow-x: auto;
   scrollbar-width: thin;
   scrollbar-color: var(--color-graphite) var(--color-hairline);
 }
-.table-scroll::-webkit-scrollbar { height: 10px; }
-.table-scroll::-webkit-scrollbar-track { background: var(--color-hairline); border-radius: 6px; }
-.table-scroll::-webkit-scrollbar-thumb { background: var(--color-graphite); border-radius: 6px; }
-.table-scroll::-webkit-scrollbar-thumb:hover { background: var(--color-ink); }
 
 .table { width: 100%; border-collapse: collapse; font-size: 14px; }
 .table th, .table td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--color-hairline); }
@@ -251,19 +513,26 @@ a.card-bucket.card-bucket-active {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 44px;
-  height: 44px;
+  width: 46px;
+  height: 46px;
   border-radius: 50%;
-  background: var(--color-ink);
+  background: var(--color-topbar-bg);
   color: #fff;
-  border: none;
+  border: 2px solid #fff;
   box-shadow: var(--shadow-modal);
   cursor: pointer;
   font-size: 18px;
+  font-weight: 600;
   text-decoration: none;
-  opacity: 0.9;
+  opacity: 0.95;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
 }
-.float-nav-btn:hover { opacity: 1; background: var(--color-primary); }
+.float-nav-btn:hover {
+  opacity: 1;
+  transform: translateY(-2px) scale(1.06);
+  box-shadow: 0 10px 22px rgba(2, 62, 138, 0.35);
+}
+.float-nav-btn:active { transform: translateY(0) scale(0.97); }
 .float-nav-btn.is-hidden { display: none; }
 .muted { color: var(--color-graphite); font-size: 13px; }
 .text-neg { color: var(--color-danger); font-weight: 600; }
@@ -304,4 +573,122 @@ form textarea { font-family: monospace; resize: vertical; }
 /* ---------- Buttons: sharp rounded-md (HP's two-tier "sharp buttons / soft
    cards" split). Uppercase + tracking matches HP's button-md typography. ---------- */
 .btn {
-  display: inl
+  display: inline-block;
+  padding: 10px 20px;
+  border-radius: var(--radius-md);
+  border: none;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  cursor: pointer;
+  text-decoration: none;
+  margin-top: 10px;
+  transition: background 0.15s;
+}
+.btn-primary { background: var(--color-primary); color: #fff; }
+.btn-primary:hover { background: var(--color-primary-deep); }
+.btn-secondary { background: var(--color-fog); color: var(--color-ink); }
+.btn-secondary:hover { background: var(--color-steel); }
+/* Dung lam nut filter dang tab (vd Tat ca / Khu vui choi / May tu dong o
+   trang Hop Dong Thue Gian Hang) -- noi bat mau primary khi dang chon. */
+.btn-secondary.is-active { background: var(--color-primary); color: #fff; }
+.btn-secondary.is-active:hover { background: var(--color-primary-deep); }
+.btn-full { width: 100%; }
+
+.link-btn {
+  background: none;
+  border: none;
+  color: var(--color-primary);
+  cursor: pointer;
+  font-size: 13px;
+  padding: 0;
+  text-decoration: none;
+}
+.link-btn:hover { text-decoration: underline; }
+.link-danger { color: var(--color-danger); }
+
+.alert { padding: 11px 16px; border-radius: var(--radius-md); margin-bottom: 14px; font-size: 14px; }
+.alert-error { background: var(--color-danger-bg); color: var(--color-danger); border: 1px solid #f3c6c4; }
+.alert-success { background: var(--color-success-bg); color: var(--color-success); border: 1px solid #bfe6cf; }
+
+.login-body {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  background: linear-gradient(180deg, #012a4a 0%, #023e8a 45%, #0096c7 100%);
+  position: relative;
+  overflow: hidden;
+}
+.login-card {
+  background: var(--color-canvas);
+  padding: 36px;
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-modal);
+  width: 100%;
+  max-width: 380px;
+  position: relative;
+  z-index: 1;
+}
+.login-card h1 { margin-bottom: 4px; }
+
+/* ---------- Ca mascot goc duoi trai (Luyen yeu cau 2026-07-17: doi theme
+   sang thuy cung xanh duong, thay heo bang ca): dung SVG ve tay (khong dung
+   file anh rieng vi chua co san trong repo), dat o goc TRAI de khong dung
+   voi .float-nav (goc phai). Bong thoai doi cau moi 10s qua JS trong
+   nav.ejs. ---------- */
+.aqua-mascot {
+  position: fixed;
+  left: 18px;
+  bottom: 18px;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  pointer-events: none;
+}
+.aqua-bubble {
+  position: relative;
+  max-width: 220px;
+  background: #fff;
+  color: var(--color-ink);
+  border: 2px solid var(--color-primary-soft);
+  border-radius: var(--radius-lg);
+  padding: 8px 12px;
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.4;
+  box-shadow: var(--shadow-modal);
+  opacity: 1;
+  transition: opacity 0.35s ease, transform 0.35s ease;
+  margin-left: 6px;
+}
+.aqua-bubble.is-fading { opacity: 0; transform: translateY(4px); }
+.aqua-bubble::after {
+  content: "";
+  position: absolute;
+  left: 18px;
+  bottom: -8px;
+  width: 14px;
+  height: 14px;
+  background: #fff;
+  border-right: 2px solid var(--color-primary-soft);
+  border-bottom: 2px solid var(--color-primary-soft);
+  transform: rotate(45deg);
+}
+.aqua-mascot-face {
+  width: 56px;
+  height: 56px;
+  filter: drop-shadow(0 3px 6px rgba(2, 62, 138, 0.35));
+  animation: fish-wiggle 2.4s ease-in-out infinite;
+}
+@keyframes fish-wiggle {
+  0%, 100% { transform: translateY(0) rotate(-3deg); }
+  50% { transform: translateY(-5px) rotate(3deg); }
+}
+@media (max-width: 640px) {
+  .aqua-mascot { left: 10px; bottom: 10px; }
+  .aqua-bubble { max-width: 160px; font-size: 11.5px; }
+}

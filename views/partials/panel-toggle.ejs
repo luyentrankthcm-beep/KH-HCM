@@ -1,0 +1,91 @@
+<!--
+  Luyen, 2026-07-17: "mỗi cái khung này nè thêm cho tôi cái gốc phải phía
+  trên có chữ hiện và ẩn đi chứ để trang rối quá" -- moi <section class="panel">
+  qua nhieu (đối soát Momo/VietQR/Zalo-VNPay-Payoo deu co hang chuc khung),
+  nen them nut "Ẩn"/"Hiện" o goc phai tieu de h2 cua TUNG khung de tu thu gon
+  bot, khong can sua tung file/tung section rieng -- dung chung 1 script nay,
+  include o cuoi moi trang doi soat. Nho trang thai an/hien qua localStorage
+  (theo dung URL + noi dung tieu de) nen lan sau vao lai khong bi mo lai het.
+
+  Luyen, 2026-07-20: "hiện khung ẩn hay hiện cho tôi và tất cả các cái nào có
+  ẩn hiện khi mở đều trong trạng thái ẩn nhá" -- 2 thay doi:
+  1) Mac dinh LAN DAU vao trang (chua co localStorage luu) la AN (collapsed),
+     truoc day mac dinh la HIEN -- lam trang rat dai/roi khi vao lan dau.
+  2) Them icon mui ten (▾ dang mo / ▸ dang an) canh chu "Ẩn"/"Hiện" de nhin
+     ro trang thai hon la chi doc chu.
+-->
+<style>
+  section.panel > h2:first-child {
+    position: relative;
+    padding-right: 64px;
+  }
+  .panel-toggle-btn {
+    position: absolute;
+    top: -2px;
+    right: 0;
+    background: none;
+    border: 1px solid var(--color-primary, #d46a9f);
+    border-radius: 999px;
+    color: var(--color-primary, #d46a9f);
+    cursor: pointer;
+    font-size: 12px;
+    padding: 3px 12px;
+    line-height: 1.4;
+    white-space: nowrap;
+  }
+  .panel-toggle-btn:hover { opacity: 0.75; }
+  .panel-toggle-btn .panel-toggle-icon { display: inline-block; margin-right: 4px; }
+  /* Details/summary "Xem N mã", "Chi tiết"... deu la <details> native, da mac
+     dinh dong; them style cho marker de nhin ro hon dang dong (▸) / dang mo (▾). */
+  details > summary { cursor: pointer; }
+  details > summary::marker { color: var(--color-primary, #d46a9f); }
+</style>
+<script>
+  (function () {
+    var STORAGE_PREFIX = "khbt_panel_collapsed:" + location.pathname + ":";
+    var panels = document.querySelectorAll("section.panel");
+    panels.forEach(function (panel, idx) {
+      var h2 = panel.querySelector("h2");
+      if (!h2 || h2.parentElement !== panel) return;
+      var key = STORAGE_PREFIX + (h2.textContent.trim() || String(idx));
+
+      // Gom toan bo cac phan tu SAU h2 (truc tiep trong section nay) vao 1
+      // wrapper de an/hien cung luc bang 1 nut duy nhat.
+      var wrapper = document.createElement("div");
+      wrapper.className = "panel-collapsible-body";
+      var node = h2.nextSibling;
+      while (node) {
+        var next = node.nextSibling;
+        wrapper.appendChild(node);
+        node = next;
+      }
+      panel.appendChild(wrapper);
+
+      var btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "panel-toggle-btn";
+      h2.appendChild(btn);
+
+      function setState(collapsed) {
+        wrapper.style.display = collapsed ? "none" : "";
+        var icon = collapsed ? "▸" : "▾";
+        var label = collapsed ? "Hiện" : "Ẩn";
+        btn.innerHTML = '<span class="panel-toggle-icon">' + icon + "</span>" + label;
+        try {
+          localStorage.setItem(key, collapsed ? "1" : "0");
+        } catch (e) {}
+      }
+
+      var saved = null;
+      try {
+        saved = localStorage.getItem(key);
+      } catch (e) {}
+      // Chua co gia tri luu (lan dau vao trang) -> mac dinh AN (collapsed).
+      setState(saved === null ? true : saved === "1");
+
+      btn.addEventListener("click", function () {
+        setState(wrapper.style.display !== "none");
+      });
+    });
+  })();
+</script>

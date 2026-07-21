@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <%- include('partials/head') %>
+</head>
+<body>
+  <%- include('partials/nav') %>
+  <main class="container">
+    <h1>Hợp Đồng NCC</h1>
+    <p class="muted" style="margin-top:-10px;margin-bottom:20px;">
+      Danh sách hợp đồng mua hàng hóa/dịch vụ với nhà cung cấp (NCC) — lấy từ Google Sheet "THEO DÕI HĐ HN-HCM"
+      (các dòng không phải hợp đồng thuê gian hàng). Mỗi hợp đồng gộp 1 dòng (gồm HĐ gốc + phụ lục/BBNT/BBBG nếu có) —
+      bấm "Chi tiết" để xem đầy đủ và link file gốc. Tổng: <%= totalForCompany %> hợp đồng.
+    </p>
+
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+    <% if (success) { %><div class="alert alert-success"><%= success %></div><% } %>
+
+    <style>
+      .icon-upload-btn {
+        display: inline-flex; flex-direction: column; align-items: center; justify-content: center;
+        gap: 4px; cursor: pointer; border: 1px solid var(--color-hairline); border-radius: var(--radius-md);
+        padding: 12px 20px; background: #fff; transition: box-shadow .15s, transform .15s;
+      }
+      .icon-upload-btn:hover { box-shadow: 0 2px 8px rgba(0,0,0,.1); transform: translateY(-1px); }
+      .icon-upload-btn .icon-upload-btn-icon { font-size: 26px; line-height: 1; }
+      .icon-upload-btn .icon-upload-btn-label { font-size: 12px; font-weight: 600; white-space: nowrap; }
+    </style>
+    <div style="margin-bottom:16px;">
+      <form method="POST" action="/phap-danh/hop-dong-ncc/upload" enctype="multipart/form-data" style="display:inline-block;">
+        <label class="icon-upload-btn" title='Chọn lại file xuất từ Google Sheet "THEO DÕI HĐ HN-HCM" để dò NCC mới và phụ lục mới cho NCC đã có (không mất dữ liệu đã có)'>
+          <input type="file" name="file" accept=".xlsx,.xls" style="display:none;" onchange="this.form.submit()" />
+          <span class="icon-upload-btn-icon">🐷</span>
+          <span class="icon-upload-btn-label">Cập nhật hợp đồng</span>
+        </label>
+      </form>
+    </div>
+
+    <section class="panel">
+      <h2>Thêm hợp đồng mới (nhập tay)</h2>
+      <form method="POST" action="/phap-danh/hop-dong-ncc" class="form-grid">
+        <label>Tên NCC <input type="text" name="tenNCC" required /></label>
+        <label>Hàng hóa mua <input type="text" name="hangHoaMua" /></label>
+        <label>Nội dung hợp đồng <input type="text" name="noiDung" /></label>
+        <label>Phân loại HĐ <input type="text" name="phanLoaiHD" placeholder="vd HĐ mua bán, BBNT..." /></label>
+        <label>Số hợp đồng <input type="text" name="soHopDong" /></label>
+        <label>Ngày ký <input type="date" name="ngayKy" /></label>
+        <label>Ngày hết hạn <input type="date" name="ngayHetHan" /></label>
+        <label>Tổng tiền hợp đồng <input type="text" name="giaTriHopDong" placeholder="vd 50000000" /></label>
+        <label style="grid-column: 1 / -1;">Link hợp đồng <input type="text" name="linkHopDong" placeholder="link Google Drive..." /></label>
+        <label style="grid-column: 1 / -1;">Ghi chú <input type="text" name="ghiChu" /></label>
+        <button type="submit" class="btn btn-primary">Lưu</button>
+      </form>
+    </section>
+
+    <section class="panel">
+      <h2>Danh sách (<%= rows.length %> hợp đồng)</h2>
+      <div class="form-grid" style="margin-bottom:10px;">
+        <label style="grid-column: 1 / -1;">
+          Tìm nhanh (tên NCC, hàng hóa, nội dung, số HĐ...)
+          <input type="text" id="nccSearchBox" placeholder="Gõ để tìm..." oninput="filterNccRows()" />
+        </label>
+      </div>
+      <div class="table-scroll">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Tên NCC</th>
+              <th>Hàng hóa mua</th>
+              <th>Nội dung chính</th>
+              <th>Phân loại HĐ</th>
+              <th>Tổng tiền HĐ</th>
+              <th>Hạn</th>
+              <th>Trạng thái</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="nccTableBody">
+            <% rows.forEach(function(r) { %>
+            <tr class="ncc-row" id="ncc-<%= r.id %>" data-search="<%= (r.tenNCC + ' ' + r.hangHoaMua + ' ' + r.noiDung + ' ' + r.soHopDong + ' ' + r.phanLoaiHD).toLowerCase().replace(/"/g,'&quot;') %>">
+              <td><%= r.tenNCC %></td>
+              <td><%= r.hangHoaMua %></td>
+              <td><%= r.noiDung %></td>
+              <td><%= r.phanLoaiHD %></td>
+              <td>
+                <% if (r.giaTriHopDong) { %>
+                  <%= r.giaTriHopDong.toLocaleString('vi-VN') %> đ
+                <% } else if (r.giaTriHopDongRaw) { %>
+                  <%= r.giaTriHopDongRaw %>
+                <% } else { %>
+                  <span class="muted">—</span>
+                <% } %>
+              </td>
+              <td><%= r.ngayHetHan || '—' %></td>
+              <td>
+                <% if (r.trangThaiNCC === 'Hết hạn') { %><span class="badge badge-danger">Hết hạn</span>
+                <% } else if (r.trangThaiNCC === 'Còn hoạt động') { %><span class="badge badge-success">Còn hoạt động</span>
+                <% } else { %><span class="badge">Không rõ</span>
+                <% } %>
+              </td>
+              <td>
+                <details>
+                  <summary class="link-btn">Chi tiết</summary>
+                  <div style="padding:10px; background:#fafafa; border-radius:8px; margin-top:6px; font-size:13px;">
+                    <p><strong>Tên đầy đủ NCC:</strong> <%= r.tenDayDuNCC || '—' %></p>
+                    <p><strong>MST:</strong> <%= r.mstNCC || '—' %> &nbsp; <strong>Địa chỉ:</strong> <%= r.diaChiNCC || '—' %></p>
+                    <p><strong>Số HĐ (gốc):</strong> <%= r.soHopDong || '—' %> &nbsp; <strong>Ngày ký:</strong> <%= r.ngayKy || '—' %> &nbsp; <strong>Bắt đầu:</strong> <%= r.ngayBatDauHD || '—' %></p>
+                    <% if (r.soTKNH) { %><p><strong>Số TK NH:</strong> <%= r.soTKNH %> — <%= r.khachMoTaiNH %></p><% } %>
+                    <% if (r.linkHopDong) { %><p><a href="<%= r.linkHopDong %>" target="_blank" rel="noopener">📄 Xem file hợp đồng gốc</a></p><% } %>
+                    <% if (r.ghiChu) { %><p class="muted"><%= r.ghiChu %></p><% } %>
+                    <% if (r.hoaDonDaThanhToan && r.hoaDonDaThanhToan.length) { %>
+                    <p style="margin-top:10px;"><strong>Hóa đơn đã thanh toán (đối chiếu từ trang Chi Phí):</strong></p>
+                    <table class="table" style="margin-top:4px;">
+                      <thead><tr><th>Ngày</th><th>Số hóa đơn</th><th>Số tiền</th><th></th></tr></thead>
+                      <tbody>
+                        <% r.hoaDonDaThanhToan.forEach(function(hd) { %>
+                        <tr>
+                          <td><%= hd.ngay || '—' %></td>
+                          <td><%= hd.soHoaDon %></td>
+                          <td><%= (hd.soTien||0).toLocaleString('vi-VN') %> đ</td>
+                          <td><a href="/chi-phi?thang=#cp-<%= hd.chiPhiId %>" target="_blank" rel="noopener">Xem ở Chi Phí</a></td>
+                        </tr>
+                        <% }) %>
+                      </tbody>
+                    </table>
+                    <% } %>
+                    <% if (r.chiTiet && r.chiTiet.length) { %>
+                    <table class="table" style="margin-top:8px;">
+                      <thead>
+                        <tr><th>Nội dung / Số phụ lục</th><th>Phân loại</th><th>Số HĐ</th><th>Ngày ký</th><th>Bắt đầu</th><th>Hết hạn</th><th>Số tiền</th><th>Link</th></tr>
+                      </thead>
+                      <tbody>
+                        <% r.chiTiet.forEach(function(ct) { %>
+                        <tr>
+                          <td><%= ct.noiDung %></td>
+                          <td><%= ct.phanLoaiHD %></td>
+                          <td><%= ct.soHopDong %></td>
+                          <td><%= ct.ngayKy %></td>
+                          <td><%= ct.ngayBatDau %></td>
+                          <td><%= ct.ngayHetHan %></td>
+                          <td><%= ct.soTienHD || ct.tongTienThang || '' %></td>
+                          <td><% if (ct.link) { %><a href="<%= ct.link %>" target="_blank" rel="noopener">Link</a><% } %></td>
+                        </tr>
+                        <% }) %>
+                      </tbody>
+                    </table>
+                    <% } %>
+                  </div>
+                </details>
+              </td>
+            </tr>
+            <% }) %>
+            <% if (rows.length === 0) { %>
+            <tr><td colspan="8" class="muted">Chưa có hợp đồng nào.</td></tr>
+            <% } %>
+          </tbody>
+        </table>
+      </div>
+      <div id="nccPagination" style="display:flex; align-items:center; gap:10px; justify-content:center; margin-top:12px;">
+        <button type="button" class="link-btn" id="nccPrevBtn" onclick="nccChangePage(-1)">&larr; Trang trước</button>
+        <span id="nccPageInfo" class="muted"></span>
+        <button type="button" class="link-btn" id="nccNextBtn" onclick="nccChangePage(1)">Trang sau &rarr;</button>
+      </div>
+    </section>
+  </main>
+  <script>
+    (function () {
+      var PAGE_SIZE = 20;
+      var page = 1;
+      window.filterNccRows = function () {
+        page = 1;
+        render();
+      };
+      window.nccChangePage = function (delta) {
+        page += delta;
+        render();
+      };
+      function render() {
+        var q = (document.getElementById('nccSearchBox').value || '').toLowerCase().trim();
+        var allRows = Array.prototype.slice.call(document.querySelectorAll('#nccTableBody tr.ncc-row'));
+        var matched = allRows.filter(function (tr) {
+          return !q || tr.getAttribute('data-search').indexOf(q) !== -1;
+        });
+        var totalPages = Math.max(1, Math.ceil(matched.length / PAGE_SIZE));
+        if (page > totalPages) page = totalPages;
+        if (page < 1) page = 1;
+        var start = (page - 1) * PAGE_SIZE;
+        var end = start + PAGE_SIZE;
+        allRows.forEach(function (tr) { tr.style.display = 'none'; });
+        matched.slice(start, end).forEach(function (tr) { tr.style.display = ''; });
+        var info = document.getElementById('nccPageInfo');
+        info.textContent = matched.length === 0
+          ? 'Không có hợp đồng phù hợp'
+          : 'Trang ' + page + '/' + totalPages + ' (' + matched.length + ' hợp đồng)';
+        document.getElementById('nccPrevBtn').disabled = page <= 1;
+        document.getElementById('nccNextBtn').disabled = page >= totalPages;
+      }
+      render();
+
+      // Luyen, 2026-07-20: neu URL co #ncc-<id> (link tu trang Chi Phi qua),
+      // tu dong mo the "Chi tiet" cua dong do va cuon toi cho de xem ngay.
+      if (window.location.hash && window.location.hash.indexOf('#ncc-') === 0) {
+        var target = document.querySelector(window.location.hash);
+        if (target) {
+          target.style.display = '';
+          var det = target.querySelector('details');
+          if (det) det.open = true;
+          setTimeout(function () { target.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, 50);
+          target.style.background = '#fff6d8';
+        }
+      }
+    })();
+  </script>
+</body>
+</html>

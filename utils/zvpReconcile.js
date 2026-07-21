@@ -78,9 +78,30 @@ function parsePayooNgayExpr(expr) {
 }
 
 function extractZvpSettlements(transactions) {
-  const online = [];
-  const offline = [];
+  const onlineByRange = {};
+  const offlineByRange = {};
   const payooByRange = {};
+
+  // Luyen, 2026-07-21: "sao zalo app offline bị double lên 2 lần vậy" -- VNPay
+  // thinh thoang tra tien cua CUNG 1 ngay doanh thu qua 2 giao dich ngan hang
+  // rieng (vd 1 khoan chinh + 1 khoan dieu chinh/bo sung, cung ghi "NGAY
+  // 15.07.26" nhung so tien khac nhau). Truoc day moi giao dich VNPay (CTT/QR
+  // OFFLINE) duoc coi la 1 "khoan ve" DOC LAP, nen 2 giao dich cung ngay ->
+  // ca 2 deu tu keo doanh thu-theo-gian CHO NGAY DO, xuat ra file bi trung
+  // lap y het (cung so HD, cung so tien, lap lai 2 lan). Fix bang cach GOM
+  // theo (fromIso, toIso) VA CONG don so tien ngan hang lai -- giong dung
+  // cach Payoo da lam ben duoi tu truoc -- de moi khoang ngay doanh thu chi
+  // con DUY NHAT 1 "khoan ve" (voi tong tien ngan hang la tong ca 2 giao
+  // dich), tranh xuat trung dong.
+  function addToRange(map, t, fromIso, toIso) {
+    const key = `${fromIso}|${toIso}`;
+    if (!map[key]) {
+      map[key] = { date: t.date, amount: 0, fromIso, toIso, txIds: [] };
+    }
+    map[key].amount += t.amount;
+    map[key].txIds.push(t.id);
+    if (t.date > map[key].date) map[key].date = t.date;
+  }
 
   for (const t of transactions) {
     if (t.type !== "thu") continue;
@@ -90,12 +111,12 @@ function extractZvpSettlements(transactions) {
       const mOff = desc.match(/DV\s+QR\s+OFFLINE\s+NGAY\s+([0-9.\-_]+)/i);
       if (mCtt) {
         const r = parseVnpayNgayExpr(mCtt[1]);
-        if (r) online.push({ id: t.id, date: t.date, amount: t.amount, fromIso: r.fromIso, toIso: r.toIso });
+        if (r) addToRange(onlineByRange, t, r.fromIso, r.toIso);
         continue;
       }
       if (mOff) {
         const r = parseVnpayNgayExpr(mOff[1]);
-        if (r) offline.push({ id: t.id, date: t.date, amount: t.amount, fromIso: r.fromIso, toIso: r.toIso });
+        if (r) addToRange(offlineByRange, t, r.fromIso, r.toIso);
         continue;
       }
       continue;
@@ -105,20 +126,18 @@ function extractZvpSettlements(transactions) {
       if (mPayoo) {
         const cleaned = mPayoo[1].replace(/\.+$/, "");
         const r = parsePayooNgayExpr(cleaned);
-        if (r) {
-          const key = `${r.fromIso}|${r.toIso}`;
-          if (!payooByRange[key]) {
-            payooByRange[key] = { date: t.date, amount: 0, fromIso: r.fromIso, toIso: r.toIso, txIds: [] };
-          }
-          payooByRange[key].amount += t.amount;
-          payooByRange[key].txIds.push(t.id);
-          if (t.date > payooByRange[key].date) payooByRange[key].date = t.date;
-        }
+        if (r) addToRange(payooByRange, t, r.fromIso, r.toIso);
       }
     }
   }
 
-  return { online, offline, payoo: Object.values(payooByRange) };
+  // "id" field tren cac ket qua nay chi con y nghia hien thi (khong dung de
+  // join nua, xem txIds cho danh sach day du) -- giu lai id CUOI CUNG gop
+  // vao de khong pha vo cho nao con doc s.id truc tiep.
+  const finalize = (byRange) =>
+    Object.values(byRange).map((s) => ({ ...s, id: s.txIds[s.txIds.length - 1] }));
+
+  return { online: finalize(onlineByRange), offline: finalize(offlineByRange), payoo: Object.values(payooByRange) };
 }
 
 // Extract the day-list from a "Dich vu thu ho" cell. Unlike Momo's raw
@@ -551,23 +570,68 @@ function buildOnlineProductMatcher(diemList) {
     const tNoSpace = t.replace(/[^a-z0-9]/g, "");
     // Pass 1: exact-code substring match (strongest signal) -- only trust
     // codes at least 4 chars long (short codes risk accidental substring
-    // hits), and if more than one candidate's code appears, prefer the
-    // LONGEST code (most specific) rather than array order.
+    // hits). Checked BOTH directions (candidate code inside input, OR input
+    // inside candidate code) -- Luyen, 2026-07-19: after switching BIDV7702's
+    // store names to come straight from her "mã điểm xuất hóa đơn" column
+    // (no more "PHCM"/"BIDV" suffix baked in, e.g. matchText is now literally
+    // "Sense CT PVĐ" instead of "SENSE CT PVĐ PHCM"), the ORIGINAL one-way
+    // check (candidate code must appear INSIDE input) silently failed for
+    // every one of these -- input "sensectpv" is never a substring of the
+    // candidate's own longer code "sensectpvphcm" -- so real, otherwise-exact
+    // matches kept falling through to Pass 2 and colliding on a shared
+    // generic keyword instead (verified: "Sense CT PVĐ"'s revenue landed on
+    // "Sense Bến Tre" via the shared "sense" keyword). Checking the reverse
+    // direction too (input's code IS a substring of the candidate's code)
+    // catches this "same name, candidate just has an extra location suffix"
+    // case without needing a fuzzy keyword fallback at all. Prefer whichever
+    // candidate has the LONGEST overlapping code (most specific) on a tie.
     let codeBest = null;
+    let codeBestOverlap = 0;
     for (const e of entries) {
-      if (e.codeNoSpace.length >= 4 && tNoSpace.includes(e.codeNoSpace)) {
-        if (!codeBest || e.codeNoSpace.length > codeBest.codeNoSpace.length) codeBest = e;
+      if (e.codeNoSpace.length < 4) continue;
+      let overlap = 0;
+      if (tNoSpace.includes(e.codeNoSpace)) overlap = e.codeNoSpace.length;
+      else if (tNoSpace.length >= 4 && e.codeNoSpace.includes(tNoSpace)) overlap = tNoSpace.length;
+      if (overlap > codeBestOverlap) {
+        codeBest = e;
+        codeBestOverlap = overlap;
       }
     }
     if (codeBest) return codeBest;
-    // Pass 2: fallback to the original generic keyword-overlap heuristic.
+    // Pass 2: fallback to the original generic keyword-overlap heuristic --
+    // matched against WHOLE WORD TOKENS of productTitle (not a raw substring
+    // check) since a short keyword like "tra" (from "Go Trà Vinh") used to
+    // match via t.includes(kw) even when it only appeared as a fragment
+    // INSIDE a longer, unrelated word (e.g. "tra" inside "Nha TRAng" == Nha
+    // Trang) -- verified against real BIDV7702 data, 2026-07-18: a "Nha
+    // Trang" QR row (no invoice yet for that gian, so it's genuinely
+    // unmatched right now) was silently misattributed to "Go Tra Vinh"'s
+    // gross, inflating it above its real invoice total. Tokenizing productTitle
+    // the same way extractKeywords() tokenizes the candidate name, then
+    // requiring an exact token match, keeps legitimate short keywords (e.g.
+    // "vinh") working while refusing purely-coincidental substrings.
+    // Luyen, 2026-07-18: raised from >=3 to >=4 after a SECOND real collision
+    // found the same day -- "tho" (from "Go Mỹ Tho") silently matched "SB
+    // CAN THO PHCM" (Sân Bay CẦN THƠ, a totally different airport) because
+    // Vietnamese accent-stripping makes "Tho" and "Thơ" the same normalized
+    // token. 3-letter Vietnamese syllables collide too easily after accents
+    // are stripped (homophones like tho/thơ, tra/trà, la/là...) to trust as a
+    // matching signal on their own.
+    // Luyen, 2026-07-19: a candidate with 2+ qualifying (len>=4) keywords now
+    // needs ALL of them present in the input, not just the best single one --
+    // "AE Bình Dương Ghế" (keywords "binh","duong") used to match a raw "AE
+    // Bình Tân ghế" row via "binh" alone (Bình Dương/Bình Tân/Bình Thạnh...
+    // all share that syllable) even though "duong" was nowhere in the input.
+    // A candidate with only 1 qualifying keyword still uses that lone one
+    // (nothing stronger available), same risk as before.
+    const tTokens = new Set(t.split(/[^a-z0-9]+/).filter(Boolean));
     let best = null;
     for (const e of entries) {
-      for (const kw of e.keywords) {
-        if (kw.length >= 3 && t.includes(kw)) {
-          if (!best || kw.length > best.kwLen) best = { ...e, kwLen: kw.length };
-        }
-      }
+      const qualifying = e.keywords.filter((kw) => kw.length >= 4);
+      if (qualifying.length === 0) continue;
+      if (!qualifying.every((kw) => tTokens.has(kw))) continue;
+      const score = qualifying.reduce((sum, kw) => sum + kw.length, 0);
+      if (!best || score > best.score) best = { ...e, score };
     }
     return best;
   };
@@ -577,6 +641,10 @@ function extractKeywords(name) {
   const STOP = new Set([
     "funzone", "tau", "kvc", "am", "ae", "sc", "farm", "lotte", "mall", "aeon",
     "adventure", "combo", "ve", "khu", "vui", "choi", "giai", "tri", "the", "mn",
+    // Luyen, 2026-07-19: "mart" qua chung chung -- nhieu chi nhanh "Lotte
+    // mart X" khac nhau deu co tu nay, gay trung khi dung 1 minh lam keyword
+    // (vd "Lotte mart Gò Vấp" bi gan nham vao "Lotte mart Nam Sài Gòn").
+    "mart",
   ]);
   const t = normText(name);
   return t.split(/[^a-z0-9]+/).filter((w) => w.length >= 3 && !STOP.has(w));
@@ -1170,7 +1238,10 @@ function reconcileZvpChannel(settlements, grossData, invoiceData, gianMapping, m
       const line = {
         code: g.code,
         maCongTrinh: displayCode(g.code),
-        tkCo: gianMapping[g.code] || (g.code.endsWith(FF_SUFFIX) ? "1388" : "131"),
+        // Luyen, 2026-07-17: "doi xuat ra 1388 thanh 131 het" -- khong con
+        // fallback ve 1388 cho gian FF/CSE nua, mac dinh 131 neu chua co trong
+        // gian_mapping.
+        tkCo: gianMapping[g.code] || "131",
         gross: g.gross,
         net: Math.round(g.net),
         invoiceNumbers: invoiceList,
@@ -1195,9 +1266,22 @@ function reconcileZvpChannel(settlements, grossData, invoiceData, gianMapping, m
         const mm = manualMatches[`${s.date}|${line.code}`];
         if (mm) {
           line.invoiceNumbers = mm.invoiceNumbers || [];
+          // grossAdjustment (Luyen, 2026-07-20): "bo het cai FUNZONE IPH KVCN
+          // nay cho lech ra het di" -- mot vai gian (vd FUNZONE IPH KVCN) bi
+          // trung/gop nham doanh thu cua gian khac vao gross cua no (xac nhan:
+          // phan du dung bang toan bo doanh thu cua 1 gian khac da tu khop
+          // hoa don rieng roi), nen can TRU BOT thang vao gross cua chinh dong
+          // nay cho 1 ngay/ky cu the, giong co che +/- Sua DT da co ben VietQR
+          // (utils/vietqrReconcile.js) -- truoc day ZVP chua co, chi sua duoc
+          // "amount" (so tien HD hien thi) ma khong dong den gross that su nen
+          // "Chenh lech" dau ky khong bao gio het du dong da danh dau "Khop".
+          if (mm.grossAdjustment) {
+            line.gross += mm.grossAdjustment;
+            line.net = Math.round(line.gross);
+          }
           line.invoiceTotal = mm.amount != null ? mm.amount : line.gross;
           line.diff = line.invoiceTotal - line.gross;
-          line.matched = true;
+          line.matched = Math.abs(line.diff) < 1;
           line.manualOverride = true;
           line.manualNote = mm.note || "";
         }
@@ -1412,8 +1496,8 @@ function parseFeeReportWorkbook(buffer, orderMap) {
 // payoo) trong 1 lan -- khong can upload lai file nay tren tung trang rieng.
 // Dùng lai parseInvoiceWorkbook cua Momo (da on dinh, khong doi) cho tag momo,
 // va parseInvoiceWorkbookByTag (generic) cho 3 tag con lai.
-function parseSharedInvoiceWorkbook(buffer) {
-  const momoParsed = m.parseInvoiceWorkbook(buffer);
+function parseSharedInvoiceWorkbook(buffer, companyKey) {
+  const momoParsed = m.parseInvoiceWorkbook(buffer, companyKey);
   const zaloParsed = parseInvoiceWorkbookByTag(buffer, "zalo");
   const vnpayParsed = parseInvoiceWorkbookByTag(buffer, "vnpay");
   const payooParsed = parseInvoiceWorkbookByTag(buffer, "payoo");

@@ -34,6 +34,16 @@
       })();
     </script>
 
+    <% if (usesSharedSource) { %>
+    <section class="panel">
+      <p class="muted" style="margin:0;">
+        <strong>Lưu ý:</strong> KH Mới chưa có tài khoản Momo riêng thực sự nhận tiền, nên trang này đang đối soát
+        trên CÙNG sao kê ngân hàng và doanh thu "Tổng Momo" của <strong><%= sourceLabel %></strong> (KH Cũ) — không
+        cần tải lại doanh thu ở đây. Chỉ hóa đơn ở mục 2 bên dưới là riêng của KH Mới. Muốn xem/tải doanh thu gốc,
+        chuyển qua tab "Cũ" trên thanh trên cùng.
+      </p>
+    </section>
+    <% } else { %>
     <section class="panel">
       <details>
         <summary style="font-weight:700;color:#111;cursor:pointer;">1. Tải dữ liệu doanh thu Momo</summary>
@@ -78,6 +88,7 @@
         </div>
       </details>
     </section>
+    <% } %>
 
     <section class="panel">
       <details>
@@ -99,33 +110,78 @@
       </details>
     </section>
 
-    <% if (allCodes.length > 0) { %>
+    <% var unmappedCuaHangCodes = allCodes.filter(function(c){ return c.indexOf('CHUA MAP: ') === 0; }); %>
+    <% if (unmappedCuaHangCodes.length > 0) { %>
     <section class="panel">
-      <h2>3. TK Có theo từng mã công trình (131 = thông thường, 1388 = doanh thu chia sẻ, "Chưa xuất MISA" = khách mới)</h2>
+      <h2>3a. Ánh xạ mã cửa hàng mới về đúng Mã công trình</h2>
       <p class="muted">
-        Chọn "Chưa xuất MISA (KH mới)" cho các gian là khách hàng mới chưa lên MISA — dòng đối soát vẫn hiện
-        trên trang này để theo dõi, nhưng sẽ KHÔNG được đưa vào file xuất Excel ở mục 4.
+        Các mã dưới đây mới xuất hiện trong file báo cáo MoMo (.zip) mà web chưa từng thấy trong bảng
+        "Tổng Momo Gộp" nên chưa biết thuộc Mã công trình nào. Điền đúng Mã công trình cho từng mã —
+        áp dụng ngay cho <strong>cả 2 công ty</strong>, không cần tải lại file.
       </p>
-      <form method="POST" action="/doi-soat/momo/mapping">
-        <table class="table">
-          <thead><tr><th>Mã công trình</th><th>TK Có</th></tr></thead>
-          <tbody>
-            <% allCodes.forEach(function(code) { %>
-            <tr>
-              <td><%= code.endsWith('__FF') ? code.replace('__FF', '') + ' (gian FF - chia sẻ)' : code %></td>
-              <td>
-                <select name="tkco_<%= code %>">
-                  <option value="131" <%= (gianMapping[code] || '131') === '131' ? 'selected' : '' %>>131</option>
-                  <option value="1388" <%= gianMapping[code] === '1388' ? 'selected' : '' %>>1388 (chia sẻ)</option>
-                  <option value="SKIP" <%= gianMapping[code] === 'SKIP' ? 'selected' : '' %>>Chưa xuất MISA (KH mới)</option>
-                </select>
-              </td>
-            </tr>
-            <% }) %>
-          </tbody>
-        </table>
-        <button type="submit" class="btn btn-secondary">Lưu bảng TK Có</button>
+      <table class="table">
+        <thead><tr><th>Mã cửa hàng (chưa nhận diện)</th><th colspan="2">Mã công trình đúng</th></tr></thead>
+        <tbody>
+          <% unmappedCuaHangCodes.forEach(function(code) { %>
+          <% var rawCode = code.slice('CHUA MAP: '.length); %>
+          <tr>
+            <td><%= rawCode %></td>
+            <td colspan="2">
+              <form method="POST" action="/doi-soat/momo/cuahang-map" class="form-inline">
+                <input type="hidden" name="rawCode" value="<%= rawCode %>" />
+                <input type="text" name="targetCode" list="congTrinhOptions" placeholder="vd AE TAN AN KVC" required />
+                <button type="submit" class="btn btn-secondary">Lưu ánh xạ</button>
+              </form>
+            </td>
+          </tr>
+          <% }) %>
+        </tbody>
+      </table>
+      <datalist id="congTrinhOptions">
+        <% allCodes.filter(function(c){ return c.indexOf('CHUA MAP: ') !== 0; }).forEach(function(c) { %>
+        <option value="<%= c.endsWith('__FF') ? c.replace('__FF', '') : c %>"></option>
+        <% }) %>
+      </datalist>
+    </section>
+    <% } %>
+
+    <% if ((allCodes.length > 0) || (gianHidden && gianHidden.length > 0)) { %>
+    <section class="panel">
+      <h2>3c. Ẩn gian không thuộc công ty này khỏi trang đối soát</h2>
+      <p class="muted">
+        Dùng khi doanh thu 1 gian bị gộp nhầm vào file tải lên của công ty đang xem, nhưng gian đó thực ra
+        thuộc công ty kia (sẽ xuất hóa đơn ở bên đó). Ẩn ở đây CHỈ ẩn khỏi trang này, không xóa dữ liệu, không
+        ảnh hưởng công ty kia nếu họ dùng chung mã.
+      </p>
+      <% if (allCodes.length > 0) { %>
+      <form method="POST" action="/doi-soat/momo/gian-hidden" class="form-inline">
+        <select name="code" required>
+          <option value="">-- Chọn mã công trình cần ẩn --</option>
+          <% allCodes.forEach(function(code) { %>
+          <option value="<%= code %>"><%= code.endsWith('__FF') ? code.replace('__FF', '') + ' (gian FF - chia sẻ)' : code %></option>
+          <% }) %>
+        </select>
+        <button type="submit" class="btn btn-secondary">Ẩn gian này</button>
       </form>
+      <% } %>
+      <% if (gianHidden && gianHidden.length > 0) { %>
+      <table class="table" style="margin-top:12px;">
+        <thead><tr><th>Đã ẩn khỏi trang này</th><th></th></tr></thead>
+        <tbody>
+          <% gianHidden.forEach(function(code) { %>
+          <tr>
+            <td><%= code %></td>
+            <td>
+              <form method="POST" action="/doi-soat/momo/gian-hidden/delete" onsubmit="return confirm('Hiện lại gian này trên trang?');">
+                <input type="hidden" name="code" value="<%= code %>" />
+                <button type="submit" class="link-btn link-danger">Hiện lại</button>
+              </form>
+            </td>
+          </tr>
+          <% }) %>
+        </tbody>
+      </table>
+      <% } %>
     </section>
     <% } %>
 
@@ -138,6 +194,11 @@
         dù tiền hóa đơn thực ra vẫn có. Ánh xạ tên này về đúng Mã công trình bên dưới, áp dụng ngay không cần tải lại hóa đơn.
       </p>
       <% if (unmatchedInvoiceCodes && unmatchedInvoiceCodes.length > 0) { %>
+      <datalist id="dl-ma-cong-trinh">
+        <% allCodes.forEach(function(c) { %>
+        <option value="<%= c %>"><%= c.endsWith('__FF') ? c.replace('__FF', '') + ' (gian FF - chia sẻ)' : c %></option>
+        <% }) %>
+      </datalist>
       <table class="table">
         <thead><tr><th>Tên/Mã điểm trên hóa đơn (chưa khớp)</th><th>Ánh xạ về Mã công trình</th><th></th></tr></thead>
         <tbody>
@@ -147,12 +208,8 @@
             <td colspan="2">
               <form method="POST" action="/doi-soat/momo/diem-alias" class="form-inline">
                 <input type="hidden" name="sourceCode" value="<%= code %>" />
-                <select name="targetCode" required>
-                  <option value="">-- Chọn Mã công trình --</option>
-                  <% allCodes.forEach(function(c) { %>
-                  <option value="<%= c %>"><%= c.endsWith('__FF') ? c.replace('__FF', '') + ' (gian FF - chia sẻ)' : c %></option>
-                  <% }) %>
-                </select>
+                <input type="text" name="targetCode" list="dl-ma-cong-trinh" autocomplete="off"
+                  placeholder="Gõ để lọc, chọn mã có sẵn hoặc nhập mã công trình mới..." style="min-width:280px;" required />
                 <button type="submit" class="btn btn-secondary">Lưu ánh xạ</button>
               </form>
             </td>
@@ -160,6 +217,10 @@
           <% }) %>
         </tbody>
       </table>
+      <p class="muted" style="margin-top:-4px;">
+        Gõ vài chữ để lọc danh sách gian có sẵn (cả KH Cũ và KH Mới). Nếu gian này thật sự chưa có trong hệ thống,
+        gõ hẳn tên Mã công trình mới rồi lưu — hệ thống sẽ tự tạo mã đó (mặc định TK Có 131).
+      </p>
       <% } %>
       <% if (invoiceDiemAlias && Object.keys(invoiceDiemAlias).length > 0) { %>
       <table class="table" style="margin-top:12px;">
@@ -183,6 +244,24 @@
     <% } %>
 
     <section class="panel">
+      <p class="muted" style="margin-bottom:6px;">
+        🔒 Khóa sổ: các ngày từ đầu đến ngày khóa (bao gồm ngày đó) sẽ không còn hiện cảnh báo "Chưa có HĐ"/"Lệch"
+        nữa (số liệu gốc vẫn giữ nguyên để tra cứu). Dùng khi các ngày cũ đã chốt xong, không cần xử lý tiếp nữa.
+        <% if (lockDate) { %><strong>Đang khóa đến hết ngày <%= lockDate %>.</strong><% } else { %><em>Chưa khóa.</em><% } %>
+      </p>
+      <form method="POST" action="/doi-soat/momo/khoa-so" class="form-inline">
+        <input type="date" name="lockDate" value="<%= lockDate %>" required />
+        <button type="submit" class="btn btn-secondary">Khóa đến ngày này</button>
+      </form>
+      <% if (lockDate) { %>
+      <form method="POST" action="/doi-soat/momo/khoa-so" class="form-inline" style="margin-top:6px;">
+        <input type="hidden" name="lockDate" value="" />
+        <button type="submit" class="btn btn-secondary" onclick="return confirm('Mở khóa sổ?');">Mở khóa</button>
+      </form>
+      <% } %>
+    </section>
+
+    <section class="panel">
       <h2>4. Kết quả đối soát theo từng khoản momo về ngân hàng</h2>
       <% if (months.length > 0) { %>
       <form method="GET" action="/doi-soat/momo" class="form-inline" style="margin-bottom:14px;">
@@ -201,21 +280,22 @@
       <div class="form-inline" style="margin-bottom:14px;">
         <label style="margin:0;">Số chứng từ bắt đầu (NTTK...):</label>
         <input type="number" id="startNo" value="1" min="1" style="width:100px;" />
-        <a class="btn btn-secondary" id="exportBtn" href="/doi-soat/momo/export.xlsx?start=1">Xuất Excel (định dạng AMIS)</a>
+        <a class="btn btn-secondary" id="exportBtn" href="/doi-soat/momo/export.xlsx?start=1&month=<%= encodeURIComponent(selectedMonth) %>">Xuất Excel (định dạng AMIS)</a>
       </div>
       <p class="muted" style="margin-top:-8px; margin-bottom:14px;">
-        Các dòng đánh dấu "KH mới - chưa xuất MISA" bên dưới sẽ tự động bị loại khỏi file xuất Excel. File xuất luôn gồm TOÀN BỘ các khoản chưa xuất, không chỉ tháng đang lọc xem ở đây.
+Các dòng mờ (KH mới, chưa xuất MISA) bên dưới sẽ tự động bị loại khỏi file xuất Excel.
+<% if (selectedMonth) { %>File xuất chỉ gồm đúng tháng <strong><%= selectedMonth %></strong> đang chọn ở trên — đổi "Chọn tháng" rồi bấm lại nút này để xuất tháng khác.<% } else { %>Đang chọn "Tất cả" nên file xuất gồm toàn bộ các khoản chưa xuất từ trước đến nay.<% } %>
       </p>
       <script>
         document.getElementById('startNo').addEventListener('input', function() {
-          document.getElementById('exportBtn').href = '/doi-soat/momo/export.xlsx?start=' + (this.value || 1);
+          document.getElementById('exportBtn').href = '/doi-soat/momo/export.xlsx?start=' + (this.value || 1) + '&month=<%= encodeURIComponent(selectedMonth) %>';
         });
       </script>
 
       <% reconciled.forEach(function(r) { %>
-      <div class="panel" style="background:#fafbfc; box-shadow:none; border:1px solid #eee;">
+      <div class="panel" style="background:#fafbfc; box-shadow:none; border:1px solid #eee;<%= r.locked ? ' opacity:0.6;' : '' %>">
         <h2 style="display:flex; justify-content:space-between; font-size:14px;">
-          <span>Khoản về ngày <%= r.settlementDate %> (doanh thu <%= r.from %><%= r.from !== r.to ? ' → ' + r.to : '' %>)</span>
+          <span>Khoản về ngày <%= r.settlementDate %><%= r.locked ? ' 🔒 (đã khóa sổ)' : '' %> (doanh thu <%= r.from %><%= r.from !== r.to ? ' → ' + r.to : '' %>)</span>
           <span>
             Ngân hàng: <strong><%= r.bankAmount.toLocaleString('vi-VN') %> đ</strong>
             &nbsp;|&nbsp; Tính từ Tổng Momo: <strong><%= r.totalNetComputed.toLocaleString('vi-VN') %> đ</strong>
@@ -239,8 +319,8 @@
               <td><%= l.invoiceNumbers.join(', ') || '-' %></td>
               <td><%= l.invoiceTotal.toLocaleString('vi-VN') %> đ</td>
               <td>
-                <% if (l.tkCo === 'SKIP') { %>
-                  <span class="badge badge-chi">KH mới - chưa xuất MISA</span>
+                <% if (l.locked) { %>
+                  <span class="badge">🔒 Đã khóa sổ</span>
                 <% } else if (l.invoiceNumbers.length === 0) { %>
                   <span class="badge badge-chi">Chưa có HĐ</span>
                 <% } else if (l.matched) { %>
@@ -258,5 +338,6 @@
       <% } %>
     </section>
   </main>
+  <%- include('partials/panel-toggle') %>
 </body>
 </html>
