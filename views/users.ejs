@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <%- include('partials/head') %>
+</head>
+<body>
+  <%- include('partials/nav') %>
+  <main class="container">
+    <h1>Quản lý tài khoản đăng nhập</h1>
+    <p class="muted" style="margin-top:-10px;">
+      <strong>Quản trị</strong>: xem, sửa, xóa, tải lên được mọi thứ. <strong>Chỉ xem</strong>: chỉ xem số liệu và
+      chọn bộ lọc/công ty, không sửa/xóa/tải lên được gì (mọi nút thao tác sẽ tự ẩn khi đăng nhập bằng tài khoản này).
+    </p>
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+    <% if (success) { %><div class="alert alert-success"><%= success %></div><% } %>
+
+    <section class="panel">
+      <h2>Danh sách tài khoản</h2>
+      <table class="table">
+        <thead><tr><th>Tên đăng nhập</th><th>Tên hiển thị</th><th>Quyền</th><th>Đặt lại mật khẩu</th><th></th></tr></thead>
+        <tbody>
+          <% users.forEach(function (u) { %>
+          <tr>
+            <td><%= u.username %></td>
+            <td><%= u.name %></td>
+            <td>
+              <form method="POST" action="/he-thong/nguoi-dung/<%= u.id %>/role" class="form-inline">
+                <select name="role" onchange="this.form.submit()">
+                  <option value="admin" <%= (u.role || 'admin') === 'admin' ? 'selected' : '' %>>Quản trị</option>
+                  <option value="viewer" <%= u.role === 'viewer' ? 'selected' : '' %>>Chỉ xem</option>
+                </select>
+              </form>
+            </td>
+            <td>
+              <form method="POST" action="/he-thong/nguoi-dung/<%= u.id %>/mat-khau" class="form-inline"
+                    onsubmit="return confirm('Đặt mật khẩu mới cho tài khoản ' + '<%= u.username %>' + '?');">
+                <input type="password" name="password" placeholder="Mật khẩu mới (từ 6 ký tự)" minlength="6" required />
+                <button type="submit" class="btn btn-secondary">Đặt lại</button>
+              </form>
+            </td>
+            <td>
+              <% if (String(u.id) !== String(currentUserId)) { %>
+              <form method="POST" action="/he-thong/nguoi-dung/<%= u.id %>/delete"
+                    onsubmit="return confirm('Xóa hẳn tài khoản ' + '<%= u.username %>' + '?');">
+                <button type="submit" class="link-btn link-danger">Xóa</button>
+              </form>
+              <% } else { %>
+              <span class="muted">(đang đăng nhập)</span>
+              <% } %>
+            </td>
+          </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="panel">
+      <h2>Tạo tài khoản mới</h2>
+      <form method="POST" action="/he-thong/nguoi-dung" class="form-inline">
+        <input type="text" name="username" placeholder="Tên đăng nhập" autocomplete="off" required />
+        <input type="text" name="name" placeholder="Tên hiển thị" required />
+        <input type="password" name="password" placeholder="Mật khẩu (từ 6 ký tự)" minlength="6" required />
+        <select name="role">
+          <option value="admin">Quản trị (toàn quyền)</option>
+          <option value="viewer" selected>Chỉ xem</option>
+        </select>
+        <button type="submit" class="btn btn-primary">Tạo tài khoản</button>
+      </form>
+    </section>
+  </main>
+</body>
+</html>

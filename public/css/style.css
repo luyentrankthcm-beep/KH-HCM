@@ -211,6 +211,14 @@ body {
 }
 .nav-links a:hover { opacity: 1; background: rgba(255, 255, 255, 0.08); }
 .nav-user { display: flex; align-items: center; gap: 12px; font-size: 14px; opacity: 0.92; }
+.viewer-badge {
+  background: rgba(255, 255, 255, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: var(--radius-sm);
+  padding: 3px 10px;
+  font-size: 12px;
+  font-weight: 600;
+}
 
 /* Nut chuyen cong ty (KH Cu / KH Moi) tren topbar -- 2 nut dinh vao nhau
    nhu 1 toggle, nut dang chon noi bat mau Electric Blue, nut con lai mo. */

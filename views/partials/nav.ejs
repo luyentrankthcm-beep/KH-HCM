@@ -87,8 +87,14 @@
       </div>
     </div>
     <a href="/he-thong/sao-luu">Sao lưu</a>
+    <% if (typeof isAdmin !== "undefined" && isAdmin) { %>
+    <a href="/he-thong/nguoi-dung">Tài khoản</a>
+    <% } %>
   </nav>
   <div class="nav-user">
+    <% if (typeof isAdmin !== "undefined" && !isAdmin) { %>
+    <span class="viewer-badge" title="Tai khoan chi xem: khong the sua, xoa hay tai len du lieu">👁 Chỉ xem</span>
+    <% } %>
     <span><%= userName %></span>
     <form method="POST" action="/logout" style="display:inline">
       <button type="submit" class="link-btn">Đăng xuất</button>
@@ -265,3 +271,24 @@
     }
   })();
 </script>
+<% if (typeof isAdmin !== "undefined" && !isAdmin) { %>
+<script>
+  // Chi Nhan (2026-07-21): tai khoan "chi xem" -- an bot moi form/nut thao
+  // tac ghi/sua/xoa/tai len (chi de UI do nhin, khong phai lop bao ve chinh:
+  // middleware/auth.js requireAdmin da chan that su o backend, chan du
+  // form co bi lo ra do JS chua kip chay hay bi tat JS thi thao tac van bi
+  // tu choi). Giu lai (khong an) 2 form dung chung cho ca 2 quyen: chuyen
+  // cong ty (/chon-cong-ty, chi loc/xem) va doi mat khau cua chinh minh
+  // (/account/password). Tat ca form POST khac deu la thao tac ghi -- an
+  // luon (khong chi disable) de trang do gon, khong roi mat voi nut khong
+  // dung duoc.
+  (function () {
+    var ALLOWED_ACTIONS = ["/chon-cong-ty", "/account/password", "/logout"];
+    document.querySelectorAll('form[method="POST" i]').forEach(function (form) {
+      var action = form.getAttribute("action") || "";
+      if (ALLOWED_ACTIONS.some(function (a) { return action.indexOf(a) === 0; })) return;
+      form.style.display = "none";
+    });
+  })();
+</script>
+<% } %>

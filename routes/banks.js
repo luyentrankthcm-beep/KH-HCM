@@ -1,6 +1,6 @@
 const express = require("express");
 const { load, save, nextId } = require("../store");
-const { requireLogin } = require("../middleware/auth");
+const { requireLogin, requireAdmin } = require("../middleware/auth");
 const { getCompany } = require("../utils/companies");
 
 const router = express.Router();
@@ -39,7 +39,7 @@ router.get("/banks", (req, res) => {
   res.render("banks", { banks, userName: req.session.userName, error: null });
 });
 
-router.post("/banks", (req, res) => {
+router.post("/banks", requireAdmin, (req, res) => {
   const {
     name,
     account_number,
@@ -84,7 +84,7 @@ router.post("/banks", (req, res) => {
   res.redirect("/banks");
 });
 
-router.post("/banks/:id/delete", (req, res) => {
+router.post("/banks/:id/delete", requireAdmin, (req, res) => {
   const store = load();
   const id = Number(req.params.id);
   store.banks = store.banks.filter((b) => b.id !== id);

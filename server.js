@@ -21,6 +21,7 @@ const congnoNccRoutes = require("./routes/congno-ncc");
 const phapDanhRoutes = require("./routes/phap-danh");
 const chiPhiRoutes = require("./routes/chi-phi");
 const backupRoutes = require("./routes/backup");
+const usersRoutes = require("./routes/users");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -48,6 +49,12 @@ app.use((req, res, next) => {
   res.locals.activeCompany = getCompany(req);
   res.locals.COMPANIES = COMPANIES;
   res.locals.currentPath = req.originalUrl || req.path;
+  // Chi Nhan (2026-07-21): phan quyen quan tri/chi xem -- xem
+  // middleware/auth.js (requireAdmin) cho phan chan o backend (day moi la
+  // cho THAT SU chan sua/xoa/tai len). isAdmin o day chi phuc vu UI (nav.ejs
+  // an bot nut/form thao tac cho tai khoan "chi xem" de do roi mat, KHONG
+  // phai lop bao ve chinh).
+  res.locals.isAdmin = !!(req.session && req.session.role === "admin");
   next();
 });
 
@@ -73,6 +80,7 @@ app.use("/", doisoatChiPhiRoutes);
 app.use("/", phapDanhRoutes);
 app.use("/", chiPhiRoutes);
 app.use("/", backupRoutes);
+app.use("/", usersRoutes);
 
 app.use((req, res) => {
   res.status(404).send("Khong tim thay trang.");

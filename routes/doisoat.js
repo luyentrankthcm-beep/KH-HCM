@@ -3,7 +3,7 @@ const multer = require("multer");
 const XLSX = require("xlsx");
 const AdmZip = require("adm-zip");
 const { load, save, nextId } = require("../store");
-const { requireLogin } = require("../middleware/auth");
+const { requireLogin, requireAdmin } = require("../middleware/auth");
 const {
   parseTongMomoWorkbook,
   parseInvoiceWorkbook,
@@ -445,7 +445,7 @@ router.get("/doi-soat/momo", (req, res) => {
 });
 
 // ---------- Khoa so (giong VietQR) -- gui lockDate rong de mo khoa lai. ----------
-router.post("/doi-soat/momo/khoa-so", (req, res) => {
+router.post("/doi-soat/momo/khoa-so", requireAdmin, (req, res) => {
   const store = load();
   const activeCompany = getCompany(req);
   try {
@@ -507,7 +507,7 @@ function ensureNo1388(store) {
   return changed;
 }
 
-router.post("/doi-soat/momo/upload-tong", upload.single("file"), (req, res) => {
+router.post("/doi-soat/momo/upload-tong", requireAdmin, upload.single("file"), (req, res) => {
   const store = load();
   const activeCompany = getCompany(req);
   const momoCfg = MOMO_CHANNELS[activeCompany];
@@ -573,7 +573,7 @@ router.post("/doi-soat/momo/upload-tong", upload.single("file"), (req, res) => {
 // Upload 1 file danh sach hoa don (MTT) tren trang Momo cung cap nhat luon ca
 // 3 danh sach hoa don Zalo/VNPay/Payoo (dung chung parseSharedInvoiceWorkbook
 // voi trang /doi-soat/zvp) -- khong can upload lai file nay tren trang kia.
-router.post("/doi-soat/momo/upload-hoadon", upload.single("file"), (req, res) => {
+router.post("/doi-soat/momo/upload-hoadon", requireAdmin, upload.single("file"), (req, res) => {
   const store = load();
   const activeCompany = getCompany(req);
   const momoCfg = MOMO_CHANNELS[activeCompany];
@@ -624,7 +624,7 @@ router.post("/doi-soat/momo/upload-hoadon", upload.single("file"), (req, res) =>
   }
 });
 
-router.post("/doi-soat/momo/mapping", (req, res) => {
+router.post("/doi-soat/momo/mapping", requireAdmin, (req, res) => {
   const store = load();
   const body = req.body || {};
   for (const [key, val] of Object.entries(body)) {
@@ -641,7 +641,7 @@ router.post("/doi-soat/momo/mapping", (req, res) => {
 // PHU") nhung thuc chat cung 1 Ma Cong Trinh voi doanh thu (vd "AM TP KVCM")
 // -- ap dung ngay luc doi soat, khong can tai lai file hoa don. Bang nay
 // dung CHUNG voi trang doi-soat/zvp (store.invoice_diem_alias). ----------
-router.post("/doi-soat/momo/diem-alias", (req, res) => {
+router.post("/doi-soat/momo/diem-alias", requireAdmin, (req, res) => {
   const store = load();
   try {
     const { sourceCode, targetCode } = req.body;
@@ -657,7 +657,7 @@ router.post("/doi-soat/momo/diem-alias", (req, res) => {
   }
 });
 
-router.post("/doi-soat/momo/diem-alias/delete", (req, res) => {
+router.post("/doi-soat/momo/diem-alias/delete", requireAdmin, (req, res) => {
   const store = load();
   const { sourceCode } = req.body;
   if (store.invoice_diem_alias) delete store.invoice_diem_alias[sourceCode];
@@ -671,7 +671,7 @@ router.post("/doi-soat/momo/diem-alias/delete", (req, res) => {
 // store.cua_hang_mapping (KHONG theo companyKey) vi day la 1 danh muc
 // gian/mat bang CHUNG, khong phai rieng cong ty nao -- ap dung ngay cho ca
 // trang KH Cu va KH Moi, khong can tai lai file zip (xem applyCuaHangAlias).
-router.post("/doi-soat/momo/cuahang-map", (req, res) => {
+router.post("/doi-soat/momo/cuahang-map", requireAdmin, (req, res) => {
   const store = load();
   try {
     const { rawCode, targetCode } = req.body;
@@ -698,7 +698,7 @@ router.post("/doi-soat/momo/cuahang-map", (req, res) => {
 // Moi). CHI an khoi HIEN THI cua cong ty dang xem (store.gian_hidden theo
 // company key) -- KHONG dong den store.gian_mapping (van dung chung), nen
 // cong ty KIA neu dung chung ma nay van thay binh thuong. ----------
-router.post("/doi-soat/momo/gian-hidden", (req, res) => {
+router.post("/doi-soat/momo/gian-hidden", requireAdmin, (req, res) => {
   const store = load();
   ensureGianHidden(store);
   const companyKey = getCompany(req);
@@ -710,7 +710,7 @@ router.post("/doi-soat/momo/gian-hidden", (req, res) => {
   res.redirect("/doi-soat/momo?success=" + encodeURIComponent(`Da an gian "${code}" khoi trang nay.`));
 });
 
-router.post("/doi-soat/momo/gian-hidden/delete", (req, res) => {
+router.post("/doi-soat/momo/gian-hidden/delete", requireAdmin, (req, res) => {
   const store = load();
   ensureGianHidden(store);
   const companyKey = getCompany(req);
@@ -728,7 +728,7 @@ router.delete("/doi-soat/momo/upload-tong/:id", (req, res) => {
   res.redirect("/doi-soat/momo");
 });
 
-router.post("/doi-soat/momo/upload-tong/:id/delete", (req, res) => {
+router.post("/doi-soat/momo/upload-tong/:id/delete", requireAdmin, (req, res) => {
   const store = load();
   const momoCfg = MOMO_CHANNELS[getCompany(req)];
   store[momoCfg.grossKey] = (store[momoCfg.grossKey] || []).filter((u) => String(u.id) !== req.params.id);
@@ -736,7 +736,7 @@ router.post("/doi-soat/momo/upload-tong/:id/delete", (req, res) => {
   res.redirect("/doi-soat/momo");
 });
 
-router.post("/doi-soat/momo/invoices/clear", (req, res) => {
+router.post("/doi-soat/momo/invoices/clear", requireAdmin, (req, res) => {
   const store = load();
   const momoCfg = MOMO_CHANNELS[getCompany(req)];
   store[momoCfg.invoicesKey] = [];

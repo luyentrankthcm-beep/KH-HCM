@@ -2,7 +2,7 @@ const express = require("express");
 const multer = require("multer");
 const XLSX = require("xlsx");
 const { load, save, nextId } = require("../store");
-const { requireLogin } = require("../middleware/auth");
+const { requireLogin, requireAdmin } = require("../middleware/auth");
 const {
   extractVqrCode,
   extractVietQrSettlements,
@@ -697,7 +697,7 @@ router.get("/doi-soat/vietqr", (req, res) => {
 // ---------- Cross-match: 1 gian du hoa don + 1 gian thieu hoa don CUNG NGAY,
 // cung 1 so tien -- Luyen xac nhan tung cap qua nut nay (khong tu dong ap
 // dung) truoc khi ghi de thanh 2 ban ghi manual-match. ----------
-router.post("/doi-soat/vietqr/cross-match/:channel", (req, res) => {
+router.post("/doi-soat/vietqr/cross-match/:channel", requireAdmin, (req, res) => {
   const store = load();
   ensureChannelShape(store);
   const channelKey = req.params.channel;
@@ -748,7 +748,7 @@ router.post("/doi-soat/vietqr/cross-match/:channel", (req, res) => {
 // ap dung LAI TUNG DUNG LOGIC nhu route don o tren (khong tu che, van doi
 // chieu lai voi ket qua doi soat MOI NHAT truoc khi ghi -- neu 1 gian da
 // thay doi/khong con dung nua thi bo qua item do, khong lam hong ca lo).
-router.post("/doi-soat/vietqr/cross-match-all", (req, res) => {
+router.post("/doi-soat/vietqr/cross-match-all", requireAdmin, (req, res) => {
   const store = load();
   ensureChannelShape(store);
   try {
@@ -826,7 +826,7 @@ router.post("/doi-soat/vietqr/cross-match-all", (req, res) => {
 });
 
 // ---------- Upload: raw QR export file (contains BOTH the transaction log sheet AND the "Cua hang" store-catalog sheet) ----------
-router.post("/doi-soat/vietqr/upload-raw/:channel", upload.single("file"), (req, res) => {
+router.post("/doi-soat/vietqr/upload-raw/:channel", requireAdmin, upload.single("file"), (req, res) => {
   const store = load();
   ensureChannelShape(store);
   const channelKey = req.params.channel;
@@ -885,7 +885,7 @@ router.post("/doi-soat/vietqr/upload-raw/:channel", upload.single("file"), (req,
 // ma cua hang la MOI (chua tung thay) hoac DOI ten diem ban so voi lan
 // truoc, canh bao ngay trong thong bao de Luyen kiem tra xem co phai gian
 // moi can gan vao ngan hang dang up hay khong. ----------
-router.post("/doi-soat/vietqr/upload-store/:channel", upload.single("file"), (req, res) => {
+router.post("/doi-soat/vietqr/upload-store/:channel", requireAdmin, upload.single("file"), (req, res) => {
   const store = load();
   ensureChannelShape(store);
   const channelKey = req.params.channel;
@@ -934,7 +934,7 @@ router.post("/doi-soat/vietqr/upload-store/:channel", upload.single("file"), (re
 // den het 20/7 thay vi chi sua rieng ngay do/gian do). Xem xu ly tai
 // buildChannelReconciliation (dua diff ve 0, danh dau locked cho moi dong tu
 // ngay dau den ngay khoa). Gui lockDate rong ("") de MO khoa lai.
-router.post("/doi-soat/vietqr/khoa-so/:channel", (req, res) => {
+router.post("/doi-soat/vietqr/khoa-so/:channel", requireAdmin, (req, res) => {
   const store = load();
   ensureChannelShape(store);
   const channelKey = req.params.channel;
@@ -960,7 +960,7 @@ router.post("/doi-soat/vietqr/khoa-so/:channel", (req, res) => {
 // (giu nguyen tenCuaHang/tenDiemBan cu neu co de con hien thi, chi doi
 // matchText -- dung dung field ma resolveGianGross dung de khop fuzzy) ap
 // dung ngay, khong can tai lai file "store_export"/"Cua hang".
-router.post("/doi-soat/vietqr/store-map/:channel", (req, res) => {
+router.post("/doi-soat/vietqr/store-map/:channel", requireAdmin, (req, res) => {
   const store = load();
   ensureChannelShape(store);
   const channelKey = req.params.channel;
@@ -992,7 +992,7 @@ router.post("/doi-soat/vietqr/store-map/:channel", (req, res) => {
 // ca nhom, nen phai luu theo tung vqrCode (xem viet_qr_nocode_assignments,
 // resolveGianGross doc lai o utils/vietqrReconcile.js). ap dung ngay, khong
 // can tai lai file.
-router.post("/doi-soat/vietqr/nocode-assign/:channel", (req, res) => {
+router.post("/doi-soat/vietqr/nocode-assign/:channel", requireAdmin, (req, res) => {
   const store = load();
   ensureChannelShape(store);
   const channelKey = req.params.channel;
@@ -1018,7 +1018,7 @@ router.post("/doi-soat/vietqr/nocode-assign/:channel", (req, res) => {
 // 2026-07-19: "co nut xoa hay chinh sua cac phan dien" -- truoc gio gan xong
 // la het, khong xem/sua/xoa lai duoc; them nut Xoa de tra giao dich do ve lai
 // dien "chua gan" (co the gan lai ma khac ngay sau do neu gan nham).
-router.post("/doi-soat/vietqr/nocode-assign/:channel/:vqrCode/delete", (req, res) => {
+router.post("/doi-soat/vietqr/nocode-assign/:channel/:vqrCode/delete", requireAdmin, (req, res) => {
   const store = load();
   ensureChannelShape(store);
   const channelKey = req.params.channel;
@@ -1035,7 +1035,7 @@ router.post("/doi-soat/vietqr/nocode-assign/:channel/:vqrCode/delete", (req, res
 });
 
 // ---------- Upload: danh sach hoa don dung chung (file MTT), gan 3 tag Viet QR cung luc ----------
-router.post("/doi-soat/vietqr/upload-hoadon", upload.single("file"), (req, res) => {
+router.post("/doi-soat/vietqr/upload-hoadon", requireAdmin, upload.single("file"), (req, res) => {
   const store = load();
   ensureChannelShape(store);
   try {
@@ -1067,7 +1067,7 @@ router.post("/doi-soat/vietqr/upload-hoadon", upload.single("file"), (req, res) 
   }
 });
 
-router.post("/doi-soat/vietqr/mapping", (req, res) => {
+router.post("/doi-soat/vietqr/mapping", requireAdmin, (req, res) => {
   const store = load();
   const body = req.body || {};
   for (const [key, val] of Object.entries(body)) {
@@ -1081,7 +1081,7 @@ router.post("/doi-soat/vietqr/mapping", (req, res) => {
 });
 
 // ---------- Alias: dung CHUNG voi Momo/ZVP (store.invoice_diem_alias) ----------
-router.post("/doi-soat/vietqr/diem-alias", (req, res) => {
+router.post("/doi-soat/vietqr/diem-alias", requireAdmin, (req, res) => {
   const store = load();
   try {
     const { sourceCode, targetCode } = req.body;
@@ -1097,7 +1097,7 @@ router.post("/doi-soat/vietqr/diem-alias", (req, res) => {
   }
 });
 
-router.post("/doi-soat/vietqr/diem-alias/delete", (req, res) => {
+router.post("/doi-soat/vietqr/diem-alias/delete", requireAdmin, (req, res) => {
   const store = load();
   const { sourceCode } = req.body;
   if (store.invoice_diem_alias) delete store.invoice_diem_alias[sourceCode];
@@ -1105,7 +1105,7 @@ router.post("/doi-soat/vietqr/diem-alias/delete", (req, res) => {
   res.redirect("/doi-soat/vietqr?success=" + encodeURIComponent("Da xoa anh xa ma diem."));
 });
 
-router.post("/doi-soat/vietqr/upload-raw/:channel/:id/delete", (req, res) => {
+router.post("/doi-soat/vietqr/upload-raw/:channel/:id/delete", requireAdmin, (req, res) => {
   const store = load();
   ensureChannelShape(store);
   const channelKey = req.params.channel;
@@ -1115,7 +1115,7 @@ router.post("/doi-soat/vietqr/upload-raw/:channel/:id/delete", (req, res) => {
   res.redirect("/doi-soat/vietqr");
 });
 
-router.post("/doi-soat/vietqr/invoices/clear", (req, res) => {
+router.post("/doi-soat/vietqr/invoices/clear", requireAdmin, (req, res) => {
   const store = load();
   ensureChannelShape(store);
   CHANNEL_KEYS.forEach((ch) => (store.viet_qr_invoices[ch] = []));
@@ -1124,7 +1124,7 @@ router.post("/doi-soat/vietqr/invoices/clear", (req, res) => {
 });
 
 // ---------- Manual match: dong "Chua co HD" da xac nhan la co HD bu ----------
-router.post("/doi-soat/vietqr/manual-match", (req, res) => {
+router.post("/doi-soat/vietqr/manual-match", requireAdmin, (req, res) => {
   const store = load();
   ensureChannelShape(store);
   try {
@@ -1168,7 +1168,7 @@ router.post("/doi-soat/vietqr/manual-match", (req, res) => {
   }
 });
 
-router.post("/doi-soat/vietqr/manual-match/delete", (req, res) => {
+router.post("/doi-soat/vietqr/manual-match/delete", requireAdmin, (req, res) => {
   const store = load();
   ensureChannelShape(store);
   try {

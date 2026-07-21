@@ -2,7 +2,7 @@ const express = require("express");
 const multer = require("multer");
 const XLSX = require("xlsx");
 const { load, save, nextId } = require("../store");
-const { requireLogin } = require("../middleware/auth");
+const { requireLogin, requireAdmin } = require("../middleware/auth");
 const { parsePastedTransactions, parseAmount, parseDate } = require("../utils/parse");
 const { parseBankStatement, computeThuChi } = require("../utils/bankStatementParser");
 const { getCompany } = require("../utils/companies");
@@ -122,7 +122,7 @@ router.get("/transactions", (req, res) => {
   });
 });
 
-router.post("/transactions", (req, res) => {
+router.post("/transactions", requireAdmin, (req, res) => {
   const { bank_id, date, description, amount, type } = req.body;
   const parsedDate = parseDate(date) || date;
   const parsedAmount = Math.abs(parseAmount(amount));
@@ -144,7 +144,7 @@ router.post("/transactions", (req, res) => {
   res.redirect("/transactions?bank_id=" + encodeURIComponent(bank_id));
 });
 
-router.post("/transactions/paste", (req, res) => {
+router.post("/transactions/paste", requireAdmin, (req, res) => {
   const { bank_id, paste_text } = req.body;
   const store = load();
   const activeCompany = getCompany(req);
@@ -214,7 +214,7 @@ router.post("/transactions/paste", (req, res) => {
 // back to date+amount+type as before -- description is intentionally still
 // excluded from that fallback key, since different statement exports can
 // render slightly different description text for the same transaction.
-router.post("/transactions/upload-statement", upload.single("file"), (req, res) => {
+router.post("/transactions/upload-statement", requireAdmin, upload.single("file"), (req, res) => {
   const store = load();
   const activeCompany = getCompany(req);
   const banks = companyBanks(store, activeCompany);
@@ -345,7 +345,7 @@ router.post("/transactions/upload-statement", upload.single("file"), (req, res) 
 // gian/cong trinh xuat hien o cac trang khac (vd Chi Phi). Moi lan tai len
 // THAY THE toan bo danh sach cua dung cong ty dang chon (KH Cu / KH Moi
 // khong dung chung 1 danh sach vi la 2 phap nhan khac nhau).
-router.post("/transactions/upload-ma-cong-trinh", upload.single("file"), (req, res) => {
+router.post("/transactions/upload-ma-cong-trinh", requireAdmin, upload.single("file"), (req, res) => {
   const store = load();
   const activeCompany = getCompany(req);
   const banks = companyBanks(store, activeCompany);

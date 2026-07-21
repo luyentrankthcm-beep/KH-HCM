@@ -18,6 +18,11 @@ router.post("/login", (req, res) => {
   }
   req.session.userId = user.id;
   req.session.userName = user.name;
+  // Chi Nhan (2026-07-21): phan quyen "quan tri" (toan quyen) vs "xem" (chi
+  // xem/loc, khong sua/xoa/tai len -- xem middleware/auth.js requireAdmin).
+  // User cu chua co truong role (tao truoc khi co tinh nang nay) mac dinh la
+  // admin de khong tu nhien bi khoa quyen dang co san.
+  req.session.role = user.role || "admin";
   res.redirect("/");
 });
 

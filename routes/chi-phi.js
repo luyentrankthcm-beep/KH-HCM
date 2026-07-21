@@ -1,7 +1,7 @@
 const express = require("express");
 const multer = require("multer");
 const { load, save, nextId } = require("../store");
-const { requireLogin } = require("../middleware/auth");
+const { requireLogin, requireAdmin } = require("../middleware/auth");
 const { getCompany } = require("../utils/companies");
 const { parseChiPhiSheetWorkbook } = require("../utils/chiPhiSheetParser");
 const { extractGianRentText, matchGianRecord } = require("../utils/rentPaymentMatcher");
@@ -122,7 +122,7 @@ router.get("/chi-phi", (req, res) => {
   });
 });
 
-router.post("/chi-phi/:id/hach-toan", (req, res) => {
+router.post("/chi-phi/:id/hach-toan", requireAdmin, (req, res) => {
   const store = load();
   ensureShape(store);
   const r = store.chi_phi.find((x) => String(x.id) === req.params.id);
@@ -142,7 +142,7 @@ router.post("/chi-phi/:id/hach-toan", (req, res) => {
 // TT TIEN MAT bi chan captcha/khong mo duoc link) van chua co so hoa don tu
 // dong tra ra duoc, can Luyen tu dien tay sau khi tra cuu/xem hoa don giay.
 // Cho sua truc tiep tu bang danh sach, khong can vao form rieng.
-router.post("/chi-phi/:id/so-hoa-don", (req, res) => {
+router.post("/chi-phi/:id/so-hoa-don", requireAdmin, (req, res) => {
   const store = load();
   ensureShape(store);
   const r = store.chi_phi.find((x) => String(x.id) === req.params.id);
@@ -163,7 +163,7 @@ router.post("/chi-phi/:id/so-hoa-don", (req, res) => {
   res.redirect("/chi-phi?" + qs.join("&"));
 });
 
-router.post("/chi-phi", (req, res) => {
+router.post("/chi-phi", requireAdmin, (req, res) => {
   const store = load();
   ensureShape(store);
   const activeCompany = getCompany(req);
@@ -236,7 +236,7 @@ function isUpgradableGian(gianText) {
   return GENERIC_GIAN_LABELS.has(n);
 }
 
-router.post("/chi-phi/upload", upload.single("file"), (req, res) => {
+router.post("/chi-phi/upload", requireAdmin, upload.single("file"), (req, res) => {
   const store = load();
   ensureShape(store);
   try {
@@ -330,7 +330,7 @@ router.post("/chi-phi/upload", upload.single("file"), (req, res) => {
 // de tranh nhoi hang loat dong ngoai pham vi dang dung). Dedup bang truong
 // rieng "bankTxId" (id giao dich nguon) luu tren moi dong Chi Phi da tao --
 // chay lai (hang ngay) se tu bo qua giao dich da xu ly, khong tao trung.
-router.post("/chi-phi/quet-ngan-hang", (req, res) => {
+router.post("/chi-phi/quet-ngan-hang", requireAdmin, (req, res) => {
   const store = load();
   ensureShape(store);
   try {

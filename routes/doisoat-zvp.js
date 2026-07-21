@@ -2,7 +2,7 @@ const express = require("express");
 const multer = require("multer");
 const XLSX = require("xlsx");
 const { load, save, nextId } = require("../store");
-const { requireLogin } = require("../middleware/auth");
+const { requireLogin, requireAdmin } = require("../middleware/auth");
 const {
   extractZvpSettlements,
   parseInvoiceWorkbookByTag,
@@ -352,7 +352,7 @@ router.get("/doi-soat/zvp", (req, res) => {
 });
 
 // ---------- Khoa so (giong VietQR/Momo) -- gui lockDate rong de mo khoa lai. ----------
-router.post("/doi-soat/zvp/khoa-so", (req, res) => {
+router.post("/doi-soat/zvp/khoa-so", requireAdmin, (req, res) => {
   const store = load();
   try {
     const lockDate = (req.body.lockDate || "").trim();
@@ -375,7 +375,7 @@ router.post("/doi-soat/zvp/khoa-so", (req, res) => {
 // khong khop duoc voi gian nao co san luc tai. Luu y: sua o day CHI anh huong
 // cho lan tai file Online TIEP THEO -- doanh thu da tai truoc do van giu
 // nguyen ma cu, can tai lai file "Tong hop Zalo App" (muc 1) sau khi sua.
-router.post("/doi-soat/zvp/online-gian-fix", (req, res) => {
+router.post("/doi-soat/zvp/online-gian-fix", requireAdmin, (req, res) => {
   const store = load();
   try {
     const { tenDiem, maCongTrinh, isCse } = req.body;
@@ -399,7 +399,7 @@ router.post("/doi-soat/zvp/online-gian-fix", (req, res) => {
 });
 
 // ---------- Upload: file "Tong hop Zalo App" (gian hang xuat HD + Doi soat Vnpay Online) ----------
-router.post("/doi-soat/zvp/upload-online", upload.single("file"), (req, res) => {
+router.post("/doi-soat/zvp/upload-online", requireAdmin, upload.single("file"), (req, res) => {
   const store = load();
   try {
     if (!req.file) throw new Error("Vui long chon 1 file de tai len.");
@@ -494,7 +494,7 @@ router.post("/doi-soat/zvp/upload-online", upload.single("file"), (req, res) => 
 });
 
 // ---------- Upload: file VNPay Offline ("du lieu VNpay co so KHxxx" + "gian hang VNpay co so KHxxx") ----------
-router.post("/doi-soat/zvp/upload-offline", upload.single("file"), (req, res) => {
+router.post("/doi-soat/zvp/upload-offline", requireAdmin, upload.single("file"), (req, res) => {
   const store = load();
   try {
     if (!req.file) throw new Error("Vui long chon 1 file de tai len.");
@@ -542,7 +542,7 @@ router.post("/doi-soat/zvp/upload-offline", upload.single("file"), (req, res) =>
 });
 
 // ---------- Upload: file Payoo ("Du lieu Payoo co so KHxxx" + "Danh muc ten diem") ----------
-router.post("/doi-soat/zvp/upload-payoo", upload.single("file"), (req, res) => {
+router.post("/doi-soat/zvp/upload-payoo", requireAdmin, upload.single("file"), (req, res) => {
   const store = load();
   try {
     if (!req.file) throw new Error("Vui long chon 1 file de tai len.");
@@ -595,7 +595,7 @@ router.post("/doi-soat/zvp/upload-payoo", upload.single("file"), (req, res) => {
 // (cho moi dong co raw khac Ma cong trinh, bat ke thuoc kenh nao) -- KHONG
 // dung lai lich su cu (moi lan tai la thay the toan bo danh sach goc, nen
 // khong lo bi trung dong khi tai lai file da cap nhat).
-router.post("/doi-soat/zvp/upload-gian-master", upload.single("file"), (req, res) => {
+router.post("/doi-soat/zvp/upload-gian-master", requireAdmin, upload.single("file"), (req, res) => {
   const store = load();
   try {
     if (!req.file) throw new Error("Vui long chon 1 file de tai len.");
@@ -664,7 +664,7 @@ router.post("/doi-soat/zvp/upload-gian-master", upload.single("file"), (req, res
 // ho co so" (de co bang mapping Chi nhanh Offline) truoc do.
 router.post(
   "/doi-soat/zvp/upload-combo",
-  upload.fields([
+  requireAdmin, upload.fields([
     { name: "fileOrders", maxCount: 1 },
     { name: "fileFee", maxCount: 1 },
   ]),
@@ -763,7 +763,7 @@ router.post(
 // Upload 1 file tren TRANG NAY cung cap nhat luon ca hoa don Momo (dung chung
 // parseSharedInvoiceWorkbook voi trang /doi-soat/momo) -- khong can upload lai
 // file nay tren trang kia.
-router.post("/doi-soat/zvp/upload-hoadon", upload.single("file"), (req, res) => {
+router.post("/doi-soat/zvp/upload-hoadon", requireAdmin, upload.single("file"), (req, res) => {
   const store = load();
   try {
     if (!req.file) throw new Error("Vui long chon 1 file de tai len.");
@@ -826,7 +826,7 @@ router.post("/doi-soat/zvp/upload-hoadon", upload.single("file"), (req, res) => 
   }
 });
 
-router.post("/doi-soat/zvp/mapping", (req, res) => {
+router.post("/doi-soat/zvp/mapping", requireAdmin, (req, res) => {
   const store = load();
   const body = req.body || {};
   for (const [key, val] of Object.entries(body)) {
@@ -843,7 +843,7 @@ router.post("/doi-soat/zvp/mapping", (req, res) => {
 // PHU") nhung thuc chat cung 1 Ma Cong Trinh voi doanh thu (vd "AM TP KVCM")
 // -- ap dung ngay luc doi soat, khong can tai lai file hoa don. Bang nay
 // dung CHUNG voi trang doi-soat/momo (store.invoice_diem_alias). ----------
-router.post("/doi-soat/zvp/diem-alias", (req, res) => {
+router.post("/doi-soat/zvp/diem-alias", requireAdmin, (req, res) => {
   const store = load();
   try {
     const { sourceCode, targetCode } = req.body;
@@ -859,7 +859,7 @@ router.post("/doi-soat/zvp/diem-alias", (req, res) => {
   }
 });
 
-router.post("/doi-soat/zvp/diem-alias/delete", (req, res) => {
+router.post("/doi-soat/zvp/diem-alias/delete", requireAdmin, (req, res) => {
   const store = load();
   const { sourceCode } = req.body;
   if (store.invoice_diem_alias) delete store.invoice_diem_alias[sourceCode];
@@ -867,28 +867,28 @@ router.post("/doi-soat/zvp/diem-alias/delete", (req, res) => {
   res.redirect("/doi-soat/zvp?success=" + encodeURIComponent("Da xoa anh xa ma diem."));
 });
 
-router.post("/doi-soat/zvp/upload-online/:id/delete", (req, res) => {
+router.post("/doi-soat/zvp/upload-online/:id/delete", requireAdmin, (req, res) => {
   const store = load();
   store.zvp_online_uploads = store.zvp_online_uploads.filter((u) => String(u.id) !== req.params.id);
   save(store);
   res.redirect("/doi-soat/zvp");
 });
 
-router.post("/doi-soat/zvp/upload-offline/:id/delete", (req, res) => {
+router.post("/doi-soat/zvp/upload-offline/:id/delete", requireAdmin, (req, res) => {
   const store = load();
   store.zvp_offline_uploads = store.zvp_offline_uploads.filter((u) => String(u.id) !== req.params.id);
   save(store);
   res.redirect("/doi-soat/zvp");
 });
 
-router.post("/doi-soat/zvp/upload-payoo/:id/delete", (req, res) => {
+router.post("/doi-soat/zvp/upload-payoo/:id/delete", requireAdmin, (req, res) => {
   const store = load();
   store.zvp_payoo_uploads = store.zvp_payoo_uploads.filter((u) => String(u.id) !== req.params.id);
   save(store);
   res.redirect("/doi-soat/zvp");
 });
 
-router.post("/doi-soat/zvp/invoices/clear", (req, res) => {
+router.post("/doi-soat/zvp/invoices/clear", requireAdmin, (req, res) => {
   const store = load();
   store.zvp_invoices = { zalo: [], vnpay: [], payoo: [] };
   save(store);
@@ -899,7 +899,7 @@ router.post("/doi-soat/zvp/invoices/clear", (req, res) => {
 // Dung cho truong hop 1 gian khong di qua dò hoa don tu dong cho ky doi soat
 // nay (vd hoa don chi duoc xuat ngay hom sau, ngoai khoang ngay cua ky nay),
 // nhung Luyen da tu kiem tra va biet chac hoa don nao bu cho khoan tien nay.
-router.post("/doi-soat/zvp/manual-match", (req, res) => {
+router.post("/doi-soat/zvp/manual-match", requireAdmin, (req, res) => {
   const store = load();
   try {
     const { channel, settlementDate, code, invoiceNumbers, amount, grossAdjustment, note } = req.body;
@@ -930,7 +930,7 @@ router.post("/doi-soat/zvp/manual-match", (req, res) => {
   }
 });
 
-router.post("/doi-soat/zvp/manual-match/delete", (req, res) => {
+router.post("/doi-soat/zvp/manual-match/delete", requireAdmin, (req, res) => {
   const store = load();
   try {
     const { channel, settlementDate, code } = req.body;

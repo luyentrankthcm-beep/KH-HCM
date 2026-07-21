@@ -255,6 +255,7 @@ function nextId(store, collection) {
       username: defaultUsername,
       password_hash: hash,
       name: "Quan tri vien K&H",
+      role: "admin",
       created_at: new Date().toISOString(),
     });
     changed = true;

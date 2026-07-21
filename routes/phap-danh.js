@@ -2,7 +2,7 @@ const express = require("express");
 const XLSX = require("xlsx");
 const multer = require("multer");
 const { load, save, nextId } = require("../store");
-const { requireLogin } = require("../middleware/auth");
+const { requireLogin, requireAdmin } = require("../middleware/auth");
 const { getCompany } = require("../utils/companies");
 const { parseHopDongHcmWorkbook, isNccRow } = require("../utils/hopDongHcmParser");
 
@@ -216,7 +216,7 @@ router.get("/phap-danh/hop-dong-thue-gian-hang/export.xlsx", (req, res) => {
   res.send(buf);
 });
 
-router.post("/phap-danh/hop-dong-thue-gian-hang", (req, res) => {
+router.post("/phap-danh/hop-dong-thue-gian-hang", requireAdmin, (req, res) => {
   const store = load();
   ensureShape(store);
   const activeCompany = getCompany(req);
@@ -273,7 +273,7 @@ router.post("/phap-danh/hop-dong-thue-gian-hang", (req, res) => {
   }
 });
 
-router.post("/phap-danh/hop-dong-thue-gian-hang/:id/delete", (req, res) => {
+router.post("/phap-danh/hop-dong-thue-gian-hang/:id/delete", requireAdmin, (req, res) => {
   const store = load();
   ensureShape(store);
   store.phap_danh_hop_dong_thue = store.phap_danh_hop_dong_thue.filter((r) => String(r.id) !== req.params.id);
@@ -363,7 +363,7 @@ router.get("/phap-danh/hop-dong-ncc", (req, res) => {
 //     CHI append vao mang chiTiet (du lieu tho, khong tinh lai tong hop) +
 //     ghi 1 dong CANH BAO vao ghiChu de chi tu xem va cap nhat tay cac truong
 //     tong hop (ngayHetHan/giaTriHopDong) neu can.
-router.post("/phap-danh/hop-dong-ncc/upload", upload.single("file"), (req, res) => {
+router.post("/phap-danh/hop-dong-ncc/upload", requireAdmin, upload.single("file"), (req, res) => {
   const store = load();
   ensureShape(store);
   try {
@@ -501,7 +501,7 @@ router.post("/phap-danh/hop-dong-ncc/upload", upload.single("file"), (req, res) 
   }
 });
 
-router.post("/phap-danh/hop-dong-ncc", (req, res) => {
+router.post("/phap-danh/hop-dong-ncc", requireAdmin, (req, res) => {
   const store = load();
   ensureShape(store);
   const activeCompany = getCompany(req);
@@ -533,7 +533,7 @@ router.post("/phap-danh/hop-dong-ncc", (req, res) => {
   }
 });
 
-router.post("/phap-danh/hop-dong-ncc/:id/delete", (req, res) => {
+router.post("/phap-danh/hop-dong-ncc/:id/delete", requireAdmin, (req, res) => {
   const store = load();
   ensureShape(store);
   store.phap_danh_hop_dong_ncc = store.phap_danh_hop_dong_ncc.filter((r) => String(r.id) !== req.params.id);

@@ -1,7 +1,7 @@
 const express = require("express");
 const multer = require("multer");
 const { load, save, DATA_FILE } = require("../store");
-const { requireLogin } = require("../middleware/auth");
+const { requireLogin, requireAdmin } = require("../middleware/auth");
 
 const router = express.Router();
 router.use(requireLogin);
@@ -28,7 +28,7 @@ router.get("/he-thong/sao-luu/tai-xuong", (req, res) => {
   res.send(data);
 });
 
-router.post("/he-thong/sao-luu/phuc-hoi", upload.single("file"), (req, res) => {
+router.post("/he-thong/sao-luu/phuc-hoi", requireAdmin, upload.single("file"), (req, res) => {
   try {
     if (!req.file) throw new Error("Vui long chon 1 file sao luu (.json) de phuc hoi.");
     const text = req.file.buffer.toString("utf8");
