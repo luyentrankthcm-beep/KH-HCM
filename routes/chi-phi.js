@@ -236,6 +236,83 @@ function isUpgradableGian(gianText) {
   return GENERIC_GIAN_LABELS.has(n);
 }
 
+// Luyen, 2026-07-21 (lan 3): tach logic ap dung monthRows vao store thanh ham
+// dung chung cho CA route upload file VA route moi doc thang tu Google Sheet
+// link (xem ben duoi) -- "cập nhật chi phí nữa từ gg sheet". Hanh vi upsert
+// GIU NGUYEN nhu truoc (chi them dong MOI, khong dong tay dong da co -- Luyen
+// xac nhan rieng "không cập nhật cái mới thôi cái cũ vẫn giữ nguyên") --
+// doi o day CHI la nguon lay du lieu (file vs link), khong doi cach xu ly.
+function applyChiPhiMonthRowsToStore(store, monthRows, sourceLabel) {
+  const existingByKey = new Map();
+  store.chi_phi.forEach((r) => existingByKey.set(chiPhiRowKey(r), r));
+  let added = 0;
+  let addedNoGian = 0;
+  let upgradedGian = 0;
+  const monthSummary = [];
+  for (const mr of monthRows) {
+    let addedThisSheet = 0;
+    for (const r of mr.rows) {
+      const key = chiPhiRowKey(r);
+      const existingRow = existingByKey.get(key);
+      if (existingRow) {
+        // Dong da co roi -- KHONG dong tay, chi nang cap Gian tu nhan nhom
+        // chung chung len ten that neu lan nay tach duoc cu the hon.
+        if (r.gian && isUpgradableGian(existingRow.gian) && !isUpgradableGian(r.gian)) {
+          existingRow.gian = r.gian;
+          upgradedGian++;
+        }
+        continue;
+      }
+      const newRow = {
+        id: nextId(store, "chi_phi_seq") || Date.now(),
+        congTy: r.congTy,
+        ngay: r.ngay,
+        gian: r.gian,
+        ncc: r.ncc,
+        soHoaDon: r.soHoaDon || "",
+        soUNC: r.soUNC || "",
+        soChungTuLienQuan: "",
+        dienGiai: r.dienGiai,
+        loaiChiPhi: "",
+        soTien: r.soTien,
+        soTienHoaDonGoc: null,
+        linkHoaDon: "",
+        trangThaiHoaDon: r.gian ? "" : "Chưa xác định Gian (tự động) -- cần điền tay",
+        daHachToan: false,
+        nguon: mr.sheetName,
+        ghiChu: "",
+        createdAt: new Date().toISOString(),
+        source: sourceLabel,
+      };
+      store.chi_phi.push(newRow);
+      existingByKey.set(key, newRow);
+      added++;
+      addedThisSheet++;
+      if (!r.gian) addedNoGian++;
+    }
+    if (addedThisSheet > 0) monthSummary.push(`${mr.sheetName}: +${addedThisSheet}`);
+  }
+  return { added, addedNoGian, upgradedGian, monthSummary };
+}
+
+function buildChiPhiResultMessage(prefix, result, skippedSheets) {
+  let msg = `${prefix} thêm ${result.added} khoản chi mới${
+    result.monthSummary.length ? " (" + result.monthSummary.join(", ") + ")" : ""
+  }.`;
+  if (result.upgradedGian > 0) {
+    msg += ` Đã nâng cấp Gian (từ nhãn nhóm chung chung như "posh"/"JP" sang tên gian cụ thể) cho ${result.upgradedGian} dòng đã có sẵn.`;
+  }
+  if (result.addedNoGian > 0) {
+    msg += ` CẢNH BÁO: ${result.addedNoGian} dòng không tự xác định được Gian (diễn giải không có cụm "ghế ...") -- cần chị tự điền tay, lọc theo cột Gian trống.`;
+  }
+  if (skippedSheets.length > 0) {
+    msg += ` Đã bỏ qua sheet không phải "Tháng N.YYYY": ${skippedSheets.join(", ")}${
+      skippedSheets.includes("TT TIỀN MẶT") ? " (tab này cần mở từng link tra cứu thủ công như trước giờ, không tự động parse)" : ""
+    }.`;
+  }
+  return msg;
+}
+
 router.post("/chi-phi/upload", requireAdmin, upload.single("file"), (req, res) => {
   const store = load();
   ensureShape(store);
@@ -247,72 +324,48 @@ router.post("/chi-phi/upload", requireAdmin, upload.single("file"), (req, res) =
         `File không có sheet nào khớp tên dạng "Tháng N.YYYY" (đã thấy: ${skippedSheets.join(", ") || "(không có sheet)"}).`
       );
     }
-
-    const existingByKey = new Map();
-    store.chi_phi.forEach((r) => existingByKey.set(chiPhiRowKey(r), r));
-    let added = 0;
-    let addedNoGian = 0;
-    let upgradedGian = 0;
-    const monthSummary = [];
-    for (const mr of monthRows) {
-      let addedThisSheet = 0;
-      for (const r of mr.rows) {
-        const key = chiPhiRowKey(r);
-        const existingRow = existingByKey.get(key);
-        if (existingRow) {
-          // Dong da co roi -- KHONG dong tay, chi nang cap Gian tu nhan nhom
-          // chung chung len ten that neu lan nay tach duoc cu the hon.
-          if (r.gian && isUpgradableGian(existingRow.gian) && !isUpgradableGian(r.gian)) {
-            existingRow.gian = r.gian;
-            upgradedGian++;
-          }
-          continue;
-        }
-        const newRow = {
-          id: nextId(store, "chi_phi_seq") || Date.now(),
-          congTy: r.congTy,
-          ngay: r.ngay,
-          gian: r.gian,
-          ncc: r.ncc,
-          soHoaDon: r.soHoaDon || "",
-          soUNC: r.soUNC || "",
-          soChungTuLienQuan: "",
-          dienGiai: r.dienGiai,
-          loaiChiPhi: "",
-          soTien: r.soTien,
-          soTienHoaDonGoc: null,
-          linkHoaDon: "",
-          trangThaiHoaDon: r.gian ? "" : "Chưa xác định Gian (tự động) -- cần điền tay",
-          daHachToan: false,
-          nguon: mr.sheetName,
-          ghiChu: "",
-          createdAt: new Date().toISOString(),
-          source: `upload "${req.file.originalname}" ${new Date().toISOString().slice(0, 10)}`,
-        };
-        store.chi_phi.push(newRow);
-        existingByKey.set(key, newRow);
-        added++;
-        addedThisSheet++;
-        if (!r.gian) addedNoGian++;
-      }
-      if (addedThisSheet > 0) monthSummary.push(`${mr.sheetName}: +${addedThisSheet}`);
-    }
+    const sourceLabel = `upload "${req.file.originalname}" ${new Date().toISOString().slice(0, 10)}`;
+    const result = applyChiPhiMonthRowsToStore(store, monthRows, sourceLabel);
     save(store);
+    const msg = buildChiPhiResultMessage(`Đã nạp "${req.file.originalname}":`, result, skippedSheets);
+    res.redirect("/chi-phi?success=" + encodeURIComponent(msg));
+  } catch (e) {
+    res.redirect("/chi-phi?error=" + encodeURIComponent(e.message));
+  }
+});
 
-    let msg = `Đã nạp "${req.file.originalname}": thêm ${added} khoản chi mới${
-      monthSummary.length ? " (" + monthSummary.join(", ") + ")" : ""
-    }.`;
-    if (upgradedGian > 0) {
-      msg += ` Đã nâng cấp Gian (từ nhãn nhóm chung chung như "posh"/"JP" sang tên gian cụ thể) cho ${upgradedGian} dòng đã có sẵn.`;
+// Luyen, 2026-07-21 (lan 3): "cập nhật chi phí nữa từ gg sheet" -- doc THANG
+// tu Google Sheet (khong can tai file ve roi tai len nua), giong nut Cap nhat
+// hop dong NCC. Dung export?format=xlsx (khong phai format=csv nhu NCC) vi
+// parser nay can CA workbook nhieu sheet (tu do sheet "Tháng N.YYYY" bang ten)
+// VA thong tin merged-cell (cot Gian forward-fill) -- ca 2 thu nay CSV export
+// (chi 1 tab, khong merge) khong co duoc, chi export?format=xlsx (toan bo file,
+// giu nguyen dinh dang .xlsx that) moi dam bao dung.
+const CHI_PHI_SHEET_XLSX_URL =
+  process.env.CHI_PHI_SHEET_XLSX_URL ||
+  "https://docs.google.com/spreadsheets/d/17PdHu2ji8y1sO1KK6H-BOJTXhsbcSziEG9hHRd9-iL0/export?format=xlsx";
+
+router.post("/chi-phi/cap-nhat-tu-sheet", requireAdmin, async (req, res) => {
+  const store = load();
+  ensureShape(store);
+  try {
+    const resp = await fetch(CHI_PHI_SHEET_XLSX_URL);
+    if (!resp.ok) {
+      throw new Error(
+        `Không đọc được Google Sheet (mã lỗi ${resp.status}). Kiểm tra lại sheet đã chia sẻ "Bất kỳ ai có link đều xem được" chưa, hoặc link có bị đổi không.`
+      );
     }
-    if (addedNoGian > 0) {
-      msg += ` CẢNH BÁO: ${addedNoGian} dòng không tự xác định được Gian (diễn giải không có cụm "ghế ...") -- cần chị tự điền tay, lọc theo cột Gian trống.`;
+    const buf = Buffer.from(await resp.arrayBuffer());
+    const { monthRows, skippedSheets } = parseChiPhiSheetWorkbook(buf);
+    if (monthRows.length === 0) {
+      throw new Error(
+        `Google Sheet không có sheet nào khớp tên dạng "Tháng N.YYYY" (đã thấy: ${skippedSheets.join(", ") || "(không có sheet)"}).`
+      );
     }
-    if (skippedSheets.length > 0) {
-      msg += ` Đã bỏ qua sheet không phải "Tháng N.YYYY": ${skippedSheets.join(", ")}${
-        skippedSheets.includes("TT TIỀN MẶT") ? " (tab này cần mở từng link tra cứu thủ công như trước giờ, không tự động parse)" : ""
-      }.`;
-    }
+    const sourceLabel = "GG Sheet " + new Date().toISOString().slice(0, 10);
+    const result = applyChiPhiMonthRowsToStore(store, monthRows, sourceLabel);
+    save(store);
+    const msg = buildChiPhiResultMessage("Đã đọc thẳng từ Google Sheet:", result, skippedSheets);
     res.redirect("/chi-phi?success=" + encodeURIComponent(msg));
   } catch (e) {
     res.redirect("/chi-phi?error=" + encodeURIComponent(e.message));

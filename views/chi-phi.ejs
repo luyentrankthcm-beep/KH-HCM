@@ -27,12 +27,11 @@
       .icon-upload-btn .icon-upload-btn-label { font-size: 12px; font-weight: 600; white-space: nowrap; }
     </style>
     <div style="margin-bottom:16px; display:flex; gap:12px;">
-      <form method="POST" action="/chi-phi/upload" enctype="multipart/form-data" style="display:inline-block;">
-        <label class="icon-upload-btn" title='Chọn lại file "ĐI ỦY NHIỆM CHI KVC + MTĐ MN" xuất từ Google Sheet để nạp thêm khoản chi mới (không mất dữ liệu đã có)'>
-          <input type="file" name="file" accept=".xlsx,.xls" style="display:none;" onchange="this.form.submit()" />
+      <form method="POST" action="/chi-phi/cap-nhat-tu-sheet" style="display:inline-block;">
+        <button type="submit" class="icon-upload-btn" style="border:none;" title='Đọc thẳng từ Google Sheet "ĐI ỦY NHIỆM CHI KVC + MTĐ MN" để nạp thêm khoản chi mới (không cần tải file lên nữa, không mất dữ liệu đã có)'>
           <span class="icon-upload-btn-icon">📥</span>
           <span class="icon-upload-btn-label">Cập nhật chi phí</span>
-        </label>
+        </button>
       </form>
       <form method="POST" action="/chi-phi/quet-ngan-hang" style="display:inline-block;">
         <button type="submit" class="icon-upload-btn" style="border:1px solid var(--color-hairline);" title="Tự động quét các giao dịch Chi (tiền thuê gian) trong tháng hiện tại trên tất cả tài khoản ngân hàng, khớp gian hàng và tạo khoản chi phí mới (không tạo trùng). Chạy hàng ngày để tự cập nhật.">
