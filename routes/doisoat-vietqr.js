@@ -113,6 +113,21 @@ function ensureChannelShape(store) {
   if (!store.viet_qr_gian_merge) store.viet_qr_gian_merge = {};
   if (!store.viet_qr_nocode_assignments) store.viet_qr_nocode_assignments = {};
   if (!store.ma_cong_trinh_display_alias) store.ma_cong_trinh_display_alias = {};
+  // Chi Nhan, 2026-07-22: "nhấn nhầm nạp nhầm chỗ này mà hk có nút xóa hay
+  // lịch sử" -- upload "Danh sách điểm bán riêng" (store_export) truoc day
+  // ghi THANG (Object.assign) vao viet_qr_store_names, khong luu lai lich su
+  // nen khong the xoa/hoan tac 1 lan tai nham. Gio luu tung lan tai vao
+  // viet_qr_store_uploads[channel] (giong het cach lam voi viet_qr_raw_uploads),
+  // roi TINH LAI viet_qr_store_names[channel] = baseline + gop tat ca cac lan
+  // tai con lai theo thu tu thoi gian (xem mergeStoreNames) -- xoa 1 lan tai
+  // nao se tu dong tinh lai dung, khong con dinh lien vao lan do nua.
+  // viet_qr_store_names_baseline chi duoc "chup" 1 LAN DUY NHAT (luc tinh nang
+  // nay moi trien khai) de giu lai toan bo du lieu da co truoc do (tu cac lan
+  // tai file "Dữ liệu Viet QR" hoac sua tay tung ma) -- khong bao gio ghi de
+  // lai sau do, vi cac thay doi tu nhung nguon KHAC (khong phai store_export)
+  // van tiep tuc ghi truc tiep vao viet_qr_store_names nhu cu.
+  if (!store.viet_qr_store_uploads) store.viet_qr_store_uploads = {};
+  if (!store.viet_qr_store_names_baseline) store.viet_qr_store_names_baseline = {};
   // Luyen, 2026-07-21: "không cần chỉnh cái cũ khóa cho tôi" -- muon 1 tinh
   // nang "khoa so" that su (tung yeu cau 2 lan truoc: "khóa sổ cho tôi chỉ
   // nạp cái mới thôi"), khong phai sua tay tung dong lech cu. Luu 1 ngay
