@@ -23,6 +23,23 @@ if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
 // and destroyed real accounting data before this guard existed.
 let loadedFromUnrecoverableCorruption = false;
 
+// Chi Nhan, 2026-07-22: cache trong bo nho -- file store.json da lon (30-40MB+
+// sau khi them cac tinh nang luu lich su tai len). Truoc day MOI request (ke
+// ca chi xem trang, khong sua gi) deu goi load() va load() lai doc + JSON.parse
+// LAI TU DAU toan bo file nay (~300-500ms, chan CUNG luong Node.js vi la ham
+// dong bo/synchronous) -- khi 2-3 request den gan nhau (vd 1 nguoi mo 2 tab,
+// hoac Railway tu kiem tra "/" trong luc dang co request khac dang xu ly) thi
+// request den sau phai cho, co the vuot qua thoi gian cho toi da cua Railway
+// va tra ve loi "502 Application failed to respond" -- day chinh la nguyen
+// nhan gay loi 502 xay ra ngau nhien tren nhieu trang (ke ca trang chu) sau
+// khi du lieu lon dan. Fix: chi thuc su doc file tu dia 1 LAN (luc server moi
+// khoi dong, hoac neu vi ly do gi do chua co cache), sau do giu lai trong bo
+// nho (cachedStore) va tra ve THANG cho cac lan goi load() tiep theo -- save()
+// cap nhat lai cache ngay sau khi ghi thanh cong. An toan vi server nay chi
+// chay 1 tien trinh Node.js duy nhat cho 1 file du lieu (khong co tien trinh
+// nao khac cung sua file nay cung luc).
+let cachedStore = null;
+
 function emptyStore() {
   return {
     users: [],
@@ -125,18 +142,21 @@ function backupCorruptedFile() {
 }
 
 function load() {
+  if (cachedStore) return cachedStore;
   if (!fs.existsSync(DATA_FILE)) {
     const fresh = emptyStore();
-    fs.writeFileSync(DATA_FILE, JSON.stringify(fresh, null, 2));
-    return fresh;
+    fs.writeFileSync(DATA_FILE, JSON.stringify(fresh));
+    cachedStore = fresh;
+    return cachedStore;
   }
   const raw = fs.readFileSync(DATA_FILE, "utf8");
   try {
     const parsed = JSON.parse(raw);
     const base = emptyStore();
-    return Object.assign({}, base, parsed, {
+    cachedStore = Object.assign({}, base, parsed, {
       seq: Object.assign({}, base.seq, parsed.seq || {}),
     });
+    return cachedStore;
   } catch (e) {
     console.error("[store] Loi doc file du lieu, thu tu phuc hoi:", e.message);
     try {
@@ -148,7 +168,8 @@ function load() {
         seq: Object.assign({}, base.seq, parsed.seq || {}),
       });
       save(healed); // persist the healed version immediately so it stays fixed
-      return healed;
+      cachedStore = healed;
+      return cachedStore;
     } catch (e2) {
       // CRITICAL: the file exists but we could not recover it. Do NOT return
       // an empty store silently and let the caller (seed()) persist that
@@ -195,7 +216,11 @@ function save(store) {
   // the old file is fully replaced, not overwritten byte-by-byte), then
   // (3) read the result back and verify it actually parses before declaring
   // success, retrying a few times if not.
-  const data = JSON.stringify(store, null, 2);
+  // Chi Nhan, 2026-07-22: bo indent (null, 2) -- file da lon (30-40MB+), indent
+  // lam file to hon dang ke va JSON.stringify cham hon (van la JSON hop le,
+  // doc/phuc hoi lai binh thuong), gop voi cache o load() de giam toi da thoi
+  // gian chan luong Node.js gay 502.
+  const data = JSON.stringify(store);
   let lastErr = null;
   for (let attempt = 1; attempt <= 3; attempt++) {
     const tmpFile = DATA_FILE + ".tmp-" + process.pid + "-" + Date.now() + "-" + Math.random().toString(36).slice(2);
@@ -204,6 +229,7 @@ function save(store) {
       fs.renameSync(tmpFile, DATA_FILE);
       const check = fs.readFileSync(DATA_FILE, "utf8");
       JSON.parse(check); // throws if the file on disk is corrupted
+      cachedStore = store; // cache updated only after a verified-successful write
       return; // success
     } catch (e) {
       lastErr = e;

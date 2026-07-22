@@ -33,6 +33,22 @@
         <button type="submit" class="btn btn-secondary">Phục hồi dữ liệu</button>
       </form>
     </section>
+
+    <section class="panel">
+      <h2>3. Đồng bộ một phần (Momo KH Cũ/Mới + 1 kênh Viet QR) từ file offline</h2>
+      <p class="muted">
+        Dùng khi chỉ muốn đưa dữ liệu Momo (cả KH Cũ và KH Mới) và 1 kênh Viet QR cụ thể từ bản chạy trên máy
+        (offline) lên bản online -- KHÔNG đụng đến các trang/dữ liệu khác đang có trên bản online (khác với mục 2
+        ở trên là thay thế toàn bộ). Chọn file sao lưu (.json) tải từ bản offline (mục 1 ở trên, chạy trên bản
+        offline), gõ đúng tên kênh Viet QR cần đồng bộ (vd <code>bidv7702</code>).
+      </p>
+      <form method="POST" action="/he-thong/sao-luu/dong-bo-mot-phan" enctype="multipart/form-data" class="form-inline"
+            onsubmit="return confirm('Sẽ ghi đè dữ liệu Momo (KH Cũ + KH Mới) và kênh Viet QR đã chọn bằng dữ liệu trong file này. Chắc chắn tiếp tục?');">
+        <input type="file" name="file" accept=".json" required />
+        <input type="text" name="channels" placeholder="vd: bidv7702" required style="width:140px;" />
+        <button type="submit" class="btn btn-secondary">Đồng bộ một phần</button>
+      </form>
+    </section>
   </main>
 </body>
 </html>
