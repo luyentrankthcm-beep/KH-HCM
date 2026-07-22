@@ -138,9 +138,16 @@
               </td>
               <td><%= (r.soTien || 0).toLocaleString('vi-VN') %> đ</td>
               <td>
-                <% if (r.linkHoaDon) { %><a href="<%= r.linkHoaDon %>" target="_blank" rel="noopener">Xem hóa đơn</a>
-                <% } else { %><span class="muted">Không có</span>
+                <% if (r.linkHoaDon) { %><a href="<%= r.linkHoaDon %>" target="_blank" rel="noopener">Xem hóa đơn</a><br/>
+                <% } else { %><span class="muted">Không có</span><br/>
                 <% } %>
+                <form method="POST" action="/chi-phi/<%= r.id %>/link-hoa-don" class="form-inline" style="gap:4px;">
+                  <input type="hidden" name="hachToan" value="<%= hachToanFilter %>" />
+                  <input type="hidden" name="thang" value="<%= thangFilter %>" />
+                  <input type="hidden" name="hoaDon" value="<%= hoaDonFilter %>" />
+                  <input type="text" name="linkHoaDon" value="<%= r.linkHoaDon %>" placeholder="Dán link Drive" style="width:90px; font-size:11px; padding:2px 4px;" />
+                  <button type="submit" class="link-btn" style="font-size:11px;" title="Lưu link hóa đơn">Lưu</button>
+                </form>
               </td>
               <td>
                 <form method="POST" action="/chi-phi/<%= r.id %>/hach-toan" style="display:inline;">

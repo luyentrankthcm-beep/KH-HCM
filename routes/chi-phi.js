@@ -209,6 +209,27 @@ router.post("/chi-phi/:id/so-hoa-don", requireAdmin, (req, res) => {
   res.redirect("/chi-phi?" + qs.join("&"));
 });
 
+// Luyen, 2026-07-22: "tìm hóa đơn qua Gmail lưu Drive rồi gán lên đây" -- can
+// route rieng de cap nhat link hoa don (link Google Drive) cho 1 dong Chi Phi
+// da co san, khong dung chung voi /so-hoa-don (chi sua so hoa don thu cong).
+router.post("/chi-phi/:id/link-hoa-don", requireAdmin, (req, res) => {
+  const store = load();
+  ensureShape(store);
+  const r = store.chi_phi.find((x) => String(x.id) === req.params.id);
+  const qs = [];
+  if (req.body.hachToan) qs.push("hachToan=" + encodeURIComponent(req.body.hachToan));
+  if (req.body.thang !== undefined) qs.push("thang=" + encodeURIComponent(req.body.thang));
+  if (req.body.hoaDon) qs.push("hoaDon=" + encodeURIComponent(req.body.hoaDon));
+  if (!r) {
+    qs.push("error=" + encodeURIComponent("Không tìm thấy khoản chi này."));
+    return res.redirect("/chi-phi?" + qs.join("&"));
+  }
+  r.linkHoaDon = (req.body.linkHoaDon || "").trim();
+  save(store);
+  qs.push("success=" + encodeURIComponent("Đã cập nhật link hóa đơn."));
+  res.redirect("/chi-phi?" + qs.join("&"));
+});
+
 router.post("/chi-phi", requireAdmin, (req, res) => {
   const store = load();
   ensureShape(store);
