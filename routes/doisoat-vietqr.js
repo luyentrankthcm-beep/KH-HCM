@@ -496,6 +496,55 @@ function buildChannelReconciliation(store, channelKey) {
     });
   }
 
+  // Chi Nhan, 2026-07-22: "cộng gộp các điểm mã công trình lại với nhau đi"
+  // -- nhieu ma cua hang/code tho khac nhau deu duoc displayMaCongTrinhFor o
+  // tren quy ve CUNG 1 ten Ma Cong Trinh chuan (vd "SB CAN THO PHCM", "GO MY
+  // THO"...), nhung bang "Ket qua doi soat" chi tiet van hien MOI CODE THO
+  // thanh 1 dong rieng nen bi trung ten nhieu lan. CHI gop cac dong DA KHOA
+  // SO lai voi nhau (khong con nut sua/xoa nao, an toan tuyet doi khi gop) --
+  // dong nao CHUA khoa (con dang can xu ly/co nut sua) thi GIU NGUYEN rieng
+  // le nhu cu, tranh lam hong cac nut "Sua HD"/doi tru thu cong dang gan voi
+  // dung 1 code cu the.
+  reconciled.forEach((r) => {
+    const groups = {};
+    const order = [];
+    r.lines.forEach((l) => {
+      const isCse = l.code.endsWith(FF_SUFFIX);
+      const key = `${l.maCongTrinh} ${isCse ? 1 : 0}`;
+      if (!groups[key]) {
+        groups[key] = [];
+        order.push(key);
+      }
+      groups[key].push(l);
+    });
+    const newLines = [];
+    order.forEach((key) => {
+      const group = groups[key];
+      if (group.length === 1 || !group.every((l) => l.locked)) {
+        newLines.push(...group);
+        return;
+      }
+      const first = group[0];
+      const gross = group.reduce((s, l) => s + l.gross, 0);
+      const invoiceTotal = group.reduce((s, l) => s + l.invoiceTotal, 0);
+      const invoiceNumbers = Array.from(new Set(group.flatMap((l) => l.invoiceNumbers)));
+      newLines.push({
+        code: first.code,
+        maCongTrinh: first.maCongTrinh,
+        tkCo: first.tkCo,
+        gross,
+        net: gross,
+        invoiceNumbers,
+        invoiceTotal,
+        diff: 0,
+        matched: invoiceNumbers.length > 0 && Math.abs(invoiceTotal - gross) < 1,
+        manualOverride: group.some((l) => l.manualOverride),
+        locked: true,
+      });
+    });
+    r.lines = newLines;
+  });
+
   const allCodes = new Set();
   reconciled.forEach((r) => r.lines.forEach((l) => allCodes.add(l.code)));
 
@@ -603,7 +652,7 @@ router.get("/doi-soat/vietqr", (req, res) => {
       r.lines.forEach((l) => {
         const maCongTrinh = resolveMaCongTrinh(l.code);
         const isCse = l.code.endsWith(FF_SUFFIX);
-        const groupKey = `${maCongTrinh} ${isCse ? 1 : 0}`;
+        const groupKey = `${maCongTrinh} ${isCse ? 1 : 0}`;
         groupInfo[groupKey] = { maCongTrinh, isCse };
         if (!cellMap[groupKey]) cellMap[groupKey] = {};
         const existing = cellMap[groupKey][r.settlementDate];
