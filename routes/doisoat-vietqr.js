@@ -1462,6 +1462,38 @@ router.get("/doi-soat/vietqr/export.xlsx", (req, res) => {
   res.send(buf);
 });
 
+// Chi Nhan, 2026-07-22: file "/he-thong/sao-luu/tai-xuong" (tai xuong toan bo
+// du lieu) gio da qua lon, hay bi 502/timeout khi tai xuong -- route nay tra
+// ve tom tat NHE (chi ten file, thoi gian tai, so dong -- KHONG kem toan bo
+// du lieu giao dich) cho 1 kenh cu the, de kiem tra/xoa dung lan tai can
+// thiet ma khong can tai ca file sao luu nang.
+router.get("/doi-soat/vietqr/debug/:channel", requireAdmin, (req, res) => {
+  const store = load();
+  ensureChannelShape(store);
+  const channelKey = req.params.channel;
+  if (!CHANNELS[channelKey]) return res.status(404).json({ error: "Kenh khong hop le." });
+  const raw = (store.viet_qr_raw_uploads[channelKey] || []).map((u) => ({
+    id: u.id,
+    file_name: u.file_name,
+    uploaded_at: u.uploaded_at,
+    rowCount: (u.rows || []).length,
+  }));
+  const storeUps = (store.viet_qr_store_uploads[channelKey] || []).map((u) => ({
+    id: u.id,
+    file_name: u.file_name,
+    uploaded_at: u.uploaded_at,
+    entryCount: Object.keys(u.map || {}).length,
+  }));
+  const invoices = store.viet_qr_invoices[channelKey] || [];
+  res.json({
+    channel: channelKey,
+    rawUploads: raw,
+    storeUploads: storeUps,
+    invoiceCount: invoices.length,
+    storeNamesCount: Object.keys(store.viet_qr_store_names[channelKey] || {}).length,
+  });
+});
+
 // Exposed so routes/dashboard.js (Tong quan / Cong no) can reuse the exact
 // same per-channel reconciliation this page shows, without a second
 // implementation. CHANNELS/CHANNEL_KEYS let the caller loop over all 3 Viet
