@@ -572,31 +572,71 @@ router.get("/doi-soat/vietqr", (req, res) => {
   activeKeys.forEach((ch) => {
     const rows = reconciledByChannel[ch] || [];
     const dates = Array.from(new Set(rows.map((r) => r.settlementDate))).sort();
-    const cellMap = {};
-    const codesSet = new Set();
+    // Chi Nhan, 2026-07-22: "mấy cái này gộp theo mã công trình như hôm qua
+    // á" -- bang nay truoc day gop dong theo "code" THO (chuoi goc tu
+    // resolveGianGross, ke ca cac "self-fallback" rieng cho tung ten cua
+    // hang chua co hoa don, vd "LM VT 02", "LM VT 04"... hay nhieu ma cua
+    // hang khac nhau cung fuzzy-match ve 1 diem that qua displayMaCongTrinhFor
+    // nhu "SB CAN THO PHCM"). Nhieu "code" khac nhau co the CUNG quy ve 1
+    // TEN MA CONG TRINH sau khi hien thi (displayMaCongTrinhFor so khop voi
+    // danh sach cong trinh chuan), nen truoc day hien thanh nhieu dong TRUNG
+    // TEN nhau thay vi gop lam 1 -- gio gop theo TEN DA QUY VE (maCongTrinh +
+    // isCse) ngay tu dau, cong don doanh thu/hoa don cua tat ca cac code con
+    // lai vao chung 1 dong duy nhat cho tung ngay.
+    const cellMap = {}; // groupKey -> { date -> merged cell data }
+    const groupInfo = {}; // groupKey -> { maCongTrinh, isCse }
     rows.forEach((r) => {
       r.lines.forEach((l) => {
-        codesSet.add(l.code);
-        if (!cellMap[l.code]) cellMap[l.code] = {};
-        cellMap[l.code][r.settlementDate] = l;
+        const maCongTrinh = displayMaCongTrinhFor(l.code, CHANNELS[ch].company, store);
+        const isCse = l.code.endsWith(FF_SUFFIX);
+        const groupKey = `${maCongTrinh} ${isCse ? 1 : 0}`;
+        groupInfo[groupKey] = { maCongTrinh, isCse };
+        if (!cellMap[groupKey]) cellMap[groupKey] = {};
+        const existing = cellMap[groupKey][r.settlementDate];
+        if (!existing) {
+          cellMap[groupKey][r.settlementDate] = {
+            tkCo: l.tkCo,
+            gross: l.gross,
+            invoiceTotal: l.invoiceTotal,
+            invoiceNumbers: [...l.invoiceNumbers],
+            matched: l.matched,
+            manualOverride: l.manualOverride,
+            locked: !!l.locked,
+          };
+        } else {
+          existing.gross += l.gross;
+          existing.invoiceTotal += l.invoiceTotal;
+          existing.invoiceNumbers = existing.invoiceNumbers.concat(l.invoiceNumbers);
+          existing.matched = existing.matched && l.matched;
+          existing.manualOverride = existing.manualOverride || l.manualOverride;
+          // Chi coi ca nhom la "da khoa" cho ngay do neu TAT CA cac code con
+          // gop vao deu da khoa -- con 1 code chua khoa thi van can hien de
+          // xu ly, khong an di.
+          existing.locked = existing.locked && !!l.locked;
+          if ((!existing.tkCo || existing.tkCo === "SKIP") && l.tkCo && l.tkCo !== "SKIP") existing.tkCo = l.tkCo;
+        }
       });
     });
-    const codes = Array.from(codesSet).sort();
+    const groupKeys = Object.keys(groupInfo).sort((a, b) =>
+      groupInfo[a].maCongTrinh.localeCompare(groupInfo[b].maCongTrinh)
+    );
     pivotByChannel[ch] = {
       dates,
-      rows: codes.map((code) => {
+      rows: groupKeys.map((groupKey) => {
+        const { maCongTrinh, isCse } = groupInfo[groupKey];
         let sumGross = 0;
         let sumInvoiceTotal = 0;
         let sumDiffUnlocked = 0;
         const cells = dates.map((d) => {
-          const l = (cellMap[code] || {})[d];
+          const l = (cellMap[groupKey] || {})[d];
           if (!l) return null;
           sumGross += l.gross;
           sumInvoiceTotal += l.invoiceTotal;
+          const diff = l.invoiceTotal - l.gross;
           // Khoa so: dong da khoa van tinh vao Tong DT (tien that), nhung
           // KHONG tinh vao "Tong lech" nua (khong con can xu ly) -- xem ghi
           // chu tai buildChannelReconciliation.
-          if (!l.locked) sumDiffUnlocked += l.invoiceTotal - l.gross;
+          if (!l.locked) sumDiffUnlocked += diff;
           let status;
           if (l.locked) status = "locked";
           else if (l.tkCo === "SKIP") status = "skip";
@@ -608,18 +648,18 @@ router.get("/doi-soat/vietqr", (req, res) => {
             tkCo: l.tkCo,
             gross: l.gross,
             invoiceTotal: l.invoiceTotal,
-            diff: l.diff,
+            diff,
             invoiceNumbers: l.invoiceNumbers,
             matched: l.matched,
             manualOverride: l.manualOverride,
-            locked: !!l.locked,
+            locked: l.locked,
             status,
           };
         });
         return {
-          code,
-          maCongTrinh: displayMaCongTrinhFor(code, CHANNELS[ch].company, store),
-          isCse: code.endsWith(FF_SUFFIX),
+          code: maCongTrinh,
+          maCongTrinh,
+          isCse,
           cells,
           sumGross,
           sumInvoiceTotal,
