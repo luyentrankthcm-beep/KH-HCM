@@ -606,7 +606,13 @@ function extractMomoSettlements(transactions) {
 // alternate name, without needing to re-upload the invoice file.
 function reconcileMomo(settlements, grossData, invoiceData, gianMapping, diemAlias) {
   const alias = diemAlias || {};
-  const invoicesByDiemDay = {}; // "CODE|YYYY-MM-DD" -> [invoice,...]
+
+  // Resolve every invoice's day-of-month list into full ISO calendar dates
+  // once (handles the "day near start of month actually belongs to end of
+  // PREVIOUS month" case), tagged with its effective Ma Cong trinh (after
+  // alias) -- reused below both to detect duplicate combined invoices and to
+  // build invoicesByDiemDay.
+  const resolvedInvoices = [];
   for (const inv of invoiceData.invoices) {
     if (!inv.ngayHd || !inv.days || inv.days.length === 0) continue;
     // The invoice date tells us the month/year; revenue day(s) are inv.days,
@@ -615,7 +621,7 @@ function reconcileMomo(settlements, grossData, invoiceData, gianMapping, diemAli
     // was from the LAST day of the previous month.
     const [invY, invMo, invD] = inv.ngayHd.split("-").map(Number);
     const effectiveMaDiem = alias[inv.maDiem] || inv.maDiem;
-    for (const day of inv.days) {
+    const isos = inv.days.map((day) => {
       let y = invY;
       let mo = invMo;
       if (day > 20 && invD <= 3) {
@@ -626,7 +632,41 @@ function reconcileMomo(settlements, grossData, invoiceData, gianMapping, diemAli
           y -= 1;
         }
       }
-      const iso = `${y}-${String(mo).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+      return `${y}-${String(mo).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+    });
+    resolvedInvoices.push({ inv, effectiveMaDiem, isos });
+  }
+
+  // Luyen, 2026-07-22: "do bị trùng á bỏ qua cho tôi nhá" -- chi xac nhan qua
+  // truong hop thuc te (thang 7/2026, gian DIY ESTELLA/FARM LOTTE PHAN
+  // THIET/NHA TRANG/AE TAN AN): moi gian da co san 1 hoa don RIENG cho ngay
+  // 18 (vd so HD 9977-9981), roi NCC lai xuat THEM 1 hoa don GOP ghi ca 2
+  // ngay ("momo 18,19" -> days=[18,19], vd so HD 10008-10012) -- day la hoa
+  // don xuat TRUNG/XUAT LAI (trung lap voi ngay 18 da co hoa don rieng roi),
+  // KHONG phai doanh thu moi -- cong ca 2 hoa don vao lam doi soat bi "Lech"
+  // dung bang chinh so tien hoa don gop do.
+  //
+  // Quy tac chung: 1 hoa don gop NHIEU ngay (>1 ngay) ma CO IT NHAT 1 trong
+  // cac ngay do (theo ngay lich ISO day du, khong chi so ngay-trong-thang --
+  // tranh nham giua cac thang khac nhau) DA CO SAN 1 hoa don RIENG (chi 1
+  // ngay) khac cho CUNG gian, thi coi hoa don gop nay la TRUNG LAP -- loai
+  // HOAN TOAN khoi doi soat (khong cong vao bat ky ngay nao), thay vi cong
+  // them lam du doanh thu.
+  const singleDayIsoByCode = {}; // "CODE|ISO" -> true, tu cac hoa don CHI 1 ngay
+  for (const { inv, effectiveMaDiem, isos } of resolvedInvoices) {
+    if (inv.days.length === 1) {
+      singleDayIsoByCode[`${effectiveMaDiem}|${isos[0]}`] = true;
+    }
+  }
+
+  const invoicesByDiemDay = {}; // "CODE|YYYY-MM-DD" -> [invoice,...]
+  for (const { inv, effectiveMaDiem, isos } of resolvedInvoices) {
+    const isDuplicateCombinedInvoice =
+      inv.days.length > 1 &&
+      isos.some((iso) => singleDayIsoByCode[`${effectiveMaDiem}|${iso}`]);
+    if (isDuplicateCombinedInvoice) continue; // hoa don gop trung -- bo qua hoan toan
+
+    for (const iso of isos) {
       const key = `${effectiveMaDiem}|${iso}`;
       if (!invoicesByDiemDay[key]) invoicesByDiemDay[key] = [];
       invoicesByDiemDay[key].push(inv);
