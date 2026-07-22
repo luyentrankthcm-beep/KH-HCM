@@ -5,6 +5,7 @@ const { load, save } = require("../store");
 const router = express.Router();
 
 router.get("/login", (req, res) => {
+  if (process.env.DISABLE_AUTH === "true") return res.redirect("/");
   if (req.session && req.session.userId) return res.redirect("/");
   res.render("login", { error: null });
 });

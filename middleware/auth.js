@@ -1,5 +1,25 @@
 const { load } = require("../store");
 
+// Chi Nhan (2026-07-22): "offline bỏ cái mật khẩu luôn đi" -- CHI ap dung cho
+// ban chay OFFLINE tren may cua Nhan, tuyet doi KHONG duoc bat bien nay tren
+// Railway (ban online): dat DISABLE_AUTH=true trong file .env O MAY (khong
+// commit file .env len git, va KHONG duoc tao bien nay trong Railway
+// Settings > Variables) -- khi bat, moi trang tu dong dang nhap san bang tai
+// khoan admin dau tien, khong can nhap mat khau nua.
+const AUTH_DISABLED = process.env.DISABLE_AUTH === "true";
+
+function autoLoginSession(req) {
+  const store = load();
+  const user = (store.users || []).find((u) => u.role === "admin") || (store.users || [])[0];
+  if (!user) return null;
+  req.session = req.session || {};
+  req.session.userId = user.id;
+  req.session.userName = user.name;
+  req.session.role = user.role || "admin";
+  req.session.sessionVersion = user.session_version || 0;
+  return user;
+}
+
 // Chi Nhan (2026-07-22): "khi tôi đổi mk đăng xuất khỏi các đăng nhập cũ cho
 // tôi nhá" -- session dung cookie-session (KHONG co session store phia
 // server, toan bo du lieu session nam trong cookie ky ten o may nguoi dung),
@@ -13,6 +33,10 @@ const { load } = require("../store");
 // bi/trinh duyet dang dang nhap bang mat khau CU, ke ca may khong dung de
 // doi mat khau.
 function requireLogin(req, res, next) {
+  if (AUTH_DISABLED) {
+    const user = autoLoginSession(req);
+    if (user) return next();
+  }
   if (req.session && req.session.userId) {
     const store = load();
     const user = (store.users || []).find((u) => u.id === req.session.userId);
@@ -37,6 +61,7 @@ function requireLogin(req, res, next) {
 // /account/password da duoc gan middleware nay). Neu khong phai admin, quay
 // ve trang truoc (Referer) kem thong bao loi thay vi thuc hien thao tac.
 function requireAdmin(req, res, next) {
+  if (AUTH_DISABLED) return next();
   if (req.session && req.session.role === "admin") {
     return next();
   }
