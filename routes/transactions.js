@@ -37,12 +37,13 @@ function companyBankIds(store, company) {
   return new Set(companyBanks(store, company).map((b) => b.id));
 }
 
-function filterTransactions(store, { bank_id, from, to, bankIds }) {
+function filterTransactions(store, { bank_id, from, to, type, bankIds }) {
   let rows = [...store.transactions];
   if (bankIds) rows = rows.filter((t) => bankIds.has(t.bank_id));
   if (bank_id) rows = rows.filter((t) => t.bank_id === Number(bank_id));
   if (from) rows = rows.filter((t) => t.date >= from);
   if (to) rows = rows.filter((t) => t.date <= to);
+  if (type === "thu" || type === "chi") rows = rows.filter((t) => t.type === type);
   rows.sort((a, b) => (b.date > a.date ? 1 : b.date < a.date ? -1 : b.id - a.id));
   return rows.map((t) => withBankLabel(store, t));
 }
@@ -100,19 +101,29 @@ router.get("/transactions", (req, res) => {
   const store = load();
   const activeCompany = getCompany(req);
   const banks = companyBanks(store, activeCompany);
-  const { bank_id, from, to } = req.query;
+  const { bank_id, from, to, type } = req.query;
 
-  const rows = filterTransactionsWithBalance(store, {
+  // Chi Nhan (2026-07-22): "tách thu chi thành 2 cột ... cộng tổng thu chi
+  // đang hiển thị ... lọc thu chi ở đây theo ngày tháng" -- tinh tong Thu/Chi
+  // tren TOAN BO danh sach da loc (khong chi 500 dong hien thi), de dung voi
+  // bo loc dang chon, roi moi cat con 500 dong de hien thi bang.
+  const allFiltered = filterTransactionsWithBalance(store, {
     bank_id,
     from,
     to,
+    type,
     bankIds: companyBankIds(store, activeCompany),
-  }).slice(0, 500);
+  });
+  const rows = allFiltered.slice(0, 500);
+  const totalThu = allFiltered.filter((t) => t.type === "thu").reduce((s, t) => s + Number(t.amount || 0), 0);
+  const totalChi = allFiltered.filter((t) => t.type === "chi").reduce((s, t) => s + Number(t.amount || 0), 0);
 
   res.render("transactions", {
     banks,
     rows,
-    filters: { bank_id: bank_id || "", from: from || "", to: to || "" },
+    totalThu,
+    totalChi,
+    filters: { bank_id: bank_id || "", from: from || "", to: to || "", type: type || "" },
     userName: req.session.userName,
     pasteResult: null,
     uploadResult: null,

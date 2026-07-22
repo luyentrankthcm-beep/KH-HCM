@@ -147,9 +147,21 @@
         </select>
         <input type="date" name="from" value="<%= filters.from %>" />
         <input type="date" name="to" value="<%= filters.to %>" />
+        <select name="type">
+          <option value="">Tất cả Thu/Chi</option>
+          <option value="thu" <%= filters.type === 'thu' ? 'selected' : '' %>>Chỉ Thu</option>
+          <option value="chi" <%= filters.type === 'chi' ? 'selected' : '' %>>Chỉ Chi</option>
+        </select>
         <button type="submit" class="btn btn-secondary">Lọc</button>
         <a class="btn btn-secondary" href="/export.xlsx?bank_id=<%= filters.bank_id %>&from=<%= filters.from %>&to=<%= filters.to %>">Xuất Excel</a>
       </form>
+
+      <div style="margin:10px 0; padding:8px 12px; background:#f5f7fa; border:1px solid #e1e6ec; border-radius:8px; font-size:13px;">
+        Tổng đang hiển thị (theo bộ lọc) —
+        Thu: <strong class="text-pos"><%= totalThu.toLocaleString('vi-VN') %> đ</strong>
+        &nbsp;|&nbsp;
+        Chi: <strong class="text-neg"><%= totalChi.toLocaleString('vi-VN') %> đ</strong>
+      </div>
 
       <p class="muted" style="margin:6px 0 10px;">
         Mẹo: giữ <strong>Ctrl</strong> (hoặc <strong>Cmd</strong> trên Mac) rồi bấm vào nhiều dòng để cộng tổng số tiền các dòng đã chọn.
@@ -161,7 +173,7 @@
 
       <table class="table">
         <thead>
-          <tr><th>Ngày</th><th>Ngân hàng</th><th>Diễn giải</th><th>Loại</th><th>Số tiền</th><th>Số dư</th></tr>
+          <tr><th>Ngày</th><th>Ngân hàng</th><th>Diễn giải</th><th>Thu</th><th>Chi</th><th>Số dư</th></tr>
         </thead>
         <tbody>
           <% rows.forEach(function(t) { %>
@@ -169,10 +181,8 @@
             <td><%= t.date %></td>
             <td><%= t.bank_label %></td>
             <td class="desc-cell" title="<%= t.description %>"><%= t.description %></td>
-            <td><span class="badge badge-<%= t.type %>"><%= t.type === 'thu' ? 'Thu' : 'Chi' %></span></td>
-            <td class="<%= t.type === 'chi' ? 'text-neg' : 'text-pos' %>">
-              <%= t.type === 'chi' ? '-' : '+' %><%= t.amount.toLocaleString('vi-VN') %> đ
-            </td>
+            <td class="text-pos"><%= t.type === 'thu' ? t.amount.toLocaleString('vi-VN') + ' đ' : '' %></td>
+            <td class="text-neg"><%= t.type === 'chi' ? t.amount.toLocaleString('vi-VN') + ' đ' : '' %></td>
             <td><%= t.balance != null ? t.balance.toLocaleString('vi-VN') + ' đ' : '-' %></td>
           </tr>
           <% }) %>
