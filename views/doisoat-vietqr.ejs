@@ -113,6 +113,33 @@
           <input type="file" name="file" accept=".xlsx,.xls" required />
           <button type="submit" class="btn btn-secondary">Tải danh sách điểm bán</button>
         </form>
+        <% var storeUps = storeUploads[ch] || []; %>
+        <details style="margin-top:10px;">
+          <summary class="muted" style="cursor:pointer;">
+            Đã tải <%= storeUps.length %> lần (bấm để xem chi tiết, có thể xoá nếu lỡ tải nhầm)
+          </summary>
+          <table class="table" style="margin-top:10px;">
+            <thead><tr><th>File</th><th>Sheet</th><th>Số điểm bán</th><th>Lúc tải</th><th></th></tr></thead>
+            <tbody>
+              <% storeUps.forEach(function(u) { %>
+              <tr>
+                <td><%= u.file_name %></td>
+                <td><%= u.sheetName %></td>
+                <td><%= Object.keys(u.map || {}).length %></td>
+                <td><%= new Date(u.uploaded_at).toLocaleString('vi-VN') %></td>
+                <td>
+                  <form method="POST" action="/doi-soat/vietqr/upload-store/<%= ch %>/<%= u.id %>/delete" onsubmit="return confirm('Xoá lần tải danh sách điểm bán này? (sẽ tính lại danh sách từ các lần tải còn lại)');">
+                    <button type="submit" class="link-btn link-danger">Xoá</button>
+                  </form>
+                </td>
+              </tr>
+              <% }) %>
+              <% if (storeUps.length === 0) { %>
+              <tr><td colspan="5" class="muted">Chưa tải file nào cho kênh này.</td></tr>
+              <% } %>
+            </tbody>
+          </table>
+        </details>
       </div>
 
       <div style="margin-top:16px; padding-top:12px; border-top:1px dashed #ddd;">

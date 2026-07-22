@@ -152,7 +152,27 @@ function ensureChannelShape(store) {
     if (!store.viet_qr_invoices[ch]) store.viet_qr_invoices[ch] = [];
     if (!store.viet_qr_manual_matches[ch]) store.viet_qr_manual_matches[ch] = {};
     if (!store.viet_qr_nocode_assignments[ch]) store.viet_qr_nocode_assignments[ch] = {};
+    if (!store.viet_qr_store_uploads[ch]) store.viet_qr_store_uploads[ch] = [];
+    if (!store.viet_qr_store_names_baseline[ch]) {
+      // Chup 1 lan duy nhat: du lieu diem ban HIEN CO ngay truoc khi tinh
+      // nang lich su/xoa nay ton tai, de khong mat du lieu cu.
+      store.viet_qr_store_names_baseline[ch] = Object.assign({}, store.viet_qr_store_names[ch]);
+    }
   });
+}
+
+// Gop danh sach diem ban tu nhieu lan tai "store_export" (moi lan la 1 object
+// {maCuaHang: {...}}) theo thu tu THOI GIAN (cu truoc, moi sau) chong len
+// baseline -- lan tai MOI HON de nguoi thang neu cung 1 ma cua hang xuat hien
+// o nhieu lan tai. Xoa 1 lan tai (bo entry do khoi mang roi goi lai ham nay)
+// se tu dong tinh lai dung ma khong con dinh lieu cua lan da xoa.
+function mergeStoreNames(uploads, baseline) {
+  let merged = Object.assign({}, baseline || {});
+  const sorted = [...uploads].sort((a, b) => new Date(a.uploaded_at) - new Date(b.uploaded_at));
+  for (const u of sorted) {
+    merged = Object.assign(merged, u.map || {});
+  }
+  return merged;
 }
 
 // Merge raw-upload rows across multiple uploads the same way Momo/ZVP merge
@@ -688,6 +708,10 @@ router.get("/doi-soat/vietqr", (req, res) => {
       acc[ch] = store.viet_qr_raw_uploads[ch];
       return acc;
     }, {}),
+    storeUploads: activeKeys.reduce((acc, ch) => {
+      acc[ch] = store.viet_qr_store_uploads[ch];
+      return acc;
+    }, {}),
     invoiceCounts: activeKeys.reduce((acc, ch) => {
       acc[ch] = store.viet_qr_invoices[ch].length;
       return acc;
@@ -921,9 +945,20 @@ router.post("/doi-soat/vietqr/upload-store/:channel", requireAdmin, upload.singl
         changedEntries.push(`${maCuaHang}: "${prev.tenDiemBan || prev.matchText}" -> "${next.tenDiemBan}"`);
       }
     });
-    // Cong don: giu nguyen cac ma cua hang cu khong co trong file moi, chi
-    // them moi/cap nhat nhung ma co trong file nay (khong xoa du lieu cu).
-    store.viet_qr_store_names[channelKey] = Object.assign({}, existing, map);
+    // Chi Nhan, 2026-07-22: luu lai LICH SU lan tai nay (thay vi ghi thang de
+    // luc lo tai nham co the bam Xoa hoan tac -- xem ensureChannelShape/
+    // mergeStoreNames o tren).
+    store.viet_qr_store_uploads[channelKey].push({
+      id: nextId(store, "viet_qr_store_uploads_seq") || Date.now(),
+      uploaded_at: new Date().toISOString(),
+      file_name: req.file.originalname,
+      sheetName,
+      map,
+    });
+    store.viet_qr_store_names[channelKey] = mergeStoreNames(
+      store.viet_qr_store_uploads[channelKey],
+      store.viet_qr_store_names_baseline[channelKey]
+    );
     save(store);
 
     let msg = `Da nap "${sheetName}": ${Object.keys(map).length} diem ban (${CHANNELS[channelKey].label}).${UPDATED_NOTE}`;
@@ -938,6 +973,31 @@ router.post("/doi-soat/vietqr/upload-store/:channel", requireAdmin, upload.singl
         .join("; ")}${changedEntries.length > 8 ? `... va ${changedEntries.length - 8} ma khac` : ""}.`;
     }
     res.redirect("/doi-soat/vietqr?success=" + encodeURIComponent(msg));
+  } catch (e) {
+    res.redirect("/doi-soat/vietqr?error=" + encodeURIComponent(e.message));
+  }
+});
+
+// Chi Nhan, 2026-07-22: "nhấn nhầm nạp nhầm chỗ này mà hk có nút xóa" -- xoa
+// 1 lan tai "store_export" cu the, roi tinh lai viet_qr_store_names tu
+// baseline + cac lan tai CON LAI (theo dung thu tu thoi gian) -- hoan tac
+// dung 1 lan tai bi loi, khong dung den cac lan tai/sua tay khac.
+router.post("/doi-soat/vietqr/upload-store/:channel/:id/delete", requireAdmin, (req, res) => {
+  const store = load();
+  ensureChannelShape(store);
+  const channelKey = req.params.channel;
+  try {
+    if (!CHANNELS[channelKey]) throw new Error("Kenh khong hop le.");
+    const list = store.viet_qr_store_uploads[channelKey] || [];
+    const idx = list.findIndex((u) => String(u.id) === req.params.id);
+    if (idx === -1) throw new Error("Khong tim thay lan tai nay (co the da bi xoa roi).");
+    list.splice(idx, 1);
+    store.viet_qr_store_names[channelKey] = mergeStoreNames(list, store.viet_qr_store_names_baseline[channelKey]);
+    save(store);
+    res.redirect(
+      "/doi-soat/vietqr?success=" +
+        encodeURIComponent(`Da xoa lan tai danh sach diem ban do -- da tinh lai danh sach tu cac lan tai con lai.${UPDATED_NOTE}`)
+    );
   } catch (e) {
     res.redirect("/doi-soat/vietqr?error=" + encodeURIComponent(e.message));
   }
