@@ -45,6 +45,14 @@ function toIsoDate(v) {
     const [, y, mo, d] = m;
     return `${y}-${String(mo).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
   }
+  // "DD-MM-YYYY[ HH:MM:SS]" -- format used by the MoMo portal's "Transaction
+  // report" export (cot "Thời gian", vd "21-07-2026 21:25:17"). Checked AFTER
+  // the "YYYY-MM-DD" pattern above so a real ISO string is never misread.
+  m = s.match(/^(\d{1,2})-(\d{1,2})-(\d{4})/);
+  if (m) {
+    const [, d, mo, y] = m;
+    return `${y}-${String(mo).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+  }
   return null;
 }
 
@@ -438,6 +446,124 @@ function parseRawMomoPortalWorkbook(buffer) {
   return { transactions };
 }
 
+// ---------- Parse the NEWER "Transaction report" MoMo portal export ----------
+// Chi Nhan, 2026-07-22: "tôi mới tải file bạn xem nó trả qua ví trả sao hay
+// gì đó lấy ra tiền sao phí cho tôi được không" -- khac voi zip "daily_report"
+// o tren (cot "MS.*"), day la 1 file .xlsx (khong nen zip) tai truc tiep tu
+// cong MoMo voi ten cot KHONG co tien to "MS.": "Thời gian", "Trạng thái",
+// "Số tiền", "Phương thức thanh toán", "Nguồn tiền", "Mã cửa hàng"... Diem
+// quan trong: file nay co du thong tin de tinh PHI THAT theo tung giao dich
+// (KH Cu dung phi co dinh 1,1% nen khong can, nhung KH Moi dung 3 muc phi
+// khac nhau tuy theo NGUON TIEN khach hang dung de thanh toan -- xac nhan
+// bang du lieu that trong file "BÁO CÁO DOANH THU momo.xlsm" (sheet "Dữ liệu
+// Momo KH", cot AJ/AK/AP): cot "Nguồn tiền" = "Ví MoMo" -> phi 1% (
+// 1,1% da gom VAT); = "Ví trả sau" -> phi 1,2% (1,32% da gom VAT); moi truong
+// hop khac (vd "Ngân hàng hoặc Ví khác", "Thẻ Quốc Tế") -> phi 0,3% (0,33% da
+// gom VAT) -- day la muc "con lai" trong ghi chu "Phí MoMo KH mới: Ví
+// MoMo*1%, Ví trả sau*1,2%, còn lại*0,3% (giá chưa thuế)" cua Luyen.
+const KH_MOI_FEE_RATE_BY_NGUON_TIEN = {
+  "vi momo": 0.011, // 1% + 10% VAT
+  "vi tra sau": 0.0132, // 1.2% + 10% VAT
+};
+const KH_MOI_FEE_RATE_DEFAULT = 0.0033; // "con lai" -- 0.3% + 10% VAT
+
+function feeRateForNguonTien(nguonTien) {
+  const n = normText(nguonTien || "");
+  return KH_MOI_FEE_RATE_BY_NGUON_TIEN[n] !== undefined ? KH_MOI_FEE_RATE_BY_NGUON_TIEN[n] : KH_MOI_FEE_RATE_DEFAULT;
+}
+
+function parseKhMoiFeeTransactionWorkbook(buffer) {
+  const wb = XLSX.read(buffer, { type: "buffer" });
+  const seenTransIds = new Set();
+  const transactions = []; // {transId, date, maCuaHang, amount, fee}
+  let matchedAnySheet = false;
+
+  for (const sheetName of wb.SheetNames) {
+    const ws = wb.Sheets[sheetName];
+    const grid = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: null });
+
+    let headerRowIdx = -1;
+    let cols = {};
+    for (let r = 0; r < Math.min(grid.length, 12); r++) {
+      const row = grid[r] || [];
+      const idx = {};
+      row.forEach((v, c) => {
+        if (!v || typeof v !== "string") return;
+        const s = normText(v);
+        if (s === "so tien" || s.includes("so tien") && !s.includes("giam gia")) idx.amount = c;
+        if (s.includes("thoi gian")) idx.date = c;
+        if (s.includes("ma cua hang")) idx.maCuaHang = c;
+        if (s.includes("trang thai")) idx.trangThai = c;
+        if (s.includes("nguon tien")) idx.nguonTien = c;
+        if (s.includes("ma giao dich")) idx.transId = c;
+      });
+      if (idx.amount !== undefined && idx.date !== undefined && idx.maCuaHang !== undefined && idx.nguonTien !== undefined) {
+        headerRowIdx = r;
+        cols = idx;
+        break;
+      }
+    }
+    if (headerRowIdx < 0) continue; // not a matching sheet, skip silently
+
+    matchedAnySheet = true;
+    for (let r = headerRowIdx + 1; r < grid.length; r++) {
+      const row = grid[r] || [];
+      const trangThai = cols.trangThai !== undefined ? row[cols.trangThai] : null;
+      if (trangThai !== null && !/th.nh c.ng|thanh cong/i.test(String(trangThai))) continue;
+      const amount = cols.amount !== undefined ? Number(row[cols.amount]) || 0 : 0;
+      if (!amount) continue;
+      const maCuaHang = cols.maCuaHang !== undefined ? normCode(row[cols.maCuaHang]) : "";
+      if (!maCuaHang) continue;
+      const dateRaw = cols.date !== undefined ? row[cols.date] : null;
+      const date = toIsoDate(dateRaw);
+      if (!date) continue;
+      const nguonTien = cols.nguonTien !== undefined ? row[cols.nguonTien] : "";
+      const fee = Math.round(amount * feeRateForNguonTien(nguonTien));
+      const transId = cols.transId !== undefined ? String(row[cols.transId] || "") : `${sheetName}-${r}`;
+      if (seenTransIds.has(transId)) continue;
+      seenTransIds.add(transId);
+      transactions.push({ transId, date, maCuaHang, amount, fee });
+    }
+  }
+
+  if (!matchedAnySheet) {
+    throw new Error(
+      'Khong nhan dien duoc file "Transaction report": can co cot "Thời gian", "Số tiền", "Mã cửa hàng", "Nguồn tiền".'
+    );
+  }
+
+  return { transactions };
+}
+
+// Giong resolveRawPortalGross nhung tinh THEM feeByCode/netByCode (net =
+// gross - phi) tu cac giao dich da co san phi (xem parseKhMoiFeeTransactionWorkbook).
+function resolveKhMoiFeeTransactionGross(transactions, cuaHangMapping) {
+  const dateSet = new Set();
+  const codesSeen = new Set();
+  const grossByCode = {};
+  const netByCode = {};
+  const unmapped = new Set();
+
+  for (const t of transactions) {
+    const known = cuaHangMapping[t.maCuaHang];
+    const code = known ? known.code : `CHUA MAP: ${t.maCuaHang}`;
+    if (!known) unmapped.add(t.maCuaHang);
+    dateSet.add(t.date);
+    codesSeen.add(code);
+    const key = `${t.date}|${code}`;
+    grossByCode[key] = (grossByCode[key] || 0) + t.amount;
+    netByCode[key] = (netByCode[key] || 0) + (t.amount - t.fee);
+  }
+
+  return {
+    dates: Array.from(dateSet).sort(),
+    codes: Array.from(codesSeen),
+    grossByCode,
+    netByCode,
+    unmapped: Array.from(unmapped),
+  };
+}
+
 // Resolve a raw portal export's per-transaction (date, Ma cua hang, amount)
 // rows into the same {dates, codes, grossByCode} shape parseTongMomoWorkbook
 // produces, using a Ma cua hang -> {code} mapping table (built up over time
@@ -786,6 +912,8 @@ module.exports = {
   parseInvoiceWorkbook,
   parseRawMomoPortalWorkbook,
   resolveRawPortalGross,
+  parseKhMoiFeeTransactionWorkbook,
+  resolveKhMoiFeeTransactionGross,
   reconcileMomo,
   extractMomoSettlements,
   toIsoDate,

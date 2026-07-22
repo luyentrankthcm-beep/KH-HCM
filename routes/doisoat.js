@@ -9,6 +9,8 @@ const {
   parseInvoiceWorkbook,
   parseRawMomoPortalWorkbook,
   resolveRawPortalGross,
+  parseKhMoiFeeTransactionWorkbook,
+  resolveKhMoiFeeTransactionGross,
   reconcileMomo,
   extractMomoSettlements,
   isoToDmy,
@@ -133,7 +135,29 @@ function applyCuaHangAlias(grossData, cuaHangMapping) {
     const newKey = `${date}|${targetCode}`;
     grossByCodeOut[newKey] = (grossByCodeOut[newKey] || 0) + val;
   }
-  return { ...grossData, codes: Array.from(codesOut), grossByCode: grossByCodeOut };
+  // Chi Nhan, 2026-07-22: netByCode (so tien NET, xem parseKhMoiFeeTransactionWorkbook)
+  // phai duoc anh xa lai "CHUA MAP: X" -> ma cong trinh THAT giong het
+  // grossByCode o tren -- neu khong, sau khi Luyen dien anh xa 1 lan, cac
+  // key netByCode van con nam duoi ten "CHUA MAP: X" cu, khong bao gio khop
+  // duoc voi grossByCode (da doi ten) nua, khien reconcileMomo tim netByCode
+  // luon that bai (roi lai am tham fallback ve cong thuc phi co dinh 0,989).
+  let netByCodeOut;
+  if (grossData.netByCode) {
+    netByCodeOut = {};
+    for (const [key, val] of Object.entries(grossData.netByCode)) {
+      const sep = key.indexOf("|");
+      const date = key.slice(0, sep);
+      const targetCode = resolve(key.slice(sep + 1));
+      const newKey = `${date}|${targetCode}`;
+      netByCodeOut[newKey] = (netByCodeOut[newKey] || 0) + val;
+    }
+  }
+  return {
+    ...grossData,
+    codes: Array.from(codesOut),
+    grossByCode: grossByCodeOut,
+    netByCode: netByCodeOut,
+  };
 }
 
 // Detect a .zip upload (either by extension or by the zip magic bytes "PK"),
@@ -545,7 +569,35 @@ router.post("/doi-soat/momo/upload-tong", requireAdmin, upload.single("file"), (
         successMsg += ` CANH BAO: ${resolved.unmapped.length} ma cua hang chua map duoc Ma Cong Trinh (${resolved.unmapped.join(", ")}) -- doanh thu cua cac ma nay dang hien o dong "CHUA MAP: ..." trong bang duoi, hay tai lai 1 file "Tong Momo Gop" co chua cac ma cua hang nay de he thong tu hoc mapping.`;
       }
     } else {
-      const parsed = parseTongMomoWorkbook(req.file.buffer);
+      // Chi Nhan, 2026-07-22: "tôi mới tải file bạn xem nó trả qua ví trả
+      // sao hay gì đó lấy ra tiền sao phí cho tôi được không" -- file .xlsx
+      // (khong nen zip) tai truc tiep tu cong MoMo, cot KHONG co tien to
+      // "MS." (Thời gian/Số tiền/Nguồn tiền/Mã cửa hàng...) chua du thong
+      // tin de tinh PHI THAT theo tung giao dich (KH Moi dung 3 muc phi khac
+      // nhau tuy Nguon tien: Vi MoMo 1%, Vi tra sau 1.2%, con lai 0.3% --
+      // xem utils/momoReconcile.js parseKhMoiFeeTransactionWorkbook). Thu
+      // parser nay TRUOC (chi khop dung khi file THAT SU co du cac cot can
+      // thiet, nem loi va roi ve parser "Tong Momo Gop/flat" cu neu khong).
+      let usedFeeParser = false;
+      let feeUnmapped = [];
+      let parsed;
+      try {
+        const { transactions } = parseKhMoiFeeTransactionWorkbook(req.file.buffer);
+        const resolved = resolveKhMoiFeeTransactionGross(transactions, store.cua_hang_mapping);
+        parsed = {
+          sheetName: "MoMo Transaction report (co phi theo nguon tien)",
+          dates: resolved.dates,
+          codes: resolved.codes,
+          grossByCode: resolved.grossByCode,
+          netByCode: resolved.netByCode,
+          cuaHangMap: {},
+        };
+        feeUnmapped = resolved.unmapped;
+        usedFeeParser = true;
+      } catch (feeParseErr) {
+        parsed = parseTongMomoWorkbook(req.file.buffer);
+      }
+
       store[momoCfg.grossKey].push({
         id: nextId(store, "momo_gross_uploads_seq") || Date.now(),
         uploaded_at: new Date().toISOString(),
@@ -554,6 +606,7 @@ router.post("/doi-soat/momo/upload-tong", requireAdmin, upload.single("file"), (
         dates: parsed.dates,
         codes: parsed.codes,
         grossByCode: parsed.grossByCode,
+        netByCode: parsed.netByCode,
       });
       seedGianMappingDefaults(store, parsed.codes);
       // Learn/refresh the Ma cua hang -> Ma Cong trinh mapping from this
@@ -561,7 +614,14 @@ router.post("/doi-soat/momo/upload-tong", requireAdmin, upload.single("file"), (
       // automatically without needing this sheet uploaded again.
       Object.assign(store.cua_hang_mapping, parsed.cuaHangMap || {});
       save(store);
-      successMsg = `Da nap "${parsed.sheetName}" (${parsed.dates[0]} - ${parsed.dates[parsed.dates.length - 1]}), ${parsed.codes.length} ma cong trinh/gian. Ket qua doi soat ben duoi da tu cap nhat theo du lieu moi.`;
+      if (usedFeeParser) {
+        successMsg = `Da nap "${req.file.originalname}" (bao cao giao dich MoMo, ${parsed.dates[0]} - ${parsed.dates[parsed.dates.length - 1]}), tu dong tinh phi THAT theo nguon tien (Vi MoMo 1%, Vi tra sau 1.2%, con lai 0.3%) cho ${parsed.codes.length} ma. Ket qua doi soat ben duoi da tu cap nhat theo du lieu moi.`;
+        if (feeUnmapped.length > 0) {
+          successMsg += ` CANH BAO: ${feeUnmapped.length} ma cua hang chua map duoc Ma Cong Trinh (${feeUnmapped.join(", ")}) -- doanh thu/phi cua cac ma nay dang hien o dong "CHUA MAP: ..." trong bang duoi, hay tai 1 file "Tong Momo Gop" co chua cac ma cua hang nay de he thong tu hoc mapping.`;
+        }
+      } else {
+        successMsg = `Da nap "${parsed.sheetName}" (${parsed.dates[0]} - ${parsed.dates[parsed.dates.length - 1]}), ${parsed.codes.length} ma cong trinh/gian. Ket qua doi soat ben duoi da tu cap nhat theo du lieu moi.`;
+      }
     }
 
     res.redirect("/doi-soat/momo?success=" + encodeURIComponent(successMsg));
