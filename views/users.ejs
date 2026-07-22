@@ -55,6 +55,17 @@
     </section>
 
     <section class="panel">
+      <h2>Ghi chú</h2>
+      <p class="muted" style="margin-top:-10px;">Ghi chú chung, dùng chung cho mọi tài khoản quản trị (không riêng của ai).</p>
+      <form method="POST" action="/he-thong/nguoi-dung/ghi-chu">
+        <textarea name="ghiChu" rows="6" style="width:100%; max-width:600px;" placeholder="Ghi chú..."><%= ghiChu %></textarea>
+        <div style="margin-top:8px;">
+          <button type="submit" class="btn btn-secondary">Lưu ghi chú</button>
+        </div>
+      </form>
+    </section>
+
+    <section class="panel">
       <h2>Tạo tài khoản mới</h2>
       <form method="POST" action="/he-thong/nguoi-dung" class="form-inline">
         <input type="text" name="username" placeholder="Tên đăng nhập" autocomplete="off" required />

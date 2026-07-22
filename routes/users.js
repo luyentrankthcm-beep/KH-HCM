@@ -32,9 +32,22 @@ router.get("/he-thong/nguoi-dung", (req, res) => {
     userName: req.session.userName,
     users: store.users,
     currentUserId: req.session.userId,
+    ghiChu: store.ghi_chu_he_thong || "",
     error: req.query.error || null,
     success: req.query.success || null,
   });
+});
+
+// Chi Nhan (2026-07-22): "nam phia duoi tai khoan dang nhap them khung note
+// ghi chu cho toi" -- 1 khung ghi chu chung, dung chung cho MOI tai khoan
+// quan tri (khong rieng cho tung nguoi), de ghi lai nhung dieu can nho ve he
+// thong (vd mat khau tam, viec can lam...). Luu truc tiep vao store, khong
+// gioi han do dai.
+router.post("/he-thong/nguoi-dung/ghi-chu", (req, res) => {
+  const store = load();
+  store.ghi_chu_he_thong = req.body.ghiChu || "";
+  save(store);
+  res.redirect("/he-thong/nguoi-dung?success=" + encodeURIComponent("Da luu ghi chu."));
 });
 
 router.post("/he-thong/nguoi-dung", (req, res) => {
