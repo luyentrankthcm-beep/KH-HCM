@@ -48,6 +48,27 @@
         <span class="icon-upload-btn-icon">📊</span>
         <span class="icon-upload-btn-label">Xuất Excel</span>
       </a>
+      <% if (gmailConnected) { %>
+        <form method="POST" action="/chi-phi/tim-hoa-don-gmail" style="display:inline-block;">
+          <input type="hidden" name="hachToan" value="<%= hachToanFilter %>" />
+          <input type="hidden" name="thang" value="<%= thangFilter %>" />
+          <input type="hidden" name="hoaDon" value="<%= hoaDonFilter %>" />
+          <button type="submit" class="icon-upload-btn" style="border:1px solid var(--color-hairline);" title='Tự động tìm hóa đơn qua Gmail cho các dòng của tháng mới nhất còn thiếu Link hóa đơn (bỏ qua dòng đã có link). Bấm nhiều lần để quét tiếp phần còn lại.'>
+            <span class="icon-upload-btn-icon">✉️</span>
+            <span class="icon-upload-btn-label">Cập nhật tìm hóa đơn</span>
+          </button>
+        </form>
+      <% } else { %>
+        <a
+          href="/gmail/connect"
+          class="icon-upload-btn"
+          style="border:1px solid var(--color-hairline); text-decoration:none; color:inherit;"
+          title='<%= gmailConfigured ? "Kết nối tài khoản Gmail để dùng nút Cập nhật tìm hóa đơn (tự động tìm hóa đơn qua email)" : "Chưa cấu hình Google OAuth trên Railway (GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET/GOOGLE_REDIRECT_URI) -- báo Claude thiết lập trước" %>'
+        >
+          <span class="icon-upload-btn-icon">🔗</span>
+          <span class="icon-upload-btn-label">Kết nối Gmail</span>
+        </a>
+      <% } %>
     </div>
 
     <section class="panel">

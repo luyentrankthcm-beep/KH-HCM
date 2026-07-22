@@ -22,6 +22,7 @@ const phapDanhRoutes = require("./routes/phap-danh");
 const chiPhiRoutes = require("./routes/chi-phi");
 const backupRoutes = require("./routes/backup");
 const usersRoutes = require("./routes/users");
+const gmailOauthRoutes = require("./routes/gmail-oauth");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -81,6 +82,7 @@ app.use("/", phapDanhRoutes);
 app.use("/", chiPhiRoutes);
 app.use("/", backupRoutes);
 app.use("/", usersRoutes);
+app.use("/", gmailOauthRoutes);
 
 app.use((req, res) => {
   res.status(404).send("Khong tim thay trang.");

@@ -6,6 +6,8 @@ const { requireLogin, requireAdmin } = require("../middleware/auth");
 const { getCompany } = require("../utils/companies");
 const { parseChiPhiSheetWorkbook } = require("../utils/chiPhiSheetParser");
 const { extractGianRentText, matchGianRecord } = require("../utils/rentPaymentMatcher");
+const gmailApi = require("../utils/gmailApi");
+const gmailInvoiceMatcher = require("../utils/gmailInvoiceMatcher");
 
 const router = express.Router();
 router.use(requireLogin);
@@ -120,6 +122,8 @@ router.get("/chi-phi", (req, res) => {
     tongTien,
     error: req.query.error || null,
     success: req.query.success || null,
+    gmailConfigured: gmailApi.isConfigured(),
+    gmailConnected: !!(store.gmail_oauth && store.gmail_oauth.refresh_token),
   });
 });
 
@@ -553,6 +557,91 @@ router.post("/chi-phi/quet-ngan-hang", requireAdmin, (req, res) => {
         .join("; ")}.`;
     }
     res.redirect("/chi-phi?success=" + encodeURIComponent(msg));
+  } catch (e) {
+    res.redirect("/chi-phi?error=" + encodeURIComponent(e.message));
+  }
+});
+
+// Nhan, 2026-07-22: "thêm cho tôi 1 nút cập nhật tìm hóa đơn ... tìm trên
+// gmail giống như vậy ... tìm cái thời gian mới nhất với lại các hóa đơn chưa
+// có thôi không cần tìm cái cũ đâu nhá" -- nut that trong web, tu dong tim qua
+// Gmail API (utils/gmailApi.js + utils/gmailInvoiceMatcher.js) thay vi Claude
+// tra bang tay. Pham vi CHINH XAC theo yeu cau: (1) chi thang MOI NHAT dang co
+// du lieu cho cong ty dang chon (khong lui ve cac thang cu da xu ly roi), (2)
+// chi cac dong dang THIEU link hoa don (bo qua dong da co linkHoaDon, du co
+// hay khong co soHoaDon rieng -- tranh tim lai nhung dong da xong).
+//
+// Gioi han so dong xu ly 1 lan bam (MAX_ROWS_PER_RUN) vi moi dong can vai lan
+// goi Gmail API (search + doc tung email ung vien) -- xu ly qua nhieu dong 1
+// luc de bi timeout giua chung (dung nhu da gap khi Claude chay script tay
+// truoc do). Bam nhieu lan se tiep tuc xu ly cac dong con lai (da xong roi thi
+// tu dong bi bo qua o lan bam sau, vi luc do da co linkHoaDon).
+const GMAIL_AUTO_MAX_ROWS_PER_RUN = 25;
+
+router.post("/chi-phi/tim-hoa-don-gmail", requireAdmin, async (req, res) => {
+  const store = load();
+  ensureShape(store);
+  const activeCompany = getCompany(req);
+  try {
+    if (!gmailApi.isConfigured()) {
+      throw new Error(
+        "Chưa cấu hình Google OAuth trên Railway (thiếu GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET/GOOGLE_REDIRECT_URI)."
+      );
+    }
+    if (!store.gmail_oauth || !store.gmail_oauth.refresh_token) {
+      throw new Error("Chưa kết nối Gmail -- bấm nút \"Kết nối Gmail\" trước.");
+    }
+
+    let rows = store.chi_phi.map(ensureChiPhiDefaults).filter((r) => r.congTy === activeCompany);
+    const monthSet = new Set();
+    rows.forEach((r) => {
+      const m = (r.ngay || "").slice(0, 7);
+      if (m) monthSet.add(m);
+    });
+    const newestMonth = [...monthSet].sort().reverse()[0] || "";
+
+    const candidates = store.chi_phi.filter(
+      (r) =>
+        r.congTy === activeCompany &&
+        (r.ngay || "").slice(0, 7) === newestMonth &&
+        !(r.linkHoaDon || "").trim()
+    );
+    const toProcess = candidates.slice(0, GMAIL_AUTO_MAX_ROWS_PER_RUN);
+
+    let found = 0;
+    let errors = 0;
+    for (const r of toProcess) {
+      try {
+        const match = await gmailInvoiceMatcher.findInvoiceForRow(store, r);
+        if (match) {
+          r.linkHoaDon = match.linkHoaDon || r.linkHoaDon;
+          if (match.soHoaDon) {
+            r.soHoaDon = match.soHoaDon;
+            r.trangThaiHoaDon = "Đã tìm thấy qua Gmail (tự động)";
+          } else {
+            r.trangThaiHoaDon = "Đã tìm thấy email qua Gmail (tự động) -- chưa đọc được số hóa đơn, kiểm tra lại link.";
+          }
+          found++;
+        }
+      } catch (e) {
+        errors++;
+      }
+    }
+    save(store);
+
+    let msg = `Đã quét ${toProcess.length}/${candidates.length} dòng thiếu hóa đơn của tháng ${newestMonth || "(không rõ)"}. Tìm thấy ${found} dòng.`;
+    if (candidates.length > toProcess.length) {
+      msg += ` Còn ${candidates.length - toProcess.length} dòng chưa quét (bấm "Cập nhật tìm hóa đơn" thêm lần nữa để tiếp tục).`;
+    }
+    if (errors > 0) {
+      msg += ` (${errors} dòng gặp lỗi khi tra Gmail, có thể do hết hạn mức API -- thử lại sau.)`;
+    }
+    const qs = [];
+    if (req.body.hachToan) qs.push("hachToan=" + encodeURIComponent(req.body.hachToan));
+    if (req.body.thang !== undefined) qs.push("thang=" + encodeURIComponent(req.body.thang));
+    if (req.body.hoaDon) qs.push("hoaDon=" + encodeURIComponent(req.body.hoaDon));
+    qs.push("success=" + encodeURIComponent(msg));
+    res.redirect("/chi-phi?" + qs.join("&"));
   } catch (e) {
     res.redirect("/chi-phi?error=" + encodeURIComponent(e.message));
   }
