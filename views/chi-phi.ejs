@@ -39,6 +39,15 @@
           <span class="icon-upload-btn-label">Quét ngân hàng</span>
         </button>
       </form>
+      <a
+        href="/chi-phi/export.xlsx?hachToan=<%= encodeURIComponent(hachToanFilter) %>&thang=<%= encodeURIComponent(thangFilter) %>&hoaDon=<%= encodeURIComponent(hoaDonFilter) %>"
+        class="icon-upload-btn"
+        style="border:1px solid var(--color-hairline); text-decoration:none; color:inherit;"
+        title="Xuất ra file Excel danh sách chi phí đang hiển thị (theo đúng bộ lọc hạch toán/tháng/số hóa đơn đang chọn)"
+      >
+        <span class="icon-upload-btn-icon">📊</span>
+        <span class="icon-upload-btn-label">Xuất Excel</span>
+      </a>
     </div>
 
     <section class="panel">

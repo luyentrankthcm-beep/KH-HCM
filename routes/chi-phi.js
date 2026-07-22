@@ -1,5 +1,6 @@
 const express = require("express");
 const multer = require("multer");
+const XLSX = require("xlsx");
 const { load, save, nextId } = require("../store");
 const { requireLogin, requireAdmin } = require("../middleware/auth");
 const { getCompany } = require("../utils/companies");
@@ -120,6 +121,51 @@ router.get("/chi-phi", (req, res) => {
     error: req.query.error || null,
     success: req.query.success || null,
   });
+});
+
+// Chi Nhan, 2026-07-22: "thêm chỗ xuất ra excel nhá" -- xuat danh sach DANG
+// XEM (theo cong ty + bo loc hach toan/thang/so hoa don dang chon tren man
+// hinh, giong cach lam voi trang Hop Dong Thue Gian Hang) ra file Excel.
+router.get("/chi-phi/export.xlsx", (req, res) => {
+  const store = load();
+  ensureShape(store);
+  const activeCompany = getCompany(req);
+  const hachToanFilter = req.query.hachToan || "";
+  const hoaDonFilter = req.query.hoaDon || "";
+  const thangFilter = req.query.thang !== undefined ? req.query.thang : "";
+  let rows = store.chi_phi.map(ensureChiPhiDefaults).filter((r) => r.congTy === activeCompany);
+  if (hachToanFilter === "1") rows = rows.filter((r) => r.daHachToan);
+  else if (hachToanFilter === "0") rows = rows.filter((r) => !r.daHachToan);
+  if (thangFilter) rows = rows.filter((r) => (r.ngay || "").slice(0, 7) === thangFilter);
+  if (hoaDonFilter === "1") rows = rows.filter((r) => (r.soHoaDon || "").trim());
+  else if (hoaDonFilter === "0") rows = rows.filter((r) => !(r.soHoaDon || "").trim());
+  rows.sort((a, b) => (a.ngay < b.ngay ? 1 : -1));
+
+  const exportRows = rows.map((r) => ({
+    "Ngày chi": r.ngay,
+    "Gian/Cơ sở": r.gian,
+    NCC: r.ncc,
+    "Số hóa đơn": r.soHoaDon,
+    "Số UNC": r.soUNC,
+    "Số chứng từ liên quan": r.soChungTuLienQuan,
+    "Loại chi phí": r.loaiChiPhi,
+    "Diễn giải": r.dienGiai,
+    "Số tiền": r.soTien,
+    "Link hóa đơn": r.linkHoaDon,
+    "Trạng thái hóa đơn": r.trangThaiHoaDon,
+    "Đã hạch toán": r.daHachToan ? "Có" : "Không",
+    "Ghi chú": r.ghiChu,
+    Nguồn: r.nguon,
+  }));
+
+  const ws = XLSX.utils.json_to_sheet(exportRows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Chi phi");
+  const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
+
+  res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+  res.setHeader("Content-Disposition", `attachment; filename=chi-phi-${activeCompany}.xlsx`);
+  res.send(buf);
 });
 
 router.post("/chi-phi/:id/hach-toan", requireAdmin, (req, res) => {
