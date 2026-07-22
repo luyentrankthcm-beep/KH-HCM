@@ -168,6 +168,15 @@ router.get("/chi-phi/export.xlsx", (req, res) => {
   res.send(buf);
 });
 
+// Luyen, 2026-07-22: "cập nhật thì giữ nguyên trang, đừng đưa lên đầu trang" --
+// khi request la AJAX (goi tu JS trong chi-phi.ejs, khong phai form submit
+// thuong) thi tra ve JSON thay vi redirect, de trang KHONG reload/scroll len
+// dau va bo loc dang chon KHONG bi doi -- dong duoc sua van nam nguyen tai
+// cho chi den khi chi tu tay doi bo loc.
+function isAjaxChiPhiRequest(req) {
+  return req.get("X-Requested-With") === "XMLHttpRequest";
+}
+
 router.post("/chi-phi/:id/hach-toan", requireAdmin, (req, res) => {
   const store = load();
   ensureShape(store);
@@ -175,6 +184,10 @@ router.post("/chi-phi/:id/hach-toan", requireAdmin, (req, res) => {
   if (r) {
     r.daHachToan = req.body.daHachToan === "1";
     save(store);
+  }
+  if (isAjaxChiPhiRequest(req)) {
+    if (!r) return res.status(404).json({ error: "Không tìm thấy khoản chi này." });
+    return res.json({ success: true, daHachToan: r.daHachToan });
   }
   const qs = [];
   if (req.body.hachToan) qs.push("hachToan=" + encodeURIComponent(req.body.hachToan));
@@ -192,11 +205,12 @@ router.post("/chi-phi/:id/so-hoa-don", requireAdmin, (req, res) => {
   const store = load();
   ensureShape(store);
   const r = store.chi_phi.find((x) => String(x.id) === req.params.id);
-  const qs = [];
-  if (req.body.hachToan) qs.push("hachToan=" + encodeURIComponent(req.body.hachToan));
-  if (req.body.thang !== undefined) qs.push("thang=" + encodeURIComponent(req.body.thang));
-  if (req.body.hoaDon) qs.push("hoaDon=" + encodeURIComponent(req.body.hoaDon));
   if (!r) {
+    if (isAjaxChiPhiRequest(req)) return res.status(404).json({ error: "Không tìm thấy khoản chi này." });
+    const qs = [];
+    if (req.body.hachToan) qs.push("hachToan=" + encodeURIComponent(req.body.hachToan));
+    if (req.body.thang !== undefined) qs.push("thang=" + encodeURIComponent(req.body.thang));
+    if (req.body.hoaDon) qs.push("hoaDon=" + encodeURIComponent(req.body.hoaDon));
     qs.push("error=" + encodeURIComponent("Không tìm thấy khoản chi này."));
     return res.redirect("/chi-phi?" + qs.join("&"));
   }
@@ -205,6 +219,13 @@ router.post("/chi-phi/:id/so-hoa-don", requireAdmin, (req, res) => {
   // kiem tra") vi Luyen da tu xu ly xong dong nay.
   r.trangThaiHoaDon = r.soHoaDon ? "Đã điền số hóa đơn thủ công" : r.trangThaiHoaDon;
   save(store);
+  if (isAjaxChiPhiRequest(req)) {
+    return res.json({ success: true, soHoaDon: r.soHoaDon, trangThaiHoaDon: r.trangThaiHoaDon || "" });
+  }
+  const qs = [];
+  if (req.body.hachToan) qs.push("hachToan=" + encodeURIComponent(req.body.hachToan));
+  if (req.body.thang !== undefined) qs.push("thang=" + encodeURIComponent(req.body.thang));
+  if (req.body.hoaDon) qs.push("hoaDon=" + encodeURIComponent(req.body.hoaDon));
   qs.push("success=" + encodeURIComponent("Đã cập nhật số hóa đơn."));
   res.redirect("/chi-phi?" + qs.join("&"));
 });
@@ -216,16 +237,24 @@ router.post("/chi-phi/:id/link-hoa-don", requireAdmin, (req, res) => {
   const store = load();
   ensureShape(store);
   const r = store.chi_phi.find((x) => String(x.id) === req.params.id);
-  const qs = [];
-  if (req.body.hachToan) qs.push("hachToan=" + encodeURIComponent(req.body.hachToan));
-  if (req.body.thang !== undefined) qs.push("thang=" + encodeURIComponent(req.body.thang));
-  if (req.body.hoaDon) qs.push("hoaDon=" + encodeURIComponent(req.body.hoaDon));
   if (!r) {
+    if (isAjaxChiPhiRequest(req)) return res.status(404).json({ error: "Không tìm thấy khoản chi này." });
+    const qs = [];
+    if (req.body.hachToan) qs.push("hachToan=" + encodeURIComponent(req.body.hachToan));
+    if (req.body.thang !== undefined) qs.push("thang=" + encodeURIComponent(req.body.thang));
+    if (req.body.hoaDon) qs.push("hoaDon=" + encodeURIComponent(req.body.hoaDon));
     qs.push("error=" + encodeURIComponent("Không tìm thấy khoản chi này."));
     return res.redirect("/chi-phi?" + qs.join("&"));
   }
   r.linkHoaDon = (req.body.linkHoaDon || "").trim();
   save(store);
+  if (isAjaxChiPhiRequest(req)) {
+    return res.json({ success: true, linkHoaDon: r.linkHoaDon });
+  }
+  const qs = [];
+  if (req.body.hachToan) qs.push("hachToan=" + encodeURIComponent(req.body.hachToan));
+  if (req.body.thang !== undefined) qs.push("thang=" + encodeURIComponent(req.body.thang));
+  if (req.body.hoaDon) qs.push("hoaDon=" + encodeURIComponent(req.body.hoaDon));
   qs.push("success=" + encodeURIComponent("Đã cập nhật link hóa đơn."));
   res.redirect("/chi-phi?" + qs.join("&"));
 });

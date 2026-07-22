@@ -116,12 +116,13 @@
               <td><%= r.gian %></td>
               <td><%= r.ncc %></td>
               <td>
-                <form method="POST" action="/chi-phi/<%= r.id %>/so-hoa-don" class="form-inline" style="gap:4px;">
+                <form method="POST" action="/chi-phi/<%= r.id %>/so-hoa-don" class="form-inline cp-ajax-form" data-kind="so-hoa-don" style="gap:4px;">
                   <input type="hidden" name="hachToan" value="<%= hachToanFilter %>" />
                   <input type="hidden" name="thang" value="<%= thangFilter %>" />
                   <input type="hidden" name="hoaDon" value="<%= hoaDonFilter %>" />
                   <input type="text" name="soHoaDon" value="<%= r.soHoaDon %>" placeholder="Nhập số HĐ" style="width:80px; font-size:12px; padding:2px 4px;" />
                   <button type="submit" class="link-btn" style="font-size:11px;" title="Lưu số hóa đơn">Lưu</button>
+                  <span class="cp-save-flash" style="font-size:11px; color:#1a7f37; display:none;">✓</span>
                 </form>
               </td>
               <td><%= r.soUNC %></td>
@@ -131,26 +132,29 @@
               </td>
               <td style="max-width:320px;">
                 <%= r.dienGiai || r.loaiChiPhi %>
-                <% if (r.trangThaiHoaDon) { %><br/><span class="muted" style="font-size:11px;"><%= r.trangThaiHoaDon %></span><% } %>
+                <span class="cp-trang-thai-hoa-don" id="trangThai-<%= r.id %>"><% if (r.trangThaiHoaDon) { %><br/><span class="muted" style="font-size:11px;"><%= r.trangThaiHoaDon %></span><% } %></span>
                 <% if (r.soTienHoaDonGoc && r.soTienHoaDonGoc !== r.soTien) { %>
                   <br/><span class="text-neg" style="font-size:11px;">⚠ Số tiền trên hóa đơn gốc: <%= r.soTienHoaDonGoc.toLocaleString('vi-VN') %> đ (khác số trong sheet)</span>
                 <% } %>
               </td>
               <td><%= (r.soTien || 0).toLocaleString('vi-VN') %> đ</td>
               <td>
+                <span class="cp-link-hoa-don-display" id="linkDisplay-<%= r.id %>">
                 <% if (r.linkHoaDon) { %><a href="<%= r.linkHoaDon %>" target="_blank" rel="noopener">Xem hóa đơn</a><br/>
                 <% } else { %><span class="muted">Không có</span><br/>
                 <% } %>
-                <form method="POST" action="/chi-phi/<%= r.id %>/link-hoa-don" class="form-inline" style="gap:4px;">
+                </span>
+                <form method="POST" action="/chi-phi/<%= r.id %>/link-hoa-don" class="form-inline cp-ajax-form" data-kind="link-hoa-don" style="gap:4px;">
                   <input type="hidden" name="hachToan" value="<%= hachToanFilter %>" />
                   <input type="hidden" name="thang" value="<%= thangFilter %>" />
                   <input type="hidden" name="hoaDon" value="<%= hoaDonFilter %>" />
                   <input type="text" name="linkHoaDon" value="<%= r.linkHoaDon %>" placeholder="Dán link Drive" style="width:90px; font-size:11px; padding:2px 4px;" />
                   <button type="submit" class="link-btn" style="font-size:11px;" title="Lưu link hóa đơn">Lưu</button>
+                  <span class="cp-save-flash" style="font-size:11px; color:#1a7f37; display:none;">✓</span>
                 </form>
               </td>
               <td>
-                <form method="POST" action="/chi-phi/<%= r.id %>/hach-toan" style="display:inline;">
+                <form method="POST" action="/chi-phi/<%= r.id %>/hach-toan" class="cp-ajax-form" data-kind="hach-toan" style="display:inline;">
                   <input type="hidden" name="daHachToan" value="<%= r.daHachToan ? '0' : '1' %>" />
                   <input type="hidden" name="hachToan" value="<%= hachToanFilter %>" />
                   <input type="hidden" name="thang" value="<%= thangFilter %>" />
@@ -221,6 +225,60 @@
         document.getElementById('cpNextBtn').disabled = page >= totalPages;
       }
       render();
+
+      // Luyen, 2026-07-22: "cập nhật thì giữ nguyên trang, đừng đưa lên đầu
+      // trang rồi kéo xuống" + "khi nào tôi bỏ lọc mới thay đổi, còn lại vẫn
+      // phải có" -- cac form Luu (so hoa don / link hoa don / hach toan) gui
+      // AJAX (X-Requested-With) thay vi submit thuong, de trang KHONG reload:
+      // khong mat vi tri cuon, va dong khong bi bien mat theo bo loc dang
+      // chon cho toi khi chi tu tay doi bo loc.
+      function showFlash(form) {
+        var flash = form.querySelector('.cp-save-flash');
+        if (!flash) return;
+        flash.style.display = 'inline';
+        setTimeout(function () { flash.style.display = 'none'; }, 1500);
+      }
+      document.querySelectorAll('form.cp-ajax-form').forEach(function (form) {
+        form.addEventListener('submit', function (e) {
+          e.preventDefault();
+          var kind = form.getAttribute('data-kind');
+          var tr = form.closest('tr.cp-row');
+          var rowId = tr ? tr.id.replace('cp-', '') : null;
+          var body = new URLSearchParams(new FormData(form));
+          fetch(form.action, {
+            method: 'POST',
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            body: body,
+          })
+            .then(function (resp) { return resp.json().then(function (data) { return { ok: resp.ok, data: data }; }); })
+            .then(function (result) {
+              if (!result.ok) { alert((result.data && result.data.error) || 'Có lỗi khi lưu, thử lại giúp tôi.'); return; }
+              var data = result.data;
+              if (kind === 'hach-toan') {
+                var btn = form.querySelector('button[type="submit"]');
+                btn.textContent = data.daHachToan ? '☑' : '☐';
+                form.querySelector('input[name="daHachToan"]').value = data.daHachToan ? '0' : '1';
+              } else if (kind === 'so-hoa-don') {
+                var trangThaiEl = document.getElementById('trangThai-' + rowId);
+                if (trangThaiEl) {
+                  trangThaiEl.innerHTML = data.trangThaiHoaDon
+                    ? '<br/><span class="muted" style="font-size:11px;">' + data.trangThaiHoaDon + '</span>'
+                    : '';
+                }
+                if (tr) tr.setAttribute('data-search', tr.getAttribute('data-search'));
+              } else if (kind === 'link-hoa-don') {
+                var linkEl = document.getElementById('linkDisplay-' + rowId);
+                if (linkEl) {
+                  linkEl.innerHTML = data.linkHoaDon
+                    ? '<a href="' + data.linkHoaDon + '" target="_blank" rel="noopener">Xem hóa đơn</a><br/>'
+                    : '<span class="muted">Không có</span><br/>';
+                }
+              }
+              showFlash(form);
+            })
+            .catch(function () { alert('Không kết nối được, thử lại giúp tôi.'); });
+        });
+      });
     })();
   </script>
 </body>
