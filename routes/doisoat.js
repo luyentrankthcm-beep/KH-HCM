@@ -634,6 +634,13 @@ router.post("/doi-soat/momo/mapping", requireAdmin, (req, res) => {
     }
   }
   save(store);
+  // Nhan, 2026-07-22: "nhấn vô dưới thì lại đưa lên trang đầu, muốn ở lại màn
+  // hình đó luôn" -- bang TK Co khong lam thay doi du lieu doi soat hien tren
+  // trang (chi luu tuy chinh xuat MISA), nen luu bang AJAX la an toan, khong
+  // can load lai ca trang / mat vi tri cuon.
+  if (req.get("X-Requested-With") === "XMLHttpRequest") {
+    return res.json({ success: true });
+  }
   res.redirect("/doi-soat/momo?success=" + encodeURIComponent("Da luu bang TK Co theo gian."));
 });
 

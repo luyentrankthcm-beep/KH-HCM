@@ -154,7 +154,7 @@
         KHÔNG thuộc công ty đang xem (sẽ xuất hóa đơn ở công ty kia), bấm "Ẩn" ở cột cuối để gian đó không
         hiện trên trang này nữa (chỉ ẩn ở công ty này, không ảnh hưởng công ty kia).
       </p>
-      <form method="POST" action="/doi-soat/momo/mapping">
+      <form method="POST" action="/doi-soat/momo/mapping" id="tkCoForm">
         <table class="table">
           <thead><tr><th>Mã công trình</th><th>TK Có</th><th></th></tr></thead>
           <tbody>
@@ -174,50 +174,8 @@
           </tbody>
         </table>
         <button type="submit" class="btn btn-secondary">Lưu bảng TK Có</button>
+        <span id="tkCoSaveFlash" style="font-size:13px; color:#1a7f37; display:none; margin-left:8px;">✓ Đã lưu</span>
       </form>
-    </section>
-    <% } %>
-
-    <% if ((allCodes.length > 0) || (gianHidden && gianHidden.length > 0)) { %>
-    <section class="panel">
-      <h2>3c. Ẩn gian không thuộc công ty này khỏi trang đối soát</h2>
-      <p class="muted">
-        Dùng khi doanh thu 1 gian bị gộp nhầm vào file tải lên của công ty đang xem, nhưng gian đó thực ra
-        thuộc công ty kia (sẽ xuất hóa đơn ở bên đó). Ẩn ở đây CHỈ ẩn khỏi trang này, không xóa dữ liệu, không
-        ảnh hưởng công ty kia nếu họ dùng chung mã.
-      </p>
-      <% if (allCodes.length > 0) { %>
-      <form method="POST" action="/doi-soat/momo/gian-hidden" class="form-inline">
-        <select name="code" required>
-          <option value="">-- Chọn mã công trình cần ẩn --</option>
-          <% allCodes.forEach(function(code) { %>
-          <option value="<%= code %>"><%= code.endsWith('__FF') ? code.replace('__FF', '') + ' (gian FF - chia sẻ)' : code %></option>
-          <% }) %>
-        </select>
-        <button type="submit" class="btn btn-secondary">Ẩn gian này</button>
-      </form>
-      <% } %>
-      <% if (gianHidden && gianHidden.length > 0) { %>
-      </form>
-      <% } %>
-      <% if (gianHidden && gianHidden.length > 0) { %>
-      <table class="table" style="margin-top:12px;">
-        <thead><tr><th>Đã ẩn khỏi trang này</th><th></th></tr></thead>
-        <tbody>
-          <% gianHidden.forEach(function(code) { %>
-          <tr>
-            <td><%= code %></td>
-            <td>
-              <form method="POST" action="/doi-soat/momo/gian-hidden/delete" onsubmit="return confirm('Hiện lại gian này trên trang?');">
-                <input type="hidden" name="code" value="<%= code %>" />
-                <button type="submit" class="link-btn link-danger">Hiện lại</button>
-              </form>
-            </td>
-          </tr>
-          <% }) %>
-        </tbody>
-      </table>
-      <% } %>
     </section>
     <% } %>
 
@@ -415,5 +373,52 @@ Các dòng mờ (KH mới, chưa xuất MISA) bên dưới sẽ tự động b�
     </section>
   </main>
   <%- include('partials/panel-toggle') %>
+  <script>
+    (function () {
+      // Nhan, 2026-07-22: "nhấn vô dưới thì lại đưa lên trang đầu, muốn ở lại
+      // màn hình đó luôn" -- bang "TK Co theo tung ma cong trinh" luu bang
+      // AJAX, khong load lai trang (giu nguyen vi tri cuon, khong bi dua len
+      // dau trang).
+      var tkCoForm = document.getElementById('tkCoForm');
+      if (tkCoForm) {
+        tkCoForm.addEventListener('submit', function (e) {
+          e.preventDefault();
+          var flash = document.getElementById('tkCoSaveFlash');
+          fetch(tkCoForm.action, {
+            method: 'POST',
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            body: new URLSearchParams(new FormData(tkCoForm)),
+          })
+            .then(function (resp) { return resp.json(); })
+            .then(function () {
+              if (flash) {
+                flash.style.display = 'inline';
+                setTimeout(function () { flash.style.display = 'none'; }, 1500);
+              }
+            })
+            .catch(function () { alert('Không lưu được, thử lại giúp tôi.'); });
+        });
+      }
+
+      // Cac form khac tren trang nay (Ẩn gian / Hiện lại...) can load lai
+      // trang de tinh lai toan bo bang doi soat phia tren, nen van submit
+      // binh thuong -- nhung luu lai vi tri cuon truoc khi submit va tu cuon
+      // ve dung cho do sau khi trang tai lai, thay vi nhay len dau trang.
+      var SCROLL_KEY = 'doiSoatMomoScrollY';
+      document.querySelectorAll('form').forEach(function (form) {
+        if (form.id === 'tkCoForm') return;
+        form.addEventListener('submit', function () {
+          try { sessionStorage.setItem(SCROLL_KEY, String(window.scrollY)); } catch (e) {}
+        });
+      });
+      try {
+        var savedY = sessionStorage.getItem(SCROLL_KEY);
+        if (savedY !== null) {
+          sessionStorage.removeItem(SCROLL_KEY);
+          window.scrollTo(0, parseInt(savedY, 10) || 0);
+        }
+      } catch (e) {}
+    })();
+  </script>
 </body>
 </html>
