@@ -98,6 +98,12 @@ router.post("/he-thong/nguoi-dung/:id/mat-khau", (req, res) => {
     const password = req.body.password || "";
     if (!password || password.length < 6) throw new Error("Mat khau moi phai tu 6 ky tu tro len.");
     user.password_hash = bcrypt.hashSync(password, 10);
+    // Chi Nhan (2026-07-22): "khi tôi đổi mk đăng xuất khỏi các đăng nhập cũ
+    // cho tôi nhá" -- ap dung ca khi ADMIN dat lai mat khau cho tai khoan
+    // khac: tang session_version de moi noi tai khoan do dang dang nhap san
+    // (bang mat khau CU) bi dang xuat o request ke tiep -- xem
+    // middleware/auth.js requireLogin.
+    user.session_version = (user.session_version || 0) + 1;
     save(store);
     res.redirect("/he-thong/nguoi-dung?success=" + encodeURIComponent(`Da dat lai mat khau cho tai khoan "${user.username}".`));
   } catch (e) {

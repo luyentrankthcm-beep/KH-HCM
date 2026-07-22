@@ -23,6 +23,10 @@ router.post("/login", (req, res) => {
   // User cu chua co truong role (tao truoc khi co tinh nang nay) mac dinh la
   // admin de khong tu nhien bi khoa quyen dang co san.
   req.session.role = user.role || "admin";
+  // Chi Nhan (2026-07-22): "khi tôi đổi mk đăng xuất khỏi các đăng nhập cũ" --
+  // ghi lai session_version HIEN TAI cua user vao cookie luc dang nhap, de
+  // middleware/auth.js requireLogin doi chieu sau nay (xem ghi chu o do).
+  req.session.sessionVersion = user.session_version || 0;
   res.redirect("/");
 });
 
@@ -46,7 +50,16 @@ router.post("/account/password", (req, res) => {
     return res.redirect("/?pwerror=" + encodeURIComponent("Xac nhan mat khau khong khop."));
   }
   user.password_hash = bcrypt.hashSync(new_password, 10);
+  // Chi Nhan (2026-07-22): "khi tôi đổi mk đăng xuất khỏi các đăng nhập cũ
+  // cho tôi nhá" -- tang session_version de MOI thiet bi/trinh duyet khac
+  // dang dang nhap bang mat khau CU tu dong bi dang xuat o request ke tiep
+  // cua ho (xem middleware/auth.js requireLogin). Rieng thiet bi dang thao
+  // tac doi mat khau nay thi cap nhat luon cookie hien tai theo version moi,
+  // KHONG bi dang xuat theo (khong co ly do phai dang nhap lai ngay tren
+  // chinh may vua doi mat khau thanh cong).
+  user.session_version = (user.session_version || 0) + 1;
   save(store);
+  req.session.sessionVersion = user.session_version;
   res.redirect("/?pwsuccess=1");
 });
 

@@ -1,5 +1,30 @@
+const { load } = require("../store");
+
+// Chi Nhan (2026-07-22): "khi tôi đổi mk đăng xuất khỏi các đăng nhập cũ cho
+// tôi nhá" -- session dung cookie-session (KHONG co session store phia
+// server, toan bo du lieu session nam trong cookie ky ten o may nguoi dung),
+// nen KHONG co danh sach "cac session dang mo" de server chu dong dang xuat
+// tu xa. Cach lam: moi user co 1 "session_version" (so nguyen, tang len moi
+// lan doi mat khau -- xem routes/auth.js POST /account/password va
+// routes/users.js POST /:id/mat-khau). Luc dang nhap, session_version HIEN
+// TAI duoc ghi vao cookie. Moi request sau do, so sanh voi session_version
+// MOI NHAT trong store: neu KHAC (tuc mat khau da doi sau khi cookie nay
+// duoc tao) thi coi nhu het han, buoc dang xuat -- ap dung cho MOI thiet
+// bi/trinh duyet dang dang nhap bang mat khau CU, ke ca may khong dung de
+// doi mat khau.
 function requireLogin(req, res, next) {
   if (req.session && req.session.userId) {
+    const store = load();
+    const user = (store.users || []).find((u) => u.id === req.session.userId);
+    if (!user) {
+      req.session = null;
+      return res.redirect("/login");
+    }
+    const currentVersion = user.session_version || 0;
+    if ((req.session.sessionVersion || 0) !== currentVersion) {
+      req.session = null;
+      return res.redirect("/login?error=" + encodeURIComponent("Mat khau vua duoc doi -- vui long dang nhap lai."));
+    }
     return next();
   }
   return res.redirect("/login");
