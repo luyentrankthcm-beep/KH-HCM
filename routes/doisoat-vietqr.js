@@ -585,9 +585,23 @@ router.get("/doi-soat/vietqr", (req, res) => {
     // lai vao chung 1 dong duy nhat cho tung ngay.
     const cellMap = {}; // groupKey -> { date -> merged cell data }
     const groupInfo = {}; // groupKey -> { maCongTrinh, isCse }
+    // Chi Nhan, 2026-07-22 (fix khan): displayMaCongTrinhFor goi
+    // findBestMaCongTrinh, la 1 vong lap fuzzy-match qua TOAN BO danh sach
+    // cong trinh chuan (co the vai tram dong) -- truoc day chi goi 1 LAN cho
+    // MOI CODE DUY NHAT (sau khi da gop qua Set), gio neu goi lai cho TUNG
+    // DONG settlement (co the hang chuc nghin dong) se cham hang chuc/tram
+    // lan, gay treo/timeout server thuc te (502 tren Railway). Cache lai theo
+    // code de van chi tinh 1 lan cho moi code duy nhat nhu cu.
+    const maCongTrinhCache = {};
+    function resolveMaCongTrinh(code) {
+      if (!(code in maCongTrinhCache)) {
+        maCongTrinhCache[code] = displayMaCongTrinhFor(code, CHANNELS[ch].company, store);
+      }
+      return maCongTrinhCache[code];
+    }
     rows.forEach((r) => {
       r.lines.forEach((l) => {
-        const maCongTrinh = displayMaCongTrinhFor(l.code, CHANNELS[ch].company, store);
+        const maCongTrinh = resolveMaCongTrinh(l.code);
         const isCse = l.code.endsWith(FF_SUFFIX);
         const groupKey = `${maCongTrinh} ${isCse ? 1 : 0}`;
         groupInfo[groupKey] = { maCongTrinh, isCse };
