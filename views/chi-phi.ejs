@@ -137,7 +137,15 @@
               <td><%= r.gian %></td>
               <td><%= r.ncc %></td>
               <td>
-                <form method="POST" action="/chi-phi/<%= r.id %>/so-hoa-don" class="form-inline cp-ajax-form" data-kind="so-hoa-don" style="gap:4px;">
+                <!-- Chi Nhan (2026-07-22): "có số hóa đơn rồi thì khóa lun không cần
+                     cho phép chỉnh sửa đâu" -- dong da co soHoaDon mac dinh KHOA (chi
+                     hien text + nut "Sửa" nho de mo lai neu that su can sua), tranh
+                     bam nham/ghi de mat du lieu da luu. -->
+                <span class="cp-so-hd-locked" id="soHdLocked-<%= r.id %>" style="font-size:12px; <%= r.soHoaDon ? '' : 'display:none;' %>">
+                  <%= r.soHoaDon %>
+                  <button type="button" class="link-btn" style="font-size:10px;" onclick="cpUnlock('<%= r.id %>','so-hoa-don')">Sửa</button>
+                </span>
+                <form method="POST" action="/chi-phi/<%= r.id %>/so-hoa-don" class="form-inline cp-ajax-form" data-kind="so-hoa-don" id="soHdForm-<%= r.id %>" style="gap:4px; <%= r.soHoaDon ? 'display:none;' : '' %>">
                   <input type="hidden" name="hachToan" value="<%= hachToanFilter %>" />
                   <input type="hidden" name="thang" value="<%= thangFilter %>" />
                   <input type="hidden" name="hoaDon" value="<%= hoaDonFilter %>" />
@@ -161,11 +169,12 @@
               <td><%= (r.soTien || 0).toLocaleString('vi-VN') %> đ</td>
               <td>
                 <span class="cp-link-hoa-don-display" id="linkDisplay-<%= r.id %>">
-                <% if (r.linkHoaDon) { %><a href="<%= r.linkHoaDon %>" target="_blank" rel="noopener">Xem hóa đơn</a><br/>
+                <% if (r.linkHoaDon) { %><a href="<%= r.linkHoaDon %>" target="_blank" rel="noopener">Xem hóa đơn</a>
+                  <button type="button" class="link-btn" style="font-size:10px;" onclick="cpUnlock('<%= r.id %>','link-hoa-don')">Sửa</button><br/>
                 <% } else { %><span class="muted">Không có</span><br/>
                 <% } %>
                 </span>
-                <form method="POST" action="/chi-phi/<%= r.id %>/link-hoa-don" class="form-inline cp-ajax-form" data-kind="link-hoa-don" style="gap:4px;">
+                <form method="POST" action="/chi-phi/<%= r.id %>/link-hoa-don" class="form-inline cp-ajax-form" data-kind="link-hoa-don" id="linkHdForm-<%= r.id %>" style="gap:4px; <%= r.linkHoaDon ? 'display:none;' : '' %>">
                   <input type="hidden" name="hachToan" value="<%= hachToanFilter %>" />
                   <input type="hidden" name="thang" value="<%= thangFilter %>" />
                   <input type="hidden" name="hoaDon" value="<%= hoaDonFilter %>" />
@@ -224,6 +233,28 @@
       window.cpChangePage = function (delta) {
         page += delta;
         render();
+      };
+      // Chi Nhan (2026-07-22): "có số hóa đơn rồi thì khóa lun không cần cho
+      // phép chỉnh sửa đâu" -- mo lai form khi bam nut "Sửa" (chu dong, tranh
+      // sua nham); kind: 'so-hoa-don' hoac 'link-hoa-don'.
+      window.cpUnlock = function (rowId, kind) {
+        if (kind === 'so-hoa-don') {
+          var lockedEl = document.getElementById('soHdLocked-' + rowId);
+          var formEl = document.getElementById('soHdForm-' + rowId);
+          if (lockedEl) lockedEl.style.display = 'none';
+          if (formEl) {
+            formEl.style.display = '';
+            var input = formEl.querySelector('input[name="soHoaDon"]');
+            if (input) input.focus();
+          }
+        } else if (kind === 'link-hoa-don') {
+          var formEl2 = document.getElementById('linkHdForm-' + rowId);
+          if (formEl2) {
+            formEl2.style.display = '';
+            var input2 = formEl2.querySelector('input[name="linkHoaDon"]');
+            if (input2) input2.focus();
+          }
+        }
       };
       function render() {
         var q = (document.getElementById('cpSearchBox').value || '').toLowerCase().trim();
@@ -287,13 +318,23 @@
                     : '';
                 }
                 if (tr) tr.setAttribute('data-search', tr.getAttribute('data-search'));
+                // Chi Nhan (2026-07-22): luu xong ma co gia tri thi khoa lai ngay
+                // (an form, hien text + nut Sua) -- khong doi ban ghi phai bam F5.
+                var soHdLockedEl = document.getElementById('soHdLocked-' + rowId);
+                if (data.soHoaDon && soHdLockedEl) {
+                  soHdLockedEl.innerHTML = data.soHoaDon +
+                    ' <button type="button" class="link-btn" style="font-size:10px;" onclick="cpUnlock(\'' + rowId + '\',\'so-hoa-don\')">Sửa</button>';
+                  soHdLockedEl.style.display = '';
+                  form.style.display = 'none';
+                }
               } else if (kind === 'link-hoa-don') {
                 var linkEl = document.getElementById('linkDisplay-' + rowId);
                 if (linkEl) {
                   linkEl.innerHTML = data.linkHoaDon
-                    ? '<a href="' + data.linkHoaDon + '" target="_blank" rel="noopener">Xem hóa đơn</a><br/>'
+                    ? '<a href="' + data.linkHoaDon + '" target="_blank" rel="noopener">Xem hóa đơn</a> <button type="button" class="link-btn" style="font-size:10px;" onclick="cpUnlock(\'' + rowId + '\',\'link-hoa-don\')">Sửa</button><br/>'
                     : '<span class="muted">Không có</span><br/>';
                 }
+                if (data.linkHoaDon) form.style.display = 'none';
               }
               showFlash(form);
             })

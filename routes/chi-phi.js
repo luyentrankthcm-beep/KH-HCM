@@ -600,11 +600,19 @@ router.post("/chi-phi/tim-hoa-don-gmail", requireAdmin, async (req, res) => {
     });
     const newestMonth = [...monthSet].sort().reverse()[0] || "";
 
+    // Chi Nhan (2026-07-22): "các dữ liệu tôi cập nhật rồi lưu ... để khi tôi
+    // nhấn cập nhật cái lại mất phải làm lại" -- truoc day chi bo qua dong da
+    // co linkHoaDon, nen dong nao chi da tu dien tay soHoaDon (nhung chua dan
+    // linkHoaDon) van bi nut "Cap nhat tim hoa don" quet lai va GHI DE so hoa
+    // don tim duoc tu Gmail len tren, mat du lieu chi da luu. Sua: bo qua ca
+    // dong da co soHoaDon (khong chi linkHoaDon) -- dong nao chi da dien/luu 1
+    // trong 2 truong deu duoc coi la xong, khong tu dong dong vao nua.
     const candidates = store.chi_phi.filter(
       (r) =>
         r.congTy === activeCompany &&
         (r.ngay || "").slice(0, 7) === newestMonth &&
-        !(r.linkHoaDon || "").trim()
+        !(r.linkHoaDon || "").trim() &&
+        !(r.soHoaDon || "").trim()
     );
     const toProcess = candidates.slice(0, GMAIL_AUTO_MAX_ROWS_PER_RUN);
 
