@@ -281,7 +281,16 @@
   // Van giu nguyen noi dung HTML (khong xoa khoi DOM) -- chi ho bien mat khoi
   // man hinh bang opacity/height, phong khi Luyen can doc lai (bam F5 la lai
   // hien vi query ?success=... con nguyen tren URL).
-  (function () {
+  //
+  // Nhan, 2026-07-22: script nay dat trong nav.ejs, ma nav.ejs duoc include
+  // NGAY DAU <body> (truoc <main>) o tat ca trang -- neu chay ngay (khong
+  // cho DOM tai xong) thi luc script chay, .alert-success/.alert-error (nam
+  // trong <main>, o SAU nav trong HTML) CHUA TON TAI trong DOM, nen
+  // querySelectorAll luon tra ve rong va script tu thoat ma khong lam gi ca.
+  // Bug nay khien tinh nang tu an banner KHONG THUC SU CHAY tu truoc den gio
+  // (dau la request "hiển thị năm giây rồi tắt" da lam nhung chua bao gio
+  // thuc su hoat dong). Sua bang cach cho DOMContentLoaded truoc khi chay.
+  document.addEventListener("DOMContentLoaded", function () {
     var alerts = document.querySelectorAll(".alert-success, .alert-error");
     if (!alerts.length) return;
     alerts.forEach(function (el) {
@@ -295,8 +304,9 @@
         el.style.paddingBottom = "0";
       }, 5000);
     });
-  })();
+  });
 </script>
+<%- include('panel-toggle') %>
 <% if (typeof isAdmin !== "undefined" && !isAdmin) { %>
 <script>
   // Chi Nhan (2026-07-21): tai khoan "chi xem" -- an bot moi form/nut thao

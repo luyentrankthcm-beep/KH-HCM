@@ -13,6 +13,15 @@
      truoc day mac dinh la HIEN -- lam trang rat dai/roi khi vao lan dau.
   2) Them icon mui ten (▾ dang mo / ▸ dang an) canh chu "Ẩn"/"Hiện" de nhin
      ro trang thai hon la chi doc chu.
+
+  Nhan, 2026-07-22: "tất cả các khung đều có nút ẩn cho tôi nhá" -- truoc day
+  chi 3 trang doi soat (Momo/VietQR/Zalo-VNPay-Payoo) tu include partial nay,
+  cac trang khac (Chi Phi, Phap danh...) khong co. Gio include 1 lan DUY NHAT
+  trong nav.ejs (o moi trang) de TAT CA <section class="panel"> o TAT CA
+  trang deu tu dong co nut Ẩn/Hiện, khong can sua tung file. Vi nav.ejs nam
+  o DAU <body> (truoc <main>, noi chua cac section.panel), script phai cho
+  DOMContentLoaded roi moi chay (giong bug vua sua o script an banner trong
+  nav.ejs) -- neu khong se khong tim thay panel nao ca.
 -->
 <style>
   section.panel > h2:first-child {
@@ -41,7 +50,12 @@
   details > summary::marker { color: var(--color-primary, #d46a9f); }
 </style>
 <script>
-  (function () {
+  document.addEventListener("DOMContentLoaded", function () {
+    // Neu 1 trang nao do vo tinh con include partial nay lan 2 (vd file cu
+    // chua don), tranh chay lai/tao nut lap doi tren cung 1 panel.
+    if (window.__khbtPanelToggleInit) return;
+    window.__khbtPanelToggleInit = true;
+
     var STORAGE_PREFIX = "khbt_panel_collapsed:" + location.pathname + ":";
     var panels = document.querySelectorAll("section.panel");
     panels.forEach(function (panel, idx) {
@@ -87,5 +101,5 @@
         setState(wrapper.style.display !== "none");
       });
     });
-  })();
+  });
 </script>
