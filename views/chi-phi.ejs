@@ -328,6 +328,12 @@
                   form.style.display = 'none';
                 }
               } else if (kind === 'link-hoa-don') {
+                var trangThaiEl2 = document.getElementById('trangThai-' + rowId);
+                if (trangThaiEl2 && data.trangThaiHoaDon !== undefined) {
+                  trangThaiEl2.innerHTML = data.trangThaiHoaDon
+                    ? '<br/><span class="muted" style="font-size:11px;">' + data.trangThaiHoaDon + '</span>'
+                    : '';
+                }
                 var linkEl = document.getElementById('linkDisplay-' + rowId);
                 if (linkEl) {
                   linkEl.innerHTML = data.linkHoaDon

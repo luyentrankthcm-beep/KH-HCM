@@ -221,7 +221,19 @@ router.post("/chi-phi/:id/so-hoa-don", requireAdmin, (req, res) => {
   r.soHoaDon = (req.body.soHoaDon || "").trim();
   // Ghi nhan la da dien tay, xoa cac ghi chu canh bao cu (vd "can mo link
   // kiem tra") vi Luyen da tu xu ly xong dong nay.
-  r.trangThaiHoaDon = r.soHoaDon ? "Đã điền số hóa đơn thủ công" : r.trangThaiHoaDon;
+  //
+  // Chi Nhan (2026-07-22): "hóa đơn xăng dầu mà sao lại ra cái này" -- dong
+  // id 239 bi gan nham so hoa don/link cua cong ty khac (canh bao mismatch tu
+  // luc import). Neu chi XOA TRANG so hoa don (thay vi dien so moi) VA dong
+  // dang co canh bao mismatch cu, coi day la "chi dang don lai du lieu sai",
+  // xoa luon canh bao + so tien hoa don goc di kem (khong con y nghia gi nua
+  // khi da xoa so hoa don), thay bang ghi chu ngan gon nhac chi dien lai.
+  if (!r.soHoaDon && (r.trangThaiHoaDon || "").includes("CẢNH BÁO")) {
+    r.trangThaiHoaDon = "Đã xóa số hóa đơn cũ (bị gán nhầm) -- cần điền lại số hóa đơn đúng.";
+    r.soTienHoaDonGoc = null;
+  } else {
+    r.trangThaiHoaDon = r.soHoaDon ? "Đã điền số hóa đơn thủ công" : r.trangThaiHoaDon;
+  }
   save(store);
   if (isAjaxChiPhiRequest(req)) {
     return res.json({ success: true, soHoaDon: r.soHoaDon, trangThaiHoaDon: r.trangThaiHoaDon || "" });
@@ -251,9 +263,15 @@ router.post("/chi-phi/:id/link-hoa-don", requireAdmin, (req, res) => {
     return res.redirect("/chi-phi?" + qs.join("&"));
   }
   r.linkHoaDon = (req.body.linkHoaDon || "").trim();
+  // Chi Nhan (2026-07-22): tuong tu /so-hoa-don -- neu chi XOA TRANG link (dang
+  // don dep 1 mismatch cu) thi xoa luon canh bao + so tien hoa don goc di kem.
+  if (!r.linkHoaDon && (r.trangThaiHoaDon || "").includes("CẢNH BÁO")) {
+    r.trangThaiHoaDon = "Đã xóa link hóa đơn cũ (bị gán nhầm) -- cần dán lại link đúng.";
+    r.soTienHoaDonGoc = null;
+  }
   save(store);
   if (isAjaxChiPhiRequest(req)) {
-    return res.json({ success: true, linkHoaDon: r.linkHoaDon });
+    return res.json({ success: true, linkHoaDon: r.linkHoaDon, trangThaiHoaDon: r.trangThaiHoaDon || "" });
   }
   const qs = [];
   if (req.body.hachToan) qs.push("hachToan=" + encodeURIComponent(req.body.hachToan));
