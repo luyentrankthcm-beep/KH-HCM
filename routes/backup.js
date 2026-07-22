@@ -21,7 +21,10 @@ router.get("/he-thong/sao-luu", (req, res) => {
 
 router.get("/he-thong/sao-luu/tai-xuong", (req, res) => {
   const store = load();
-  const data = JSON.stringify(store, null, 2);
+  // Chi Nhan, 2026-07-22: du lieu da lon dan (nhieu nam lich su tai len), stringify
+  // co indent (null, 2) lam file to hon dang ke va cham hon -- bo indent de nhanh/nhe
+  // hon (van la JSON hop le, phuc hoi lai binh thuong), tranh timeout/502 khi tai xuong.
+  const data = JSON.stringify(store);
   const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
   res.setHeader("Content-Type", "application/json; charset=utf-8");
   res.setHeader("Content-Disposition", `attachment; filename=kh-bank-tracker-sao-luu-${stamp}.json`);
