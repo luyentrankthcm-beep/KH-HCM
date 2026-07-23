@@ -217,4 +217,115 @@ function parseChiPhiSheetWorkbook(buffer) {
   return { monthRows, skippedSheets };
 }
 
-module.exports = { parseChiPhiSheetWorkbook, extractDate, extractSoHoaDon, normCongTy };
+// ---------- Parser cho file KVC MIEN BAC ("Tạo lệnh UNC KVC MB.xlsx") ----------
+// Luyen, 2026-07-23: nguon rieng cho Chi Phi MIEN BAC -- KHAC HAN file MTĐ MN
+// (Mien Nam): CHI 1 tab lien tuc, KHONG tach theo ten sheet "Tháng N.YYYY".
+// Luyen xac nhan qua AskUserQuestion: "1 tab thôi KVC HN C THANH á" -- nhung
+// KHONG hardcode ten sheet do (de phong doi ten sau nay), thay vao do nhan
+// dien qua CHU KY COT: co ca "gian hàng", "Số tiền", "Tên đơn vị thụ hưởng",
+// "Ngày tạo lệnh" trong 8 dong dau. Cong ty (KH Cu/Moi) KHONG co cot rieng --
+// nam LAN trong 1 cot ghi chu ngan hang (header "...note rõ", gia tri thuc te
+// vd "VP KH MỚI", "BIDV KH CŨ", "KH cũ VP" -- nhieu bien the hoa/thuong, co
+// khong tien to VP/BIDV) -- dung LAI normCongTy() da co (chi can chua "moi"
+// hoac "cu" sau khi bo dau). ~450/1057 dong lich su (truoc thang 7.2026) dong
+// nay BO TRONG -- nhung dong do bi LOAI (unclassifiedCount++), KHONG doan mo
+// hinh, tranh gan sai cong ty. "gian hàng" cot rieng cung hau nhu luon TRONG
+// (chi 36/1057 dong co, da so la TEN NGUOI duyet don nhu "Hường"/"Dương" chu
+// khong phai ten gian that) -- van lay nguyen gia tri cot nay neu co (khong
+// tu suy doan tu dien giai nhu file Mien Nam, vi khong co anchor dang tin cay
+// "ghế " o day), phan lon se trong cho Luyen tu dien tay giong nhu file Mien
+// Nam. So hoa don: KHONG co cot rieng, nhung thuong nhac trong dien giai kieu
+// "...theo hoa don so 12345 cho..." -- tan dung lai extractSoHoaDon() de lay
+// duoc mien phi khi co.
+function mbNormHeader(s) {
+  return removeDiacritics(String(s || "")).toLowerCase().replace(/\s+/g, " ").trim();
+}
+
+function findMbHeaderRow(grid) {
+  for (let r = 0; r < Math.min(grid.length, 8); r++) {
+    const row = grid[r] || [];
+    const idx = {};
+    row.forEach((cell, c) => {
+      if (cell === null || cell === undefined || typeof cell !== "string") return;
+      const h = mbNormHeader(cell);
+      if (idx.ngayTaoLenh === undefined && h.includes("ngay tao lenh")) idx.ngayTaoLenh = c;
+      if (idx.ngayXinPm === undefined && h.includes("ngay xin pm")) idx.ngayXinPm = c;
+      if (idx.gianHang === undefined && h.includes("gian hang")) idx.gianHang = c;
+      if (idx.deXuat === undefined && h.includes("de xuat")) idx.deXuat = c;
+      if (idx.unc === undefined && h.includes("tren unc")) idx.unc = c;
+      if (idx.soTien === undefined && h === "so tien") idx.soTien = c;
+      if (idx.thuHuong === undefined && h.includes("thu huong") && h.includes("don vi")) idx.thuHuong = c;
+      if (idx.ghiChuCongTy === undefined && h.includes("note ro")) idx.ghiChuCongTy = c;
+    });
+    if (idx.soTien !== undefined && idx.thuHuong !== undefined && idx.gianHang !== undefined && idx.ghiChuCongTy !== undefined) {
+      return { headerRowIdx: r, ...idx };
+    }
+  }
+  return null;
+}
+
+function mbParseDateCell(v) {
+  if (v === null || v === undefined || v === "") return null;
+  if (typeof v === "number") return excelSerialToIso(v);
+  const s = String(v).trim();
+  const m = s.match(/^(\d{1,2})[\/.](\d{1,2})[\/.](\d{2,4})/);
+  if (!m) return null;
+  let yr = Number(m[3]);
+  if (yr < 100) yr += 2000;
+  return `${yr}-${pad2(Number(m[2]))}-${pad2(Number(m[1]))}`;
+}
+
+// Tra ve { sheetName, rows, unclassifiedCount, skippedNoAmountOrDate } -- 1
+// tab duy nhat khop chu ky cot (dung tab dau tien khop, bo qua cac tab khac
+// nhu "JP HN"/"đối trừ goldtrans"/"site code" vi KHONG khop chu ky nay).
+function parseKvcMienBacWorkbook(buffer) {
+  const wb = XLSX.read(buffer, { type: "buffer" });
+  let sheetName = null;
+  let rows = [];
+  let unclassifiedCount = 0;
+
+  for (const sn of wb.SheetNames) {
+    const ws = wb.Sheets[sn];
+    const grid = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: null });
+    const found = findMbHeaderRow(grid);
+    if (!found) continue;
+    sheetName = sn;
+    for (let r = found.headerRowIdx + 1; r < grid.length; r++) {
+      const row = grid[r] || [];
+      const soTienRaw = row[found.soTien];
+      const soTien = typeof soTienRaw === "number" ? soTienRaw : NaN;
+      if (!soTien || isNaN(soTien) || soTien <= 0) continue; // dong trong/tieu de phu/tong nhom
+
+      const ngay =
+        (found.ngayTaoLenh !== undefined ? mbParseDateCell(row[found.ngayTaoLenh]) : null) ||
+        (found.ngayXinPm !== undefined ? mbParseDateCell(row[found.ngayXinPm]) : null);
+      if (!ngay) continue;
+
+      const deXuatText = found.deXuat !== undefined ? cellText(row[found.deXuat]) : "";
+      const uncText = found.unc !== undefined ? cellText(row[found.unc]) : "";
+      const dienGiai = deXuatText || uncText;
+      const ncc = found.thuHuong !== undefined ? cellText(row[found.thuHuong]) : "";
+      const gian = found.gianHang !== undefined ? cellText(row[found.gianHang]) : "";
+      const congTyNote = found.ghiChuCongTy !== undefined ? row[found.ghiChuCongTy] : "";
+      const congTy = normCongTy(congTyNote);
+      if (!congTy) {
+        unclassifiedCount++;
+        continue; // khong doan mo hinh KH Cu/Moi -- bo qua, khong nhap sai cong ty
+      }
+      const soHoaDon = extractSoHoaDon(uncText) || extractSoHoaDon(deXuatText);
+
+      rows.push({ congTy, ngay, gian, ncc, soHoaDon, soUNC: "", dienGiai, soTien });
+    }
+    break; // chi lay tab DAU TIEN khop chu ky (Luyen xac nhan chi co 1 tab lien quan)
+  }
+
+  return { sheetName, rows, unclassifiedCount };
+}
+
+module.exports = {
+  parseChiPhiSheetWorkbook,
+  parseKvcMienBacWorkbook,
+  extractDate,
+  extractSoHoaDon,
+  normCongTy,
+};

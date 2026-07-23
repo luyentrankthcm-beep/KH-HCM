@@ -4,7 +4,7 @@ const XLSX = require("xlsx");
 const { load, save, nextId } = require("../store");
 const { requireLogin, requireAdmin } = require("../middleware/auth");
 const { getCompany } = require("../utils/companies");
-const { parseChiPhiSheetWorkbook } = require("../utils/chiPhiSheetParser");
+const { parseChiPhiSheetWorkbook, parseKvcMienBacWorkbook } = require("../utils/chiPhiSheetParser");
 const { extractGianRentText, matchGianRecord } = require("../utils/rentPaymentMatcher");
 const gmailApi = require("../utils/gmailApi");
 const gmailInvoiceMatcher = require("../utils/gmailInvoiceMatcher");
@@ -454,8 +454,28 @@ router.post("/chi-phi/:mien(mien-nam|mien-bac)", requireAdmin, (req, res) => {
 // ro rang, truoc gio phai mo tung link tra cuu/OCR bang tay) -- KHONG tu dong
 // parse o day de tranh nhap sai/trung 105 dong da xu ly thu cong, chi bao cho
 // Luyen biet da bo qua tab nay.
-function chiPhiRowKey(r) {
-  return [r.congTy, r.ngay, (r.ncc || "").trim(), r.soTien, (r.dienGiai || "").trim()].join("|");
+// Luyen, 2026-07-23: them khoa "mien" (nam/bac) de khong lan du lieu Mien
+// Nam/Mien Bac neu ngau nhien trung congTy+ngay+ncc+soTien+dienGiai (2 nguon
+// KHAC HAN nhau nen kha nang trung that su rat thap, nhung van nen tach cho
+// chac). QUAN TRONG: dung "(r.mien || 'nam')" (KHONG phai r.mien tho) --
+// 781 dong Mien Nam co san TRUOC KHI co truong "mien" nay hoan toan KHONG co
+// field nay trong du lieu da luu (chi duoc gan mac dinh "nam" luc DOC qua
+// ensureChiPhiDefaults, khong phai luc luu) -- neu dung r.mien tho o day, khoa
+// cua 781 dong cu se la "undefined|..." trong khi dong MOI parse tu sheet
+// Mien Nam co r.mien = "nam" ro rang, 2 khoa se KHONG khop nhau va gay nhan
+// doi toan bo 781 dong o lan "Cập nhật chi phí" tiep theo.
+// mienOverride: cac dong VUA PARSE tu sheet (mr.rows, chua duoc luu) KHONG TU
+// mang san field ".mien" (chi duoc gan luc tao newRow ben duoi) -- neu chi
+// dung "r.mien || 'nam'" o day cho ca 2 phia (dong luu roi VA dong vua parse),
+// dong Mien Bac vua parse se luon bi tinh nham thanh khoa "nam" (vi r.mien
+// luon undefined tren dong parse), khong bao gio khop voi khoa "bac" cua
+// chinh no sau khi da luu -- gay nhap TRUNG LAP moi lan bam "Cập nhật chi
+// phí" tiep theo (da phat hien qua dry-run truoc khi dung that, xem
+// applyChiPhiMonthRowsToStore ben duoi). Truyen rieng mienOverride khi tinh
+// khoa cho dong MOI VUA PARSE (dong DA LUU thi khong can, tu no da co r.mien
+// dung roi hoac mac dinh dung "nam" cho du lieu cu).
+function chiPhiRowKey(r, mienOverride) {
+  return [(r.mien || mienOverride || "nam"), r.congTy, r.ngay, (r.ncc || "").trim(), r.soTien, (r.dienGiai || "").trim()].join("|");
 }
 
 // Cac gian la nhan nhom chung chung tu cot A (khong phai ten gian that) --
@@ -472,7 +492,7 @@ function isUpgradableGian(gianText) {
 // GIU NGUYEN nhu truoc (chi them dong MOI, khong dong tay dong da co -- Luyen
 // xac nhan rieng "không cập nhật cái mới thôi cái cũ vẫn giữ nguyên") --
 // doi o day CHI la nguon lay du lieu (file vs link), khong doi cach xu ly.
-function applyChiPhiMonthRowsToStore(store, monthRows, sourceLabel) {
+function applyChiPhiMonthRowsToStore(store, monthRows, sourceLabel, mien = "nam") {
   const existingByKey = new Map();
   store.chi_phi.forEach((r) => existingByKey.set(chiPhiRowKey(r), r));
   let added = 0;
@@ -482,7 +502,7 @@ function applyChiPhiMonthRowsToStore(store, monthRows, sourceLabel) {
   for (const mr of monthRows) {
     let addedThisSheet = 0;
     for (const r of mr.rows) {
-      const key = chiPhiRowKey(r);
+      const key = chiPhiRowKey(r, mien);
       const existingRow = existingByKey.get(key);
       if (existingRow) {
         // Dong da co roi -- KHONG dong tay, chi nang cap Gian tu nhan nhom
@@ -496,12 +516,11 @@ function applyChiPhiMonthRowsToStore(store, monthRows, sourceLabel) {
       const newRow = {
         id: nextId(store, "chi_phi_seq") || Date.now(),
         congTy: r.congTy,
-        // Luyen, 2026-07-23: sheet "ĐI ỦY NHIỆM CHI KVC + MTĐ MN" (nguon duy
-        // nhat cua route upload/cap-nhat-tu-sheet nay) la du lieu Mien Nam --
-        // luon gan "nam" bat ke dang xem trang Mien Nam hay Mien Bac luc bam
-        // nut (xem router.post upload/cap-nhat-tu-sheet ben duoi, deu redirect
-        // ve /chi-phi/mien-nam sau khi xong vi du lieu moi luon nam o do).
-        mien: "nam",
+        // Luyen, 2026-07-23: gio ham nay dung chung cho CA 2 nguon (sheet
+        // "ĐI ỦY NHIỆM CHI KVC + MTĐ MN" = Mien Nam, VA sheet "Tạo lệnh UNC
+        // KVC MB" = Mien Bac) -- nguoi goi (router.post upload/cap-nhat-tu-sheet
+        // ben duoi) truyen dung tham so mien vao, KHONG con hardcode "nam" o day.
+        mien,
         ngay: r.ngay,
         gian: r.gian,
         ncc: r.ncc,
@@ -561,7 +580,7 @@ router.post("/chi-phi/upload", requireAdmin, upload.single("file"), (req, res) =
       );
     }
     const sourceLabel = `upload "${req.file.originalname}" ${new Date().toISOString().slice(0, 10)}`;
-    const result = applyChiPhiMonthRowsToStore(store, monthRows, sourceLabel);
+    const result = applyChiPhiMonthRowsToStore(store, monthRows, sourceLabel, "nam");
     save(store);
     const msg = buildChiPhiResultMessage(`Đã nạp "${req.file.originalname}":`, result, skippedSheets);
     // Sheet nay luon la du lieu Mien Nam (xem applyChiPhiMonthRowsToStore) --
@@ -584,30 +603,67 @@ const CHI_PHI_SHEET_XLSX_URL =
   process.env.CHI_PHI_SHEET_XLSX_URL ||
   "https://docs.google.com/spreadsheets/d/17PdHu2ji8y1sO1KK6H-BOJTXhsbcSziEG9hHRd9-iL0/export?format=xlsx";
 
-router.post("/chi-phi/cap-nhat-tu-sheet", requireAdmin, async (req, res) => {
+// Luyen, 2026-07-23: nguon rieng cho Mien Bac -- file "Tạo lệnh UNC KVC MB"
+// (Luyen: "link này là mảng kvc miền bắc có cột kh cũ kh mới"). Dung
+// parseKvcMienBacWorkbook (utils/chiPhiSheetParser.js) -- KHAC parser voi
+// Mien Nam vi cau truc sheet hoan toan khac (1 tab lien tuc, khong tach theo
+// ten sheet thang, cong ty nam trong cot ghi chu chu khong phai cot rieng).
+const KVC_MB_SHEET_XLSX_URL =
+  process.env.KVC_MB_SHEET_XLSX_URL ||
+  "https://docs.google.com/spreadsheets/d/12QOccXdRPnhb3JmRXUfdbszHioMaumsz/export?format=xlsx";
+
+router.post("/chi-phi/:mien(mien-nam|mien-bac)/cap-nhat-tu-sheet", requireAdmin, async (req, res) => {
   const store = load();
   ensureShape(store);
+  const mien = mienFromSeg(req.params.mien);
   try {
-    const resp = await fetch(CHI_PHI_SHEET_XLSX_URL);
-    if (!resp.ok) {
-      throw new Error(
-        `Không đọc được Google Sheet (mã lỗi ${resp.status}). Kiểm tra lại sheet đã chia sẻ "Bất kỳ ai có link đều xem được" chưa, hoặc link có bị đổi không.`
-      );
+    if (mien === "nam") {
+      const resp = await fetch(CHI_PHI_SHEET_XLSX_URL);
+      if (!resp.ok) {
+        throw new Error(
+          `Không đọc được Google Sheet (mã lỗi ${resp.status}). Kiểm tra lại sheet đã chia sẻ "Bất kỳ ai có link đều xem được" chưa, hoặc link có bị đổi không.`
+        );
+      }
+      const buf = Buffer.from(await resp.arrayBuffer());
+      const { monthRows, skippedSheets } = parseChiPhiSheetWorkbook(buf);
+      if (monthRows.length === 0) {
+        throw new Error(
+          `Google Sheet không có sheet nào khớp tên dạng "Tháng N.YYYY" (đã thấy: ${skippedSheets.join(", ") || "(không có sheet)"}).`
+        );
+      }
+      const sourceLabel = "GG Sheet " + new Date().toISOString().slice(0, 10);
+      const result = applyChiPhiMonthRowsToStore(store, monthRows, sourceLabel, "nam");
+      save(store);
+      const msg = buildChiPhiResultMessage("Đã đọc thẳng từ Google Sheet:", result, skippedSheets);
+      res.redirect("/chi-phi/mien-nam?success=" + encodeURIComponent(msg));
+    } else {
+      const resp = await fetch(KVC_MB_SHEET_XLSX_URL);
+      if (!resp.ok) {
+        throw new Error(
+          `Không đọc được Google Sheet KVC Miền Bắc (mã lỗi ${resp.status}). Kiểm tra lại sheet đã chia sẻ "Bất kỳ ai có link đều xem được" chưa, hoặc link có bị đổi không.`
+        );
+      }
+      const buf = Buffer.from(await resp.arrayBuffer());
+      const { sheetName, rows, unclassifiedCount } = parseKvcMienBacWorkbook(buf);
+      if (!sheetName) {
+        throw new Error(
+          `Không tìm thấy tab nào khớp đúng cấu trúc "gian hàng/Số tiền/Tên đơn vị thụ hưởng/note rõ" trong Google Sheet KVC Miền Bắc.`
+        );
+      }
+      const sourceLabel = "GG Sheet KVC MB " + new Date().toISOString().slice(0, 10);
+      const result = applyChiPhiMonthRowsToStore(store, [{ sheetName, rows }], sourceLabel, "bac");
+      save(store);
+      let msg = `Đã đọc thẳng từ Google Sheet KVC Miền Bắc (tab "${sheetName}"): thêm ${result.added} khoản chi mới.`;
+      if (result.addedNoGian > 0) {
+        msg += ` ${result.addedNoGian} dòng không có sẵn Gian (cột "gian hàng" hầu như luôn trống trong sheet này) -- cần chị tự điền tay.`;
+      }
+      if (unclassifiedCount > 0) {
+        msg += ` CẢNH BÁO: bỏ qua ${unclassifiedCount} dòng không xác định được KH Cũ/Mới (cột ghi chú ngân hàng trống hoặc không rõ) -- không tự đoán để tránh gán sai công ty.`;
+      }
+      res.redirect("/chi-phi/mien-bac?success=" + encodeURIComponent(msg));
     }
-    const buf = Buffer.from(await resp.arrayBuffer());
-    const { monthRows, skippedSheets } = parseChiPhiSheetWorkbook(buf);
-    if (monthRows.length === 0) {
-      throw new Error(
-        `Google Sheet không có sheet nào khớp tên dạng "Tháng N.YYYY" (đã thấy: ${skippedSheets.join(", ") || "(không có sheet)"}).`
-      );
-    }
-    const sourceLabel = "GG Sheet " + new Date().toISOString().slice(0, 10);
-    const result = applyChiPhiMonthRowsToStore(store, monthRows, sourceLabel);
-    save(store);
-    const msg = buildChiPhiResultMessage("Đã đọc thẳng từ Google Sheet:", result, skippedSheets);
-    res.redirect("/chi-phi/mien-nam?success=" + encodeURIComponent(msg));
   } catch (e) {
-    res.redirect("/chi-phi/mien-nam?error=" + encodeURIComponent(e.message));
+    res.redirect("/chi-phi/" + mienSeg(mien) + "?error=" + encodeURIComponent(e.message));
   }
 });
 

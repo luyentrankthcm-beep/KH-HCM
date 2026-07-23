@@ -33,8 +33,8 @@
       .icon-upload-btn .icon-upload-btn-label { font-size: 12px; font-weight: 600; white-space: nowrap; }
     </style>
     <div style="margin-bottom:16px; display:flex; gap:12px;">
-      <form method="POST" action="/chi-phi/cap-nhat-tu-sheet" style="display:inline-block;">
-        <button type="submit" class="icon-upload-btn" style="border:none;" title='Đọc thẳng từ Google Sheet "ĐI ỦY NHIỆM CHI KVC + MTĐ MN" để nạp thêm khoản chi mới (không cần tải file lên nữa, không mất dữ liệu đã có)'>
+      <form method="POST" action="/chi-phi/mien-<%= mien %>/cap-nhat-tu-sheet" style="display:inline-block;">
+        <button type="submit" class="icon-upload-btn" style="border:none;" title='<%= mien === "nam" ? "Đọc thẳng từ Google Sheet \"ĐI ỦY NHIỆM CHI KVC + MTĐ MN\" để nạp thêm khoản chi mới (không cần tải file lên nữa, không mất dữ liệu đã có)" : "Đọc thẳng từ Google Sheet \"Tạo lệnh UNC KVC MB\" để nạp thêm khoản chi Miền Bắc mới (không cần tải file lên nữa, không mất dữ liệu đã có)" %>'>
           <span class="icon-upload-btn-icon">📥</span>
           <span class="icon-upload-btn-label">Cập nhật chi phí</span>
         </button>
