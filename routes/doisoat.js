@@ -164,10 +164,32 @@ function applyCuaHangAlias(grossData, cuaHangMapping) {
 // unzip it in memory, and return the buffer of the first .xlsx/.xls entry
 // found inside. This is how the raw MoMo merchant-portal "daily_report" is
 // distributed (a zip containing one xlsx).
+//
+// BUG FIXED 2026-07-23 (Luyen: "tai khoong dduocjw nos khoong nhaanj dangj",
+// loi "Khong tim thay file Excel nao trong file .zip da tai len." khi tai
+// dung file .xlsx "Transaction_report" -- KHONG phai zip): .xlsx/.xlsm ban
+// than no CUNG LA 1 file zip (dinh dang Office Open XML), nen luon khop voi
+// magic bytes "PK" ben duoi -- truoc day moi file .xlsx deu bi nham la file
+// zip "daily_report", roi extractFirstExcelFromZip khong tim thay file Excel
+// NAM LONG BEN TRONG (vi ban than no da la file dich, khong phai zip bao
+// ngoai 1 file khac) nen bao loi. Sua: uu tien check DUOI FILE truoc (an
+// toan, dut khoat cho ca 2 chieu); chi fallback ve magic-byte + kiem tra cau
+// truc noi bo (co "[Content_Types].xml" o goc hay khong -- day la dau hieu
+// rieng cua file Office, khong co trong file zip "daily_report" thong
+// thuong) cho truong hop ten file khong ro duoi.
 function isZipFile(file) {
-  if (/\.zip$/i.test(file.originalname || "")) return true;
+  const name = file.originalname || "";
+  if (/\.zip$/i.test(name)) return true;
+  if (/\.(xlsx|xlsm|xls)$/i.test(name)) return false;
   const buf = file.buffer;
-  return buf && buf.length > 2 && buf[0] === 0x50 && buf[1] === 0x4b; // "PK"
+  if (!(buf && buf.length > 2 && buf[0] === 0x50 && buf[1] === 0x4b)) return false; // "PK"
+  try {
+    const zip = new AdmZip(buf);
+    const isOfficeDoc = zip.getEntries().some((e) => /^\[Content_Types\]\.xml$/i.test(e.entryName));
+    return !isOfficeDoc;
+  } catch (e) {
+    return false;
+  }
 }
 
 function extractFirstExcelFromZip(buffer) {
