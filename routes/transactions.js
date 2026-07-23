@@ -97,6 +97,25 @@ function filterTransactionsWithBalance(store, opts) {
   return rows.map((t) => ({ ...t, balance: balanceMap.has(t.id) ? balanceMap.get(t.id) : null }));
 }
 
+// Chi Nhan (2026-07-23): "sao tôi tải ngân hàng kh cũ không được" -- loi
+// "totalThu is not defined" khi render lai view "transactions" tu cac route
+// /transactions/paste, /transactions/upload-statement, /transactions/upload-
+// ma-cong-trinh: view can totalThu/totalChi (them luc lam tinh nang tach cot
+// Thu/Chi tren GET /transactions) nhung 3 route con lai o duoi chua tung
+// duoc cap nhat de tinh va truyen 2 gia tri nay, nen bi crash (500) MOI LAN
+// dung 1 trong 3 route do (vd tai sao ke ngan hang) du GET /transactions binh
+// thuong van chay tot. Ham dung chung nay tinh dung 1 lan, dung cho ca 4 noi
+// render "transactions" de khong con lech nhau nua.
+function computeThuChiTotals(allFilteredRows) {
+  const totalThu = allFilteredRows
+    .filter((t) => t.type === "thu")
+    .reduce((s, t) => s + Number(t.amount || 0), 0);
+  const totalChi = allFilteredRows
+    .filter((t) => t.type === "chi")
+    .reduce((s, t) => s + Number(t.amount || 0), 0);
+  return { totalThu, totalChi };
+}
+
 router.get("/transactions", (req, res) => {
   const store = load();
   const activeCompany = getCompany(req);
@@ -206,6 +225,8 @@ router.post("/transactions/paste", requireAdmin, (req, res) => {
     return res.render("transactions", {
       banks,
       rows: [],
+      totalThu: 0,
+      totalChi: 0,
       filters: { bank_id: "", from: "", to: "" },
       userName: req.session.userName,
       pasteResult: null,
@@ -232,14 +253,16 @@ router.post("/transactions/paste", requireAdmin, (req, res) => {
   }
   if (rows.length > 0) save(store);
 
-  const currentRows = filterTransactionsWithBalance(store, {
+  const allFilteredAfterPaste = filterTransactionsWithBalance(store, {
     bank_id,
     bankIds: companyBankIds(store, activeCompany),
-  }).slice(0, 500);
+  });
+  const currentRows = allFilteredAfterPaste.slice(0, 500);
 
   res.render("transactions", {
     banks,
     rows: currentRows,
+    ...computeThuChiTotals(allFilteredAfterPaste),
     filters: { bank_id, from: "", to: "" },
     userName: req.session.userName,
     pasteResult: { inserted: rows.length, errors },
@@ -272,13 +295,15 @@ router.post("/transactions/upload-statement", requireAdmin, upload.single("file"
   const banks = companyBanks(store, activeCompany);
   const { bank_id } = req.body;
 
-  const renderError = (message) =>
-    res.render("transactions", {
+  const renderError = (message) => {
+    const allFilteredForError = filterTransactionsWithBalance(store, {
+      bank_id: bank_id || "",
+      bankIds: companyBankIds(store, activeCompany),
+    });
+    return res.render("transactions", {
       banks,
-      rows: filterTransactionsWithBalance(store, {
-        bank_id: bank_id || "",
-        bankIds: companyBankIds(store, activeCompany),
-      }).slice(0, 500),
+      rows: allFilteredForError.slice(0, 500),
+      ...computeThuChiTotals(allFilteredForError),
       filters: { bank_id: bank_id || "", from: "", to: "" },
       userName: req.session.userName,
       pasteResult: null,
@@ -287,6 +312,7 @@ router.post("/transactions/upload-statement", requireAdmin, upload.single("file"
       maCongTrinhResult: null,
       error: message,
     });
+  };
 
   if (!bank_id) return renderError("Vui long chon ngan hang truoc khi tai file sao ke.");
   if (!req.file) return renderError("Vui long chon 1 file sao ke de tai len.");
@@ -368,13 +394,15 @@ router.post("/transactions/upload-statement", requireAdmin, upload.single("file"
   }
   if (added > 0 || healedRemoved > 0) save(store);
 
-  const currentRows = filterTransactionsWithBalance(store, {
+  const allFilteredAfterUpload = filterTransactionsWithBalance(store, {
     bank_id,
     bankIds: companyBankIds(store, activeCompany),
-  }).slice(0, 500);
+  });
+  const currentRows = allFilteredAfterUpload.slice(0, 500);
   res.render("transactions", {
     banks,
     rows: currentRows,
+    ...computeThuChiTotals(allFilteredAfterUpload),
     filters: { bank_id, from: "", to: "" },
     userName: req.session.userName,
     pasteResult: null,
@@ -401,14 +429,16 @@ router.post("/transactions/upload-ma-cong-trinh", requireAdmin, upload.single("f
   const store = load();
   const activeCompany = getCompany(req);
   const banks = companyBanks(store, activeCompany);
-  const rowsForList = filterTransactionsWithBalance(store, {
+  const allFilteredForMaCongTrinh = filterTransactionsWithBalance(store, {
     bankIds: companyBankIds(store, activeCompany),
-  }).slice(0, 500);
+  });
+  const rowsForList = allFilteredForMaCongTrinh.slice(0, 500);
 
   const renderWith = (maCongTrinhResult, error) =>
     res.render("transactions", {
       banks,
       rows: rowsForList,
+      ...computeThuChiTotals(allFilteredForMaCongTrinh),
       filters: { bank_id: "", from: "", to: "" },
       userName: req.session.userName,
       pasteResult: null,
