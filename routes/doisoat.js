@@ -811,6 +811,43 @@ router.post("/doi-soat/momo/invoices/clear", requireAdmin, (req, res) => {
   res.redirect("/doi-soat/momo?success=" + encodeURIComponent(`Da xoa toan bo hoa don momo da nap (${momoCfg.label}).`));
 });
 
+// Chi Nhan (2026-07-23): "đối chiếu từng ngày đi bị trùng á" -- Luyen phat
+// hien 1 truong hop hoa don CU (vd so 9977-9981, xuat rieng cho tung ngay
+// 18) van con luu trong he thong SAU KHI NCC xuat lai hoa don GOP thay the
+// (vd so 10008-10012, "momo 18,19") -- file MTT moi nhat KHONG con nhung so
+// cu nay nua (NCC da huy/thay), nhung upload chi CONG THEM dong moi, khong
+// bao gio tu xoa dong cu, nen ban ghi cu nam lai vinh vien va bi cong TRUNG
+// vao doi soat (dung logic loai hoa don gop trung o utils/momoReconcile.js
+// deu ly ra la trung -- nhung ro rang van con hien Lech tren trang, co the
+// vi ban ghi cu nay duoc tao TRUOC khi co logic loc do, hoac 1 truong hop
+// bien the khac chua bat duoc). Thay vi phai sua tay file store.json, them
+// nut xoa dung 1 so hoa don theo So HD, ap dung cho dung cong ty dang xem --
+// dung khi phat hien 1 so HD cu/trung khong con dung nua (NCC da xuat lai).
+router.post("/doi-soat/momo/invoices/xoa-theo-so", requireAdmin, (req, res) => {
+  const store = load();
+  const momoCfg = MOMO_CHANNELS[getCompany(req)];
+  const raw = (req.body.soHdList || "").trim();
+  if (!raw) {
+    return res.redirect("/doi-soat/momo?error=" + encodeURIComponent("Chưa nhập số HĐ cần xoá."));
+  }
+  const targets = new Set(
+    raw
+      .split(/[,\s]+/)
+      .map((s) => s.trim())
+      .filter(Boolean)
+  );
+  const before = (store[momoCfg.invoicesKey] || []).length;
+  store[momoCfg.invoicesKey] = (store[momoCfg.invoicesKey] || []).filter(
+    (i) => !targets.has(String(i.soHd))
+  );
+  const removed = before - store[momoCfg.invoicesKey].length;
+  save(store);
+  res.redirect(
+    "/doi-soat/momo?success=" +
+      encodeURIComponent(`Đã xoá ${removed} hoá đơn (${momoCfg.label}) theo số HĐ: ${Array.from(targets).join(", ")}.`)
+  );
+});
+
 // Export in the EXACT "Mau phieu thu tien gui de nhap vao AMIS Accounting"
 // layout Luyen uses (sheet "MISATHUE123456" of DULIEUMOMO.xlsm): 28 named
 // columns, one row per gian per settlement. Extra QC columns (invoice match

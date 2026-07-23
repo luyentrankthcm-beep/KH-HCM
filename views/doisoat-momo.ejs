@@ -105,6 +105,14 @@
       <form method="POST" action="/doi-soat/momo/invoices/clear" onsubmit="return confirm('Xoá toàn bộ hóa đơn momo đã nạp?');">
         <button type="submit" class="btn btn-secondary">Xoá hết hóa đơn đã nạp</button>
       </form>
+      <form method="POST" action="/doi-soat/momo/invoices/xoa-theo-so" class="form-inline" style="margin-top:8px;" onsubmit="return confirm('Xoá đúng (các) số HĐ này khỏi danh sách đã nạp?');">
+        <label style="margin:0;">Xoá HĐ cũ/trùng theo số (NCC đã xuất lại), cách nhau bằng dấu phẩy:</label>
+        <input type="text" name="soHdList" placeholder="VD: 9977, 9978, 9979" style="min-width:220px;" />
+        <button type="submit" class="btn btn-secondary">Xoá các số HĐ này</button>
+      </form>
+      <p class="muted" style="margin-top:4px;">
+        Dùng khi NCC xuất lại hóa đơn gộp nhiều ngày thay cho hóa đơn cũ (VD hóa đơn riêng ngày 18 đã bị thay bằng hóa đơn gộp "momo 18,19") — hóa đơn cũ vẫn nằm trong hệ thống (tải file mới chỉ thêm, không tự xoá dòng cũ) và bị cộng trùng vào đối soát.
+      </p>
       <% } %>
         </div>
       </details>
