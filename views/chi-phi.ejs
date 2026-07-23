@@ -132,7 +132,7 @@
         <table class="table">
           <thead>
             <tr>
-              <th>Ngày</th><th>Gian</th><th>NCC</th><th>Số hóa đơn</th><th>Số UNC</th><th>Chứng từ liên quan</th><th>Diễn giải</th>
+              <th>Ngày</th><th>Gian</th><th>Tài khoản</th><th>NCC</th><th>Số hóa đơn</th><th>Số UNC</th><th>Chứng từ liên quan</th><th>Diễn giải</th>
               <th>Số tiền</th><th>Link hóa đơn</th><th>Đã hạch toán</th>
             </tr>
           </thead>
@@ -141,6 +141,15 @@
             <tr class="cp-row" id="cp-<%= r.id %>" data-search="<%= (r.gian + ' ' + r.ncc + ' ' + r.soHoaDon + ' ' + r.soUNC + ' ' + r.soChungTuLienQuan + ' ' + r.dienGiai + ' ' + r.loaiChiPhi).toLowerCase().replace(/\"/g,'&quot;') %>">
               <td><%= r.ngay %></td>
               <td><%= r.gian %></td>
+              <td>
+                <!-- Luyen, 2026-07-23: "1 cột tài khoản ... doanh thu chia sẻ gian thì
+                     đưa vô 1388 còn lại thì để 131 ... dựa vào hợp đồng thuê gian" --
+                     tinh tu dong (khong luu vao dong), xem computeTaiKhoanChiPhi
+                     trong routes/chi-phi.js. -->
+                <span class="badge" style="<%= r.taiKhoan === '1388' ? 'background:#fff3cd;color:#7a5b00;' : 'background:#eef2f7;color:#33475b;' %> padding:2px 6px; border-radius:4px; font-size:11px; font-weight:600;">
+                  <%= r.taiKhoan %>
+                </span>
+              </td>
               <td>
                 <!-- Chi Nhan (2026-07-23): "có công ty ncc mà đưa vô cho tôi nhá" --
                      dong tao tu "quet ngan hang" khong co san NCC (chi co trong sheet
@@ -244,7 +253,7 @@
             </tr>
             <% }) %>
             <% if (rows.length === 0) { %>
-            <tr><td colspan="10" class="muted">Chưa có khoản chi nào.</td></tr>
+            <tr><td colspan="11" class="muted">Chưa có khoản chi nào.</td></tr>
             <% } %>
           </tbody>
         </table>

@@ -9,7 +9,7 @@ const {
   parseKvcMienBacWorkbook,
   parseKvcMienBacAutoWorkbook,
 } = require("../utils/chiPhiSheetParser");
-const { extractGianRentText, matchGianRecord } = require("../utils/rentPaymentMatcher");
+const { extractGianRentText, matchGianRecord, isDoanhThuChiaSeRecord } = require("../utils/rentPaymentMatcher");
 const gmailApi = require("../utils/gmailApi");
 const gmailInvoiceMatcher = require("../utils/gmailInvoiceMatcher");
 const { parseAmount } = require("../utils/parse");
@@ -102,6 +102,22 @@ function mienSeg(mien) {
   return mien === "bac" ? "mien-bac" : "mien-nam";
 }
 
+// Luyen, 2026-07-23: "thêm cho tôi 1 cột tài khoản ... doanh thu chia sẻ gian
+// thì đưa vô 1388 còn lại thì để 131 ... dựa vào hợp đồng thuê gian á của
+// miền nam trước nhá chi phí của miền nam cả 2 kh" -- moi dong Chi Phi duoc
+// gan TK 1388 khi ten gian (r.gian) khop CHAC CHAN (qua matchGianRecord, cung
+// nguong tin cay >=0.6 da dung o quet-ngan-hang) voi 1 hop dong trong "Hop
+// Dong Thue Gian Hang" (store.phap_danh_hop_dong_thue) duoc danh dau la
+// "doanh thu chia se" (xem isDoanhThuChiaSeRecord). Con lai (khong khop duoc
+// gian nao, hoac khop nhung khong phai doanh thu chia se) -> mac dinh TK 131.
+// TINH TAI THOI DIEM XEM/XUAT (khong luu vao dong Chi Phi) de tu dong cap
+// nhat khi hop dong thay doi/them moi, khong can chay lai import gi ca.
+function computeTaiKhoanChiPhi(r, gianList) {
+  if (!r.gian || !r.gian.trim()) return "131";
+  const rec = matchGianRecord(r.gian, gianList);
+  return rec && isDoanhThuChiaSeRecord(rec) ? "1388" : "131";
+}
+
 // Luyen, 2026-07-23: link cu "/chi-phi" (khong co doan mien) -- giu lai de
 // khong hong cac link/bookmark cu (vd "/chi-phi?thang=2026-07&hoaDon=1" da
 // dung truoc do), chuyen thang ve "/chi-phi/mien-nam" (moi du lieu cu deu la
@@ -144,6 +160,8 @@ router.get("/chi-phi/:mien(mien-nam|mien-bac)", (req, res) => {
 
   rows.sort((a, b) => (a.ngay < b.ngay ? 1 : -1));
   const tongTien = rows.reduce((s, r) => s + (r.soTien || 0), 0);
+  const gianListForTaiKhoan = store.phap_danh_hop_dong_thue || [];
+  rows.forEach((r) => { r.taiKhoan = computeTaiKhoanChiPhi(r, gianListForTaiKhoan); });
   res.render("chi-phi", {
     userName: req.session.userName,
     mien,
@@ -183,9 +201,11 @@ router.get("/chi-phi/:mien(mien-nam|mien-bac)/export.xlsx", (req, res) => {
   else if (hoaDonFilter === "0") rows = rows.filter((r) => !(r.soHoaDon || "").trim());
   rows.sort((a, b) => (a.ngay < b.ngay ? 1 : -1));
 
+  const gianListForTaiKhoanExport = store.phap_danh_hop_dong_thue || [];
   const exportRows = rows.map((r) => ({
     "Ngày chi": r.ngay,
     "Gian/Cơ sở": r.gian,
+    "Tài khoản": computeTaiKhoanChiPhi(r, gianListForTaiKhoanExport),
     NCC: r.ncc,
     "Số hóa đơn": r.soHoaDon,
     "Số UNC": r.soUNC,

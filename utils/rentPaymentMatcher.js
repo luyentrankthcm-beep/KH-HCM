@@ -98,4 +98,25 @@ function matchGianRecord(rentText, gianList) {
   return null;
 }
 
-module.exports = { extractGianRentText, matchGianRecord, removeDiacritics };
+// Luyen, 2026-07-23: "thêm cho tôi 1 cột tài khoản ... doanh thu chia sẻ gian
+// thì đưa vô 1388 còn lại thì để 131 ... dựa vào hợp đồng thuê gian" -- xac
+// dinh 1 hop dong trong "Hop Dong Thue Gian Hang" (store.phap_danh_hop_dong_thue)
+// co phai kieu "doanh thu chia se" hay khong, dua vao 2 dau hieu da co san
+// trong du lieu hop dong (khong them truong moi):
+//   1. dieuKhoanThanhToan co ghi ro "chia se doanh thu" hoac ty le "% doanh thu"
+//      (vd "POSH MN KIWOOZA QUẬN 2": "Chia se doanh thu: Khach 35% / Cong ty 65%").
+//   2. hinhThucThuTien duoc dien (truong nay CHI dien khi la kieu "mall giu
+//      tien roi cuoi thang tra ve qua tai khoan cho minh phan da tru tien thue
+//      voi phi dich vu" -- xem chu thich trong phap-danh.js -- day cung la 1
+//      dang doanh thu chia se, khac voi thu tien truc tiep qua VietQR/POS).
+// Khong khop duoc gian nao / gian khong co 2 dau hieu tren -> mac dinh TK 131
+// (thu thuong), giu nguyen quy uoc TKCO da dung ben doi soat Momo.
+function isDoanhThuChiaSeRecord(r) {
+  if (!r) return false;
+  const dtt = removeDiacritics(r.dieuKhoanThanhToan || "").toLowerCase();
+  if (/chia se doanh thu|%\s*doanh thu/.test(dtt)) return true;
+  if (r.hinhThucThuTien && String(r.hinhThucThuTien).trim()) return true;
+  return false;
+}
+
+module.exports = { extractGianRentText, matchGianRecord, isDoanhThuChiaSeRecord, removeDiacritics };
