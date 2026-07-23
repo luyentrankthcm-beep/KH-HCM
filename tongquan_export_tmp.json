@@ -1,0 +1,3059 @@
+{
+  "exportedAt": "2026-07-23T06:41:50.043Z",
+  "banks": [
+    {
+      "id": 3,
+      "name": "ACB31268",
+      "account_number": "12131268",
+      "bank_name": "ACB",
+      "opening_balance": 102890214,
+      "opening_date": "2026-03-16",
+      "khu_vuc": "KVC MN + MB CHO ZALO",
+      "chi_nhanh": "ACB CN Ha Thanh",
+      "trung_gian_thu_ho": "zalo miniapp-Vnpay",
+      "created_at": "2026-07-14T20:30:00.000Z",
+      "balance": 533905986
+    },
+    {
+      "id": 4,
+      "name": "BIDV123456",
+      "account_number": "8699123456",
+      "bank_name": "BIDV",
+      "opening_balance": 61508124,
+      "opening_date": "2026-04-02",
+      "khu_vuc": "KVC MN",
+      "chi_nhanh": "BIDV CN Thanh Xuan",
+      "trung_gian_thu_ho": "momo",
+      "created_at": "2026-07-14T20:30:00.000Z",
+      "balance": 995187982
+    },
+    {
+      "id": 1,
+      "name": "BIDV7555",
+      "account_number": "8601617555",
+      "bank_name": "BIDV",
+      "opening_balance": 0,
+      "opening_date": "2026-05-15",
+      "khu_vuc": "TM POSH + JP MB, MN",
+      "chi_nhanh": "BIDV CN Van Phuc",
+      "trung_gian_thu_ho": "",
+      "created_at": "2026-07-14T20:30:00.000Z",
+      "balance": 985484
+    },
+    {
+      "id": 13,
+      "name": "BIDV7701",
+      "account_number": "8620107701",
+      "bank_name": "BIDV",
+      "opening_balance": 0,
+      "opening_date": "2026-07-16",
+      "company": "kh_moi",
+      "created_at": "2026-07-16T05:21:19.699Z",
+      "balance": -56004479
+    },
+    {
+      "id": 14,
+      "name": "BIDV7702",
+      "account_number": "8640107702",
+      "bank_name": "BIDV",
+      "opening_balance": 0,
+      "opening_date": "2026-07-16",
+      "company": "kh_moi",
+      "created_at": "2026-07-16T05:21:19.699Z",
+      "balance": -171726006
+    },
+    {
+      "id": 2,
+      "name": "BIDV77020",
+      "account_number": "8660077020",
+      "bank_name": "BIDV",
+      "opening_balance": 0,
+      "opening_date": "2026-04-23",
+      "khu_vuc": "POSH MB+JP MB",
+      "chi_nhanh": "BIDV CN So giao dich 1",
+      "trung_gian_thu_ho": "VietQR",
+      "created_at": "2026-07-14T20:30:00.000Z",
+      "balance": 92176189
+    },
+    {
+      "id": 5,
+      "name": "BIDV7703",
+      "account_number": "8660107703",
+      "bank_name": "BIDV",
+      "opening_balance": 0,
+      "opening_date": "2026-05-23",
+      "khu_vuc": "KVC MB",
+      "chi_nhanh": "BIDV CN Van Phuc",
+      "trung_gian_thu_ho": "Vnpay",
+      "created_at": "2026-07-14T20:30:00.000Z",
+      "balance": 1279445
+    },
+    {
+      "id": 6,
+      "name": "BIDV7704",
+      "account_number": "8690107704",
+      "bank_name": "BIDV",
+      "opening_balance": 0,
+      "opening_date": "2026-06-10",
+      "khu_vuc": "JP MN+POSH MN",
+      "chi_nhanh": "BIDV CN Van Phuc",
+      "trung_gian_thu_ho": "VietQR",
+      "created_at": "2026-07-14T20:30:00.000Z",
+      "balance": 32481000
+    },
+    {
+      "id": 11,
+      "name": "BIDV8651",
+      "account_number": "8600068651",
+      "bank_name": "BIDV",
+      "opening_balance": 1595175425,
+      "opening_date": "2026-07-01",
+      "khu_vuc": "Chi Phí",
+      "chi_nhanh": "",
+      "trung_gian_thu_ho": "Tài khoản chi phí",
+      "created_at": "2026-07-15T00:36:35.338Z",
+      "balance": 399041096
+    },
+    {
+      "id": 7,
+      "name": "MB11521268",
+      "account_number": "11521268",
+      "bank_name": "MB",
+      "opening_balance": 0,
+      "opening_date": "2026-06-04",
+      "khu_vuc": "POSH MB+JP MB",
+      "chi_nhanh": "MB",
+      "trung_gian_thu_ho": "VietQR",
+      "created_at": "2026-07-14T20:30:00.000Z",
+      "balance": 67540611
+    },
+    {
+      "id": 15,
+      "name": "VP58888",
+      "account_number": "4552958888",
+      "bank_name": "VPBank",
+      "opening_balance": 0,
+      "opening_date": "2026-07-16",
+      "company": "kh_moi",
+      "created_at": "2026-07-16T05:21:19.699Z",
+      "khu_vuc": "TM POSH + JP MB, MN",
+      "chi_nhanh": "VPBANK CN THẮNG LONG PG",
+      "trung_gian_thu_ho": "Tài khoản chi phí",
+      "balance": 2305966586
+    },
+    {
+      "id": 12,
+      "name": "VPBANK9997",
+      "account_number": "120589997",
+      "bank_name": "VPBank",
+      "opening_balance": 1715291,
+      "opening_date": "2026-06-01",
+      "khu_vuc": "Miền Nam",
+      "chi_nhanh": "VPBANK KINH ĐÔ",
+      "trung_gian_thu_ho": "Tài khoản chi phí",
+      "created_at": "2026-07-16T00:00:00.000Z",
+      "company": "kh_cu",
+      "balance": 1715291
+    }
+  ],
+  "totalBalance": 4202549185,
+  "monthSums": {
+    "thu": 10228175188,
+    "chi": 10030735517
+  },
+  "recent": [
+    {
+      "id": 57369,
+      "bank_id": 3,
+      "date": "2026-07-22",
+      "description": "CTY CP DICH VU TRUC TUYEN CONG DONG VIET-PAYOO TT TD NGAY 21.07.2026.QRCODE.DVGIAITRIKH_TONG",
+      "amount": 3346492,
+      "type": "thu",
+      "reference": "",
+      "created_at": "2026-07-22T11:34:41.009Z",
+      "created_by": "Quan tri vien K&H",
+      "bank_label": "ACB31268"
+    },
+    {
+      "id": 57368,
+      "bank_id": 3,
+      "date": "2026-07-22",
+      "description": "CTY CP DICH VU TRUC TUYEN CONG DONG VIET-PAYOO TT TD NGAY 21.07.2026.DVGIAITRIKH_TONG",
+      "amount": 529902,
+      "type": "thu",
+      "reference": "",
+      "created_at": "2026-07-22T11:34:41.009Z",
+      "created_by": "Quan tri vien K&H",
+      "bank_label": "ACB31268"
+    },
+    {
+      "id": 57361,
+      "bank_id": 3,
+      "date": "2026-07-22",
+      "description": "CONG TY CP GIAI PHAP THANH TOAN VIET NAM-VNPAY TT 829168 GIAITTRIKH989 DV QR OFFLINE NGAY 21.07.26",
+      "amount": 18664295,
+      "type": "thu",
+      "reference": "",
+      "created_at": "2026-07-22T11:19:37.833Z",
+      "created_by": "Quan tri vien K&H",
+      "bank_label": "ACB31268"
+    },
+    {
+      "id": 57360,
+      "bank_id": 3,
+      "date": "2026-07-22",
+      "description": "CONG TY CP GIAI PHAP THANH TOAN VIET NAM-VNPAY TT 829168 GIAITTRIKH989 DV CTT NGAY 21.07.26",
+      "amount": 16866432,
+      "type": "thu",
+      "reference": "",
+      "created_at": "2026-07-22T11:19:37.833Z",
+      "created_by": "Quan tri vien K&H",
+      "bank_label": "ACB31268"
+    },
+    {
+      "id": 57353,
+      "bank_id": 14,
+      "date": "2026-07-22",
+      "description": "REM Tfr Ac:1770260769 O@L_080005_211601_0_0_2274362140_V3BLC8640107702_CONG TY TNHH GIAI TRI K VA H/8640107702/CONG TY TNHH GIAI TRI K&H_2274362137_138769996718 0916655553 VQR263034178G11S AMBD 03",
+      "amount": 50000,
+      "type": "thu",
+      "reference": "75248",
+      "created_at": "2026-07-22T11:14:28.655Z",
+      "created_by": "Quan tri vien K&H",
+      "bank_label": "BIDV7702"
+    },
+    {
+      "id": 57352,
+      "bank_id": 14,
+      "date": "2026-07-22",
+      "description": "TKThe :28943877, tai ACB. @VA_V3BLC8640107702_CONG TY TNHH GIAI TRI K VA H_VQR263034162T73Q PaymentForOrder-220726-11 16 17 6203ASCB02J15SFO@L_2274358804_260722_                             -CTLNHIDI000016048898507-1/1-CRE-002",
+      "amount": 20000,
+      "type": "thu",
+      "reference": "75247",
+      "created_at": "2026-07-22T11:14:28.655Z",
+      "created_by": "Quan tri vien K&H",
+      "bank_label": "BIDV7702"
+    },
+    {
+      "id": 57351,
+      "bank_id": 14,
+      "date": "2026-07-22",
+      "description": "REM Tfr Ac:1770260769 O@L_080005_211601_0_0_2274359711_V3BLC8640107702_CONG TY TNHH GIAI TRI K VA H/8640107702/CONG TY TNHH GIAI TRI K&H_2274359972_138769934288 0342552021 VQR26303415A9XAN PaymentForOrder",
+      "amount": 20000,
+      "type": "thu",
+      "reference": "75246",
+      "created_at": "2026-07-22T11:14:28.655Z",
+      "created_by": "Quan tri vien K&H",
+      "bank_label": "BIDV7702"
+    },
+    {
+      "id": 57350,
+      "bank_id": 14,
+      "date": "2026-07-22",
+      "description": "REM Tfr Ac:1380514814 O@L_BLC002_212501_0_0_2274357235_V3BLC8640107702_CONG TY TNHH GIAI TRI K VA H_@VAVQR263034158B6DR PaymentForOrder_ QR_Chiliti.vn_so TK: V3BLC8640107702_CONG TY TNHH GIAI TRI K VA H_so tien: 20000 VND_so HD: 864010770222072026006331",
+      "amount": 20000,
+      "type": "thu",
+      "reference": "75245",
+      "created_at": "2026-07-22T11:14:28.655Z",
+      "created_by": "Quan tri vien K&H",
+      "bank_label": "BIDV7702"
+    },
+    {
+      "id": 57349,
+      "bank_id": 14,
+      "date": "2026-07-22",
+      "description": "REM Tfr Ac:1380514814 O@L_BLC002_212501_0_0_2274349134_V3BLC8640107702_CONG TY TNHH GIAI TRI K VA H_@VAVQR2630340EDHMLN LOTEE GV 04_ QR_Chiliti.vn_so TK: V3BLC8640107702_CONG TY TNHH GIAI TRI K VA H_so tien: 20000 VND_so HD: 864010770222072026006299",
+      "amount": 20000,
+      "type": "thu",
+      "reference": "75244",
+      "created_at": "2026-07-22T11:14:28.655Z",
+      "created_by": "Quan tri vien K&H",
+      "bank_label": "BIDV7702"
+    },
+    {
+      "id": 57348,
+      "bank_id": 14,
+      "date": "2026-07-22",
+      "description": "TKThe :1058068620, tai BFTVVNVX. @VA_V3BLC8640107702_CONG TY TNHH GIAI TRI K VA H_MBVCB.15233640879.986245.VQR2630340D0DKOR PaymentForOrder.CT tu 1058068620 DAO THI THANH THU toi V3BLC8640107702 CONG TY TNHH GIAI TRI K VA H tai BIDVO@L_2274346859_260722_-020097043607221114182026DBhb986245",
+      "amount": 20000,
+      "type": "thu",
+      "reference": "75243",
+      "created_at": "2026-07-22T11:14:28.655Z",
+      "created_by": "Quan tri vien K&H",
+      "bank_label": "BIDV7702"
+    },
+    {
+      "id": 57347,
+      "bank_id": 14,
+      "date": "2026-07-22",
+      "description": "TKThe :852524062006, tai MB. @VA_V3BLC8640107702_CONG TY TNHH GIAI TRI K VA H_VQR2630340A5TMJV PaymentForOrderO@L_2274341420_260722_                                                          -CTLNHIDI000016048860511-1/1-CRE-002",
+      "amount": 20000,
+      "type": "thu",
+      "reference": "75242",
+      "created_at": "2026-07-22T11:14:28.655Z",
+      "created_by": "Quan tri vien K&H",
+      "bank_label": "BIDV7702"
+    },
+    {
+      "id": 57346,
+      "bank_id": 14,
+      "date": "2026-07-22",
+      "description": "TKThe :676768868, tai VIB. @VA_V3BLC8640107702_CONG TY TNHH GIAI TRI K VA H_VQR263034094WJAL SCVV 13O@L_2274339019_260722_                                                                    -CTLNHIDI000016048856952-1/1-CRE-002",
+      "amount": 20000,
+      "type": "thu",
+      "reference": "75241",
+      "created_at": "2026-07-22T11:14:28.655Z",
+      "created_by": "Quan tri vien K&H",
+      "bank_label": "BIDV7702"
+    },
+    {
+      "id": 57345,
+      "bank_id": 14,
+      "date": "2026-07-22",
+      "description": "TKThe :7102205016062, tai VBAAVNVX. @VA_V3BLC8640107702_CONG TY TNHH GIAI TRI K VA H_BIDV;V3BLC8640107702;VQR26303402DJJIX PaymentForOrderO@L_2274331926_260722_-0200970405072211111520268G0B031234",
+      "amount": 20000,
+      "type": "thu",
+      "reference": "75240",
+      "created_at": "2026-07-22T11:14:28.655Z",
+      "created_by": "Quan tri vien K&H",
+      "bank_label": "BIDV7702"
+    },
+    {
+      "id": 57344,
+      "bank_id": 14,
+      "date": "2026-07-22",
+      "description": "REM Tfr Ac:1770260769 O@L_080005_211601_0_0_2274331972_V3BLC8640107702_CONG TY TNHH GIAI TRI K VA H/8640107702/CONG TY TNHH GIAI TRI K&H_2274332426_138769270469 0375506149 VQR263034034HZDD VHM 04",
+      "amount": 20000,
+      "type": "thu",
+      "reference": "75239",
+      "created_at": "2026-07-22T11:14:28.655Z",
+      "created_by": "Quan tri vien K&H",
+      "bank_label": "BIDV7702"
+    },
+    {
+      "id": 57343,
+      "bank_id": 14,
+      "date": "2026-07-22",
+      "description": "REM Tfr Ac:1770260769 O@L_080005_211601_0_0_2274318784_V3BLC8640107702_CONG TY TNHH GIAI TRI K VA H/8640107702/CONG TY TNHH GIAI TRI K&H_2274318783_138768901290 0865485230 VQR263033FA5HPWV SENSE PVD 01",
+      "amount": 20000,
+      "type": "thu",
+      "reference": "75238",
+      "created_at": "2026-07-22T11:14:28.655Z",
+      "created_by": "Quan tri vien K&H",
+      "bank_label": "BIDV7702"
+    }
+  ],
+  "gianMonths": [
+    "2026-07",
+    "2026-06",
+    "2026-05",
+    "2026-04"
+  ],
+  "selectedGianMonth": "2026-07",
+  "gianPivot": {
+    "channels": [
+      {
+        "key": "momo",
+        "label": "Momo (BIDV123456)"
+      },
+      {
+        "key": "zvp_online",
+        "label": "Zalo Mini App (Online)"
+      },
+      {
+        "key": "zvp_offline",
+        "label": "VNPay thu hộ (Offline)"
+      },
+      {
+        "key": "zvp_payoo",
+        "label": "Payoo"
+      },
+      {
+        "key": "vietqr_bidv7704",
+        "label": "Viet QR BIDV 7704"
+      },
+      {
+        "key": "vietqr_bidv77020",
+        "label": "Viet QR BIDV 77020"
+      },
+      {
+        "key": "vietqr_mb11521268",
+        "label": "Viet QR MB 11521268"
+      },
+      {
+        "key": "vietqr_bidv7702",
+        "label": "Viet QR BIDV 7702"
+      }
+    ],
+    "gianRows": [
+      {
+        "gian": "AM TP KVCM",
+        "cells": [
+          {
+            "gross": 607275000,
+            "invoiceTotal": 607275000,
+            "unresolvedCount": 0,
+            "drillUrl": "/doi-soat/momo?month=2026-07"
+          },
+          {
+            "gross": 105456500,
+            "invoiceTotal": 105456500,
+            "unresolvedCount": 0,
+            "drillUrl": "/doi-soat/zvp?month=2026-07"
+          },
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        "totalGross": 712731500,
+        "totalInvoiceTotal": 712731500,
+        "totalUnresolved": 0
+      },
+      {
+        "gian": "AE HUE KVCN",
+        "cells": [
+          null,
+          {
+            "gross": 145962000,
+            "invoiceTotal": 145962000,
+            "unresolvedCount": 0,
+            "drillUrl": "/doi-soat/zvp?month=2026-07"
+          },
+          {
+            "gross": 249704000,
+            "invoiceTotal": 249704000,
+            "unresolvedCount": 0,
+            "drillUrl": "/doi-soat/zvp?month=2026-07"
+          },
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        "totalGross": 395666000,
+        "totalInvoiceTotal": 395666000,
+        "totalUnresolved": 0
+      },
+      {
+        "gian": "SC VIVO KVCM",
+        "cells": [
+          {
+            "gross": 336249800,
+            "invoiceTotal": 336249800,
+            "unresolvedCount": 0,
+            "drillUrl": "/doi-soat/momo?month=2026-07"
+          },
+          {
+            "gross": 39057000,
+            "invoiceTotal": 39057000,
+            "unresolvedCount": 0,
+            "drillUrl": "/doi-soat/zvp?month=2026-07"
+          },
+          null,
+          null,
+          {
+            "gross": 6700000,
+            "invoiceTotal": 11050000,
+            "unresolvedCount": 0,
+            "drillUrl": "/doi-soat/vietqr?channel=bidv7704&month=2026-07"
+          },
+          null,
+          null,
+          null
+        ],
+        "totalGross": 382006800,
+        "totalInvoiceTotal": 386356800,
+        "totalUnresolved": 0
+      },
+      {
+        "gian": "FUNZONE IPH KVCN",
+        "cells": [
+          null,
+          {
+            "gross": 1726000,
+            "invoiceTotal": 1726000,
+            "unresolvedCount": 4,
+            "drillUrl": "/doi-soat/zvp?month=2026-07"
+          },
+          {
+            "gross": 79980000,
+            "invoiceTotal": 79980000,
+            "unresolvedCount": 0,
+            "drillUrl": "/doi-soat/zvp?month=2026-07"
+          },
+          {
+            "gross": 123029000,
+            "invoiceTotal": 123029000,
+            "unresolvedCount": 0,
+            "drillUrl": "/doi-soat/zvp?month=2026-07"
+          },
+          null,
+          null,
+          null,
+          null
+        ],
+        "totalGross": 204735000,
+        "totalInvoiceTotal": 204735000,
+        "totalUnresolved": 4
+      },
+      {
+        "gian": "KVC LOTTE VUNG TAU",
+        "cells": [
+          {
+            "gross": 165993500,
+            "invoiceTotal": 165993500,
+            "unresolvedCount": 0,
+            "drillUrl": "/doi-soat/momo?month=2026-07"
+          },
+          {
+            "gross": 21166000,
+            "invoiceTotal": 21166000,
+            "unresolvedCount": 0,
+            "drillUrl": "/doi-soat/zvp?month=2026-07"
+          },
+          null,
+          null,
+          null,
+          null,
+          null,
+          {
+            "gross": 2200000,
+            "invoiceTotal": 3430000,
+            "unresolvedCount": 0,
+            "drillUrl": "/doi-soat/vietqr?channel=bidv7702&month=2026-07"
+          }
+        ],
+        "totalGross": 189359500,
+        "totalInvoiceTotal": 190589500,
+        "totalUnresolved": 0
+      },
+      {
+        "gian": "FARM TIMES CITY",
+        "cells": [
+          null,
+          {
+            "gross": 104000,
+            "invoiceTotal": 104000,
+            "unresolvedCount": 0,
+            "drillUrl": "/doi-soat/zvp?month=2026-07"
+          },
+          {
+            "gross": 189182500,
+            "invoiceTotal": 189182500,
+            "unresolvedCount": 0,
+            "drillUrl": "/doi-soat/zvp?month=2026-07"
+          },
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        "totalGross": 189286500,
+        "totalInvoiceTotal": 189286500,
+        "totalUnresolved": 0
+      },
+      {
+        "gian": "KID FARM MM MARKET DA NANG",
+        "cells": [
+          null,
+          {
+            "gross": 3149000,
+            "invoiceTotal": 3149000,
+            "unresolvedCount": 0,
+            "drillUrl": "/doi-soat/zvp?month=2026-07"
+          },
+          {
+            "gross": 145048000,
+            "invoiceTotal": 145048000,
+            "unresolvedCount": 0,
+            "drillUrl": "/doi-soat/zvp?month=2026-07"
+          },
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        "totalGross": 148197000,
+        "totalInvoiceTotal": 148197000,
+        "totalUnresolved": 0
+      },
+      {
+        "gian": "AM TP PHCM",
+        "cells": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          {
+            "gross": 113370000,
+            "invoiceTotal": 164300000,
+            "unresolvedCount": 18,
+            "drillUrl": "/doi-soat/vietqr?channel=bidv7702&month=2026-07"
+          }
+        ],
+        "totalGross": 113370000,
+        "totalInvoiceTotal": 164300000,
+        "totalUnresolved": 18
+      },
+      {
+        "gian": "AM BD KVCM",
+        "cells": [
+          {
+            "gross": 77875000,
+            "invoiceTotal": 77875000,
+            "unresolvedCount": 0,
+            "drillUrl": "/doi-soat/momo?month=2026-07"
+          },
+          {
+            "gross": 11880000,
+            "invoiceTotal": 11880000,
+            "unresolvedCount": 0,
+            "drillUrl": "/doi-soat/zvp?month=2026-07"
+          },
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        "totalGross": 89755000,
+        "totalInvoiceTotal": 89755000,
+        "totalUnresolved": 0
+      },
+      {
+        "gian": "VHANH MALL PHCM",
+        "cells": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          {
+            "gross": 58280000,
+            "invoiceTotal": 81360000,
+            "unresolvedCount": 0,
+            "drillUrl": "/doi-soat/vietqr?channel=bidv7702&month=2026-07"
+          }
+        ],
+        "totalGross": 58280000,
+        "totalInvoiceTotal": 81360000,
+        "totalUnresolved": 0
+      },
+      {
+        "gian": "AE BINH TAN PHN",
+        "cells": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          {
+            "gross": 49160000,
+            "invoiceTotal": 70530000,
+            "unresolvedCount": 0,
+            "drillUrl": "/doi-soat/vietqr?channel=bidv7702&month=2026-07"
+          }
+        ],
+        "totalGross": 49160000,
+        "totalInvoiceTotal": 70530000,
+        "totalUnresolved": 0
+      },
+      {
+        "gian": "LOTTE GO VAP KVCM",
+        "cells": [
+          {
+            "gross": 41770000,
+            "invoiceTotal": 41770000,
+            "unresolvedCount": 0,
+            "drillUrl": "/doi-soat/momo?month=2026-07"
+          },
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        "totalGross": 41770000,
+        "totalInvoiceTotal": 41770000,
+        "totalUnresolved": 0
+      },
+      {
+        "gian": "AM HP KVCN",
+        "cells": [
+          null,
+          {
+            "gross": 32580000,
+            "invoiceTotal": 32580000,
+            "unresolvedCount": 0,
+            "drillUrl": "/doi-soat/zvp?month=2026-07"
+          },
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        "totalGross": 32580000,
+        "totalInvoiceTotal": 32580000,
+        "totalUnresolved": 0
+      },
+      {
+        "gian": "AE BD PHCM",
+        "cells": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          {
+            "gross": 28660000,
+            "invoiceTotal": 42210000,
+            "unresolvedCount": 0,
+            "drillUrl": "/doi-soat/vietqr?channel=bidv7702&month=2026-07"
+          }
+        ],
+        "totalGross": 28660000,
+        "totalInvoiceTotal": 42210000,
+        "totalUnresolved": 0
+      },
+      {
+        "gian": "SC VIVO PHCM",
+        "cells": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          {
+            "gross": 26610000,
+            "invoiceTotal": 39020000,
+            "unresolvedCount": 0,
+            "drillUrl": "/doi-soat/vietqr?channel=bidv7702&month=2026-07"
+          }
+        ],
+        "totalGross": 26610000,
+        "totalInvoiceTotal": 39020000,
+        "totalUnresolved": 0
+      },
+      {
+        "gian": "LOTTE Q7 (NSG) PHM",
+        "cells": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          {
+            "gross": 22660000,
+            "invoiceTotal": 31640000,
+            "unresolvedCount": 0,
+            "drillUrl": "/doi-soat/vietqr?channel=bidv7702&month=2026-07"
+          }
+        ],
+        "totalGross": 22660000,
+        "totalInvoiceTotal": 31640000,
+        "totalUnresolved": 0
+      },
+      {
+        "gian": "SB PHU QUOC PHN",
+        "cells": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          {
+            "gross": 22370000,
+            "invoiceTotal": 29650000,
+            "unresolvedCount": 0,
+            "drillUrl": "/doi-soat/vietqr?channel=bidv7702&month=2026-07"
+          }
+        ],
+        "totalGross": 22370000,
+        "totalInvoiceTotal": 29650000,
+        "totalUnresolved": 0
+      },
+      {
+        "gian": "VC LVV PHCM",
+        "cells": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          {
+            "gross": 19060000,
+            "invoiceTotal": 26380000,
+            "unresolvedCount": 0,
+            "drillUrl": "/doi-soat/vietqr?channel=bidv7702&month=2026-07"
+          }
+        ],
+        "totalGross": 19060000,
+        "totalInvoiceTotal": 26380000,
+        "totalUnresolved": 0
+      },
+      {
+        "gian": "BV UNG BUOU PHCM",
+        "cells": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          {
+            "gross": 15820000,
+            "invoiceTotal": 17590000,
+            "unresolvedCount": 0,
+            "drillUrl": "/doi-soat/vietqr?channel=bidv7702&month=2026-07"
+          }
+        ],
+        "totalGross": 15820000,
+        "totalInvoiceTotal": 17590000,
+        "totalUnresolved": 0
+      },
+      {
+        "gian": "LOTTE GO VAP VR-PHN",
+        "cells": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          {
+            "gross": 15540000,
+            "invoiceTotal": 22170000,
+            "unresolvedCount": 0,
+            "drillUrl": "/doi-soat/vietqr?channel=bidv7702&month=2026-07"
+          }
+        ],
+        "totalGross": 15540000,
+        "totalInvoiceTotal": 22170000,
+        "totalUnresolved": 0
+      },
+      {
+        "gian": "JPSBNB",
+        "cells": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          {
+            "gross": 15500000,
+            "invoiceTotal": 20000000,
+            "unresolvedCount": 0,
+            "drillUrl": "/doi-soat/vietqr?channel=bidv77020&month=2026-07"
+          },
+          null,
+          null
+        ],
+        "totalGross": 15500000,
+        "totalInvoiceTotal": 20000000,
+        "totalUnresolved": 0
+      },
+      {
+        "gian": "JP AE TAN PHU",
+        "cells": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          {
+            "gross": 15350000,
+            "invoiceTotal": 23650000,
+            "unresolvedCount": 0,
+            "drillUrl": "/doi-soat/vietqr?channel=bidv7702&month=2026-07"
+          }
+        ],
+        "totalGross": 15350000,
+        "totalInvoiceTotal": 23650000,
+        "totalUnresolved": 0
+      },
+      {
+        "gian": "SENSE PVD PHCM",
+        "cells": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          {
+            "gross": 15020000,
+            "invoiceTotal": 21610000,
+            "unresolvedCount": 0,
+            "drillUrl": "/doi-soat/vietqr?channel=bidv7702&month=2026-07"
+          }
+        ],
+        "totalGross": 15020000,
+        "totalInvoiceTotal": 21610000,
+        "totalUnresolved": 0
+      },
+      {
+        "gian": "VC 3/2 JP-POSH",
+        "cells": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          {
+            "gross": 13800000,
+            "invoiceTotal": 19130000,
+            "unresolvedCount": 0,
+            "drillUrl": "/doi-soat/vietqr?channel=bidv7702&month=2026-07"
+          }
+        ],
+        "totalGross": 13800000,
+        "totalInvoiceTotal": 19130000,
+        "totalUnresolved": 0
+      },
+      {
+        "gian": "Go Hue 1 Posh Posh Go Huế",
+        "cells": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          {
+            "gross": 12930000,
+            "invoiceTotal": 0,
+            "unresolvedCount": 14,
+            "drillUrl": "/doi-soat/vietqr?channel=bidv77020&month=2026-07"
+          },
+          null,
+          null
+        ],
+        "totalGross": 12930000,
+        "totalInvoiceTotal": 0,
+        "totalUnresolved": 14
+      },
+      {
+        "gian": "SB CAN THO PHCM",
+        "cells": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          {
+            "gross": 12790000,
+            "invoiceTotal": 14560000,
+            "unresolvedCount": 0,
+            "drillUrl": "/doi-soat/vietqr?channel=bidv7702&month=2026-07"
+          }
+        ],
+        "totalGross": 12790000,
+        "totalInvoiceTotal": 14560000,
+        "totalUnresolved": 0
+      },
+      {
+        "gian": "GO NTT PHCM",
+        "cells": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          {
+            "gross": 12520000,
+            "invoiceTotal": 18090000,
+            "unresolvedCount": 0,
+            "drillUrl": "/doi-soat/vietqr?channel=bidv7702&month=2026-07"
+          }
+        ],
+        "totalGross": 12520000,
+        "totalInvoiceTotal": 18090000,
+        "totalUnresolved": 0
+      },
+      {
+        "gian": "JP-POSH GRAND PARK",
+        "cells": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          {
+            "gross": 11460000,
+            "invoiceTotal": 15480000,
+            "unresolvedCount": 0,
+            "drillUrl": "/doi-soat/vietqr?channel=bidv7702&month=2026-07"
+          }
+        ],
+        "totalGross": 11460000,
+        "totalInvoiceTotal": 15480000,
+        "totalUnresolved": 0
+      },
+      {
+        "gian": "BV 175 PHCM",
+        "cells": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          {
+            "gross": 11100000,
+            "invoiceTotal": 13500000,
+            "unresolvedCount": 0,
+            "drillUrl": "/doi-soat/vietqr?channel=bidv7702&month=2026-07"
+          }
+        ],
+        "totalGross": 11100000,
+        "totalInvoiceTotal": 13500000,
+        "totalUnresolved": 0
+      },
+      {
+        "gian": "ESTELLA PHN",
+        "cells": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          {
+            "gross": 10130000,
+            "invoiceTotal": 14770000,
+            "unresolvedCount": 0,
+            "drillUrl": "/doi-soat/vietqr?channel=bidv7702&month=2026-07"
+          }
+        ],
+        "totalGross": 10130000,
+        "totalInvoiceTotal": 14770000,
+        "totalUnresolved": 0
+      },
+      {
+        "gian": "AE BAC GIANG KVCN",
+        "cells": [
+          null,
+          {
+            "gross": 8673620,
+            "invoiceTotal": 8680000,
+            "unresolvedCount": 0,
+            "drillUrl": "/doi-soat/zvp?month=2026-07"
+          },
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        "totalGross": 8673620,
+        "totalInvoiceTotal": 8680000,
+        "totalUnresolved": 0
+      },
+      {
+        "gian": "GO BA RIA PHCM",
+        "cells": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          {
+            "gross": 8520000,
+            "invoiceTotal": 12590000,
+            "unresolvedCount": 0,
+            "drillUrl": "/doi-soat/vietqr?channel=bidv7702&month=2026-07"
+          }
+        ],
+        "totalGross": 8520000,
+        "totalInvoiceTotal": 12590000,
+        "totalUnresolved": 0
+      },
+      {
+        "gian": "CON DAO AIRPORT PHCM",
+        "cells": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          {
+            "gross": 7690000,
+            "invoiceTotal": 8970000,
+            "unresolvedCount": 0,
+            "drillUrl": "/doi-soat/vietqr?channel=bidv7702&month=2026-07"
+          }
+        ],
+        "totalGross": 7690000,
+        "totalInvoiceTotal": 8970000,
+        "totalUnresolved": 0
+      },
+      {
+        "gian": "LOTTE PHAN THIET",
+        "cells": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          {
+            "gross": 6870000,
+            "invoiceTotal": 9390000,
+            "unresolvedCount": 0,
+            "drillUrl": "/doi-soat/vietqr?channel=bidv7702&month=2026-07"
+          }
+        ],
+        "totalGross": 6870000,
+        "totalInvoiceTotal": 9390000,
+        "totalUnresolved": 0
+      },
+      {
+        "gian": "KVC ROYAL",
+        "cells": [
+          null,
+          {
+            "gross": 6624000,
+            "invoiceTotal": 6624000,
+            "unresolvedCount": 0,
+            "drillUrl": "/doi-soat/zvp?month=2026-07"
+          },
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        "totalGross": 6624000,
+        "totalInvoiceTotal": 6624000,
+        "totalUnresolved": 0
+      },
+      {
+        "gian": "SB PHU QUOC PHCM",
+        "cells": [
+          null,
+          null,
+          null,
+          null,
+          {
+            "gross": 6450000,
+            "invoiceTotal": 8500000,
+            "unresolvedCount": 0,
+            "drillUrl": "/doi-soat/vietqr?channel=bidv7704&month=2026-07"
+          },
+          null,
+          null,
+          null
+        ],
+        "totalGross": 6450000,
+        "totalInvoiceTotal": 8500000,
+        "totalUnresolved": 0
+      },
+      {
+        "gian": "VC GV PHCM",
+        "cells": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          {
+            "gross": 6440000,
+            "invoiceTotal": 8610000,
+            "unresolvedCount": 0,
+            "drillUrl": "/doi-soat/vietqr?channel=bidv7702&month=2026-07"
+          }
+        ],
+        "totalGross": 6440000,
+        "totalInvoiceTotal": 8610000,
+        "totalUnresolved": 0
+      },
+      {
+        "gian": "GIGAMALL PVD PHCM",
+        "cells": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          {
+            "gross": 6160000,
+            "invoiceTotal": 9650000,
+            "unresolvedCount": 0,
+            "drillUrl": "/doi-soat/vietqr?channel=bidv7702&month=2026-07"
+          }
+        ],
+        "totalGross": 6160000,
+        "totalInvoiceTotal": 9650000,
+        "totalUnresolved": 0
+      },
+      {
+        "gian": "GO MY THO PHCM",
+        "cells": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          {
+            "gross": 5680000,
+            "invoiceTotal": 7710000,
+            "unresolvedCount": 0,
+            "drillUrl": "/doi-soat/vietqr?channel=bidv7702&month=2026-07"
+          }
+        ],
+        "totalGross": 5680000,
+        "totalInvoiceTotal": 7710000,
+        "totalUnresolved": 0
+      },
+      {
+        "gian": "GO DI AN PHCM",
+        "cells": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          {
+            "gross": 5080000,
+            "invoiceTotal": 7230000,
+            "unresolvedCount": 0,
+            "drillUrl": "/doi-soat/vietqr?channel=bidv7702&month=2026-07"
+          }
+        ],
+        "totalGross": 5080000,
+        "totalInvoiceTotal": 7230000,
+        "totalUnresolved": 0
+      },
+      {
+        "gian": "CHKQT CAM RANH",
+        "cells": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          {
+            "gross": 5040000,
+            "invoiceTotal": 38870000,
+            "unresolvedCount": 14,
+            "drillUrl": "/doi-soat/vietqr?channel=mb11521268&month=2026-07"
+          },
+          null
+        ],
+        "totalGross": 5040000,
+        "totalInvoiceTotal": 38870000,
+        "totalUnresolved": 14
+      },
+      {
+        "gian": "AM LBIEN KVCN",
+        "cells": [
+          null,
+          {
+            "gross": 4603393,
+            "invoiceTotal": 3082000,
+            "unresolvedCount": 2,
+            "drillUrl": "/doi-soat/zvp?month=2026-07"
+          },
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        "totalGross": 4603393,
+        "totalInvoiceTotal": 3082000,
+        "totalUnresolved": 2
+      },
+      {
+        "gian": "GO TRUONG CHINH PHCM",
+        "cells": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          {
+            "gross": 3780000,
+            "invoiceTotal": 5890000,
+            "unresolvedCount": 0,
+            "drillUrl": "/doi-soat/vietqr?channel=bidv7702&month=2026-07"
+          }
+        ],
+        "totalGross": 3780000,
+        "totalInvoiceTotal": 5890000,
+        "totalUnresolved": 0
+      },
+      {
+        "gian": "GO TDM",
+        "cells": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          {
+            "gross": 3480000,
+            "invoiceTotal": 5170000,
+            "unresolvedCount": 0,
+            "drillUrl": "/doi-soat/vietqr?channel=bidv7702&month=2026-07"
+          }
+        ],
+        "totalGross": 3480000,
+        "totalInvoiceTotal": 5170000,
+        "totalUnresolved": 0
+      },
+      {
+        "gian": "GALAXY QUANG TRUNG PHCM",
+        "cells": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          {
+            "gross": 3000000,
+            "invoiceTotal": 4010000,
+            "unresolvedCount": 0,
+            "drillUrl": "/doi-soat/vietqr?channel=bidv7702&month=2026-07"
+          }
+        ],
+        "totalGross": 3000000,
+        "totalInvoiceTotal": 4010000,
+        "totalUnresolved": 0
+      },
+      {
+        "gian": "LM NHA TRANG KVC",
+        "cells": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          {
+            "gross": 2820000,
+            "invoiceTotal": 120000,
+            "unresolvedCount": 20,
+            "drillUrl": "/doi-soat/vietqr?channel=bidv7702&month=2026-07"
+          }
+        ],
+        "totalGross": 2820000,
+        "totalInvoiceTotal": 120000,
+        "totalUnresolved": 20
+      },
+      {
+        "gian": "SBCR 16 Posh POSH Sân bay Cam ranh",
+        "cells": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          {
+            "gross": 2620000,
+            "invoiceTotal": 0,
+            "unresolvedCount": 13,
+            "drillUrl": "/doi-soat/vietqr?channel=bidv77020&month=2026-07"
+          },
+          null,
+          null
+        ],
+        "totalGross": 2620000,
+        "totalInvoiceTotal": 0,
+        "totalUnresolved": 13
+      },
+      {
+        "gian": "SBCR 04 Posh POSH Sân bay Cam ranh",
+        "cells": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          {
+            "gross": 2550000,
+            "invoiceTotal": 0,
+            "unresolvedCount": 14,
+            "drillUrl": "/doi-soat/vietqr?channel=bidv77020&month=2026-07"
+          },
+          null,
+          null
+        ],
+        "totalGross": 2550000,
+        "totalInvoiceTotal": 0,
+        "totalUnresolved": 14
+      },
+      {
+        "gian": "SBCR 18 Posh POSH Sân bay Cam ranh",
+        "cells": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          {
+            "gross": 2430000,
+            "invoiceTotal": 0,
+            "unresolvedCount": 13,
+            "drillUrl": "/doi-soat/vietqr?channel=bidv77020&month=2026-07"
+          },
+          null,
+          null
+        ],
+        "totalGross": 2430000,
+        "totalInvoiceTotal": 0,
+        "totalUnresolved": 13
+      },
+      {
+        "gian": "SBCR 05 Posh POSH Sân bay Cam ranh",
+        "cells": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          {
+            "gross": 2320000,
+            "invoiceTotal": 0,
+            "unresolvedCount": 14,
+            "drillUrl": "/doi-soat/vietqr?channel=bidv77020&month=2026-07"
+          },
+          null,
+          null
+        ],
+        "totalGross": 2320000,
+        "totalInvoiceTotal": 0,
+        "totalUnresolved": 14
+      },
+      {
+        "gian": "SBCR 10 Posh POSH Sân bay Cam ranh",
+        "cells": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          {
+            "gross": 2250000,
+            "invoiceTotal": 0,
+            "unresolvedCount": 14,
+            "drillUrl": "/doi-soat/vietqr?channel=bidv77020&month=2026-07"
+          },
+          null,
+          null
+        ],
+        "totalGross": 2250000,
+        "totalInvoiceTotal": 0,
+        "totalUnresolved": 14
+      },
+      {
+        "gian": "GO AU CO PHCM",
+        "cells": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          {
+            "gross": 2230000,
+            "invoiceTotal": 3340000,
+            "unresolvedCount": 0,
+            "drillUrl": "/doi-soat/vietqr?channel=bidv7702&month=2026-07"
+          }
+        ],
+        "totalGross": 2230000,
+        "totalInvoiceTotal": 3340000,
+        "totalUnresolved": 0
+      },
+      {
+        "gian": "SBCR 13 Posh POSH Sân bay Cam ranh",
+        "cells": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          {
+            "gross": 2130000,
+            "invoiceTotal": 0,
+            "unresolvedCount": 12,
+            "drillUrl": "/doi-soat/vietqr?channel=bidv77020&month=2026-07"
+          },
+          null,
+          null
+        ],
+        "totalGross": 2130000,
+        "totalInvoiceTotal": 0,
+        "totalUnresolved": 12
+      },
+      {
+        "gian": "KVC ESTELLA",
+        "cells": [
+          null,
+          {
+            "gross": 2094000,
+            "invoiceTotal": 2094000,
+            "unresolvedCount": 0,
+            "drillUrl": "/doi-soat/zvp?month=2026-07"
+          },
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        "totalGross": 2094000,
+        "totalInvoiceTotal": 2094000,
+        "totalUnresolved": 0
+      },
+      {
+        "gian": "SBCR 14 Posh POSH Sân bay Cam ranh",
+        "cells": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          {
+            "gross": 2090000,
+            "invoiceTotal": 0,
+            "unresolvedCount": 14,
+            "drillUrl": "/doi-soat/vietqr?channel=bidv77020&month=2026-07"
+          },
+          null,
+          null
+        ],
+        "totalGross": 2090000,
+        "totalInvoiceTotal": 0,
+        "totalUnresolved": 14
+      },
+      {
+        "gian": "SBCR 20 Posh POSH Sân bay Cam ranh",
+        "cells": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          {
+            "gross": 2010000,
+            "invoiceTotal": 0,
+            "unresolvedCount": 12,
+            "drillUrl": "/doi-soat/vietqr?channel=bidv77020&month=2026-07"
+          },
+          null,
+          null
+        ],
+        "totalGross": 2010000,
+        "totalInvoiceTotal": 0,
+        "totalUnresolved": 12
+      },
+      {
+        "gian": "SBCR 06 Posh POSH Sân bay Cam ranh",
+        "cells": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          {
+            "gross": 2000000,
+            "invoiceTotal": 0,
+            "unresolvedCount": 13,
+            "drillUrl": "/doi-soat/vietqr?channel=bidv77020&month=2026-07"
+          },
+          null,
+          null
+        ],
+        "totalGross": 2000000,
+        "totalInvoiceTotal": 0,
+        "totalUnresolved": 13
+      },
+      {
+        "gian": "SBCR 15 Posh POSH Sân bay Cam ranh",
+        "cells": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          {
+            "gross": 1970000,
+            "invoiceTotal": 0,
+            "unresolvedCount": 14,
+            "drillUrl": "/doi-soat/vietqr?channel=bidv77020&month=2026-07"
+          },
+          null,
+          null
+        ],
+        "totalGross": 1970000,
+        "totalInvoiceTotal": 0,
+        "totalUnresolved": 14
+      },
+      {
+        "gian": "SENSE BTRE PHCM",
+        "cells": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          {
+            "gross": 1970000,
+            "invoiceTotal": 2790000,
+            "unresolvedCount": 0,
+            "drillUrl": "/doi-soat/vietqr?channel=bidv7702&month=2026-07"
+          }
+        ],
+        "totalGross": 1970000,
+        "totalInvoiceTotal": 2790000,
+        "totalUnresolved": 0
+      },
+      {
+        "gian": "GO TRA VINH",
+        "cells": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          {
+            "gross": 1930000,
+            "invoiceTotal": 2920000,
+            "unresolvedCount": 0,
+            "drillUrl": "/doi-soat/vietqr?channel=bidv7702&month=2026-07"
+          }
+        ],
+        "totalGross": 1930000,
+        "totalInvoiceTotal": 2920000,
+        "totalUnresolved": 0
+      },
+      {
+        "gian": "SBCR 08 Posh POSH Sân bay Cam ranh",
+        "cells": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          {
+            "gross": 1850000,
+            "invoiceTotal": 0,
+            "unresolvedCount": 14,
+            "drillUrl": "/doi-soat/vietqr?channel=bidv77020&month=2026-07"
+          },
+          null,
+          null
+        ],
+        "totalGross": 1850000,
+        "totalInvoiceTotal": 0,
+        "totalUnresolved": 14
+      },
+      {
+        "gian": "SBCR 07 Posh POSH Sân bay Cam ranh",
+        "cells": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          {
+            "gross": 1840000,
+            "invoiceTotal": 0,
+            "unresolvedCount": 14,
+            "drillUrl": "/doi-soat/vietqr?channel=bidv77020&month=2026-07"
+          },
+          null,
+          null
+        ],
+        "totalGross": 1840000,
+        "totalInvoiceTotal": 0,
+        "totalUnresolved": 14
+      },
+      {
+        "gian": "SBCR 09 Posh POSH Sân bay Cam ranh",
+        "cells": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          {
+            "gross": 1710000,
+            "invoiceTotal": 0,
+            "unresolvedCount": 13,
+            "drillUrl": "/doi-soat/vietqr?channel=bidv77020&month=2026-07"
+          },
+          null,
+          null
+        ],
+        "totalGross": 1710000,
+        "totalInvoiceTotal": 0,
+        "totalUnresolved": 13
+      },
+      {
+        "gian": "SBCR 12 Posh POSH Sân bay Cam ranh",
+        "cells": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          {
+            "gross": 1650000,
+            "invoiceTotal": 0,
+            "unresolvedCount": 13,
+            "drillUrl": "/doi-soat/vietqr?channel=bidv77020&month=2026-07"
+          },
+          null,
+          null
+        ],
+        "totalGross": 1650000,
+        "totalInvoiceTotal": 0,
+        "totalUnresolved": 13
+      },
+      {
+        "gian": "SBCR 01 Posh POSH Sân bay Cam ranh",
+        "cells": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          {
+            "gross": 1600000,
+            "invoiceTotal": 0,
+            "unresolvedCount": 14,
+            "drillUrl": "/doi-soat/vietqr?channel=bidv77020&month=2026-07"
+          },
+          null,
+          null
+        ],
+        "totalGross": 1600000,
+        "totalInvoiceTotal": 0,
+        "totalUnresolved": 14
+      },
+      {
+        "gian": "SBCR 19 Posh POSH Sân bay Cam ranh",
+        "cells": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          {
+            "gross": 1550000,
+            "invoiceTotal": 0,
+            "unresolvedCount": 13,
+            "drillUrl": "/doi-soat/vietqr?channel=bidv77020&month=2026-07"
+          },
+          null,
+          null
+        ],
+        "totalGross": 1550000,
+        "totalInvoiceTotal": 0,
+        "totalUnresolved": 13
+      },
+      {
+        "gian": "GALAXY KINH DUONG VUONG PHCM",
+        "cells": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          {
+            "gross": 1450000,
+            "invoiceTotal": 1900000,
+            "unresolvedCount": 0,
+            "drillUrl": "/doi-soat/vietqr?channel=bidv7702&month=2026-07"
+          }
+        ],
+        "totalGross": 1450000,
+        "totalInvoiceTotal": 1900000,
+        "totalUnresolved": 0
+      },
+      {
+        "gian": "SBCR 17 Posh POSH Sân bay Cam ranh",
+        "cells": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          {
+            "gross": 1450000,
+            "invoiceTotal": 0,
+            "unresolvedCount": 9,
+            "drillUrl": "/doi-soat/vietqr?channel=bidv77020&month=2026-07"
+          },
+          null,
+          null
+        ],
+        "totalGross": 1450000,
+        "totalInvoiceTotal": 0,
+        "totalUnresolved": 9
+      },
+      {
+        "gian": "SBCR 03 Posh POSH Sân bay Cam ranh",
+        "cells": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          {
+            "gross": 1340000,
+            "invoiceTotal": 0,
+            "unresolvedCount": 13,
+            "drillUrl": "/doi-soat/vietqr?channel=bidv77020&month=2026-07"
+          },
+          null,
+          null
+        ],
+        "totalGross": 1340000,
+        "totalInvoiceTotal": 0,
+        "totalUnresolved": 13
+      },
+      {
+        "gian": "Kid Farm MM Market Da Nang",
+        "cells": [
+          null,
+          {
+            "gross": 1320000,
+            "invoiceTotal": 0,
+            "unresolvedCount": 1,
+            "drillUrl": "/doi-soat/zvp?month=2026-07"
+          },
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        "totalGross": 1320000,
+        "totalInvoiceTotal": 0,
+        "totalUnresolved": 1
+      },
+      {
+        "gian": "JP SBCR 29 1 JP SB Cam Ranh.new",
+        "cells": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          {
+            "gross": 1300000,
+            "invoiceTotal": 0,
+            "unresolvedCount": 5,
+            "drillUrl": "/doi-soat/vietqr?channel=mb11521268&month=2026-07"
+          },
+          null
+        ],
+        "totalGross": 1300000,
+        "totalInvoiceTotal": 0,
+        "totalUnresolved": 5
+      },
+      {
+        "gian": "SBCR 02 Posh POSH Sân bay Cam ranh",
+        "cells": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          {
+            "gross": 1300000,
+            "invoiceTotal": 0,
+            "unresolvedCount": 14,
+            "drillUrl": "/doi-soat/vietqr?channel=bidv77020&month=2026-07"
+          },
+          null,
+          null
+        ],
+        "totalGross": 1300000,
+        "totalInvoiceTotal": 0,
+        "totalUnresolved": 14
+      },
+      {
+        "gian": "LOTTE PHU THO PHCM",
+        "cells": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          {
+            "gross": 1280000,
+            "invoiceTotal": 1880000,
+            "unresolvedCount": 0,
+            "drillUrl": "/doi-soat/vietqr?channel=bidv7702&month=2026-07"
+          }
+        ],
+        "totalGross": 1280000,
+        "totalInvoiceTotal": 1880000,
+        "totalUnresolved": 0
+      },
+      {
+        "gian": "JP SBCR 22 1 JP SB Cam Ranh.new",
+        "cells": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          {
+            "gross": 1250000,
+            "invoiceTotal": 0,
+            "unresolvedCount": 5,
+            "drillUrl": "/doi-soat/vietqr?channel=mb11521268&month=2026-07"
+          },
+          null
+        ],
+        "totalGross": 1250000,
+        "totalInvoiceTotal": 0,
+        "totalUnresolved": 5
+      },
+      {
+        "gian": "SAVICO KVCN",
+        "cells": [
+          null,
+          {
+            "gross": 1239000,
+            "invoiceTotal": 664000,
+            "unresolvedCount": 2,
+            "drillUrl": "/doi-soat/zvp?month=2026-07"
+          },
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        "totalGross": 1239000,
+        "totalInvoiceTotal": 664000,
+        "totalUnresolved": 2
+      },
+      {
+        "gian": "SBCR 11 Posh POSH Sân bay Cam ranh",
+        "cells": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          {
+            "gross": 1060000,
+            "invoiceTotal": 0,
+            "unresolvedCount": 9,
+            "drillUrl": "/doi-soat/vietqr?channel=bidv77020&month=2026-07"
+          },
+          null,
+          null
+        ],
+        "totalGross": 1060000,
+        "totalInvoiceTotal": 0,
+        "totalUnresolved": 9
+      },
+      {
+        "gian": "JP SBCR 17 1 JP SB Cam Ranh.new",
+        "cells": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          {
+            "gross": 1050000,
+            "invoiceTotal": 0,
+            "unresolvedCount": 7,
+            "drillUrl": "/doi-soat/vietqr?channel=mb11521268&month=2026-07"
+          },
+          null
+        ],
+        "totalGross": 1050000,
+        "totalInvoiceTotal": 0,
+        "totalUnresolved": 7
+      },
+      {
+        "gian": "JP SBCR 21 1 JP SB Cam Ranh.new",
+        "cells": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          {
+            "gross": 1000000,
+            "invoiceTotal": 0,
+            "unresolvedCount": 2,
+            "drillUrl": "/doi-soat/vietqr?channel=mb11521268&month=2026-07"
+          },
+          null
+        ],
+        "totalGross": 1000000,
+        "totalInvoiceTotal": 0,
+        "totalUnresolved": 2
+      },
+      {
+        "gian": "JP SBCR 41 1 JP SB Cam Ranh.new",
+        "cells": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          {
+            "gross": 1000000,
+            "invoiceTotal": 0,
+            "unresolvedCount": 5,
+            "drillUrl": "/doi-soat/vietqr?channel=mb11521268&month=2026-07"
+          },
+          null
+        ],
+        "totalGross": 1000000,
+        "totalInvoiceTotal": 0,
+        "totalUnresolved": 5
+      },
+      {
+        "gian": "JP SBCR 35 1 JP SB Cam Ranh.new",
+        "cells": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          {
+            "gross": 900000,
+            "invoiceTotal": 0,
+            "unresolvedCount": 5,
+            "drillUrl": "/doi-soat/vietqr?channel=mb11521268&month=2026-07"
+          },
+          null
+        ],
+        "totalGross": 900000,
+        "totalInvoiceTotal": 0,
+        "totalUnresolved": 5
+      },
+      {
+        "gian": "JP SBCR 36 1 JP SB Cam Ranh.new",
+        "cells": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          {
+            "gross": 900000,
+            "invoiceTotal": 0,
+            "unresolvedCount": 6,
+            "drillUrl": "/doi-soat/vietqr?channel=mb11521268&month=2026-07"
+          },
+          null
+        ],
+        "totalGross": 900000,
+        "totalInvoiceTotal": 0,
+        "totalUnresolved": 6
+      },
+      {
+        "gian": "JP SBCR 46 1 JP SB Cam Ranh.new",
+        "cells": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          {
+            "gross": 900000,
+            "invoiceTotal": 0,
+            "unresolvedCount": 6,
+            "drillUrl": "/doi-soat/vietqr?channel=mb11521268&month=2026-07"
+          },
+          null
+        ],
+        "totalGross": 900000,
+        "totalInvoiceTotal": 0,
+        "totalUnresolved": 6
+      },
+      {
+        "gian": "NHA MA GO BA RIA",
+        "cells": [
+          null,
+          {
+            "gross": 882000,
+            "invoiceTotal": 882000,
+            "unresolvedCount": 0,
+            "drillUrl": "/doi-soat/zvp?month=2026-07"
+          },
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        "totalGross": 882000,
+        "totalInvoiceTotal": 882000,
+        "totalUnresolved": 0
+      },
+      {
+        "gian": "JP SBCR 47 1 JP SB Cam Ranh.new",
+        "cells": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          {
+            "gross": 850000,
+            "invoiceTotal": 0,
+            "unresolvedCount": 5,
+            "drillUrl": "/doi-soat/vietqr?channel=mb11521268&month=2026-07"
+          },
+          null
+        ],
+        "totalGross": 850000,
+        "totalInvoiceTotal": 0,
+        "totalUnresolved": 5
+      },
+      {
+        "gian": "JP SBCR 45 1 JP SB Cam Ranh.new",
+        "cells": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          {
+            "gross": 700000,
+            "invoiceTotal": 0,
+            "unresolvedCount": 6,
+            "drillUrl": "/doi-soat/vietqr?channel=mb11521268&month=2026-07"
+          },
+          null
+        ],
+        "totalGross": 700000,
+        "totalInvoiceTotal": 0,
+        "totalUnresolved": 6
+      },
+      {
+        "gian": "JP SBCR 19 1 JP SB Cam Ranh.new",
+        "cells": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          {
+            "gross": 650000,
+            "invoiceTotal": 0,
+            "unresolvedCount": 2,
+            "drillUrl": "/doi-soat/vietqr?channel=mb11521268&month=2026-07"
+          },
+          null
+        ],
+        "totalGross": 650000,
+        "totalInvoiceTotal": 0,
+        "totalUnresolved": 2
+      },
+      {
+        "gian": "JP SBCR 33 1 JP SB Cam Ranh.new",
+        "cells": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          {
+            "gross": 650000,
+            "invoiceTotal": 0,
+            "unresolvedCount": 3,
+            "drillUrl": "/doi-soat/vietqr?channel=mb11521268&month=2026-07"
+          },
+          null
+        ],
+        "totalGross": 650000,
+        "totalInvoiceTotal": 0,
+        "totalUnresolved": 3
+      },
+      {
+        "gian": "JP SBCR 30 1 JP SB Cam Ranh.new",
+        "cells": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          {
+            "gross": 600000,
+            "invoiceTotal": 0,
+            "unresolvedCount": 4,
+            "drillUrl": "/doi-soat/vietqr?channel=mb11521268&month=2026-07"
+          },
+          null
+        ],
+        "totalGross": 600000,
+        "totalInvoiceTotal": 0,
+        "totalUnresolved": 4
+      },
+      {
+        "gian": "JP SBCR 32 1 JP SB Cam Ranh.new",
+        "cells": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          {
+            "gross": 600000,
+            "invoiceTotal": 0,
+            "unresolvedCount": 3,
+            "drillUrl": "/doi-soat/vietqr?channel=mb11521268&month=2026-07"
+          },
+          null
+        ],
+        "totalGross": 600000,
+        "totalInvoiceTotal": 0,
+        "totalUnresolved": 3
+      },
+      {
+        "gian": "JP SBCR 38 1 JP SB Cam Ranh.new",
+        "cells": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          {
+            "gross": 600000,
+            "invoiceTotal": 0,
+            "unresolvedCount": 4,
+            "drillUrl": "/doi-soat/vietqr?channel=mb11521268&month=2026-07"
+          },
+          null
+        ],
+        "totalGross": 600000,
+        "totalInvoiceTotal": 0,
+        "totalUnresolved": 4
+      },
+      {
+        "gian": "JP SBCR 39 1 JP SB Cam Ranh.new",
+        "cells": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          {
+            "gross": 600000,
+            "invoiceTotal": 0,
+            "unresolvedCount": 2,
+            "drillUrl": "/doi-soat/vietqr?channel=mb11521268&month=2026-07"
+          },
+          null
+        ],
+        "totalGross": 600000,
+        "totalInvoiceTotal": 0,
+        "totalUnresolved": 2
+      },
+      {
+        "gian": "JP SBCR 42 1 JP SB Cam Ranh.new",
+        "cells": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          {
+            "gross": 600000,
+            "invoiceTotal": 0,
+            "unresolvedCount": 4,
+            "drillUrl": "/doi-soat/vietqr?channel=mb11521268&month=2026-07"
+          },
+          null
+        ],
+        "totalGross": 600000,
+        "totalInvoiceTotal": 0,
+        "totalUnresolved": 4
+      },
+      {
+        "gian": "JP SBCR 31 1 JP SB Cam Ranh.new",
+        "cells": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          {
+            "gross": 500000,
+            "invoiceTotal": 0,
+            "unresolvedCount": 3,
+            "drillUrl": "/doi-soat/vietqr?channel=mb11521268&month=2026-07"
+          },
+          null
+        ],
+        "totalGross": 500000,
+        "totalInvoiceTotal": 0,
+        "totalUnresolved": 3
+      },
+      {
+        "gian": "JP SBCR 4 1 JP SB Cam Ranh.new",
+        "cells": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          {
+            "gross": 450000,
+            "invoiceTotal": 0,
+            "unresolvedCount": 2,
+            "drillUrl": "/doi-soat/vietqr?channel=mb11521268&month=2026-07"
+          },
+          null
+        ],
+        "totalGross": 450000,
+        "totalInvoiceTotal": 0,
+        "totalUnresolved": 2
+      },
+      {
+        "gian": "JP SBCR 40 1 JP SB Cam Ranh.new",
+        "cells": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          {
+            "gross": 450000,
+            "invoiceTotal": 0,
+            "unresolvedCount": 3,
+            "drillUrl": "/doi-soat/vietqr?channel=mb11521268&month=2026-07"
+          },
+          null
+        ],
+        "totalGross": 450000,
+        "totalInvoiceTotal": 0,
+        "totalUnresolved": 3
+      },
+      {
+        "gian": "JP SBCR 10 1 JP SB Cam Ranh.new",
+        "cells": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          {
+            "gross": 400000,
+            "invoiceTotal": 0,
+            "unresolvedCount": 3,
+            "drillUrl": "/doi-soat/vietqr?channel=mb11521268&month=2026-07"
+          },
+          null
+        ],
+        "totalGross": 400000,
+        "totalInvoiceTotal": 0,
+        "totalUnresolved": 3
+      },
+      {
+        "gian": "JP SBCR 11 1 JP SB Cam Ranh.new",
+        "cells": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          {
+            "gross": 400000,
+            "invoiceTotal": 0,
+            "unresolvedCount": 3,
+            "drillUrl": "/doi-soat/vietqr?channel=mb11521268&month=2026-07"
+          },
+          null
+        ],
+        "totalGross": 400000,
+        "totalInvoiceTotal": 0,
+        "totalUnresolved": 3
+      },
+      {
+        "gian": "JP SBCR 20 1 JP SB Cam Ranh.new",
+        "cells": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          {
+            "gross": 400000,
+            "invoiceTotal": 0,
+            "unresolvedCount": 4,
+            "drillUrl": "/doi-soat/vietqr?channel=mb11521268&month=2026-07"
+          },
+          null
+        ],
+        "totalGross": 400000,
+        "totalInvoiceTotal": 0,
+        "totalUnresolved": 4
+      },
+      {
+        "gian": "JP SBCR 25 1 JP SB Cam Ranh.new",
+        "cells": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          {
+            "gross": 400000,
+            "invoiceTotal": 0,
+            "unresolvedCount": 2,
+            "drillUrl": "/doi-soat/vietqr?channel=mb11521268&month=2026-07"
+          },
+          null
+        ],
+        "totalGross": 400000,
+        "totalInvoiceTotal": 0,
+        "totalUnresolved": 2
+      },
+      {
+        "gian": "JP SBCR 34 1 JP SB Cam Ranh.new",
+        "cells": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          {
+            "gross": 400000,
+            "invoiceTotal": 0,
+            "unresolvedCount": 1,
+            "drillUrl": "/doi-soat/vietqr?channel=mb11521268&month=2026-07"
+          },
+          null
+        ],
+        "totalGross": 400000,
+        "totalInvoiceTotal": 0,
+        "totalUnresolved": 1
+      },
+      {
+        "gian": "JP SBCR 51 1 JP SB Cam Ranh.new",
+        "cells": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          {
+            "gross": 400000,
+            "invoiceTotal": 0,
+            "unresolvedCount": 2,
+            "drillUrl": "/doi-soat/vietqr?channel=mb11521268&month=2026-07"
+          },
+          null
+        ],
+        "totalGross": 400000,
+        "totalInvoiceTotal": 0,
+        "totalUnresolved": 2
+      },
+      {
+        "gian": "JP SBCR 24 1 JP SB Cam Ranh.new",
+        "cells": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          {
+            "gross": 300000,
+            "invoiceTotal": 0,
+            "unresolvedCount": 2,
+            "drillUrl": "/doi-soat/vietqr?channel=mb11521268&month=2026-07"
+          },
+          null
+        ],
+        "totalGross": 300000,
+        "totalInvoiceTotal": 0,
+        "totalUnresolved": 2
+      },
+      {
+        "gian": "JP SBCR 27 1 JP SB Cam Ranh.new",
+        "cells": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          {
+            "gross": 300000,
+            "invoiceTotal": 0,
+            "unresolvedCount": 3,
+            "drillUrl": "/doi-soat/vietqr?channel=mb11521268&month=2026-07"
+          },
+          null
+        ],
+        "totalGross": 300000,
+        "totalInvoiceTotal": 0,
+        "totalUnresolved": 3
+      },
+      {
+        "gian": "JP SBCR 44 1 JP SB Cam Ranh.new",
+        "cells": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          {
+            "gross": 300000,
+            "invoiceTotal": 0,
+            "unresolvedCount": 1,
+            "drillUrl": "/doi-soat/vietqr?channel=mb11521268&month=2026-07"
+          },
+          null
+        ],
+        "totalGross": 300000,
+        "totalInvoiceTotal": 0,
+        "totalUnresolved": 1
+      },
+      {
+        "gian": "JP SBCR 48 1 JP SB Cam Ranh.new",
+        "cells": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          {
+            "gross": 300000,
+            "invoiceTotal": 0,
+            "unresolvedCount": 3,
+            "drillUrl": "/doi-soat/vietqr?channel=mb11521268&month=2026-07"
+          },
+          null
+        ],
+        "totalGross": 300000,
+        "totalInvoiceTotal": 0,
+        "totalUnresolved": 3
+      },
+      {
+        "gian": "KNG BA RIA PHCM",
+        "cells": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          {
+            "gross": 290000,
+            "invoiceTotal": 290000,
+            "unresolvedCount": 0,
+            "drillUrl": "/doi-soat/vietqr?channel=bidv7702&month=2026-07"
+          }
+        ],
+        "totalGross": 290000,
+        "totalInvoiceTotal": 290000,
+        "totalUnresolved": 0
+      },
+      {
+        "gian": "JP SBCR 14 1 JP SB Cam Ranh.new",
+        "cells": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          {
+            "gross": 250000,
+            "invoiceTotal": 0,
+            "unresolvedCount": 3,
+            "drillUrl": "/doi-soat/vietqr?channel=mb11521268&month=2026-07"
+          },
+          null
+        ],
+        "totalGross": 250000,
+        "totalInvoiceTotal": 0,
+        "totalUnresolved": 3
+      },
+      {
+        "gian": "JP SBCR 18 1 JP SB Cam Ranh.new",
+        "cells": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          {
+            "gross": 250000,
+            "invoiceTotal": 0,
+            "unresolvedCount": 2,
+            "drillUrl": "/doi-soat/vietqr?channel=mb11521268&month=2026-07"
+          },
+          null
+        ],
+        "totalGross": 250000,
+        "totalInvoiceTotal": 0,
+        "totalUnresolved": 2
+      },
+      {
+        "gian": "JP SBCR 6 1 JP SB Cam Ranh.new",
+        "cells": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          {
+            "gross": 250000,
+            "invoiceTotal": 0,
+            "unresolvedCount": 2,
+            "drillUrl": "/doi-soat/vietqr?channel=mb11521268&month=2026-07"
+          },
+          null
+        ],
+        "totalGross": 250000,
+        "totalInvoiceTotal": 0,
+        "totalUnresolved": 2
+      },
+      {
+        "gian": "JP SBCR 15 1 JP SB Cam Ranh.new",
+        "cells": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          {
+            "gross": 200000,
+            "invoiceTotal": 0,
+            "unresolvedCount": 1,
+            "drillUrl": "/doi-soat/vietqr?channel=mb11521268&month=2026-07"
+          },
+          null
+        ],
+        "totalGross": 200000,
+        "totalInvoiceTotal": 0,
+        "totalUnresolved": 1
+      },
+      {
+        "gian": "JP SBCR 23 1 JP SB Cam Ranh.new",
+        "cells": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          {
+            "gross": 200000,
+            "invoiceTotal": 0,
+            "unresolvedCount": 1,
+            "drillUrl": "/doi-soat/vietqr?channel=mb11521268&month=2026-07"
+          },
+          null
+        ],
+        "totalGross": 200000,
+        "totalInvoiceTotal": 0,
+        "totalUnresolved": 1
+      },
+      {
+        "gian": "JP SBCR 28 1 JP SB Cam Ranh.new",
+        "cells": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          {
+            "gross": 200000,
+            "invoiceTotal": 0,
+            "unresolvedCount": 1,
+            "drillUrl": "/doi-soat/vietqr?channel=mb11521268&month=2026-07"
+          },
+          null
+        ],
+        "totalGross": 200000,
+        "totalInvoiceTotal": 0,
+        "totalUnresolved": 1
+      },
+      {
+        "gian": "JP SBCR 37 1 JP SB Cam Ranh.new",
+        "cells": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          {
+            "gross": 200000,
+            "invoiceTotal": 0,
+            "unresolvedCount": 2,
+            "drillUrl": "/doi-soat/vietqr?channel=mb11521268&month=2026-07"
+          },
+          null
+        ],
+        "totalGross": 200000,
+        "totalInvoiceTotal": 0,
+        "totalUnresolved": 2
+      },
+      {
+        "gian": "JP SBCR 43 1 JP SB Cam Ranh.new",
+        "cells": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          {
+            "gross": 200000,
+            "invoiceTotal": 0,
+            "unresolvedCount": 2,
+            "drillUrl": "/doi-soat/vietqr?channel=mb11521268&month=2026-07"
+          },
+          null
+        ],
+        "totalGross": 200000,
+        "totalInvoiceTotal": 0,
+        "totalUnresolved": 2
+      },
+      {
+        "gian": "JP SBCR 8 1 JP SB Cam Ranh.new",
+        "cells": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          {
+            "gross": 150000,
+            "invoiceTotal": 0,
+            "unresolvedCount": 1,
+            "drillUrl": "/doi-soat/vietqr?channel=mb11521268&month=2026-07"
+          },
+          null
+        ],
+        "totalGross": 150000,
+        "totalInvoiceTotal": 0,
+        "totalUnresolved": 1
+      },
+      {
+        "gian": "Farm Times City",
+        "cells": [
+          null,
+          {
+            "gross": 104000,
+            "invoiceTotal": 0,
+            "unresolvedCount": 1,
+            "drillUrl": "/doi-soat/zvp?month=2026-07"
+          },
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        "totalGross": 104000,
+        "totalInvoiceTotal": 0,
+        "totalUnresolved": 1
+      },
+      {
+        "gian": "JP SBCR 1 1 JP SB Cam Ranh.new",
+        "cells": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          {
+            "gross": 100000,
+            "invoiceTotal": 0,
+            "unresolvedCount": 1,
+            "drillUrl": "/doi-soat/vietqr?channel=mb11521268&month=2026-07"
+          },
+          null
+        ],
+        "totalGross": 100000,
+        "totalInvoiceTotal": 0,
+        "totalUnresolved": 1
+      },
+      {
+        "gian": "JP SBCR 12 1 JP SB Cam Ranh.new",
+        "cells": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          {
+            "gross": 100000,
+            "invoiceTotal": 0,
+            "unresolvedCount": 1,
+            "drillUrl": "/doi-soat/vietqr?channel=mb11521268&month=2026-07"
+          },
+          null
+        ],
+        "totalGross": 100000,
+        "totalInvoiceTotal": 0,
+        "totalUnresolved": 1
+      },
+      {
+        "gian": "JP SBCR 2 1 JP SB Cam Ranh.new",
+        "cells": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          {
+            "gross": 100000,
+            "invoiceTotal": 0,
+            "unresolvedCount": 1,
+            "drillUrl": "/doi-soat/vietqr?channel=mb11521268&month=2026-07"
+          },
+          null
+        ],
+        "totalGross": 100000,
+        "totalInvoiceTotal": 0,
+        "totalUnresolved": 1
+      },
+      {
+        "gian": "JP SBCR 26 1 JP SB Cam Ranh.new",
+        "cells": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          {
+            "gross": 100000,
+            "invoiceTotal": 0,
+            "unresolvedCount": 1,
+            "drillUrl": "/doi-soat/vietqr?channel=mb11521268&month=2026-07"
+          },
+          null
+        ],
+        "totalGross": 100000,
+        "totalInvoiceTotal": 0,
+        "totalUnresolved": 1
+      }
+    ],
+    "totalsByChannel": [
+      1229163300,
+      386620513,
+      663914500,
+      123029000,
+      13150000,
+      66150000,
+      26490000,
+      544570000
+    ],
+    "grandTotal": 3053087313
+  },
+  "channelSummary": [
+    {
+      "channelKey": "momo",
+      "channelLabel": "Momo (BIDV123456)",
+      "totalGross": 1229163300,
+      "totalMatched": 1229163300,
+      "totalChuaCoHD": 0,
+      "totalLech": 0,
+      "unresolvedCount": 0,
+      "drillUrl": "/doi-soat/momo?month=2026-07"
+    },
+    {
+      "channelKey": "zvp_offline",
+      "channelLabel": "VNPay thu hộ (Offline)",
+      "totalGross": 663914500,
+      "totalMatched": 663914500,
+      "totalChuaCoHD": 0,
+      "totalLech": 0,
+      "unresolvedCount": 0,
+      "drillUrl": "/doi-soat/zvp?month=2026-07"
+    },
+    {
+      "channelKey": "vietqr_bidv7702",
+      "channelLabel": "Viet QR BIDV 7702",
+      "totalGross": 544570000,
+      "totalMatched": 441270000,
+      "totalChuaCoHD": 2700000,
+      "totalLech": 0,
+      "unresolvedCount": 38,
+      "drillUrl": "/doi-soat/vietqr?channel=bidv7702&month=2026-07"
+    },
+    {
+      "channelKey": "zvp_online",
+      "channelLabel": "Zalo Mini App (Online)",
+      "totalGross": 386620513,
+      "totalMatched": 383566513,
+      "totalChuaCoHD": -923000,
+      "totalLech": 0,
+      "unresolvedCount": 10,
+      "drillUrl": "/doi-soat/zvp?month=2026-07"
+    },
+    {
+      "channelKey": "zvp_payoo",
+      "channelLabel": "Payoo",
+      "totalGross": 123029000,
+      "totalMatched": 123029000,
+      "totalChuaCoHD": 0,
+      "totalLech": 0,
+      "unresolvedCount": 0,
+      "drillUrl": "/doi-soat/zvp?month=2026-07"
+    },
+    {
+      "channelKey": "vietqr_bidv77020",
+      "channelLabel": "Viet QR BIDV 77020",
+      "totalGross": 66150000,
+      "totalMatched": 15500000,
+      "totalChuaCoHD": 50650000,
+      "totalLech": 0,
+      "unresolvedCount": 273,
+      "drillUrl": "/doi-soat/vietqr?channel=bidv77020&month=2026-07"
+    },
+    {
+      "channelKey": "vietqr_mb11521268",
+      "channelLabel": "Viet QR MB 11521268",
+      "totalGross": 26490000,
+      "totalMatched": 0,
+      "totalChuaCoHD": 21450000,
+      "totalLech": 33830000,
+      "unresolvedCount": 139,
+      "drillUrl": "/doi-soat/vietqr?channel=mb11521268&month=2026-07"
+    },
+    {
+      "channelKey": "vietqr_bidv7704",
+      "channelLabel": "Viet QR BIDV 7704",
+      "totalGross": 13150000,
+      "totalMatched": 13150000,
+      "totalChuaCoHD": 0,
+      "totalLech": 0,
+      "unresolvedCount": 0,
+      "drillUrl": "/doi-soat/vietqr?channel=bidv7704&month=2026-07"
+    }
+  ]
+}

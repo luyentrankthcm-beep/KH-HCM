@@ -426,6 +426,48 @@
       </script>
     </section>
 
+    <% var hoaDonDauRaChannel = channels.find(function(c){ return c.key === 'bidv7702'; }); %>
+    <% if (hoaDonDauRaChannel) { %>
+    <section class="panel">
+      <h2>Xuất Hóa đơn đầu ra (mẫu VietInvoice)</h2>
+      <p class="muted" style="margin-bottom:14px;">
+        Chọn 1 ngày đối soát BIDV 7702: mỗi gian có doanh thu ngày đó thành 1 dòng hóa đơn, cột Thành tiền = doanh thu
+        VietQR ngày đó của gian (đã tách 8% thuế GTGT). Các cột khác giữ nguyên như file mẫu. Số thứ tự hóa đơn cộng
+        dần từ số bắt đầu chị chọn.
+      </p>
+      <div class="form-inline" style="margin-bottom:14px;">
+        <label style="margin:0;">Ngày:</label>
+        <input type="date" id="hddrDate" style="width:150px;" />
+        <label style="margin:0;">Số hóa đơn bắt đầu:</label>
+        <input type="number" id="hddrStart" value="1" min="1" style="width:100px;" />
+        <a class="btn btn-secondary" id="hddrExportBtn" href="#">Xuất Hóa đơn đầu ra BIDV 7702</a>
+      </div>
+      <script>
+        (function() {
+          var dateInput = document.getElementById('hddrDate');
+          var startInput = document.getElementById('hddrStart');
+          var btn = document.getElementById('hddrExportBtn');
+          function updateHref() {
+            if (!dateInput.value) { btn.setAttribute('href', '#'); return; }
+            btn.setAttribute(
+              'href',
+              '/doi-soat/vietqr/xuat-hoa-don-dau-ra?channel=bidv7702&date=' + dateInput.value + '&start=' + (startInput.value || 1)
+            );
+          }
+          dateInput.addEventListener('input', updateHref);
+          startInput.addEventListener('input', updateHref);
+          btn.addEventListener('click', function(e) {
+            if (!dateInput.value) {
+              e.preventDefault();
+              alert('Chọn ngày cần xuất trước đã.');
+            }
+          });
+          updateHref();
+        })();
+      </script>
+    </section>
+    <% } %>
+
     <section class="panel">
       <h2>Kết quả đối soát</h2>
       <form method="GET" action="/doi-soat/vietqr" class="form-inline">

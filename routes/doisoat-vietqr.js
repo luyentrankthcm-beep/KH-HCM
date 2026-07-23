@@ -1462,6 +1462,137 @@ router.get("/doi-soat/vietqr/export.xlsx", (req, res) => {
   res.send(buf);
 });
 
+// ---------- Export: "Hóa đơn đầu ra" (mẫu VietInvoice) ----------
+// Luyen, 2026-07-23: "từ chỗ Việt QR 7702 á bạn thêm cho tôi chỗ xuất ra Hóa
+// đơn đầu ra nhá theo ngày lọc á file mẫu như thế này số thứ tự hóa đơn là
+// cộng lên 1 số ngày là ngày lọc các dữ liệu liên quan thì cứ giữ nguyên trên
+// file xuống chỉ thay đổi các số tiền theo từng dòng trên đối soát ngày hôm
+// đó cột thành tiền là cột sau khi tiền trên viet qr của điểm đó trừ đi 8%
+// tiền thuế là 8%" -- xuat 1 file .xlsx dung DUNG mau "VietInvoice" (file
+// Luyen gui), 1 dong hoa don = 1 gian (Ma cong trinh) cua 1 NGAY doi soat cu
+// the (chon qua input ngay tren trang), STT hoa don cong dan tu so bat dau
+// (giong kieu "So chung tu bat dau" cua nut Xuat MISA). Cac cot khac giu
+// NGUYEN gia tri mau mac dinh (Hinh thuc TT "TM/CK", Loai tien "VND", Ten
+// hang hoa/dich vu "Dich vu vui choi giai tri"...), CHI doi STT/Ngay/Thanh
+// tien/Tien thue GTGT/Don gia theo doanh thu VietQR that cua tung gian ngay
+// do. Thanh tien = tien nhan tren VietQR (gross, DA GOM thue) / 1.08 (tach
+// thue GTGT 8% ra, giong dung cong thuc cac dong vi du co san trong file mau:
+// 1928000 / 1.08 = 1785185, Tien thue GTGT = 1928000 - 1785185 = 142815).
+const HOA_DON_DAU_RA_HEADER_INFO = [
+  ["FILE MẪU DANH SÁCH HÓA ĐƠN ĐỂ NHẬP VÀO PHẦN MỀM VIETINVOICE"],
+  ["Hướng dẫn:"],
+  ["- Điền dữ liệu hóa đơn cần lập trên phần mềm vào các cột tương ứng trên file này"],
+  ["- Các cột có dấu (*) là những cột bắt buộc"],
+  [
+    "- Nếu hóa đơn chiết khấu theo tổng tiền hàng thì điền thông tin về tỷ lệ CK và tiền CK ở cột màu tím. Nếu chiết khấu theo từng mặt hàng thì điền thông tin ở cột màu vàng",
+  ],
+  ['- Loại tiền tệ lấy theo cột "Mã loại tiền" trong chức năng "Danh mục => Loại tiền"'],
+  ['- Mã khách hàng (cột D) chỉ hợp lệ nếu đã tồn tại trong chức năng "Danh mục => Khách hàng"'],
+  ['- Mã hàng chỉ hợp lệ nếu đã tồn tại trong chức năng "Danh mục => Hàng hóa, dịch vụ"'],
+  ["- Các dòng dữ liệu phía dưới chỉ là ví dụ minh họa"],
+  ["- Hệ thống sử dụng dấu '.' để phân tách các chữ số hàng nghìn và dấu ',' để phân tách các chữ số phần thập phân"],
+  [],
+];
+const HOA_DON_DAU_RA_HEADER_ROW = [
+  "Số thứ tự hóa đơn (*)",
+  "Ngày hóa đơn",
+  "Tên đơn vị mua hàng",
+  "Mã khách hàng",
+  "Địa chỉ",
+  "Mã số thuế",
+  "Người mua hàng",
+  "Email",
+  "CMND/CCCD",
+  "Số hộ chiếu",
+  "Mã DVQHNS",
+  "Hình thức thanh toán",
+  "Loại tiền",
+  "Tỷ giá",
+  "Tỷ lệ CK(%)",
+  "Tiền CK",
+  "% thuế GTGT",
+  "Tiền thuế GTGT",
+  "Tên hàng hóa/dịch vụ (*)",
+  "Mã hàng",
+  "ĐVT",
+  "Số lượng",
+  "Đơn giá",
+  "Tỷ lệ CK (%)",
+  "Tiền CK",
+  "Thành tiền(*)",
+];
+const HOA_DON_DAU_RA_VAT_RATE = 0.08;
+
+router.get("/doi-soat/vietqr/xuat-hoa-don-dau-ra", (req, res) => {
+  const store = load();
+  ensureChannelShape(store);
+  const channelKey = req.query.channel;
+  if (!CHANNELS[channelKey]) return res.status(400).send("Kênh không hợp lệ.");
+  const date = (req.query.date || "").trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return res.status(400).send("Thiếu hoặc sai định dạng ngày cần xuất (YYYY-MM-DD).");
+  let startNo = parseInt(req.query.start || "1", 10);
+  if (isNaN(startNo) || startNo < 1) startNo = 1;
+
+  const built = buildChannelReconciliation(store, channelKey);
+  if (built.error) return res.status(400).send(built.error);
+
+  const day = (built.reconciled || []).find((r) => r.settlementDate === date);
+  if (!day) return res.status(400).send(`Không có dữ liệu đối soát ngày ${date} cho kênh này.`);
+
+  const ngayHoaDon = isoToDmy(date);
+  const dataRows = [];
+  let seq = startNo;
+  day.lines
+    .filter((l) => l.tkCo !== "SKIP" && Math.round(l.gross) !== 0)
+    .forEach((l) => {
+      const grossTotal = Math.round(l.gross);
+      const thanhTien = Math.round(grossTotal / (1 + HOA_DON_DAU_RA_VAT_RATE));
+      const tienThueGtgt = grossTotal - thanhTien;
+      dataRows.push([
+        seq,
+        ngayHoaDon,
+        "Bán cho người tiêu dùng ",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "TM/CK",
+        "VND",
+        "",
+        "",
+        "",
+        "8",
+        tienThueGtgt,
+        "Dịch vụ vui chơi giải trí",
+        "",
+        "Kỳ ",
+        "1",
+        thanhTien,
+        "",
+        "",
+        thanhTien,
+      ]);
+      seq++;
+    });
+
+  if (dataRows.length === 0) {
+    return res.status(400).send(`Ngày ${date} không có gian nào có doanh thu (khác 0) để xuất hóa đơn.`);
+  }
+
+  const aoa = [...HOA_DON_DAU_RA_HEADER_INFO, HOA_DON_DAU_RA_HEADER_ROW, ...dataRows];
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  const wb2 = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb2, ws, "Hóa đơn");
+  const buf = XLSX.write(wb2, { type: "buffer", bookType: "xlsx" });
+  res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+  res.setHeader("Content-Disposition", `attachment; filename=HoaDonDauRa-${channelKey}-${date}.xlsx`);
+  res.send(buf);
+});
+
 // Chi Nhan, 2026-07-22: file "/he-thong/sao-luu/tai-xuong" (tai xuong toan bo
 // du lieu) gio da qua lon, hay bi 502/timeout khi tai xuong -- route nay tra
 // ve tom tat NHE (chi ten file, thoi gian tai, so dong -- KHONG kem toan bo
