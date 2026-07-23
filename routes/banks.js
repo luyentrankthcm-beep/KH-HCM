@@ -49,6 +49,7 @@ router.post("/banks", requireAdmin, (req, res) => {
     khu_vuc,
     chi_nhanh,
     trung_gian_thu_ho,
+    mien,
   } = req.body;
   const store = load();
   const activeCompany = getCompany(req);
@@ -78,9 +79,30 @@ router.post("/banks", requireAdmin, (req, res) => {
     chi_nhanh: (chi_nhanh || "").trim(),
     trung_gian_thu_ho: (trung_gian_thu_ho || "").trim(),
     company: activeCompany,
+    // Luyen, 2026-07-23: "chia cho tôi thành 2 trang 1 trang Miền Nam và 1
+    // trang miền Bắc ... liên kết link với ngân hàng tôi sẽ liên kết sau" --
+    // trang Chi Phí Miền Nam/Miền Bắc dung truong nay (xem routes/chi-phi.js
+    // quet-ngan-hang) de biet 1 tai khoan ngan hang thuoc mien nao. Mac dinh
+    // "nam" (tat ca tai khoan hien co deu dang phuc vu Mien Nam) -- doi thanh
+    // "bac" ngay tai day khi Luyen them/lien ket tai khoan ngan hang Mien Bac.
+    mien: mien === "bac" ? "bac" : "nam",
     created_at: new Date().toISOString(),
   });
   save(store);
+  res.redirect("/banks");
+});
+
+// Luyen, 2026-07-23: cho sua rieng truong "mien" cua 1 tai khoan da co san
+// (khong can xoa/them lai) -- dung khi Luyen lien ket 1 tai khoan hien co cho
+// hoat dong Mien Bac, hoac lo chon nham luc them moi.
+router.post("/banks/:id/mien", requireAdmin, (req, res) => {
+  const store = load();
+  const id = Number(req.params.id);
+  const bank = store.banks.find((b) => b.id === id);
+  if (bank) {
+    bank.mien = req.body.mien === "bac" ? "bac" : "nam";
+    save(store);
+  }
   res.redirect("/banks");
 });
 

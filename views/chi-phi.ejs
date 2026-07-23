@@ -6,10 +6,16 @@
 <body>
   <%- include('partials/nav') %>
   <main class="container">
-    <h1>Chi Phí</h1>
+    <h1>Chi Phí — <%= mienLabel %></h1>
     <p class="muted" style="margin-top:-10px;margin-bottom:20px;">
+      <% if (mien === 'nam') { %>
       Sổ ghi chi phí — lấy từ Google Sheet "ĐI ỦY NHIỆM CHI KVC + MTĐ MN" (tab THÁNG 7.2026 + TT TIỀN MẶT), tách theo
-      công ty đang chọn (nút Cũ/Mới góc trên trái). Tổng công ty: <%= totalForCompany %> khoản chi (<%= chuaHachToanCount %> chưa hạch toán, <%= chuaSoHoaDonCount %> chưa có số hóa đơn).
+      công ty đang chọn (nút Cũ/Mới góc trên trái).
+      <% } else { %>
+      Sổ ghi chi phí Miền Bắc — chưa có nguồn dữ liệu/ngân hàng liên kết, sẽ tự cập nhật khi bạn gán tài khoản ngân
+      hàng "Miền Bắc" ở trang Ngân hàng, hoặc nhập tay bên dưới.
+      <% } %>
+      Tổng công ty: <%= totalForCompany %> khoản chi (<%= chuaHachToanCount %> chưa hạch toán, <%= chuaSoHoaDonCount %> chưa có số hóa đơn).
       Đang hiển thị: <%= rows.length %> khoản, <%= tongTien.toLocaleString('vi-VN') %> đ.
     </p>
 
@@ -33,14 +39,14 @@
           <span class="icon-upload-btn-label">Cập nhật chi phí</span>
         </button>
       </form>
-      <form method="POST" action="/chi-phi/quet-ngan-hang" style="display:inline-block;">
-        <button type="submit" class="icon-upload-btn" style="border:1px solid var(--color-hairline);" title="Tự động quét các giao dịch Chi (tiền thuê gian) trong tháng hiện tại trên tất cả tài khoản ngân hàng, khớp gian hàng và tạo khoản chi phí mới (không tạo trùng). Chạy hàng ngày để tự cập nhật.">
+      <form method="POST" action="/chi-phi/mien-<%= mien %>/quet-ngan-hang" style="display:inline-block;">
+        <button type="submit" class="icon-upload-btn" style="border:1px solid var(--color-hairline);" title="Tự động quét các giao dịch Chi (tiền thuê gian) trong tháng hiện tại trên các tài khoản ngân hàng đã gán <%= mienLabel %>, khớp gian hàng và tạo khoản chi phí mới (không tạo trùng). Chạy hàng ngày để tự cập nhật.">
           <span class="icon-upload-btn-icon">🏦</span>
           <span class="icon-upload-btn-label">Quét ngân hàng</span>
         </button>
       </form>
       <a
-        href="/chi-phi/export.xlsx?hachToan=<%= encodeURIComponent(hachToanFilter) %>&thang=<%= encodeURIComponent(thangFilter) %>&hoaDon=<%= encodeURIComponent(hoaDonFilter) %>"
+        href="/chi-phi/mien-<%= mien %>/export.xlsx?hachToan=<%= encodeURIComponent(hachToanFilter) %>&thang=<%= encodeURIComponent(thangFilter) %>&hoaDon=<%= encodeURIComponent(hoaDonFilter) %>"
         class="icon-upload-btn"
         style="border:1px solid var(--color-hairline); text-decoration:none; color:inherit;"
         title="Xuất ra file Excel danh sách chi phí đang hiển thị (theo đúng bộ lọc hạch toán/tháng/số hóa đơn đang chọn)"
@@ -49,7 +55,7 @@
         <span class="icon-upload-btn-label">Xuất Excel</span>
       </a>
       <% if (gmailConnected) { %>
-        <form method="POST" action="/chi-phi/tim-hoa-don-gmail" style="display:inline-block;">
+        <form method="POST" action="/chi-phi/mien-<%= mien %>/tim-hoa-don-gmail" style="display:inline-block;">
           <input type="hidden" name="hachToan" value="<%= hachToanFilter %>" />
           <input type="hidden" name="thang" value="<%= thangFilter %>" />
           <input type="hidden" name="hoaDon" value="<%= hoaDonFilter %>" />
@@ -73,7 +79,7 @@
 
     <section class="panel">
       <h2>Thêm khoản chi mới (nhập tay)</h2>
-      <form method="POST" action="/chi-phi" class="form-grid">
+      <form method="POST" action="/chi-phi/mien-<%= mien %>" class="form-grid">
         <label>Ngày chi <input type="date" name="ngay" required /></label>
         <label>Gian/Cơ sở <input type="text" name="gian" /></label>
         <label>NCC <input type="text" name="ncc" /></label>
@@ -151,6 +157,7 @@
                   <input type="hidden" name="hachToan" value="<%= hachToanFilter %>" />
                   <input type="hidden" name="thang" value="<%= thangFilter %>" />
                   <input type="hidden" name="hoaDon" value="<%= hoaDonFilter %>" />
+                  <input type="hidden" name="mien" value="<%= mien %>" />
                   <input type="text" name="ncc" value="<%= r.ncc %>" placeholder="Tên NCC" style="width:140px; font-size:12px; padding:2px 4px;" />
                   <button type="submit" class="link-btn" style="font-size:11px;" title="Lưu NCC">Lưu</button>
                   <span class="cp-save-flash" style="font-size:11px; color:#1a7f37; display:none;">✓</span>
@@ -169,6 +176,7 @@
                   <input type="hidden" name="hachToan" value="<%= hachToanFilter %>" />
                   <input type="hidden" name="thang" value="<%= thangFilter %>" />
                   <input type="hidden" name="hoaDon" value="<%= hoaDonFilter %>" />
+                  <input type="hidden" name="mien" value="<%= mien %>" />
                   <input type="text" name="soHoaDon" value="<%= r.soHoaDon %>" placeholder="Nhập số HĐ" style="width:80px; font-size:12px; padding:2px 4px;" />
                   <button type="submit" class="link-btn" style="font-size:11px;" title="Lưu số hóa đơn">Lưu</button>
                   <span class="cp-save-flash" style="font-size:11px; color:#1a7f37; display:none;">✓</span>
@@ -198,6 +206,7 @@
                   <input type="hidden" name="hachToan" value="<%= hachToanFilter %>" />
                   <input type="hidden" name="thang" value="<%= thangFilter %>" />
                   <input type="hidden" name="hoaDon" value="<%= hoaDonFilter %>" />
+                  <input type="hidden" name="mien" value="<%= mien %>" />
                   <input type="text" name="soTien" value="<%= r.soTien %>" placeholder="Số tiền" style="width:100px; font-size:12px; padding:2px 4px;" />
                   <button type="submit" class="link-btn" style="font-size:11px;" title="Lưu số tiền">Lưu</button>
                   <span class="cp-save-flash" style="font-size:11px; color:#1a7f37; display:none;">✓</span>
@@ -214,6 +223,7 @@
                   <input type="hidden" name="hachToan" value="<%= hachToanFilter %>" />
                   <input type="hidden" name="thang" value="<%= thangFilter %>" />
                   <input type="hidden" name="hoaDon" value="<%= hoaDonFilter %>" />
+                  <input type="hidden" name="mien" value="<%= mien %>" />
                   <input type="text" name="linkHoaDon" value="<%= r.linkHoaDon %>" placeholder="Dán link Drive" style="width:90px; font-size:11px; padding:2px 4px;" />
                   <button type="submit" class="link-btn" style="font-size:11px;" title="Lưu link hóa đơn">Lưu</button>
                   <span class="cp-save-flash" style="font-size:11px; color:#1a7f37; display:none;">✓</span>
@@ -225,6 +235,7 @@
                   <input type="hidden" name="hachToan" value="<%= hachToanFilter %>" />
                   <input type="hidden" name="thang" value="<%= thangFilter %>" />
                   <input type="hidden" name="hoaDon" value="<%= hoaDonFilter %>" />
+                  <input type="hidden" name="mien" value="<%= mien %>" />
                   <button type="submit" class="link-btn" title="Bấm để đổi trạng thái" style="font-size:16px;">
                     <%= r.daHachToan ? '☑' : '☐' %>
                   </button>

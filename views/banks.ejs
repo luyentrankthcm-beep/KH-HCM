@@ -37,6 +37,17 @@
           <input type="text" name="trung_gian_thu_ho" placeholder="VD: momo, VietQR..." />
         </div>
         <div>
+          <!-- Luyen, 2026-07-23: "chia cho tôi thành 2 trang 1 trang Miền Nam
+               và 1 trang miền Bắc ... liên kết link với ngân hàng tôi sẽ liên
+               kết sau" -- tai khoan nao gan "Miền Bắc" thi trang Chi Phí Miền
+               Bắc moi quet duoc (xem routes/chi-phi.js quet-ngan-hang). -->
+          <label>Miền (Chi Phí)</label>
+          <select name="mien">
+            <option value="nam">Miền Nam</option>
+            <option value="bac">Miền Bắc</option>
+          </select>
+        </div>
+        <div>
           <label>Số dư đầu kỳ</label>
           <input type="number" step="any" name="opening_balance" value="0" />
         </div>
@@ -55,7 +66,7 @@
       <table class="table">
         <thead>
           <tr>
-            <th>Tên</th><th>Ngân hàng</th><th>Số TK</th><th>Khu vực</th><th>Chi nhánh</th><th>Trung gian thu hộ</th><th>Số dư đầu kỳ</th><th>Số dư hiện tại</th><th></th>
+            <th>Tên</th><th>Ngân hàng</th><th>Số TK</th><th>Khu vực</th><th>Chi nhánh</th><th>Trung gian thu hộ</th><th>Miền (Chi Phí)</th><th>Số dư đầu kỳ</th><th>Số dư hiện tại</th><th></th>
           </tr>
         </thead>
         <tbody>
@@ -67,6 +78,14 @@
             <td><%= b.khu_vuc || '-' %></td>
             <td><%= b.chi_nhanh || '-' %></td>
             <td><%= b.trung_gian_thu_ho || '-' %></td>
+            <td>
+              <form method="POST" action="/banks/<%= b.id %>/mien" class="form-inline" style="gap:4px;">
+                <select name="mien" onchange="this.form.submit()">
+                  <option value="nam" <%= (b.mien || 'nam') === 'nam' ? 'selected' : '' %>>Miền Nam</option>
+                  <option value="bac" <%= b.mien === 'bac' ? 'selected' : '' %>>Miền Bắc</option>
+                </select>
+              </form>
+            </td>
             <td><%= b.opening_balance.toLocaleString('vi-VN') %> đ</td>
             <td class="<%= b.balance < 0 ? 'text-neg' : '' %>"><%= b.balance.toLocaleString('vi-VN') %> đ</td>
             <td>
@@ -77,7 +96,7 @@
           </tr>
           <% }) %>
           <% if (banks.length === 0) { %>
-          <tr><td colspan="9" class="muted">Chưa có ngân hàng nào.</td></tr>
+          <tr><td colspan="10" class="muted">Chưa có ngân hàng nào.</td></tr>
           <% } %>
         </tbody>
       </table>

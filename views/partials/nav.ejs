@@ -72,8 +72,17 @@
     <!-- Luyen, 2026-07-20: "thêm cho tôi 1 trang bên kh cũ và kh mới tên là
          Chi phí nhá" -- trang so ghi chi phi moi, khac voi "Doi soat Chi phi"
          trong dropdown Ngan hang. Tach theo cong ty qua nut Cu/Moi o topbar
-         (giong Phap danh), khong can dropdown rieng. -->
-    <a href="/chi-phi">Chi Phí</a>
+         (giong Phap danh), khong can dropdown rieng.
+         Luyen, 2026-07-23: "ở phần chi phí chia cho tôi thành 2 trang 1 trang
+         Miền Nam và 1 trang miền Bắc ... liên kết link với ngân hàng tôi sẽ
+         liên kết sau" -- tach 1 muc "Chi Phí" thanh 2 muc rieng tren thanh
+         menu (Luyen xac nhan qua AskUserQuestion), cung giao dien/nut bam
+         (xem views/chi-phi.ejs), khac o cho loc theo truong "mien" moi tren
+         moi dong Chi Phi + tai khoan ngan hang (xem routes/chi-phi.js,
+         routes/banks.js). Mien Bac bat dau trong, cho Luyen tu lien ket ngan
+         hang/nguon du lieu rieng sau. -->
+    <a href="/chi-phi/mien-nam">Chi Phí Miền Nam</a>
+    <a href="/chi-phi/mien-bac">Chi Phí Miền Bắc</a>
     <!-- Luyen, 2026-07-19: muc "Phap danh" moi -- 2 trang hop dong, hien
          dang la khung rong (bang + nut them dong) cho Luyen nhap tay, se bo
          sung them cot/truong theo yeu cau chi tiet sau. -->

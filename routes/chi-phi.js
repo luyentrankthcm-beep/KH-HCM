@@ -59,6 +59,14 @@ function ensureChiPhiDefaults(row) {
   return Object.assign(
     {
       congTy: "kh_cu",
+      // Luyen, 2026-07-23: "chia cho tôi thành 2 trang 1 trang Miền Nam và 1
+      // trang miền Bắc" -- them chieu moi "mien" ("nam"/"bac"), doc lap voi
+      // congTy (Cu/Moi). TAT CA du lieu hien co (781 dong, tu sheet "ĐI ỦY
+      // NHIỆM CHI KVC + MTĐ MN") deu la Mien Nam -- Luyen xac nhan qua
+      // AskUserQuestion ("Đúng vậy") -- nen mac dinh "nam" cho moi dong
+      // KHONG co san truong nay (du lieu cu), giong cach congTy mac dinh
+      // "kh_cu" o tren.
+      mien: "nam",
       ngay: "",
       gian: "",
       ncc: "",
@@ -79,16 +87,38 @@ function ensureChiPhiDefaults(row) {
   );
 }
 
+// "mien-nam"/"mien-bac" (doan URL) <-> "nam"/"bac" (gia tri luu trong du
+// lieu). Dung 1 regex rang buoc ngay tren route (":mien(mien-nam|mien-bac)")
+// de Express tu chan 404 neu ai go sai doan URL, khong can validate tay o
+// tung route ben duoi.
+function mienFromSeg(seg) {
+  return seg === "mien-bac" ? "bac" : "nam";
+}
+function mienSeg(mien) {
+  return mien === "bac" ? "mien-bac" : "mien-nam";
+}
+
+// Luyen, 2026-07-23: link cu "/chi-phi" (khong co doan mien) -- giu lai de
+// khong hong cac link/bookmark cu (vd "/chi-phi?thang=2026-07&hoaDon=1" da
+// dung truoc do), chuyen thang ve "/chi-phi/mien-nam" (moi du lieu cu deu la
+// Mien Nam) va giu nguyen toan bo querystring dang co.
 router.get("/chi-phi", (req, res) => {
+  const qIdx = req.originalUrl.indexOf("?");
+  const qs = qIdx >= 0 ? req.originalUrl.slice(qIdx) : "";
+  res.redirect("/chi-phi/mien-nam" + qs);
+});
+
+router.get("/chi-phi/:mien(mien-nam|mien-bac)", (req, res) => {
   const store = load();
   ensureShape(store);
   const activeCompany = getCompany(req);
+  const mien = mienFromSeg(req.params.mien);
   const hachToanFilter = req.query.hachToan || ""; // "" = tat ca, "1" = da hach toan, "0" = chua hach toan
   // Luyen, 2026-07-21: "thêm chỗ lọc chưa có số hóa đơn" -- loc theo con thieu
   // soHoaDon hay khong, giup tim nhanh cac dong con can dien so hoa don (thu
   // cong hoac tra cuu them) thay vi phai doc het danh sach.
   const hoaDonFilter = req.query.hoaDon || ""; // "" = tat ca, "1" = da co so HD, "0" = chua co so HD
-  let rows = store.chi_phi.map(ensureChiPhiDefaults).filter((r) => r.congTy === activeCompany);
+  let rows = store.chi_phi.map(ensureChiPhiDefaults).filter((r) => r.congTy === activeCompany && r.mien === mien);
   const totalForCompany = rows.length;
   const chuaHachToanCount = rows.filter((r) => !r.daHachToan).length;
   const chuaSoHoaDonCount = rows.filter((r) => !(r.soHoaDon || "").trim()).length;
@@ -112,6 +142,8 @@ router.get("/chi-phi", (req, res) => {
   const tongTien = rows.reduce((s, r) => s + (r.soTien || 0), 0);
   res.render("chi-phi", {
     userName: req.session.userName,
+    mien,
+    mienLabel: mien === "bac" ? "Miền Bắc" : "Miền Nam",
     rows,
     totalForCompany,
     chuaHachToanCount,
@@ -131,14 +163,15 @@ router.get("/chi-phi", (req, res) => {
 // Chi Nhan, 2026-07-22: "thêm chỗ xuất ra excel nhá" -- xuat danh sach DANG
 // XEM (theo cong ty + bo loc hach toan/thang/so hoa don dang chon tren man
 // hinh, giong cach lam voi trang Hop Dong Thue Gian Hang) ra file Excel.
-router.get("/chi-phi/export.xlsx", (req, res) => {
+router.get("/chi-phi/:mien(mien-nam|mien-bac)/export.xlsx", (req, res) => {
   const store = load();
   ensureShape(store);
   const activeCompany = getCompany(req);
+  const mien = mienFromSeg(req.params.mien);
   const hachToanFilter = req.query.hachToan || "";
   const hoaDonFilter = req.query.hoaDon || "";
   const thangFilter = req.query.thang !== undefined ? req.query.thang : "";
-  let rows = store.chi_phi.map(ensureChiPhiDefaults).filter((r) => r.congTy === activeCompany);
+  let rows = store.chi_phi.map(ensureChiPhiDefaults).filter((r) => r.congTy === activeCompany && r.mien === mien);
   if (hachToanFilter === "1") rows = rows.filter((r) => r.daHachToan);
   else if (hachToanFilter === "0") rows = rows.filter((r) => !r.daHachToan);
   if (thangFilter) rows = rows.filter((r) => (r.ngay || "").slice(0, 7) === thangFilter);
@@ -169,7 +202,7 @@ router.get("/chi-phi/export.xlsx", (req, res) => {
   const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
 
   res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-  res.setHeader("Content-Disposition", `attachment; filename=chi-phi-${activeCompany}.xlsx`);
+  res.setHeader("Content-Disposition", `attachment; filename=chi-phi-${activeCompany}-${req.params.mien}.xlsx`);
   res.send(buf);
 });
 
@@ -199,7 +232,7 @@ router.post("/chi-phi/:id/hach-toan", requireAdmin, (req, res) => {
   if (req.body.thang !== undefined) qs.push("thang=" + encodeURIComponent(req.body.thang));
   if (req.body.hoaDon) qs.push("hoaDon=" + encodeURIComponent(req.body.hoaDon));
   qs.push("success=" + encodeURIComponent("Đã cập nhật trạng thái hạch toán."));
-  res.redirect("/chi-phi?" + qs.join("&"));
+  res.redirect("/chi-phi/" + mienSeg(r ? r.mien : req.body.mien) + "?" + qs.join("&"));
 });
 
 // Luyen, 2026-07-21: "thêm số hóa đơn thủ công được đi" -- nhieu dong (nhat la
@@ -217,7 +250,7 @@ router.post("/chi-phi/:id/so-hoa-don", requireAdmin, (req, res) => {
     if (req.body.thang !== undefined) qs.push("thang=" + encodeURIComponent(req.body.thang));
     if (req.body.hoaDon) qs.push("hoaDon=" + encodeURIComponent(req.body.hoaDon));
     qs.push("error=" + encodeURIComponent("Không tìm thấy khoản chi này."));
-    return res.redirect("/chi-phi?" + qs.join("&"));
+    return res.redirect("/chi-phi/" + mienSeg(req.body.mien) + "?" + qs.join("&"));
   }
   r.soHoaDon = (req.body.soHoaDon || "").trim();
   // Ghi nhan la da dien tay, xoa cac ghi chu canh bao cu (vd "can mo link
@@ -244,7 +277,7 @@ router.post("/chi-phi/:id/so-hoa-don", requireAdmin, (req, res) => {
   if (req.body.thang !== undefined) qs.push("thang=" + encodeURIComponent(req.body.thang));
   if (req.body.hoaDon) qs.push("hoaDon=" + encodeURIComponent(req.body.hoaDon));
   qs.push("success=" + encodeURIComponent("Đã cập nhật số hóa đơn."));
-  res.redirect("/chi-phi?" + qs.join("&"));
+  res.redirect("/chi-phi/" + mienSeg(r.mien) + "?" + qs.join("&"));
 });
 
 // Chi Nhan (2026-07-23): "có công ty ncc mà đưa vô cho tôi nhá" -- cac dong
@@ -265,7 +298,7 @@ router.post("/chi-phi/:id/ncc", requireAdmin, (req, res) => {
     if (req.body.thang !== undefined) qs.push("thang=" + encodeURIComponent(req.body.thang));
     if (req.body.hoaDon) qs.push("hoaDon=" + encodeURIComponent(req.body.hoaDon));
     qs.push("error=" + encodeURIComponent("Không tìm thấy khoản chi này."));
-    return res.redirect("/chi-phi?" + qs.join("&"));
+    return res.redirect("/chi-phi/" + mienSeg(req.body.mien) + "?" + qs.join("&"));
   }
   r.ncc = (req.body.ncc || "").trim();
   save(store);
@@ -277,7 +310,7 @@ router.post("/chi-phi/:id/ncc", requireAdmin, (req, res) => {
   if (req.body.thang !== undefined) qs.push("thang=" + encodeURIComponent(req.body.thang));
   if (req.body.hoaDon) qs.push("hoaDon=" + encodeURIComponent(req.body.hoaDon));
   qs.push("success=" + encodeURIComponent("Đã cập nhật NCC."));
-  res.redirect("/chi-phi?" + qs.join("&"));
+  res.redirect("/chi-phi/" + mienSeg(r.mien) + "?" + qs.join("&"));
 });
 
 // Chi Nhan (2026-07-23): "số tiền có 8tr mấy mà bạn lấy lên mất tỷ dữ vậy" --
@@ -296,13 +329,13 @@ router.post("/chi-phi/:id/so-tien", requireAdmin, (req, res) => {
     if (req.body.thang !== undefined) qs.push("thang=" + encodeURIComponent(req.body.thang));
     if (req.body.hoaDon) qs.push("hoaDon=" + encodeURIComponent(req.body.hoaDon));
     qs.push("error=" + encodeURIComponent("Không tìm thấy khoản chi này."));
-    return res.redirect("/chi-phi?" + qs.join("&"));
+    return res.redirect("/chi-phi/" + mienSeg(req.body.mien) + "?" + qs.join("&"));
   }
   const parsedAmount = Math.abs(parseAmount(req.body.soTien));
   if (isNaN(parsedAmount)) {
     const msg = "Số tiền không hợp lệ.";
     if (isAjaxChiPhiRequest(req)) return res.status(400).json({ error: msg });
-    return res.redirect("/chi-phi?error=" + encodeURIComponent(msg));
+    return res.redirect("/chi-phi/" + mienSeg(r.mien) + "?error=" + encodeURIComponent(msg));
   }
   r.soTien = parsedAmount;
   // Neu dong dang co canh bao mismatch/bat thuong cu (vd tu quet-ngan-hang khi
@@ -320,7 +353,7 @@ router.post("/chi-phi/:id/so-tien", requireAdmin, (req, res) => {
   if (req.body.thang !== undefined) qs.push("thang=" + encodeURIComponent(req.body.thang));
   if (req.body.hoaDon) qs.push("hoaDon=" + encodeURIComponent(req.body.hoaDon));
   qs.push("success=" + encodeURIComponent("Đã cập nhật số tiền."));
-  res.redirect("/chi-phi?" + qs.join("&"));
+  res.redirect("/chi-phi/" + mienSeg(r.mien) + "?" + qs.join("&"));
 });
 
 // Luyen, 2026-07-22: "tìm hóa đơn qua Gmail lưu Drive rồi gán lên đây" -- can
@@ -337,7 +370,7 @@ router.post("/chi-phi/:id/link-hoa-don", requireAdmin, (req, res) => {
     if (req.body.thang !== undefined) qs.push("thang=" + encodeURIComponent(req.body.thang));
     if (req.body.hoaDon) qs.push("hoaDon=" + encodeURIComponent(req.body.hoaDon));
     qs.push("error=" + encodeURIComponent("Không tìm thấy khoản chi này."));
-    return res.redirect("/chi-phi?" + qs.join("&"));
+    return res.redirect("/chi-phi/" + mienSeg(req.body.mien) + "?" + qs.join("&"));
   }
   r.linkHoaDon = (req.body.linkHoaDon || "").trim();
   // Chi Nhan (2026-07-22): tuong tu /so-hoa-don -- neu chi XOA TRANG link (dang
@@ -355,13 +388,14 @@ router.post("/chi-phi/:id/link-hoa-don", requireAdmin, (req, res) => {
   if (req.body.thang !== undefined) qs.push("thang=" + encodeURIComponent(req.body.thang));
   if (req.body.hoaDon) qs.push("hoaDon=" + encodeURIComponent(req.body.hoaDon));
   qs.push("success=" + encodeURIComponent("Đã cập nhật link hóa đơn."));
-  res.redirect("/chi-phi?" + qs.join("&"));
+  res.redirect("/chi-phi/" + mienSeg(r.mien) + "?" + qs.join("&"));
 });
 
-router.post("/chi-phi", requireAdmin, (req, res) => {
+router.post("/chi-phi/:mien(mien-nam|mien-bac)", requireAdmin, (req, res) => {
   const store = load();
   ensureShape(store);
   const activeCompany = getCompany(req);
+  const mien = mienFromSeg(req.params.mien);
   try {
     const { ngay, gian, ncc, soHoaDon, soUNC, soChungTuLienQuan, dienGiai, loaiChiPhi, soTien, linkHoaDon, ghiChu } = req.body;
     if (!ngay) throw new Error("Thiếu ngày chi.");
@@ -370,6 +404,7 @@ router.post("/chi-phi", requireAdmin, (req, res) => {
     store.chi_phi.push({
       id: nextId(store, "chi_phi_seq") || Date.now(),
       congTy: activeCompany,
+      mien,
       ngay,
       gian: (gian || "").trim(),
       ncc: (ncc || "").trim(),
@@ -388,9 +423,9 @@ router.post("/chi-phi", requireAdmin, (req, res) => {
       createdAt: new Date().toISOString(),
     });
     save(store);
-    res.redirect("/chi-phi?success=" + encodeURIComponent("Đã lưu khoản chi."));
+    res.redirect("/chi-phi/" + req.params.mien + "?success=" + encodeURIComponent("Đã lưu khoản chi."));
   } catch (e) {
-    res.redirect("/chi-phi?error=" + encodeURIComponent(e.message));
+    res.redirect("/chi-phi/" + req.params.mien + "?error=" + encodeURIComponent(e.message));
   }
 });
 
@@ -461,6 +496,12 @@ function applyChiPhiMonthRowsToStore(store, monthRows, sourceLabel) {
       const newRow = {
         id: nextId(store, "chi_phi_seq") || Date.now(),
         congTy: r.congTy,
+        // Luyen, 2026-07-23: sheet "ĐI ỦY NHIỆM CHI KVC + MTĐ MN" (nguon duy
+        // nhat cua route upload/cap-nhat-tu-sheet nay) la du lieu Mien Nam --
+        // luon gan "nam" bat ke dang xem trang Mien Nam hay Mien Bac luc bam
+        // nut (xem router.post upload/cap-nhat-tu-sheet ben duoi, deu redirect
+        // ve /chi-phi/mien-nam sau khi xong vi du lieu moi luon nam o do).
+        mien: "nam",
         ngay: r.ngay,
         gian: r.gian,
         ncc: r.ncc,
@@ -523,9 +564,12 @@ router.post("/chi-phi/upload", requireAdmin, upload.single("file"), (req, res) =
     const result = applyChiPhiMonthRowsToStore(store, monthRows, sourceLabel);
     save(store);
     const msg = buildChiPhiResultMessage(`Đã nạp "${req.file.originalname}":`, result, skippedSheets);
-    res.redirect("/chi-phi?success=" + encodeURIComponent(msg));
+    // Sheet nay luon la du lieu Mien Nam (xem applyChiPhiMonthRowsToStore) --
+    // ve thang Mien Nam de thay ngay du lieu vua nap, bat ke dang bam nut tu
+    // trang Mien Nam hay Mien Bac.
+    res.redirect("/chi-phi/mien-nam?success=" + encodeURIComponent(msg));
   } catch (e) {
-    res.redirect("/chi-phi?error=" + encodeURIComponent(e.message));
+    res.redirect("/chi-phi/mien-nam?error=" + encodeURIComponent(e.message));
   }
 });
 
@@ -561,9 +605,9 @@ router.post("/chi-phi/cap-nhat-tu-sheet", requireAdmin, async (req, res) => {
     const result = applyChiPhiMonthRowsToStore(store, monthRows, sourceLabel);
     save(store);
     const msg = buildChiPhiResultMessage("Đã đọc thẳng từ Google Sheet:", result, skippedSheets);
-    res.redirect("/chi-phi?success=" + encodeURIComponent(msg));
+    res.redirect("/chi-phi/mien-nam?success=" + encodeURIComponent(msg));
   } catch (e) {
-    res.redirect("/chi-phi?error=" + encodeURIComponent(e.message));
+    res.redirect("/chi-phi/mien-nam?error=" + encodeURIComponent(e.message));
   }
 });
 
@@ -578,9 +622,10 @@ router.post("/chi-phi/cap-nhat-tu-sheet", requireAdmin, async (req, res) => {
 // de tranh nhoi hang loat dong ngoai pham vi dang dung). Dedup bang truong
 // rieng "bankTxId" (id giao dich nguon) luu tren moi dong Chi Phi da tao --
 // chay lai (hang ngay) se tu bo qua giao dich da xu ly, khong tao trung.
-router.post("/chi-phi/quet-ngan-hang", requireAdmin, (req, res) => {
+router.post("/chi-phi/:mien(mien-nam|mien-bac)/quet-ngan-hang", requireAdmin, (req, res) => {
   const store = load();
   ensureShape(store);
+  const mien = mienFromSeg(req.params.mien);
   try {
     const now = new Date();
     const monthPrefix = now.toISOString().slice(0, 7); // "YYYY-MM"
@@ -591,9 +636,20 @@ router.post("/chi-phi/quet-ngan-hang", requireAdmin, (req, res) => {
       store.chi_phi.filter((r) => r.bankTxId).map((r) => r.bankTxId)
     );
 
-    const chiTx = store.transactions.filter(
-      (t) => t.type === "chi" && t.date && t.date.slice(0, 7) === monthPrefix && !existingBankTxIds.has(t.id)
-    );
+    // Luyen, 2026-07-23: "chia cho tôi thành 2 trang 1 trang Miền Nam và 1
+    // trang miền Bắc ... liên kết link với ngân hàng tôi sẽ liên kết sau" --
+    // chi quet cac tai khoan ngan hang DA duoc gan dung mien nay (b.mien, xem
+    // routes/banks.js -- mac dinh "nam" cho tai khoan cu). Mien Bac hien CHUA
+    // co tai khoan nao gan "bac" nen quet o trang Mien Bac se tra ve 0 giao
+    // dich, cho toi khi Luyen tu them/gan ngan hang Mien Bac ben trang Ngan
+    // hang.
+    const chiTx = store.transactions.filter((t) => {
+      if (t.type !== "chi" || !t.date || t.date.slice(0, 7) !== monthPrefix) return false;
+      if (existingBankTxIds.has(t.id)) return false;
+      const bank = banksById[t.bank_id];
+      if (!bank) return false;
+      return (bank.mien || "nam") === mien;
+    });
 
     let added = 0;
     let flaggedSuspicious = 0;
@@ -616,6 +672,7 @@ router.post("/chi-phi/quet-ngan-hang", requireAdmin, (req, res) => {
       store.chi_phi.push({
         id: nextId(store, "chi_phi_seq") || Date.now(),
         congTy,
+        mien,
         ngay: t.date,
         gian: rec.gian,
         ncc: "",
@@ -642,7 +699,11 @@ router.post("/chi-phi/quet-ngan-hang", requireAdmin, (req, res) => {
 
     save(store);
 
-    let msg = `Đã quét ${chiTx.length} giao dịch Chi tháng ${monthPrefix} (chưa xử lý) trên tất cả tài khoản. Thêm ${added} khoản chi phí thuê gian mới.`;
+    const mienLabel = mien === "bac" ? "Miền Bắc" : "Miền Nam";
+    let msg = `Đã quét ${chiTx.length} giao dịch Chi tháng ${monthPrefix} (chưa xử lý) trên các tài khoản ${mienLabel}. Thêm ${added} khoản chi phí thuê gian mới.`;
+    if (chiTx.length === 0 && mien === "bac") {
+      msg += ` (Chưa có tài khoản ngân hàng nào gán "Miền Bắc" -- vào trang Ngân hàng để gán khi chị liên kết ngân hàng Miền Bắc.)`;
+    }
     if (flaggedSuspicious > 0) {
       msg += ` CẢNH BÁO: ${flaggedSuspicious} khoản có số tiền bất thường (>= 200 triệu) -- chị xem cột Trạng thái/ghi chú.`;
     }
@@ -651,9 +712,9 @@ router.post("/chi-phi/quet-ngan-hang", requireAdmin, (req, res) => {
         .map((u) => `${u.bank} ${u.date} ${u.amount.toLocaleString("vi-VN")}đ ("${u.gianText}")`)
         .join("; ")}.`;
     }
-    res.redirect("/chi-phi?success=" + encodeURIComponent(msg));
+    res.redirect("/chi-phi/" + mienSeg(mien) + "?success=" + encodeURIComponent(msg));
   } catch (e) {
-    res.redirect("/chi-phi?error=" + encodeURIComponent(e.message));
+    res.redirect("/chi-phi/" + mienSeg(mien) + "?error=" + encodeURIComponent(e.message));
   }
 });
 
@@ -673,10 +734,11 @@ router.post("/chi-phi/quet-ngan-hang", requireAdmin, (req, res) => {
 // tu dong bi bo qua o lan bam sau, vi luc do da co linkHoaDon).
 const GMAIL_AUTO_MAX_ROWS_PER_RUN = 25;
 
-router.post("/chi-phi/tim-hoa-don-gmail", requireAdmin, async (req, res) => {
+router.post("/chi-phi/:mien(mien-nam|mien-bac)/tim-hoa-don-gmail", requireAdmin, async (req, res) => {
   const store = load();
   ensureShape(store);
   const activeCompany = getCompany(req);
+  const mien = mienFromSeg(req.params.mien);
   try {
     if (!gmailApi.isConfigured()) {
       throw new Error(
@@ -687,7 +749,7 @@ router.post("/chi-phi/tim-hoa-don-gmail", requireAdmin, async (req, res) => {
       throw new Error("Chưa kết nối Gmail -- bấm nút \"Kết nối Gmail\" trước.");
     }
 
-    let rows = store.chi_phi.map(ensureChiPhiDefaults).filter((r) => r.congTy === activeCompany);
+    let rows = store.chi_phi.map(ensureChiPhiDefaults).filter((r) => r.congTy === activeCompany && r.mien === mien);
     const monthSet = new Set();
     rows.forEach((r) => {
       const m = (r.ngay || "").slice(0, 7);
@@ -705,6 +767,7 @@ router.post("/chi-phi/tim-hoa-don-gmail", requireAdmin, async (req, res) => {
     const candidates = store.chi_phi.filter(
       (r) =>
         r.congTy === activeCompany &&
+        (r.mien || "nam") === mien &&
         (r.ngay || "").slice(0, 7) === newestMonth &&
         !(r.linkHoaDon || "").trim() &&
         !(r.soHoaDon || "").trim()
@@ -744,9 +807,9 @@ router.post("/chi-phi/tim-hoa-don-gmail", requireAdmin, async (req, res) => {
     if (req.body.thang !== undefined) qs.push("thang=" + encodeURIComponent(req.body.thang));
     if (req.body.hoaDon) qs.push("hoaDon=" + encodeURIComponent(req.body.hoaDon));
     qs.push("success=" + encodeURIComponent(msg));
-    res.redirect("/chi-phi?" + qs.join("&"));
+    res.redirect("/chi-phi/" + mienSeg(mien) + "?" + qs.join("&"));
   } catch (e) {
-    res.redirect("/chi-phi?error=" + encodeURIComponent(e.message));
+    res.redirect("/chi-phi/" + mienSeg(mien) + "?error=" + encodeURIComponent(e.message));
   }
 });
 
