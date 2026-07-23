@@ -51,7 +51,10 @@
       <p class="muted">
         Có thể tải bảng "Tổng Momo tháng" (.xlsx/.xlsm) như trước, <strong>hoặc</strong> tải thẳng file
         <strong>.zip</strong> báo cáo tải trực tiếp từ cổng MoMo (daily_report) — web tự giải nén và gộp
-        doanh thu theo từng gian, không cần đúng định dạng cũ.
+        doanh thu theo từng gian, không cần đúng định dạng cũ. <strong>Với KH Mới:</strong> có thể tải
+        thẳng file <strong>"Transaction_report_DD_MM_YYYY.xlsx"</strong> xuất từ cổng MoMo (không cần
+        chỉnh sửa gì) — web tự nhận diện và tính phí thật theo từng giao dịch (Ví MoMo 1%, Ví trả sau
+        1.2%, còn lại 0.3%, đã gồm VAT) rồi gộp doanh thu/phí theo từng gian và từng ngày.
       </p>
       <form method="POST" action="/doi-soat/momo/upload-tong" enctype="multipart/form-data" class="form-inline">
         <input type="file" name="file" accept=".xlsx,.xlsm,.xls,.zip" required />
