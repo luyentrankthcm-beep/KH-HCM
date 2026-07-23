@@ -293,7 +293,12 @@ function mbIsMultiSiteGian(t) {
 }
 function mbCleanGianCandidate(raw) {
   if (!raw) return "";
-  const g = String(raw).trim();
+  let g = String(raw).trim();
+  // "P " don le dung dau ket qua la tan du cua cum "tiền P DTCS"/"tiền P dịch
+  // vụ" (Luyen, 2026-07-23: bam vao vi du "tt tien P DTCS PF Vinke Timecity
+  // T6.2026") -- KHONG phai 1 phan cua ten gian, bo di truoc khi kiem tra tiep.
+  g = g.replace(/^p\s+/i, "").trim();
+  if (/^(th[áa]ng)\b/i.test(g)) return ""; // bat dau bang "tháng" -- chac chan khong phai ten gian
   if (mbIsGenericOrInvalidGian(g) || mbIsMultiSiteGian(g)) return "";
   return g;
 }
@@ -325,6 +330,20 @@ const MB_GIAN_RE_AFTER_THUE = new RegExp(
   "\\bthu[eê]\\s+(?!\\d)([^\\n,.;:]+?)(?:\\s+(?:" + MB_TRAILING_STOP + ")\\b|[.,:]|\\s*$)",
   "i"
 );
+// Luyen, 2026-07-23: "bên nội dung có tiền thuê gian nào nè posh gì đó hay jp
+// gì đó hay gian long biên... quăng vô gian cho tôi" -- nhieu dong "Nội dung
+// unc" ghi loai chi phi (DTCS/thuê/điện/dịch vụ) NGAY TRUOC ten gian, THUONG
+// kem theo 1 nhan hieu chung chung (POSH/PF/JP/K&H) chen giua, vd "tt tien
+// DTCS PF Vinke Timecity T6.2026" hay "tt tien dien Posh VW Vu Yen T6.2026"
+// hay "tt tien phi dich vu Posh Aeonmall Long Bien" (khong co thang o cuoi).
+// Fallback tang 3 (sau anchor thang-token va anchor "thuê " don thuan o tren)
+// -- bo qua nhan hieu chung chung ngay sau loai chi phi, lay phan con lai.
+const MB_GIAN_RE_AFTER_LOAICHIPHI = new RegExp(
+  "\\b(?:thu[eê]|dtcs|đi[eệ]n|dien|d[iị]ch\\s*vu)\\s+(?:posh|pf|jp|k\\s*h|k&h|k\\s*va\\s*h)?\\s*([^\\n,.;:]+?)(?:\\s+(?:" +
+    MB_TRAILING_STOP +
+    ")\\b|[.,:]|\\s*$)",
+  "i"
+);
 
 function extractGianChoTai(dienGiai) {
   if (!dienGiai) return "";
@@ -333,12 +352,18 @@ function extractGianChoTai(dienGiai) {
 }
 function extractGianThueMayTuDong(dienGiai) {
   if (!dienGiai) return "";
-  let m = String(dienGiai).match(MB_GIAN_RE_AFTER_MONTHTOKEN);
+  const text = String(dienGiai);
+  let m = text.match(MB_GIAN_RE_AFTER_MONTHTOKEN);
   if (m) {
     const g = mbCleanGianCandidate(m[1]);
     if (g) return g;
   }
-  m = String(dienGiai).match(MB_GIAN_RE_AFTER_THUE);
+  m = text.match(MB_GIAN_RE_AFTER_THUE);
+  if (m) {
+    const g = mbCleanGianCandidate(m[1]);
+    if (g) return g;
+  }
+  m = text.match(MB_GIAN_RE_AFTER_LOAICHIPHI);
   return mbCleanGianCandidate(m ? m[1] : "");
 }
 
