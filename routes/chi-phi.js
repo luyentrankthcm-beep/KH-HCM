@@ -247,6 +247,39 @@ router.post("/chi-phi/:id/so-hoa-don", requireAdmin, (req, res) => {
   res.redirect("/chi-phi?" + qs.join("&"));
 });
 
+// Chi Nhan (2026-07-23): "có công ty ncc mà đưa vô cho tôi nhá" -- cac dong
+// Chi Phi tao tu dong qua "quet ngan hang" (/chi-phi/quet-ngan-hang) CHI co
+// duoc ngay/dien giai/so tien tu giao dich ngan hang -- KHONG co ten NCC
+// (thong tin nay chi co trong sheet "DI UY NHIEM CHI" goc, cot "Ten don vi
+// thu huong", khong nam trong sao ke ngan hang) nen luon bi de trong. Truoc
+// gio khong co cach dien NCC qua web -- them route sua truc tiep, cung 1
+// kieu voi so-hoa-don/link-hoa-don/so-tien o tren.
+router.post("/chi-phi/:id/ncc", requireAdmin, (req, res) => {
+  const store = load();
+  ensureShape(store);
+  const r = store.chi_phi.find((x) => String(x.id) === req.params.id);
+  if (!r) {
+    if (isAjaxChiPhiRequest(req)) return res.status(404).json({ error: "Không tìm thấy khoản chi này." });
+    const qs = [];
+    if (req.body.hachToan) qs.push("hachToan=" + encodeURIComponent(req.body.hachToan));
+    if (req.body.thang !== undefined) qs.push("thang=" + encodeURIComponent(req.body.thang));
+    if (req.body.hoaDon) qs.push("hoaDon=" + encodeURIComponent(req.body.hoaDon));
+    qs.push("error=" + encodeURIComponent("Không tìm thấy khoản chi này."));
+    return res.redirect("/chi-phi?" + qs.join("&"));
+  }
+  r.ncc = (req.body.ncc || "").trim();
+  save(store);
+  if (isAjaxChiPhiRequest(req)) {
+    return res.json({ success: true, ncc: r.ncc });
+  }
+  const qs = [];
+  if (req.body.hachToan) qs.push("hachToan=" + encodeURIComponent(req.body.hachToan));
+  if (req.body.thang !== undefined) qs.push("thang=" + encodeURIComponent(req.body.thang));
+  if (req.body.hoaDon) qs.push("hoaDon=" + encodeURIComponent(req.body.hoaDon));
+  qs.push("success=" + encodeURIComponent("Đã cập nhật NCC."));
+  res.redirect("/chi-phi?" + qs.join("&"));
+});
+
 // Chi Nhan (2026-07-23): "số tiền có 8tr mấy mà bạn lấy lên mất tỷ dữ vậy" --
 // dong Chi Phi tao tu dong qua "quet ngan hang" lay dung so tien cua giao
 // dich ngan hang goc (co the bi nhap sai tu luc nhap giao dich); truoc gio

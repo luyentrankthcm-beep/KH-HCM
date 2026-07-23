@@ -135,7 +135,27 @@
             <tr class="cp-row" id="cp-<%= r.id %>" data-search="<%= (r.gian + ' ' + r.ncc + ' ' + r.soHoaDon + ' ' + r.soUNC + ' ' + r.soChungTuLienQuan + ' ' + r.dienGiai + ' ' + r.loaiChiPhi).toLowerCase().replace(/\"/g,'&quot;') %>">
               <td><%= r.ngay %></td>
               <td><%= r.gian %></td>
-              <td><%= r.ncc %></td>
+              <td>
+                <!-- Chi Nhan (2026-07-23): "có công ty ncc mà đưa vô cho tôi nhá" --
+                     dong tao tu "quet ngan hang" khong co san NCC (chi co trong sheet
+                     UNC goc, khong co trong sao ke ngan hang) -- them kha nang dien/sua
+                     NCC, cung 1 kieu voi Số hóa đơn/Link hóa đơn/Số tiền o tren. -->
+                <span class="cp-ncc-locked" id="nccLocked-<%= r.id %>" style="<%= r.ncc ? '' : 'display:none;' %>">
+                  <%= r.ncc %>
+                  <button type="button" class="link-btn" style="font-size:10px;" onclick="cpUnlock('<%= r.id %>','ncc')">Sửa</button>
+                </span>
+                <% if (!r.ncc) { %>
+                <button type="button" class="link-btn" style="font-size:11px;" id="nccAddBtn-<%= r.id %>" onclick="cpUnlock('<%= r.id %>','ncc')">+ Thêm NCC</button>
+                <% } %>
+                <form method="POST" action="/chi-phi/<%= r.id %>/ncc" class="form-inline cp-ajax-form" data-kind="ncc" id="nccForm-<%= r.id %>" style="gap:4px; display:none;">
+                  <input type="hidden" name="hachToan" value="<%= hachToanFilter %>" />
+                  <input type="hidden" name="thang" value="<%= thangFilter %>" />
+                  <input type="hidden" name="hoaDon" value="<%= hoaDonFilter %>" />
+                  <input type="text" name="ncc" value="<%= r.ncc %>" placeholder="Tên NCC" style="width:140px; font-size:12px; padding:2px 4px;" />
+                  <button type="submit" class="link-btn" style="font-size:11px;" title="Lưu NCC">Lưu</button>
+                  <span class="cp-save-flash" style="font-size:11px; color:#1a7f37; display:none;">✓</span>
+                </form>
+              </td>
               <td>
                 <!-- Chi Nhan (2026-07-22): "có số hóa đơn rồi thì khóa lun không cần
                      cho phép chỉnh sửa đâu" -- dong da co soHoaDon mac dinh KHOA (chi
@@ -279,6 +299,17 @@
             var input3 = soTienFormEl.querySelector('input[name="soTien"]');
             if (input3) { input3.focus(); input3.select(); }
           }
+        } else if (kind === 'ncc') {
+          var nccLockedEl = document.getElementById('nccLocked-' + rowId);
+          var nccAddBtn = document.getElementById('nccAddBtn-' + rowId);
+          var nccFormEl = document.getElementById('nccForm-' + rowId);
+          if (nccLockedEl) nccLockedEl.style.display = 'none';
+          if (nccAddBtn) nccAddBtn.style.display = 'none';
+          if (nccFormEl) {
+            nccFormEl.style.display = '';
+            var input4 = nccFormEl.querySelector('input[name="ncc"]');
+            if (input4) { input4.focus(); input4.select(); }
+          }
         }
       };
       function render() {
@@ -380,6 +411,16 @@
                   soTienLockedEl2.style.display = '';
                   form.style.display = 'none';
                 }
+              } else if (kind === 'ncc') {
+                var nccLockedEl2 = document.getElementById('nccLocked-' + rowId);
+                var nccAddBtn2 = document.getElementById('nccAddBtn-' + rowId);
+                if (nccLockedEl2 && data.ncc !== undefined) {
+                  nccLockedEl2.innerHTML = data.ncc +
+                    ' <button type="button" class="link-btn" style="font-size:10px;" onclick="cpUnlock(\'' + rowId + '\',\'ncc\')">Sửa</button>';
+                  nccLockedEl2.style.display = data.ncc ? '' : 'none';
+                }
+                if (nccAddBtn2) nccAddBtn2.style.display = data.ncc ? 'none' : '';
+                if (data.ncc) form.style.display = 'none';
               }
               showFlash(form);
             })
