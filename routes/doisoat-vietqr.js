@@ -1528,59 +1528,75 @@ router.get("/doi-soat/vietqr/xuat-hoa-don-dau-ra", (req, res) => {
   ensureChannelShape(store);
   const channelKey = req.query.channel;
   if (!CHANNELS[channelKey]) return res.status(400).send("Kênh không hợp lệ.");
-  const date = (req.query.date || "").trim();
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return res.status(400).send("Thiếu hoặc sai định dạng ngày cần xuất (YYYY-MM-DD).");
+  // Luyen, 2026-07-23 (lan 3): "cho cái lọc đi từ ngày mấy tới ngày mấy á" --
+  // thay vi 1 thang co dinh (lan 2) hay 1 ngay don le (lan 1), cho chon 1
+  // khoang ngay tuy y (tu ngay - den ngay, ca 2 dau bao gom) -- xuat HET cac
+  // ngay doi soat nam trong khoang do, lien tuc STT qua nhieu ngay.
+  const fromDate = (req.query.from || "").trim();
+  const toDate = (req.query.to || "").trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(fromDate) || !/^\d{4}-\d{2}-\d{2}$/.test(toDate)) {
+    return res.status(400).send("Thiếu hoặc sai định dạng ngày (YYYY-MM-DD) -- chọn đủ Từ ngày và Đến ngày trước.");
+  }
+  if (fromDate > toDate) {
+    return res.status(400).send("Từ ngày phải nhỏ hơn hoặc bằng Đến ngày.");
+  }
   let startNo = parseInt(req.query.start || "1", 10);
   if (isNaN(startNo) || startNo < 1) startNo = 1;
 
   const built = buildChannelReconciliation(store, channelKey);
   if (built.error) return res.status(400).send(built.error);
 
-  const day = (built.reconciled || []).find((r) => r.settlementDate === date);
-  if (!day) return res.status(400).send(`Không có dữ liệu đối soát ngày ${date} cho kênh này.`);
+  const days = (built.reconciled || [])
+    .filter((r) => r.settlementDate >= fromDate && r.settlementDate <= toDate)
+    .sort((a, b) => (a.settlementDate > b.settlementDate ? 1 : -1));
+  if (days.length === 0) {
+    return res.status(400).send(`Không có dữ liệu đối soát từ ${fromDate} đến ${toDate} cho kênh này.`);
+  }
 
-  const ngayHoaDon = isoToDmy(date);
   const dataRows = [];
   let seq = startNo;
-  day.lines
-    .filter((l) => l.tkCo !== "SKIP" && Math.round(l.gross) !== 0)
-    .forEach((l) => {
-      const grossTotal = Math.round(l.gross);
-      const thanhTien = Math.round(grossTotal / (1 + HOA_DON_DAU_RA_VAT_RATE));
-      const tienThueGtgt = grossTotal - thanhTien;
-      dataRows.push([
-        seq,
-        ngayHoaDon,
-        "Bán cho người tiêu dùng ",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "TM/CK",
-        "VND",
-        "",
-        "",
-        "",
-        "8",
-        tienThueGtgt,
-        "Dịch vụ vui chơi giải trí",
-        "",
-        "Kỳ ",
-        "1",
-        thanhTien,
-        "",
-        "",
-        thanhTien,
-      ]);
-      seq++;
-    });
+  days.forEach((day) => {
+    const ngayHoaDon = isoToDmy(day.settlementDate);
+    day.lines
+      .filter((l) => l.tkCo !== "SKIP" && Math.round(l.gross) !== 0)
+      .forEach((l) => {
+        const grossTotal = Math.round(l.gross);
+        const thanhTien = Math.round(grossTotal / (1 + HOA_DON_DAU_RA_VAT_RATE));
+        const tienThueGtgt = grossTotal - thanhTien;
+        dataRows.push([
+          seq,
+          ngayHoaDon,
+          "Bán cho người tiêu dùng ",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "TM/CK",
+          "VND",
+          "",
+          "",
+          "",
+          "8",
+          tienThueGtgt,
+          "Dịch vụ vui chơi giải trí",
+          "",
+          "Kỳ ",
+          "1",
+          thanhTien,
+          "",
+          "",
+          thanhTien,
+        ]);
+        seq++;
+      });
+  });
 
   if (dataRows.length === 0) {
-    return res.status(400).send(`Ngày ${date} không có gian nào có doanh thu (khác 0) để xuất hóa đơn.`);
+    return res.status(400).send(`Từ ${fromDate} đến ${toDate} không có gian nào có doanh thu (khác 0) để xuất hóa đơn.`);
   }
 
   const aoa = [...HOA_DON_DAU_RA_HEADER_INFO, HOA_DON_DAU_RA_HEADER_ROW, ...dataRows];
@@ -1589,7 +1605,7 @@ router.get("/doi-soat/vietqr/xuat-hoa-don-dau-ra", (req, res) => {
   XLSX.utils.book_append_sheet(wb2, ws, "Hóa đơn");
   const buf = XLSX.write(wb2, { type: "buffer", bookType: "xlsx" });
   res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-  res.setHeader("Content-Disposition", `attachment; filename=HoaDonDauRa-${channelKey}-${date}.xlsx`);
+  res.setHeader("Content-Disposition", `attachment; filename=HoaDonDauRa-${channelKey}-${fromDate}_${toDate}.xlsx`);
   res.send(buf);
 });
 
