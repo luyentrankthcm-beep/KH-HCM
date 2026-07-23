@@ -1,4 +1,5 @@
 const XLSX = require("xlsx");
+const { parseAmount } = require("./parse");
 
 // Parser cho file Google Sheet "ĐI ỦY NHIỆM CHI KVC + MTĐ MN" (nguồn dữ liệu
 // cho trang /chi-phi). Luyen, 2026-07-21: "thêm nút cập nhật chi phí" -- truoc
@@ -264,6 +265,83 @@ function findMbHeaderRow(grid) {
   return null;
 }
 
+// Luyen, 2026-07-23: "cái này dựa vào diễn giải lấy ra cái gian được mà có
+// ghi đó" -- tu dong tach ten gian tu dien giai khi cot "gian hàng" rieng
+// (neu co) dang trong, dung chung cho ca 2 nguon Mien Bac (sheet UNC KVC MB
+// thu cong + sheet MTĐ MB "máy tự động"). Da test bang du lieu that (589 +
+// 1283 dong dien giai) truoc khi dua vao code -- ty le trich duoc: ~25% file
+// UNC KVC MB (anchor "cho "/"tại "), ~65% file MTĐ MB (anchor sau token
+// thang "T11.2025 Ten Gian" hoac sau "thuê "/"thue "). Nguyen tac AN TOAN
+// giong het extractGianFromDienGiai() cua file Mien Nam o tren: CHI tach khi
+// co anchor dang tin cay, khop nhieu gian cung dong (noi boi "va"/"+"/",")
+// hoac nhan chung chung (posh/JP/K&H/...) deu BO QUA (de trong) thay vi doan
+// sai.
+const MB_GENERIC_GIAN_LABELS = new Set([
+  "", "x", "z", "cty", "cong ty", "kho", "van phong", "vp",
+  "co so", "cac co so", "posh", "jp", "posh+jp", "jp+posh",
+  "k h", "k&h", "k va h", "kvah",
+]);
+function mbIsGenericOrInvalidGian(t) {
+  const n = removeDiacritics(t || "").toLowerCase().replace(/\s+/g, " ").trim();
+  if (!n || MB_GENERIC_GIAN_LABELS.has(n)) return true;
+  if (/^t\d{1,2}$/.test(n)) return true; // con sot lai 1 token thang don le (vd "T11"), khong phai ten gian
+  return false;
+}
+function mbIsMultiSiteGian(t) {
+  const n = removeDiacritics(t || "").toLowerCase();
+  return / va | \+ |,/.test(" " + n + " ");
+}
+function mbCleanGianCandidate(raw) {
+  if (!raw) return "";
+  const g = String(raw).trim();
+  if (mbIsGenericOrInvalidGian(g) || mbIsMultiSiteGian(g)) return "";
+  return g;
+}
+
+// Doan chu (thang/ngay/so HD/...) hay xuat hien NGAY SAU ten gian trong dien
+// giai -- dung lam DIEM DUNG khi cat ten gian ra (nam TRONG lookahead, KHONG
+// nam trong capture group, tranh dinh kem "thang 11"/"T11.2025" vao cuoi ten).
+const MB_TRAILING_STOP =
+  "th[áa]ng\\s*\\d+|ng[àa]y\\s*\\d{1,2}|hết\\s+th[áa]ng|\\d{1,2}\\/\\d{1,2}(?:\\/\\d{2,4})?|t\\d{1,2}[.\\/]\\d{1,4}|t\\d{1,2}\\b|hd\\b|hđ\\b|lan\\s*\\d";
+
+// Anchor "cho "/"tại " -- file UNC KVC MB (vd "Thanh toán đơn kem cho nhà
+// tuyết royal 8/7"). CHI dung "tại" CO DAU (khong dung "tai" khong dau -- da
+// phat hien qua test that: "tai" khong dau khop NHAM vao trong tu "tai nạn").
+// Loai truong hop "cho de/để..." (thuc ra la "chỗ để xe...", khong phai gioi
+// tu "cho" + dia diem).
+const MB_GIAN_RE_CHO_TAI = new RegExp(
+  "\\b(?:cho|tại)\\s+(?!(?:de|để)\\b)([^\\n,.;:]+?)(?:\\s+(?:" + MB_TRAILING_STOP + ")\\b|[.,:]|\\s*$)",
+  "i"
+);
+// File MTĐ MB "máy tự động": uu tien anchor "T<thang>.<nam> " + ten gian
+// NGAY SAU (vd "tt tien thue T11.2025 Lotte Da Nang" -- chinh xac hon vi ten
+// gian luon la cum tu CUOI CUNG trong cau); fallback anchor "thuê "/"thue " +
+// ten gian (vd "tt tien thue Go Ha Long 1CL1 thang 11.2025").
+const MB_GIAN_RE_AFTER_MONTHTOKEN = new RegExp(
+  "\\bt\\d{1,2}[.\\/]\\d{1,4}\\s+([^\\n,.;:]+?)(?:\\s+(?:hd\\b|hđ\\b|lan\\s*\\d)\\b|[.,:]|\\s*$)",
+  "i"
+);
+const MB_GIAN_RE_AFTER_THUE = new RegExp(
+  "\\bthu[eê]\\s+(?!\\d)([^\\n,.;:]+?)(?:\\s+(?:" + MB_TRAILING_STOP + ")\\b|[.,:]|\\s*$)",
+  "i"
+);
+
+function extractGianChoTai(dienGiai) {
+  if (!dienGiai) return "";
+  const m = String(dienGiai).match(MB_GIAN_RE_CHO_TAI);
+  return mbCleanGianCandidate(m ? m[1] : "");
+}
+function extractGianThueMayTuDong(dienGiai) {
+  if (!dienGiai) return "";
+  let m = String(dienGiai).match(MB_GIAN_RE_AFTER_MONTHTOKEN);
+  if (m) {
+    const g = mbCleanGianCandidate(m[1]);
+    if (g) return g;
+  }
+  m = String(dienGiai).match(MB_GIAN_RE_AFTER_THUE);
+  return mbCleanGianCandidate(m ? m[1] : "");
+}
+
 function mbParseDateCell(v) {
   if (v === null || v === undefined || v === "") return null;
   if (typeof v === "number") return excelSerialToIso(v);
@@ -305,7 +383,8 @@ function parseKvcMienBacWorkbook(buffer) {
       const uncText = found.unc !== undefined ? cellText(row[found.unc]) : "";
       const dienGiai = deXuatText || uncText;
       const ncc = found.thuHuong !== undefined ? cellText(row[found.thuHuong]) : "";
-      const gian = found.gianHang !== undefined ? cellText(row[found.gianHang]) : "";
+      const gianRaw = found.gianHang !== undefined ? cellText(row[found.gianHang]) : "";
+      const gian = gianRaw || extractGianChoTai(dienGiai);
       const congTyNote = found.ghiChuCongTy !== undefined ? row[found.ghiChuCongTy] : "";
       const congTy = normCongTy(congTyNote);
       if (!congTy) {
@@ -322,9 +401,93 @@ function parseKvcMienBacWorkbook(buffer) {
   return { sheetName, rows, unclassifiedCount };
 }
 
+// ---------- Parser cho file "MÁY TỰ ĐỘNG" (TẠO LỆNH UNC MTĐ MB 2025.xlsx) ----------
+// Luyen, 2026-07-23: nguon THU 2 cho Chi Phi Mien Bac (bo sung file UNC KVC MB
+// thu cong o tren) -- "đây là của máy tự động" -- tuong duong file MTĐ MN cua
+// Mien Nam ve VAI TRO (nguon xuat tu dong), nhung cau truc cot HOAN TOAN khac
+// (khong tach theo "Tháng N.YYYY", 1 sheet du lieu lien tuc ten "MTĐ" + 1 sheet
+// tra cuu "site code" rieng -- sheet site code CHUA dung toi, chi de tham
+// khao). Cot: "Ngày xin payment"/"Ngày đi tiền" (uu tien cot dau), "Nội dung
+// unc" (dien giai + nguon trich gian), "Số tiền" (dang CHUOI co dau phay vd
+// "3,465,000" -- dung parseAmount, KHONG phai so thuan nhu file UNC KVC MB),
+// "Tên công ty" (NCC). Cong ty (KH Cu/Moi) CUNG nam trong 1 cot ghi chu KHONG
+// CO TIEU DE (chi co khoang trang) ngay sau cot "Ngân hàng" -- vi la file XUAT
+// TU DONG (khong phai Luyen tu go tay), vi tri cot on dinh hon nhieu so voi
+// file thu cong, nen xac dinh QUA VI TRI (ngay sau cot "Ngân hàng" tim duoc)
+// thay vi qua ten cot (khong the tim theo ten vi khong co tieu de).
+function findMtdAutoHeaderRow(grid) {
+  for (let r = 0; r < Math.min(grid.length, 8); r++) {
+    const row = grid[r] || [];
+    const idx = {};
+    row.forEach((cell, c) => {
+      if (cell === null || cell === undefined || typeof cell !== "string") return;
+      const h = mbNormHeader(cell);
+      if (idx.ngayXinPayment === undefined && h.includes("ngay xin payment")) idx.ngayXinPayment = c;
+      if (idx.ngayDiTien === undefined && h.includes("ngay di tien")) idx.ngayDiTien = c;
+      if (idx.noiDungUnc === undefined && h.includes("noi dung unc")) idx.noiDungUnc = c;
+      if (idx.noiDungPm === undefined && h.includes("noi dung pm")) idx.noiDungPm = c;
+      if (idx.soTien === undefined && h === "so tien") idx.soTien = c;
+      if (idx.tenCongTy === undefined && h.includes("ten cong ty")) idx.tenCongTy = c;
+      if (idx.nganHang === undefined && h === "ngan hang") idx.nganHang = c;
+    });
+    if (idx.noiDungUnc !== undefined && idx.soTien !== undefined && idx.tenCongTy !== undefined && idx.nganHang !== undefined) {
+      // Cot ghi chu KH Cu/Moi nam NGAY SAU cot "Ngân hàng" (da kiem chung tren
+      // file that Luyen gui, 2026-07-23) -- khong co tieu de rieng nen phai
+      // suy ra qua vi tri nay.
+      idx.ghiChuCongTy = idx.nganHang + 1;
+      return { headerRowIdx: r, ...idx };
+    }
+  }
+  return null;
+}
+
+function parseKvcMienBacAutoWorkbook(buffer) {
+  const wb = XLSX.read(buffer, { type: "buffer" });
+  let sheetName = null;
+  let rows = [];
+  let unclassifiedCount = 0;
+
+  for (const sn of wb.SheetNames) {
+    const ws = wb.Sheets[sn];
+    const grid = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: null });
+    const found = findMtdAutoHeaderRow(grid);
+    if (!found) continue;
+    sheetName = sn;
+    for (let r = found.headerRowIdx + 1; r < grid.length; r++) {
+      const row = grid[r] || [];
+      const soTienRaw = row[found.soTien];
+      const soTien = typeof soTienRaw === "number" ? soTienRaw : parseAmount(soTienRaw);
+      if (!soTien || isNaN(soTien) || soTien <= 0) continue; // dong trong/tieu de phu/tong nhom
+
+      const ngay =
+        mbParseDateCell(row[found.ngayXinPayment]) || mbParseDateCell(row[found.ngayDiTien]);
+      if (!ngay) continue;
+
+      const uncText = cellText(row[found.noiDungUnc]);
+      const pmText = found.noiDungPm !== undefined ? cellText(row[found.noiDungPm]) : "";
+      const dienGiai = uncText || pmText;
+      const ncc = cellText(row[found.tenCongTy]);
+      const gian = extractGianThueMayTuDong(dienGiai);
+      const congTyNote = row[found.ghiChuCongTy];
+      const congTy = normCongTy(congTyNote);
+      if (!congTy) {
+        unclassifiedCount++;
+        continue; // khong doan mo hinh KH Cu/Moi -- bo qua, khong nhap sai cong ty
+      }
+      const soHoaDon = extractSoHoaDon(uncText) || extractSoHoaDon(pmText);
+
+      rows.push({ congTy, ngay, gian, ncc, soHoaDon, soUNC: "", dienGiai, soTien });
+    }
+    break; // chi lay sheet DAU TIEN khop chu ky (sheet "MTĐ" -- sheet "site code" khong khop nen tu bo qua)
+  }
+
+  return { sheetName, rows, unclassifiedCount };
+}
+
 module.exports = {
   parseChiPhiSheetWorkbook,
   parseKvcMienBacWorkbook,
+  parseKvcMienBacAutoWorkbook,
   extractDate,
   extractSoHoaDon,
   normCongTy,

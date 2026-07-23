@@ -4,7 +4,11 @@ const XLSX = require("xlsx");
 const { load, save, nextId } = require("../store");
 const { requireLogin, requireAdmin } = require("../middleware/auth");
 const { getCompany } = require("../utils/companies");
-const { parseChiPhiSheetWorkbook, parseKvcMienBacWorkbook } = require("../utils/chiPhiSheetParser");
+const {
+  parseChiPhiSheetWorkbook,
+  parseKvcMienBacWorkbook,
+  parseKvcMienBacAutoWorkbook,
+} = require("../utils/chiPhiSheetParser");
 const { extractGianRentText, matchGianRecord } = require("../utils/rentPaymentMatcher");
 const gmailApi = require("../utils/gmailApi");
 const gmailInvoiceMatcher = require("../utils/gmailInvoiceMatcher");
@@ -603,14 +607,20 @@ const CHI_PHI_SHEET_XLSX_URL =
   process.env.CHI_PHI_SHEET_XLSX_URL ||
   "https://docs.google.com/spreadsheets/d/17PdHu2ji8y1sO1KK6H-BOJTXhsbcSziEG9hHRd9-iL0/export?format=xlsx";
 
-// Luyen, 2026-07-23: nguon rieng cho Mien Bac -- file "Tạo lệnh UNC KVC MB"
-// (Luyen: "link này là mảng kvc miền bắc có cột kh cũ kh mới"). Dung
-// parseKvcMienBacWorkbook (utils/chiPhiSheetParser.js) -- KHAC parser voi
-// Mien Nam vi cau truc sheet hoan toan khac (1 tab lien tuc, khong tach theo
-// ten sheet thang, cong ty nam trong cot ghi chu chu khong phai cot rieng).
+// Luyen, 2026-07-23: 2 nguon rieng cho Mien Bac -- (1) file "Tạo lệnh UNC KVC
+// MB" (Luyen: "link này là mảng kvc miền bắc có cột kh cũ kh mới", nhap tay,
+// 1 tab lien tuc), (2) file "TẠO LỆNH UNC MTĐ MB 2025" (Luyen: "đây là của
+// máy tự động ... chia ra cho tôi 2 miền kh mới cũ gian tên nhà cung cấp hay
+// các tiền thuê hay số hóa đơn giống như cách lấy của miền nam nhá" -- nguon
+// xuat tu dong, tuong duong vai tro voi file MTĐ MN cua Mien Nam nhung cau
+// truc cot khac han). Ca 2 deu doc va gop chung 1 lan bam "Cập nhật chi phí"
+// (giong Mien Nam gop nhieu sheet "Tháng N.YYYY" trong 1 file).
 const KVC_MB_SHEET_XLSX_URL =
   process.env.KVC_MB_SHEET_XLSX_URL ||
   "https://docs.google.com/spreadsheets/d/12QOccXdRPnhb3JmRXUfdbszHioMaumsz/export?format=xlsx";
+const MTD_MB_AUTO_SHEET_XLSX_URL =
+  process.env.MTD_MB_AUTO_SHEET_XLSX_URL ||
+  "https://docs.google.com/spreadsheets/d/132gDgtxG_3X-WlkS4LLksLsuYd_7YRYNeUQoflsy2Ic/export?format=xlsx";
 
 router.post("/chi-phi/:mien(mien-nam|mien-bac)/cap-nhat-tu-sheet", requireAdmin, async (req, res) => {
   const store = load();
@@ -637,28 +647,55 @@ router.post("/chi-phi/:mien(mien-nam|mien-bac)/cap-nhat-tu-sheet", requireAdmin,
       const msg = buildChiPhiResultMessage("Đã đọc thẳng từ Google Sheet:", result, skippedSheets);
       res.redirect("/chi-phi/mien-nam?success=" + encodeURIComponent(msg));
     } else {
-      const resp = await fetch(KVC_MB_SHEET_XLSX_URL);
-      if (!resp.ok) {
+      const monthRows = [];
+      let totalUnclassified = 0;
+      const partLabels = [];
+
+      const [respManual, respAuto] = await Promise.all([
+        fetch(KVC_MB_SHEET_XLSX_URL),
+        fetch(MTD_MB_AUTO_SHEET_XLSX_URL),
+      ]);
+      if (!respManual.ok && !respAuto.ok) {
         throw new Error(
-          `Không đọc được Google Sheet KVC Miền Bắc (mã lỗi ${resp.status}). Kiểm tra lại sheet đã chia sẻ "Bất kỳ ai có link đều xem được" chưa, hoặc link có bị đổi không.`
+          `Không đọc được cả 2 Google Sheet Miền Bắc (mã lỗi ${respManual.status}/${respAuto.status}). Kiểm tra lại đã chia sẻ "Bất kỳ ai có link đều xem được" chưa, hoặc link có bị đổi không.`
         );
       }
-      const buf = Buffer.from(await resp.arrayBuffer());
-      const { sheetName, rows, unclassifiedCount } = parseKvcMienBacWorkbook(buf);
-      if (!sheetName) {
+      if (respManual.ok) {
+        const buf = Buffer.from(await respManual.arrayBuffer());
+        const { sheetName, rows, unclassifiedCount } = parseKvcMienBacWorkbook(buf);
+        if (sheetName) {
+          monthRows.push({ sheetName: `UNC KVC MB (${sheetName})`, rows });
+          totalUnclassified += unclassifiedCount;
+          partLabels.push(`UNC KVC MB: +${rows.length}`);
+        }
+      }
+      if (respAuto.ok) {
+        const buf = Buffer.from(await respAuto.arrayBuffer());
+        const { sheetName, rows, unclassifiedCount } = parseKvcMienBacAutoWorkbook(buf);
+        if (sheetName) {
+          monthRows.push({ sheetName: `MTĐ MB tự động (${sheetName})`, rows });
+          totalUnclassified += unclassifiedCount;
+          partLabels.push(`MTĐ MB tự động: +${rows.length}`);
+        }
+      }
+      if (monthRows.length === 0) {
         throw new Error(
-          `Không tìm thấy tab nào khớp đúng cấu trúc "gian hàng/Số tiền/Tên đơn vị thụ hưởng/note rõ" trong Google Sheet KVC Miền Bắc.`
+          `Không tìm thấy tab nào khớp đúng cấu trúc mong đợi trong cả 2 Google Sheet Miền Bắc (kiểm tra lại tên cột chưa bị đổi).`
         );
       }
-      const sourceLabel = "GG Sheet KVC MB " + new Date().toISOString().slice(0, 10);
-      const result = applyChiPhiMonthRowsToStore(store, [{ sheetName, rows }], sourceLabel, "bac");
+
+      const sourceLabel = "GG Sheet Mien Bac " + new Date().toISOString().slice(0, 10);
+      const result = applyChiPhiMonthRowsToStore(store, monthRows, sourceLabel, "bac");
       save(store);
-      let msg = `Đã đọc thẳng từ Google Sheet KVC Miền Bắc (tab "${sheetName}"): thêm ${result.added} khoản chi mới.`;
+      let msg = `Đã đọc thẳng từ Google Sheet Miền Bắc (${partLabels.join(", ")} dòng khớp cấu trúc): thêm ${result.added} khoản chi mới.`;
       if (result.addedNoGian > 0) {
-        msg += ` ${result.addedNoGian} dòng không có sẵn Gian (cột "gian hàng" hầu như luôn trống trong sheet này) -- cần chị tự điền tay.`;
+        msg += ` ${result.addedNoGian} dòng không tự xác định được Gian -- cần chị tự điền tay.`;
       }
-      if (unclassifiedCount > 0) {
-        msg += ` CẢNH BÁO: bỏ qua ${unclassifiedCount} dòng không xác định được KH Cũ/Mới (cột ghi chú ngân hàng trống hoặc không rõ) -- không tự đoán để tránh gán sai công ty.`;
+      if (totalUnclassified > 0) {
+        msg += ` CẢNH BÁO: bỏ qua ${totalUnclassified} dòng không xác định được KH Cũ/Mới -- không tự đoán để tránh gán sai công ty.`;
+      }
+      if (!respManual.ok || !respAuto.ok) {
+        msg += ` (Lưu ý: chỉ đọc được 1/2 sheet lần này -- sheet ${!respManual.ok ? "UNC KVC MB" : "MTĐ MB tự động"} lỗi mã ${!respManual.ok ? respManual.status : respAuto.status}.)`;
       }
       res.redirect("/chi-phi/mien-bac?success=" + encodeURIComponent(msg));
     }
