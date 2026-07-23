@@ -81,6 +81,21 @@ function ensureThueDefaults(row) {
       // gian nay (khac voi kieu thu tien truc tiep qua VietQR/POS cong ty
       // binh thuong) de Luyen doi chieu ky hon khi nhan tien cuoi thang.
       hinhThucThuTien: "",
+      // Luyen, 2026-07-23: "có tàu bình tân với nhà ma bình dương hay ghost
+      // bình dương cũng là doanh thu chia sẻ, cho thêm thủ công cũng được" --
+      // khong phai gian doanh thu chia se nao cung tu doan duoc tu van ban
+      // hop dong (dieuKhoanThanhToan/hinhThucThuTien o tren) -- them 1 co tich
+      // chon TAY de Luyen tu danh dau bat ky gian nao la doanh thu chia se,
+      // dung cho ca cot Tai Khoan (131/1388) ben trang Chi Phi (xem
+      // isDoanhThuChiaSeRecord trong utils/rentPaymentMatcher.js).
+      doanhThuChiaSe: false,
+      // Luyen, 2026-07-23 (lan 2): "có thể viết tắc á" -- ten gian ben Chi Phi
+      // thuong la ma viet tat rieng cua Luyen (vd "TÀU BT", "GHOST AMBD") ma
+      // khac han ten day du trong hop dong nay nen he thong khong tu khop
+      // duoc -- them truong nay de Luyen TU DIEN cac ma viet tat (cach nhau
+      // boi dau phay) cho tung hop dong, dung khop CHINH XAC ben Chi Phi
+      // (xem findContractForGianText trong utils/rentPaymentMatcher.js).
+      aliasGian: "",
     },
     row
   );
@@ -279,6 +294,42 @@ router.post("/phap-danh/hop-dong-thue-gian-hang/:id/delete", requireAdmin, (req,
   store.phap_danh_hop_dong_thue = store.phap_danh_hop_dong_thue.filter((r) => String(r.id) !== req.params.id);
   save(store);
   res.redirect("/phap-danh/hop-dong-thue-gian-hang?success=" + encodeURIComponent("Đã xóa hợp đồng."));
+});
+
+// Luyen, 2026-07-23: "có tàu bình tân với nhà ma bình dương hay ghost bình
+// dương cũng là doanh thu chia sẻ ... cho thêm thủ công cũng được" -- tich
+// chon tay 1 gian la "doanh thu chia se" (dung cho cot Tai Khoan 131/1388 ben
+// trang Chi Phi), khong phu thuoc vao viec dieu khoan hop dong co ghi ro hay
+// khong. Giu nguyen loai/thang filter dang xem khi redirect ve.
+function redirectBackToThueGianList(req, res, extra) {
+  const qs = [];
+  if (req.body.loai) qs.push("loai=" + encodeURIComponent(req.body.loai));
+  if (req.body.thang) qs.push("thang=" + encodeURIComponent(req.body.thang));
+  Object.entries(extra || {}).forEach(([k, v]) => qs.push(k + "=" + encodeURIComponent(v)));
+  res.redirect("/phap-danh/hop-dong-thue-gian-hang" + (qs.length ? "?" + qs.join("&") : ""));
+}
+
+router.post("/phap-danh/hop-dong-thue-gian-hang/:id/doanh-thu-chia-se", requireAdmin, (req, res) => {
+  const store = load();
+  ensureShape(store);
+  const r = store.phap_danh_hop_dong_thue.find((x) => String(x.id) === req.params.id);
+  if (!r) return redirectBackToThueGianList(req, res, { error: "Không tìm thấy gian này." });
+  r.doanhThuChiaSe = req.body.doanhThuChiaSe === "1";
+  save(store);
+  redirectBackToThueGianList(req, res, { success: "Đã cập nhật doanh thu chia sẻ." });
+});
+
+// Luyen, 2026-07-23 (lan 2): "có thể viết tắc á" -- cho Luyen tu dien cac ma
+// viet tat (vd "TAU BT, TÀU BT") de Chi Phi khop CHINH XAC gian ma khong doan
+// nham (xem findContractForGianText trong utils/rentPaymentMatcher.js).
+router.post("/phap-danh/hop-dong-thue-gian-hang/:id/alias-gian", requireAdmin, (req, res) => {
+  const store = load();
+  ensureShape(store);
+  const r = store.phap_danh_hop_dong_thue.find((x) => String(x.id) === req.params.id);
+  if (!r) return redirectBackToThueGianList(req, res, { error: "Không tìm thấy gian này." });
+  r.aliasGian = (req.body.aliasGian || "").trim();
+  save(store);
+  redirectBackToThueGianList(req, res, { success: "Đã cập nhật mã viết tắt." });
 });
 
 // Luyen, 2026-07-21 (lan 3): "làm luôn cho thuê gian hàng nhá" -- nut doc

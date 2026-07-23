@@ -92,7 +92,7 @@
           <thead>
             <tr>
               <th>Loại hình</th><th>Gian</th><th>Tên điểm nội bộ</th><th>Mã công trình</th><th>Mã KH</th>
-              <th>Bên cho thuê (NCC)</th><th>Hình thức HT</th><th>Hình thức thu tiền</th><th>Trạng thái HĐ</th><th>Thời hạn hợp đồng</th>
+              <th>Bên cho thuê (NCC)</th><th>Hình thức HT</th><th>Hình thức thu tiền</th><th>Doanh thu chia sẻ (TK)</th><th>Mã viết tắt (Chi Phí)</th><th>Trạng thái HĐ</th><th>Thời hạn hợp đồng</th>
               <th>Tiền thuê/tháng</th><th>Ghi chú</th><th>Hợp đồng (sheet HCM)</th><th></th>
             </tr>
           </thead>
@@ -108,6 +108,33 @@
               <td><%= r.hinhThucHopTac %></td>
               <td style="font-size:12px; max-width:200px;">
                 <% if (r.hinhThucThuTien) { %><span class="badge badge-chi" title="<%= r.hinhThucThuTien %>">Mall giữ tiền</span><% } %>
+              </td>
+              <td style="font-size:12px;">
+                <!-- Luyen, 2026-07-23: "có tàu bình tân với nhà ma bình dương hay
+                     ghost bình dương cũng là doanh thu chia sẻ ... cho thêm thủ
+                     công cũng được" -- tich chon tay, khong phu thuoc dieu khoan
+                     hop dong co ghi ro hay khong. Dung de tinh cot Tài khoản
+                     (131/1388) ben trang Chi Phí. -->
+                <form method="POST" action="/phap-danh/hop-dong-thue-gian-hang/<%= r.id %>/doanh-thu-chia-se" style="display:inline;">
+                  <input type="hidden" name="loai" value="<%= loaiFilter %>" />
+                  <input type="hidden" name="thang" value="<%= thangFilter %>" />
+                  <input type="hidden" name="doanhThuChiaSe" value="<%= r.doanhThuChiaSe ? '0' : '1' %>" />
+                  <button type="submit" class="link-btn" title="Bấm để đổi trạng thái doanh thu chia sẻ (TK 1388)">
+                    <%= r.doanhThuChiaSe ? '☑ 1388' : '☐ 131' %>
+                  </button>
+                </form>
+              </td>
+              <td style="font-size:12px; min-width:160px;">
+                <!-- Luyen, 2026-07-23 (lan 2): "có thể viết tắc á" -- Luyen tu
+                     dien cac ma viet tat (cach nhau boi dau phay) Chi Phi hay
+                     dung cho gian nay (vd "TAU BT, TÀU BT"), de khop CHINH XAC
+                     thay vi fuzzy doan nham. -->
+                <form method="POST" action="/phap-danh/hop-dong-thue-gian-hang/<%= r.id %>/alias-gian" style="display:flex; gap:4px;">
+                  <input type="hidden" name="loai" value="<%= loaiFilter %>" />
+                  <input type="hidden" name="thang" value="<%= thangFilter %>" />
+                  <input type="text" name="aliasGian" value="<%= r.aliasGian %>" placeholder="vd TAU BT, GHOST AMBD" style="width:130px; font-size:11px; padding:2px 4px;" />
+                  <button type="submit" class="link-btn" style="font-size:11px;" title="Lưu mã viết tắt">Lưu</button>
+                </form>
               </td>
               <td>
                 <% if (r.trangThaiHD === 'Còn hoạt động') { %><span class="badge badge-thu">Còn hoạt động</span>
@@ -159,7 +186,7 @@
             </tr>
             <% }) %>
             <% if (rows.length === 0) { %>
-            <tr><td colspan="15" class="muted">Chưa có gian nào.</td></tr>
+            <tr><td colspan="17" class="muted">Chưa có gian nào.</td></tr>
             <% } %>
           </tbody>
         </table>

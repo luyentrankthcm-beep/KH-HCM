@@ -9,7 +9,13 @@ const {
   parseKvcMienBacWorkbook,
   parseKvcMienBacAutoWorkbook,
 } = require("../utils/chiPhiSheetParser");
-const { extractGianRentText, matchGianRecord, isDoanhThuChiaSeRecord } = require("../utils/rentPaymentMatcher");
+const {
+  extractGianRentText,
+  matchGianRecord,
+  isDoanhThuChiaSeRecord,
+  buildGianAliasIndex,
+  findContractForGianText,
+} = require("../utils/rentPaymentMatcher");
 const gmailApi = require("../utils/gmailApi");
 const gmailInvoiceMatcher = require("../utils/gmailInvoiceMatcher");
 const { parseAmount } = require("../utils/parse");
@@ -112,9 +118,9 @@ function mienSeg(mien) {
 // gian nao, hoac khop nhung khong phai doanh thu chia se) -> mac dinh TK 131.
 // TINH TAI THOI DIEM XEM/XUAT (khong luu vao dong Chi Phi) de tu dong cap
 // nhat khi hop dong thay doi/them moi, khong can chay lai import gi ca.
-function computeTaiKhoanChiPhi(r, gianList) {
+function computeTaiKhoanChiPhi(r, gianList, aliasIndex) {
   if (!r.gian || !r.gian.trim()) return "131";
-  const rec = matchGianRecord(r.gian, gianList);
+  const rec = findContractForGianText(r.gian, gianList, aliasIndex);
   return rec && isDoanhThuChiaSeRecord(rec) ? "1388" : "131";
 }
 
@@ -161,7 +167,8 @@ router.get("/chi-phi/:mien(mien-nam|mien-bac)", (req, res) => {
   rows.sort((a, b) => (a.ngay < b.ngay ? 1 : -1));
   const tongTien = rows.reduce((s, r) => s + (r.soTien || 0), 0);
   const gianListForTaiKhoan = store.phap_danh_hop_dong_thue || [];
-  rows.forEach((r) => { r.taiKhoan = computeTaiKhoanChiPhi(r, gianListForTaiKhoan); });
+  const aliasIndexForTaiKhoan = buildGianAliasIndex(gianListForTaiKhoan);
+  rows.forEach((r) => { r.taiKhoan = computeTaiKhoanChiPhi(r, gianListForTaiKhoan, aliasIndexForTaiKhoan); });
   res.render("chi-phi", {
     userName: req.session.userName,
     mien,
@@ -202,10 +209,11 @@ router.get("/chi-phi/:mien(mien-nam|mien-bac)/export.xlsx", (req, res) => {
   rows.sort((a, b) => (a.ngay < b.ngay ? 1 : -1));
 
   const gianListForTaiKhoanExport = store.phap_danh_hop_dong_thue || [];
+  const aliasIndexForTaiKhoanExport = buildGianAliasIndex(gianListForTaiKhoanExport);
   const exportRows = rows.map((r) => ({
     "Ngày chi": r.ngay,
     "Gian/Cơ sở": r.gian,
-    "Tài khoản": computeTaiKhoanChiPhi(r, gianListForTaiKhoanExport),
+    "Tài khoản": computeTaiKhoanChiPhi(r, gianListForTaiKhoanExport, aliasIndexForTaiKhoanExport),
     NCC: r.ncc,
     "Số hóa đơn": r.soHoaDon,
     "Số UNC": r.soUNC,
