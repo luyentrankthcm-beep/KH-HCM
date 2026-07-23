@@ -155,6 +155,47 @@ router.post("/transactions", requireAdmin, (req, res) => {
   res.redirect("/transactions?bank_id=" + encodeURIComponent(bank_id));
 });
 
+// Chi Nhan (2026-07-23): "số tiền có 8tr mấy mà bạn lấy lên mất tỷ dữ vậy" --
+// phat hien 1 giao dich nhap tay bi sai so tien rat nang (2.324.723.431d thay
+// vi 8.250.000d, chac do dan nham/go nham khi nhap tay). Truoc gio trang nay
+// CHUA CO cach sua 1 giao dich da co san (chi co them moi qua form/dan/tai
+// file) -- them route sua truc tiep ngay/dien giai/so tien/loai cho 1 dong,
+// dung cho khi phat hien nhap sai nhu the nay.
+router.post("/transactions/:id/sua", requireAdmin, (req, res) => {
+  const store = load();
+  const tx = store.transactions.find((t) => t.id === Number(req.params.id));
+  if (!tx) {
+    if (req.get("X-Requested-With") === "XMLHttpRequest") {
+      return res.status(404).json({ error: "Không tìm thấy giao dịch này." });
+    }
+    return res.redirect("/transactions?error=" + encodeURIComponent("Không tìm thấy giao dịch này."));
+  }
+  try {
+    const { date, description, amount, type } = req.body;
+    const parsedDate = parseDate(date) || date;
+    const parsedAmount = Math.abs(parseAmount(amount));
+    if (!parsedDate || isNaN(parsedAmount) || !["thu", "chi"].includes(type)) {
+      throw new Error("Dữ liệu không hợp lệ (kiểm tra lại ngày/số tiền/loại).");
+    }
+    tx.date = parsedDate;
+    tx.description = (description || "").trim();
+    tx.amount = parsedAmount;
+    tx.type = type;
+    tx.edited_at = new Date().toISOString();
+    tx.edited_by = req.session.userName || "";
+    save(store);
+    if (req.get("X-Requested-With") === "XMLHttpRequest") {
+      return res.json({ success: true, tx: withBankLabel(store, tx) });
+    }
+    res.redirect("/transactions?success=" + encodeURIComponent("Đã sửa giao dịch."));
+  } catch (e) {
+    if (req.get("X-Requested-With") === "XMLHttpRequest") {
+      return res.status(400).json({ error: e.message });
+    }
+    res.redirect("/transactions?error=" + encodeURIComponent(e.message));
+  }
+});
+
 router.post("/transactions/paste", requireAdmin, (req, res) => {
   const { bank_id, paste_text } = req.body;
   const store = load();

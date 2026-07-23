@@ -173,7 +173,7 @@
 
       <table class="table">
         <thead>
-          <tr><th>Ngày</th><th>Ngân hàng</th><th>Diễn giải</th><th>Thu</th><th>Chi</th><th>Số dư</th></tr>
+          <tr><th>Ngày</th><th>Ngân hàng</th><th>Diễn giải</th><th>Thu</th><th>Chi</th><th>Số dư</th><% if (isAdmin) { %><th></th><% } %></tr>
         </thead>
         <tbody>
           <% rows.forEach(function(t) { %>
@@ -184,10 +184,33 @@
             <td class="text-pos"><%= t.type === 'thu' ? t.amount.toLocaleString('vi-VN') + ' đ' : '' %></td>
             <td class="text-neg"><%= t.type === 'chi' ? t.amount.toLocaleString('vi-VN') + ' đ' : '' %></td>
             <td><%= t.balance != null ? t.balance.toLocaleString('vi-VN') + ' đ' : '-' %></td>
+            <% if (isAdmin) { %>
+            <td><button type="button" class="link-btn" style="font-size:11px;" onclick="txToggleEdit(event, '<%= t.id %>')">Sửa</button></td>
+            <% } %>
           </tr>
+          <% if (isAdmin) { %>
+          <!-- Chi Nhan (2026-07-23): "số tiền có 8tr mấy mà bạn lấy lên mất tỷ dữ
+               vậy" -- truoc gio khong co cach sua 1 giao dich da nhap sai (chi
+               them moi), them form sua an san ngay duoi dong, mo ra khi bam "Sửa". -->
+          <tr class="tx-edit-row" id="txEdit-<%= t.id %>" style="display:none; background:#fffbe6;">
+            <td colspan="7">
+              <form method="POST" action="/transactions/<%= t.id %>/sua" class="form-inline tx-edit-form" data-id="<%= t.id %>" style="gap:6px; padding:6px 0;">
+                <input type="date" name="date" value="<%= t.date %>" required style="font-size:12px;" />
+                <input type="text" name="description" value="<%= t.description %>" style="width:260px; font-size:12px;" placeholder="Diễn giải" />
+                <input type="text" name="amount" value="<%= t.amount %>" style="width:140px; font-size:12px;" placeholder="Số tiền" required />
+                <select name="type" style="font-size:12px;">
+                  <option value="thu" <%= t.type === 'thu' ? 'selected' : '' %>>Thu</option>
+                  <option value="chi" <%= t.type === 'chi' ? 'selected' : '' %>>Chi</option>
+                </select>
+                <button type="submit" class="btn btn-secondary" style="font-size:12px; padding:3px 10px;">Lưu</button>
+                <button type="button" class="link-btn" style="font-size:12px;" onclick="txToggleEdit(event, '<%= t.id %>')">Hủy</button>
+              </form>
+            </td>
+          </tr>
+          <% } %>
           <% }) %>
           <% if (rows.length === 0) { %>
-          <tr><td colspan="6" class="muted">Không có giao dịch nào.</td></tr>
+          <tr><td colspan="7" class="muted">Không có giao dịch nào.</td></tr>
           <% } %>
         </tbody>
       </table>
@@ -239,6 +262,51 @@
         document.getElementById('txSelTotal').textContent = total.toLocaleString('vi-VN') + ' đ';
       }
     })();
+  </script>
+  <script>
+    // Chi Nhan (2026-07-23): sua 1 giao dich da nhap sai (vd nhap nham so tien).
+    // Bam "Sửa" mo form an ngay duoi dong; luu xong RELOAD lai trang (khong chi
+    // vá DOM) vi so du (Số dư) la tinh don dua tren TOAN BO cac giao dich phia
+    // sau trong cung ngan hang -- sua 1 dong co the lam doi so du hang loat dong
+    // khac, phai tai lai tu server moi tinh dung lai duoc.
+    window.txToggleEdit = function (e, id) {
+      if (e) e.stopPropagation();
+      var editRow = document.getElementById('txEdit-' + id);
+      if (!editRow) return;
+      var willShow = editRow.style.display === 'none';
+      document.querySelectorAll('.tx-edit-row').forEach(function (tr) { tr.style.display = 'none'; });
+      editRow.style.display = willShow ? '' : 'none';
+      if (willShow) {
+        var input = editRow.querySelector('input[name="amount"]');
+        if (input) { input.focus(); input.select(); }
+      }
+    };
+    document.querySelectorAll('form.tx-edit-form').forEach(function (form) {
+      form.addEventListener('submit', function (e) {
+        e.preventDefault();
+        var body = new URLSearchParams(new FormData(form));
+        var btn = form.querySelector('button[type="submit"]');
+        if (btn) btn.disabled = true;
+        fetch(form.action, {
+          method: 'POST',
+          headers: { 'X-Requested-With': 'XMLHttpRequest' },
+          body: body,
+        })
+          .then(function (resp) { return resp.json().then(function (data) { return { ok: resp.ok, data: data }; }); })
+          .then(function (result) {
+            if (!result.ok) {
+              alert((result.data && result.data.error) || 'Có lỗi khi lưu, thử lại giúp tôi.');
+              if (btn) btn.disabled = false;
+              return;
+            }
+            window.location.reload();
+          })
+          .catch(function () {
+            alert('Không kết nối được, thử lại giúp tôi.');
+            if (btn) btn.disabled = false;
+          });
+      });
+    });
   </script>
 </body>
 </html>

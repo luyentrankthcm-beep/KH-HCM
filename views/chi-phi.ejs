@@ -166,7 +166,23 @@
                   <br/><span class="text-neg" style="font-size:11px;">⚠ Số tiền trên hóa đơn gốc: <%= r.soTienHoaDonGoc.toLocaleString('vi-VN') %> đ (khác số trong sheet)</span>
                 <% } %>
               </td>
-              <td><%= (r.soTien || 0).toLocaleString('vi-VN') %> đ</td>
+              <td>
+                <!-- Chi Nhan (2026-07-23): "số tiền có 8tr mấy mà bạn lấy lên mất tỷ
+                     dữ vậy" -- them kha nang sua so tien 1 dong (truoc gio khong sua
+                     duoc), mac dinh hien text (khoa) + nut "Sửa" nho de mo form. -->
+                <span class="cp-so-tien-locked" id="soTienLocked-<%= r.id %>">
+                  <%= (r.soTien || 0).toLocaleString('vi-VN') %> đ
+                  <button type="button" class="link-btn" style="font-size:10px;" onclick="cpUnlock('<%= r.id %>','so-tien')">Sửa</button>
+                </span>
+                <form method="POST" action="/chi-phi/<%= r.id %>/so-tien" class="form-inline cp-ajax-form" data-kind="so-tien" id="soTienForm-<%= r.id %>" style="gap:4px; display:none;">
+                  <input type="hidden" name="hachToan" value="<%= hachToanFilter %>" />
+                  <input type="hidden" name="thang" value="<%= thangFilter %>" />
+                  <input type="hidden" name="hoaDon" value="<%= hoaDonFilter %>" />
+                  <input type="text" name="soTien" value="<%= r.soTien %>" placeholder="Số tiền" style="width:100px; font-size:12px; padding:2px 4px;" />
+                  <button type="submit" class="link-btn" style="font-size:11px;" title="Lưu số tiền">Lưu</button>
+                  <span class="cp-save-flash" style="font-size:11px; color:#1a7f37; display:none;">✓</span>
+                </form>
+              </td>
               <td>
                 <span class="cp-link-hoa-don-display" id="linkDisplay-<%= r.id %>">
                 <% if (r.linkHoaDon) { %><a href="<%= r.linkHoaDon %>" target="_blank" rel="noopener">Xem hóa đơn</a>
@@ -253,6 +269,15 @@
             formEl2.style.display = '';
             var input2 = formEl2.querySelector('input[name="linkHoaDon"]');
             if (input2) input2.focus();
+          }
+        } else if (kind === 'so-tien') {
+          var soTienLockedEl = document.getElementById('soTienLocked-' + rowId);
+          var soTienFormEl = document.getElementById('soTienForm-' + rowId);
+          if (soTienLockedEl) soTienLockedEl.style.display = 'none';
+          if (soTienFormEl) {
+            soTienFormEl.style.display = '';
+            var input3 = soTienFormEl.querySelector('input[name="soTien"]');
+            if (input3) { input3.focus(); input3.select(); }
           }
         }
       };
@@ -341,6 +366,20 @@
                     : '<span class="muted">Không có</span><br/>';
                 }
                 if (data.linkHoaDon) form.style.display = 'none';
+              } else if (kind === 'so-tien') {
+                var trangThaiEl3 = document.getElementById('trangThai-' + rowId);
+                if (trangThaiEl3 && data.trangThaiHoaDon !== undefined) {
+                  trangThaiEl3.innerHTML = data.trangThaiHoaDon
+                    ? '<br/><span class="muted" style="font-size:11px;">' + data.trangThaiHoaDon + '</span>'
+                    : '';
+                }
+                var soTienLockedEl2 = document.getElementById('soTienLocked-' + rowId);
+                if (soTienLockedEl2 && data.soTien !== undefined) {
+                  soTienLockedEl2.innerHTML = Number(data.soTien).toLocaleString('vi-VN') + ' đ ' +
+                    '<button type="button" class="link-btn" style="font-size:10px;" onclick="cpUnlock(\'' + rowId + '\',\'so-tien\')">Sửa</button>';
+                  soTienLockedEl2.style.display = '';
+                  form.style.display = 'none';
+                }
               }
               showFlash(form);
             })

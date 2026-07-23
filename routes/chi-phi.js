@@ -8,6 +8,7 @@ const { parseChiPhiSheetWorkbook } = require("../utils/chiPhiSheetParser");
 const { extractGianRentText, matchGianRecord } = require("../utils/rentPaymentMatcher");
 const gmailApi = require("../utils/gmailApi");
 const gmailInvoiceMatcher = require("../utils/gmailInvoiceMatcher");
+const { parseAmount } = require("../utils/parse");
 
 const router = express.Router();
 router.use(requireLogin);
@@ -243,6 +244,49 @@ router.post("/chi-phi/:id/so-hoa-don", requireAdmin, (req, res) => {
   if (req.body.thang !== undefined) qs.push("thang=" + encodeURIComponent(req.body.thang));
   if (req.body.hoaDon) qs.push("hoaDon=" + encodeURIComponent(req.body.hoaDon));
   qs.push("success=" + encodeURIComponent("Đã cập nhật số hóa đơn."));
+  res.redirect("/chi-phi?" + qs.join("&"));
+});
+
+// Chi Nhan (2026-07-23): "số tiền có 8tr mấy mà bạn lấy lên mất tỷ dữ vậy" --
+// dong Chi Phi tao tu dong qua "quet ngan hang" lay dung so tien cua giao
+// dich ngan hang goc (co the bi nhap sai tu luc nhap giao dich); truoc gio
+// khong co cach sua so tien 1 dong Chi Phi da co san. Them route sua truc
+// tiep tu bang danh sach, cung 1 kieu voi so-hoa-don/link-hoa-don o tren.
+router.post("/chi-phi/:id/so-tien", requireAdmin, (req, res) => {
+  const store = load();
+  ensureShape(store);
+  const r = store.chi_phi.find((x) => String(x.id) === req.params.id);
+  if (!r) {
+    if (isAjaxChiPhiRequest(req)) return res.status(404).json({ error: "Không tìm thấy khoản chi này." });
+    const qs = [];
+    if (req.body.hachToan) qs.push("hachToan=" + encodeURIComponent(req.body.hachToan));
+    if (req.body.thang !== undefined) qs.push("thang=" + encodeURIComponent(req.body.thang));
+    if (req.body.hoaDon) qs.push("hoaDon=" + encodeURIComponent(req.body.hoaDon));
+    qs.push("error=" + encodeURIComponent("Không tìm thấy khoản chi này."));
+    return res.redirect("/chi-phi?" + qs.join("&"));
+  }
+  const parsedAmount = Math.abs(parseAmount(req.body.soTien));
+  if (isNaN(parsedAmount)) {
+    const msg = "Số tiền không hợp lệ.";
+    if (isAjaxChiPhiRequest(req)) return res.status(400).json({ error: msg });
+    return res.redirect("/chi-phi?error=" + encodeURIComponent(msg));
+  }
+  r.soTien = parsedAmount;
+  // Neu dong dang co canh bao mismatch/bat thuong cu (vd tu quet-ngan-hang khi
+  // so tien qua lon so voi cac thang truoc), coi viec chi tu sua so tien la da
+  // xu ly xong, xoa canh bao cu di tranh hien thi lac long.
+  if ((r.trangThaiHoaDon || "").includes("CẢNH BÁO") && (r.trangThaiHoaDon || "").includes("bất thường")) {
+    r.trangThaiHoaDon = "Đã sửa số tiền (trước đó bị cảnh báo bất thường).";
+  }
+  save(store);
+  if (isAjaxChiPhiRequest(req)) {
+    return res.json({ success: true, soTien: r.soTien, trangThaiHoaDon: r.trangThaiHoaDon || "" });
+  }
+  const qs = [];
+  if (req.body.hachToan) qs.push("hachToan=" + encodeURIComponent(req.body.hachToan));
+  if (req.body.thang !== undefined) qs.push("thang=" + encodeURIComponent(req.body.thang));
+  if (req.body.hoaDon) qs.push("hoaDon=" + encodeURIComponent(req.body.hoaDon));
+  qs.push("success=" + encodeURIComponent("Đã cập nhật số tiền."));
   res.redirect("/chi-phi?" + qs.join("&"));
 });
 
