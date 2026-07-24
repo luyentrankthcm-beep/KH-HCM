@@ -613,7 +613,17 @@ function resolveGianGross(rawRows, storeNameMap, gianCandidates, nocodeAssignmen
 //     rieng -- lateMatches (hien dong xanh, chi mang tinh thong bao).
 //  3) Ma cua hang MOI (chua co trong storeNameMap) hoac Ten diem ban chua co
 //     trong bang tra cuu Ma cong trinh -> unmappedStoreCodes/unmappedTenDiem.
-function resolveGianGrossByBankRef(bankTxs, rawRows, storeNameMap, tenDiemToProjectMap) {
+// Luyen, 2026-07-24: "mã cửa hàng mới này ... chỗ chọn mã công trình để gán
+// vào nhá" -- truoc gio muc "Ma cua hang MOI, chua co trong danh sach diem
+// ban" chi bao/liet ke, khong co cach gan truc tiep (phai cho toi khi co file
+// "Danh sach diem ban" moi de bo sung Ten diem ban, roi file "Ten diem - Ma
+// cong trinh" phai co dung ten do nua -- 2 buoc gian tiep). storeCodeOverride
+// (store.viet_qr_store_code_override[channel], xem routes/doisoat-vietqr.js)
+// cho phep gan THANG 1 Ma cua hang -> 1 Ma cong trinh, bo qua ca 2 buoc gian
+// tiep tren, ap dung ngay khong can tai lai file nao. Kiem tra TRUOC storeNameMap
+// nen luon uu tien neu da gan thu cong.
+function resolveGianGrossByBankRef(bankTxs, rawRows, storeNameMap, tenDiemToProjectMap, storeCodeOverride) {
+  const override = storeCodeOverride || {};
   const refIndex = new Map(); // Ma tham chieu -> [rawRow, ...]
   rawRows.forEach((row) => {
     const ref = (row.refCode || "").trim();
@@ -656,9 +666,21 @@ function resolveGianGrossByBankRef(bankTxs, rawRows, storeNameMap, tenDiemToProj
         maCuaHang: raw.maCuaHang || "",
       });
     }
+    const overrideCode = override[raw.maCuaHang];
+    if (overrideCode) {
+      codes.add(overrideCode);
+      const key = `${tx.date}|${overrideCode}`;
+      grossByCode[key] = (grossByCode[key] || 0) + tx.amount;
+      continue;
+    }
     const storeInfo = storeNameMap[raw.maCuaHang];
     if (!storeInfo) {
-      const agg = unmappedStoreCodesAgg.get(raw.maCuaHang) || { maCuaHang: raw.maCuaHang || "", count: 0, total: 0 };
+      const agg = unmappedStoreCodesAgg.get(raw.maCuaHang) || {
+        maCuaHang: raw.maCuaHang || "",
+        count: 0,
+        total: 0,
+        sampleRaw: raw.raw || "",
+      };
       agg.count += 1;
       agg.total += tx.amount;
       unmappedStoreCodesAgg.set(raw.maCuaHang, agg);

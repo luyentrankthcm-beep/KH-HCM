@@ -153,6 +153,12 @@ function ensureChannelShape(store) {
   // tiep (khong luu lich su tung lan tai, khac voi viet_qr_store_uploads) --
   // giam pham vi, Luyen chua yeu cau xem lai/hoan tac rieng bang nay.
   if (!store.viet_qr_ten_diem_master) store.viet_qr_ten_diem_master = {};
+  // Luyen, 2026-07-24: "mã cửa hàng mới này ... chỗ chọn mã công trình để gán
+  // vào nhá" -- gan THANG 1 Ma cua hang -> 1 Ma cong trinh ngay tu bang canh
+  // bao "Ma cua hang MOI, chua co trong danh sach diem ban" (xem
+  // resolveGianGrossByBankRef trong utils/vietqrReconcile.js), khong can doi
+  // upload lai file "Danh sach diem ban" + file "Ten diem - Ma cong trinh".
+  if (!store.viet_qr_store_code_override) store.viet_qr_store_code_override = {};
   // Luyen, 2026-07-21: "không cần chỉnh cái cũ khóa cho tôi" -- muon 1 tinh
   // nang "khoa so" that su (tung yeu cau 2 lan truoc: "khóa sổ cho tôi chỉ
   // nạp cái mới thôi"), khong phai sua tay tung dong lech cu. Luu 1 ngay
@@ -509,7 +515,8 @@ function buildChannelReconciliation(store, channelKey) {
   if (cfg.refMatchFrom) {
     const bankThuTxs = extractVietQrThuTransactions(txs).filter((t) => t.date >= cfg.refMatchFrom);
     const tenDiemMaster = store.viet_qr_ten_diem_master[channelKey] || {};
-    const refResolved = resolveGianGrossByBankRef(bankThuTxs, rawRows, storeNames, tenDiemMaster);
+    const storeCodeOverride = store.viet_qr_store_code_override[channelKey] || {};
+    const refResolved = resolveGianGrossByBankRef(bankThuTxs, rawRows, storeNames, tenDiemMaster, storeCodeOverride);
 
     const filteredGrossByCode = {};
     const filteredCodes = new Set();
@@ -935,9 +942,34 @@ router.get("/doi-soat/vietqr", (req, res) => {
     allRefLateMatches,
     allRefUnmappedStoreCodes,
     allRefUnmappedTenDiem,
+    maCongTrinhOptions: (store.ma_cong_trinh_master && store.ma_cong_trinh_master[activeCompany] && store.ma_cong_trinh_master[activeCompany].rows) || [],
     error: req.query.error || null,
     success: req.query.success || null,
   });
+});
+
+// Luyen, 2026-07-24: "mã cửa hàng mới này ... chỗ chọn mã công trình để gán
+// vào nhá" -- gan THANG 1 Ma cua hang (con chua co trong danh sach diem ban)
+// -> 1 Ma cong trinh, ap dung ngay cho ca du lieu cu va moi (xem
+// resolveGianGrossByBankRef), khong can doi upload lai file "Danh sach diem
+// ban" + file "Ten diem - Ma cong trinh" (2 buoc gian tiep truoc gio).
+router.post("/doi-soat/vietqr/gan-ma-cua-hang/:channel", requireDataEntry, (req, res) => {
+  const store = load();
+  ensureChannelShape(store);
+  const channelKey = req.params.channel;
+  try {
+    if (!CHANNELS[channelKey]) throw new Error("Kenh khong hop le.");
+    const { maCuaHang, maCongTrinh } = req.body;
+    if (!maCuaHang || !maCongTrinh) throw new Error("Thieu ma cua hang hoac ma cong trinh de gan.");
+    store.viet_qr_store_code_override[channelKey][maCuaHang] = maCongTrinh;
+    save(store);
+    res.redirect(
+      "/doi-soat/vietqr?success=" +
+        encodeURIComponent(`Da gan ma cua hang "${maCuaHang}" -> "${maCongTrinh}". Ket qua doi soat da tu cap nhat.`)
+    );
+  } catch (e) {
+    res.redirect("/doi-soat/vietqr?error=" + encodeURIComponent(e.message));
+  }
 });
 
 // ---------- Cross-match: 1 gian du hoa don + 1 gian thieu hoa don CUNG NGAY,

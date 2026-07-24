@@ -326,13 +326,26 @@
         điểm bán mới nhất rồi thử lại.
       </p>
       <table class="table">
-        <thead><tr><th>Mã cửa hàng</th><th>Số GD</th><th>Tổng tiền</th></tr></thead>
+        <thead><tr><th>Mã cửa hàng</th><th>Diễn giải mẫu</th><th>Số GD</th><th>Tổng tiền</th><th>Gán mã công trình</th></tr></thead>
         <tbody>
           <% allRefUnmappedStoreCodes.forEach(function(r) { %>
           <tr>
             <td><%= r.maCuaHang %></td>
+            <td style="font-size:11px; max-width:260px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="<%= r.sampleRaw || '' %>"><%= r.sampleRaw || '-' %></td>
             <td><%= r.count %></td>
             <td><%= r.total.toLocaleString('vi-VN') %> đ</td>
+            <td>
+              <form method="POST" action="/doi-soat/vietqr/gan-ma-cua-hang/<%= r.channel %>" class="form-inline" style="gap:4px;">
+                <input type="hidden" name="maCuaHang" value="<%= r.maCuaHang %>" />
+                <select name="maCongTrinh" required style="max-width:220px;">
+                  <option value="">-- Chọn mã công trình --</option>
+                  <% (typeof maCongTrinhOptions !== 'undefined' ? maCongTrinhOptions : []).forEach(function(m) { %>
+                  <option value="<%= m.maCongTrinh %>"><%= m.maCongTrinh %><%= m.tenCongTrinh ? ' - ' + m.tenCongTrinh : '' %></option>
+                  <% }) %>
+                </select>
+                <button type="submit" class="btn btn-secondary" style="font-size:12px; padding:4px 8px;">Gán</button>
+              </form>
+            </td>
           </tr>
           <% }) %>
         </tbody>
