@@ -799,7 +799,7 @@ function reconcileMomo(settlements, grossData, invoiceData, gianMapping, diemAli
     }
   }
 
-  const allSettlements = settlements.concat(buildPendingDaySettlements(settlements, grossData));
+  const allSettlements = settlements.concat(buildPendingDaySettlements(settlements, grossData, 1));
   const results = [];
   for (const s of allSettlements) {
     const days = dateRange(s.fromIso, s.toIso);
@@ -929,7 +929,24 @@ function reconcileMomo(settlements, grossData, invoiceData, gianMapping, diemAli
 // settlement THAT bao gom dung ngay do, ngay do se tu dong chuyen sang dong
 // binh thuong (khong con la "gia" nua) tu lan render tiep theo, khong lo bi
 // dung 2 lan.
-function buildPendingDaySettlements(settlements, grossData) {
+//
+// labelDayOffset: Luyen, 2026-07-24 -- "ngày 21 đối soát 20 và ngày 22 đối
+// soát ngày 21 rồi bạn đang để nhầm 22 thành 22" -- Momo THAT LUON tra tien
+// tre 1 ngay (khoan ve ngan hang ngay N phan anh doanh thu ngay N-1, thay tu
+// chinh "tu DD/MM den DD/MM" nhung ngan hang tu ghi trong dien giai). Truoc
+// day dong "gia" (chua co ngan hang) luon gan nham date=fromIso=toIso=CUNG 1
+// ngay (vd doanh thu 22/07 -> hien "Khoản về ngày 2026-07-22"), trong khi
+// THAT ra khoan tien do (khi ngan hang ve that) se hien "Khoản về ngày
+// 2026-07-23" -- gay ra 2 dong cung nhan "Khoản về ngày 2026-07-22" (1 dong
+// that ung voi doanh thu 21/07, 1 dong gia ung voi doanh thu 22/07) nhin
+// giong bi trung/nham lan. Fix: cho phep CALLER truyen do lech (so ngay tu
+// doanh thu -> ngay ngan hang du kien) CHI de tinh "date" (nhan hien thi),
+// KHONG dung cho fromIso/toIso (van la dung ngay doanh thu, dam bao tra cuu
+// gross/hoa don khong doi). Mac dinh 0 (VietQR/ZVP giu nguyen hanh vi cu,
+// chua co bang chung ve do lech rieng cua ho) -- Momo truyen 1 (xem
+// reconcileMomo goi ham nay o tren).
+function buildPendingDaySettlements(settlements, grossData, labelDayOffset) {
+  const offset = labelDayOffset || 0;
   const covered = new Set();
   for (const s of settlements || []) {
     for (const day of dateRange(s.fromIso, s.toIso)) covered.add(day);
@@ -945,7 +962,7 @@ function buildPendingDaySettlements(settlements, grossData) {
   return Array.from(pendingDays)
     .sort()
     .map((day) => ({
-      date: day,
+      date: offset ? addDays(day, offset) : day,
       amount: null,
       fromIso: day,
       toIso: day,

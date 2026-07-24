@@ -9,6 +9,7 @@ const {
   parseOfflineVnpayWorkbook,
   parseDiemMappingSheet,
   parsePayooWorkbook,
+  parsePayooRawReport,
   parsePayooDiemMapping,
   parseOnlineVnpayWorkbook,
   parseGianXuatHdSheet,
@@ -22,9 +23,13 @@ const {
   mergeDiemMapWithMaster,
   parseOrderDetailsWorkbook,
   parseFeeReportWorkbook,
+  parseVnpayOfflineFeeReport,
   parseSharedInvoiceWorkbook,
   resolveDiemGross,
   resolveOnlineGross,
+  parseOnlineProductMapSheet,
+  mergeOnlineProductMap,
+  resolveOnlineGrossByProductMap,
   reconcileZvp,
   isoToDmy,
   normText,
@@ -333,6 +338,8 @@ router.get("/doi-soat/zvp", (req, res) => {
     },
     hasGianList: store.zvp_gian_list && store.zvp_gian_list.length > 0,
     hasOfflineDiemMap: store.zvp_offline_diem_map && Object.keys(store.zvp_offline_diem_map).length > 0,
+    hasOnlineProductMap: store.zvp_online_product_map && Object.keys(store.zvp_online_product_map).length > 0,
+    onlineProductMap: store.zvp_online_product_map || {},
     gianMaster: store.zvp_gian_master || null,
     reconciled,
     months,
@@ -493,6 +500,57 @@ router.post("/doi-soat/zvp/upload-online", requireDataEntry, upload.single("file
   }
 });
 
+// ---------- Upload: bang tra CHINH XAC "Ten san pham -> Ma cong trinh" cho Online (sheet "noi") ----------
+// Luyen, 2026-07-24: "giờ tôi sẽ thiết lập lại chính sát hơn ... dựa vào
+// file hehehehehe sheet nối rồi gắn mã công trình vô ... còn cái nào sau
+// này có tên sản phẩm mới bạn cảnh báo tên sản phẩm đó cho tôi" -- file
+// rieng chi tu duy tri (sheet ten "noi"/"nối", 2 cot Ten san pham + Ma cong
+// trinh), thay the buildOnlineProductMatcher (fuzzy) trong luong
+// upload-combo cho ket qua chinh xac hon (khong doan nham khi 2 san pham
+// tinh co trung tu khoa). Merge (khong xoa dong cu) vao store.zvp_online_product_map.
+router.post("/doi-soat/zvp/upload-online-product-map", requireDataEntry, upload.single("file"), (req, res) => {
+  const store = load();
+  try {
+    if (!req.file) throw new Error("Vui long chon 1 file de tai len.");
+    const { sheetName, rows } = parseOnlineProductMapSheet(req.file.buffer);
+    if (!sheetName) {
+      throw new Error('Khong tim thay sheet "noi" (hoac "nối") trong file nay.');
+    }
+    if (rows.length === 0) {
+      throw new Error('Sheet "noi" khong doc duoc du lieu (can cot "Ten san pham" va "Ma cong trinh").');
+    }
+    const { map, added, updated } = mergeOnlineProductMap(store.zvp_online_product_map, rows, store.zvp_gian_list);
+    store.zvp_online_product_map = map;
+    save(store);
+    let successMsg = `Da nap sheet "${sheetName}": ${rows.length} dong (${added} moi, ${updated} cap nhat) -- tong ${Object.keys(map).length} san pham dang co trong bang tra Online.`;
+    res.redirect("/doi-soat/zvp?success=" + encodeURIComponent(successMsg));
+  } catch (e) {
+    res.redirect("/doi-soat/zvp?error=" + encodeURIComponent(e.message));
+  }
+});
+
+// Them nhanh 1 dong tra rieng le (khong can tai lai ca file) -- dung khi
+// canh bao "san pham moi" hien ra sau 1 lan tai combo, Luyen go luon Ma cong
+// trinh dung cho san pham do de lan sau tu khop.
+router.post("/doi-soat/zvp/online-product-map/add", requireDataEntry, (req, res) => {
+  const store = load();
+  try {
+    const { tenSanPham, maCongTrinh, isCse } = req.body;
+    if (!tenSanPham || !tenSanPham.trim()) throw new Error("Thieu ten san pham.");
+    if (!maCongTrinh || !maCongTrinh.trim()) throw new Error("Thieu ma cong trinh.");
+    if (!store.zvp_online_product_map) store.zvp_online_product_map = {};
+    const key = String(tenSanPham).trim().replace(/\s+/g, " ");
+    store.zvp_online_product_map[key] = {
+      maCongTrinh: normCode(maCongTrinh),
+      isCse: isCse === "1" || isCse === "on" || isCse === true,
+    };
+    save(store);
+    res.redirect("/doi-soat/zvp?success=" + encodeURIComponent(`Da them anh xa san pham "${key}" -> ${normCode(maCongTrinh)}.`));
+  } catch (e) {
+    res.redirect("/doi-soat/zvp?error=" + encodeURIComponent(e.message));
+  }
+});
+
 // ---------- Upload: file VNPay Offline ("du lieu VNpay co so KHxxx" + "gian hang VNpay co so KHxxx") ----------
 router.post("/doi-soat/zvp/upload-offline", requireDataEntry, upload.single("file"), (req, res) => {
   const store = load();
@@ -541,6 +599,122 @@ router.post("/doi-soat/zvp/upload-offline", requireDataEntry, upload.single("fil
   }
 });
 
+// ---------- Upload: file THO VNPay Offline (chi can 1 file "Du lieu bao cao
+// phi theo GD thanh toan", khong can OrderDetails) ----------
+// Luyen, 2026-07-24: "chỗ offline á có thể tôi tải đối soát này bạn lên đối
+// soát vnpay offline cho tôi nhá á dựa vào điểm thu để lấy ra gian và ngày
+// giao dịch phí hay là tổng tiền á lấy các giao dịch thành công nhá và bỏ qua
+// điểm thu FUNZONE MINI APP nhá và thêm trên wed úp cái dữ liệu này lên nha
+// thêm dạng này á" -- khac voi muc 2b (upload-combo, can CA 2 file vi con xu
+// ly ca phan Online), route nay CHI can 1 file duy nhat vi Offline khong can
+// tra ten san pham (OrderDetails chi de dung cho Online). Dung lai
+// store.zvp_offline_diem_map da co san (tu it nhat 1 lan tai file o muc 2)
+// de tra Ma cong trinh theo "Chi nhanh", khu trung theo TUNG giao dich (Ma
+// giao dich) qua store.zvp_offline_raw_tx -- an toan khi tai chong file cho
+// cung khoang ngay, giong het pattern upload-payoo-raw o duoi.
+router.post("/doi-soat/zvp/upload-offline-raw", requireDataEntry, upload.single("file"), (req, res) => {
+  const store = load();
+  try {
+    if (!req.file) throw new Error("Vui long chon 1 file de tai len.");
+    if (!store.zvp_offline_diem_map || Object.keys(store.zvp_offline_diem_map).length === 0) {
+      throw new Error(
+        'Chua co bang mapping "Chi nhanh -> Ma cong trinh" cua Offline -- hay tai len file "VNPay thu ho co so" (sheet "gian hang VNpay co so ...") o muc 2 truoc, it nhat 1 lan.'
+      );
+    }
+    if (!store.zvp_offline_raw_tx) store.zvp_offline_raw_tx = {};
+
+    const parsed = parseVnpayOfflineFeeReport(req.file.buffer);
+    let addedCount = 0;
+    let dupCount = 0;
+    let upgradedCount = 0;
+    for (const tx of parsed.transactions) {
+      const existing = store.zvp_offline_raw_tx[tx.txKey];
+      if (existing) {
+        if (existing.fee === 0 && tx.fee > 0) {
+          store.zvp_offline_raw_tx[tx.txKey] = { date: tx.date, chiNhanh: tx.chiNhanh, gross: tx.gross, fee: tx.fee, net: tx.net };
+          upgradedCount++;
+        } else {
+          dupCount++;
+        }
+        continue;
+      }
+      store.zvp_offline_raw_tx[tx.txKey] = { date: tx.date, chiNhanh: tx.chiNhanh, gross: tx.gross, fee: tx.fee, net: tx.net };
+      addedCount++;
+    }
+
+    if (addedCount === 0 && upgradedCount === 0) {
+      return res.redirect(
+        "/doi-soat/zvp?success=" +
+          encodeURIComponent(`File "${req.file.originalname}": ca ${dupCount} giao dich deu da co roi (bo qua toan bo, khong trung lap).`)
+      );
+    }
+
+    // Tinh lai TOAN BO grossByCode/netByCode tu TOAN BO giao dich da tich luy
+    // (khong chi file vua tai) -- moi lan tai la 1 "phien ban day du" moi
+    // nhat, dung khop pattern upload-payoo-raw. Chi nhanh khop CHINH XAC voi
+    // store.zvp_offline_diem_map truoc (da xac nhan khop 100% tren file thuc
+    // te), roi moi thu khop khong dau lam du phong cho file tuong lai co the
+    // ghi Chi nhanh khac dau/hoa thuong.
+    const diemMap = store.zvp_offline_diem_map;
+    const normalizedDiemIndex = new Map();
+    Object.keys(diemMap).forEach((k) => {
+      const nk = normText(k);
+      if (!normalizedDiemIndex.has(nk)) normalizedDiemIndex.set(nk, k);
+    });
+    const grossByCode = {};
+    const netByCode = {};
+    const codes = new Set();
+    const dates = new Set();
+    const unmapped = new Set();
+    for (const tx of Object.values(store.zvp_offline_raw_tx)) {
+      let mapped = diemMap[tx.chiNhanh];
+      if (!mapped) {
+        const origKey = normalizedDiemIndex.get(normText(tx.chiNhanh));
+        if (origKey) mapped = diemMap[origKey];
+      }
+      if (!mapped) {
+        unmapped.add(tx.chiNhanh);
+        continue;
+      }
+      const code = mapped.isCse ? mapped.maCongTrinh + FF_SUFFIX : mapped.maCongTrinh;
+      codes.add(code);
+      dates.add(tx.date);
+      const key = `${tx.date}|${code}`;
+      grossByCode[key] = (grossByCode[key] || 0) + tx.gross;
+      netByCode[key] = (netByCode[key] || 0) + tx.net;
+    }
+
+    store.zvp_offline_uploads.push({
+      id: nextId(store, "zvp_offline_uploads_seq") || Date.now(),
+      uploaded_at: new Date().toISOString(),
+      file_name: `[File thô] ${req.file.originalname}`,
+      sheetName: parsed.sheetName,
+      dates: Array.from(dates).sort(),
+      codes: Array.from(codes),
+      grossByCode,
+      netByCode,
+      unmapped: Array.from(unmapped),
+    });
+    seedGianMappingDefaults(store, Array.from(codes));
+    save(store);
+
+    let successMsg =
+      `Da nap file tho "${req.file.originalname}": ${addedCount} giao dich moi` +
+      (upgradedCount > 0 ? `, bo sung phi cho ${upgradedCount} giao dich da co truoc do` : "") +
+      (dupCount > 0 ? `, bo qua ${dupCount} giao dich da co (trung lap)` : "") +
+      ` (bo qua ${parsed.excludedFunzone} giao dich FUNZONE MINI APP - Online).${UPDATED_NOTE}`;
+    if (parsed.excludedFailedStatus > 0) {
+      successMsg += ` Bo qua ${parsed.excludedFailedStatus} giao dich khong "thanh cong".`;
+    }
+    if (unmapped.size > 0) {
+      successMsg += ` CANH BAO: ${unmapped.size} Chi nhanh chua khop mapping (${Array.from(unmapped).join(", ")}) -- can tai lai file "VNPay thu ho co so" (muc 2) neu day la co so moi.`;
+    }
+    res.redirect("/doi-soat/zvp?success=" + encodeURIComponent(successMsg));
+  } catch (e) {
+    res.redirect("/doi-soat/zvp?error=" + encodeURIComponent(e.message));
+  }
+});
+
 // ---------- Upload: file Payoo ("Du lieu Payoo co so KHxxx" + "Danh muc ten diem") ----------
 router.post("/doi-soat/zvp/upload-payoo", requireDataEntry, upload.single("file"), (req, res) => {
   const store = load();
@@ -580,6 +754,110 @@ router.post("/doi-soat/zvp/upload-payoo", requireDataEntry, upload.single("file"
     let successMsg = `Da nap "${parsed.sheetName}" (${resolved.dates[0]} - ${resolved.dates[resolved.dates.length - 1]}), ${resolved.codes.length} ma cong trinh.${UPDATED_NOTE}`;
     if (resolved.unmapped.length > 0) {
       successMsg += ` CANH BAO: ${resolved.unmapped.length} ten diem chua khop duoc mapping (${resolved.unmapped.join(", ")}).`;
+    }
+    res.redirect("/doi-soat/zvp?success=" + encodeURIComponent(successMsg));
+  } catch (e) {
+    res.redirect("/doi-soat/zvp?error=" + encodeURIComponent(e.message));
+  }
+});
+
+// ---------- Upload: file THO Payoo/VNPay (khong can sheet "Danh muc ten
+// diem" moi lan) ----------
+// Chi Nhan, 2026-07-24: Luyen tai thang file export goc tu cong ("BÁO CÁO
+// GIAO DỊCH BÁN HÀNG HỢP TÁC VỚI PAYOO", hoac "BÁO CÁO GIAO DỊCH QR" --
+// ca 2 deu duoc, tu nhan dien qua parsePayooRawReport). Dung LAI
+// store.zvp_payoo_diem_map da co san (tu lan tai file day du "Payoo thu ho"
+// it nhat 1 lan truoc do qua muc 3) de tra Ma cong trinh, khong bat tai lai
+// sheet mapping moi lan. Khu trung THEO TUNG GIAO DICH (store.zvp_payoo_raw_tx,
+// khoa la txKey -- xem parsePayooRawReport) nen tai chong file (vd tai ca bao
+// cao "Giao dich ban hang" LAN "Giao dich QR" rieng cho CUNG khoang ngay) se
+// TU DONG bo qua giao dich da thay, khong cong don/trung doanh thu.
+router.post("/doi-soat/zvp/upload-payoo-raw", requireDataEntry, upload.single("file"), (req, res) => {
+  const store = load();
+  try {
+    if (!req.file) throw new Error("Vui long chon 1 file de tai len.");
+    if (!store.zvp_payoo_diem_map || Object.keys(store.zvp_payoo_diem_map).length === 0) {
+      throw new Error(
+        'Chua co bang mapping "Chi nhanh -> Ma cong trinh" cua Payoo -- hay tai len file "Payoo thu ho" (sheet "Danh muc ten diem") o muc 3 truoc, it nhat 1 lan.'
+      );
+    }
+    if (!store.zvp_payoo_raw_tx) store.zvp_payoo_raw_tx = {};
+
+    const parsed = parsePayooRawReport(req.file.buffer);
+    let addedCount = 0;
+    let dupCount = 0;
+    let upgradedCount = 0;
+    for (const tx of parsed.transactions) {
+      const existing = store.zvp_payoo_raw_tx[tx.txKey];
+      if (existing) {
+        // Chi Nhan, 2026-07-24: bao cao "Giao dich QR" (rieng) khong co cot
+        // phi, nen 1 giao dich thay TRUOC qua bao cao do se bi ghi fee=0 --
+        // neu sau nay CUNG giao dich do xuat hien lai qua bao cao "Giao dich
+        // ban hang" (co phi that), NANG CAP len ban co phi thay vi giu mai
+        // ban thieu phi (tranh Tien ve NH bi tinh du hon thuc te mai mai).
+        if (existing.fee === 0 && tx.fee > 0) {
+          store.zvp_payoo_raw_tx[tx.txKey] = { date: tx.date, gian: tx.gian, gross: tx.gross, fee: tx.fee, net: tx.net };
+          upgradedCount++;
+        } else {
+          dupCount++;
+        }
+        continue;
+      }
+      store.zvp_payoo_raw_tx[tx.txKey] = { date: tx.date, gian: tx.gian, gross: tx.gross, fee: tx.fee, net: tx.net };
+      addedCount++;
+    }
+
+    if (addedCount === 0 && upgradedCount === 0) {
+      return res.redirect(
+        "/doi-soat/zvp?success=" +
+          encodeURIComponent(`File "${req.file.originalname}": ca ${dupCount} giao dich deu da co roi (bo qua toan bo, khong trung lap).`)
+      );
+    }
+
+    // Tinh lai TOAN BO grossByCode/netByCode tu TOAN BO giao dich da tich luy
+    // (khong chi file vua tai) -- moi lan tai la 1 "phien ban day du" moi
+    // nhat, luon dung du da tai bao nhieu lan/dinh dang khac nhau truoc do.
+    const diemMap = store.zvp_payoo_diem_map;
+    const grossByCode = {};
+    const netByCode = {};
+    const codes = new Set();
+    const dates = new Set();
+    const unmapped = new Set();
+    for (const tx of Object.values(store.zvp_payoo_raw_tx)) {
+      const mapped = diemMap[tx.gian];
+      if (!mapped) {
+        unmapped.add(tx.gian);
+        continue;
+      }
+      const code = mapped.isCse ? mapped.maCongTrinh + FF_SUFFIX : mapped.maCongTrinh;
+      codes.add(code);
+      dates.add(tx.date);
+      const key = `${tx.date}|${code}`;
+      grossByCode[key] = (grossByCode[key] || 0) + tx.gross;
+      netByCode[key] = (netByCode[key] || 0) + tx.net;
+    }
+
+    store.zvp_payoo_uploads.push({
+      id: nextId(store, "zvp_payoo_uploads_seq") || Date.now(),
+      uploaded_at: new Date().toISOString(),
+      file_name: `[File thô] ${req.file.originalname}`,
+      sheetName: parsed.sheetName,
+      dates: Array.from(dates).sort(),
+      codes: Array.from(codes),
+      grossByCode,
+      netByCode,
+      unmapped: Array.from(unmapped),
+    });
+    seedGianMappingDefaults(store, Array.from(codes));
+    save(store);
+
+    let successMsg =
+      `Da nap file tho "${req.file.originalname}": ${addedCount} giao dich moi` +
+      (upgradedCount > 0 ? `, bo sung phi cho ${upgradedCount} giao dich da co truoc do` : "") +
+      (dupCount > 0 ? `, bo qua ${dupCount} giao dich da co (trung lap)` : "") +
+      `.${UPDATED_NOTE}`;
+    if (unmapped.size > 0) {
+      successMsg += ` CANH BAO: ${unmapped.size} Chi nhanh chua khop mapping (${Array.from(unmapped).join(", ")}) -- can tai lai file "Payoo thu ho" (muc 3) neu day la cua hang moi.`;
     }
     res.redirect("/doi-soat/zvp?success=" + encodeURIComponent(successMsg));
   } catch (e) {
@@ -664,7 +942,7 @@ router.post("/doi-soat/zvp/upload-gian-master", requireAdmin, upload.single("fil
 // ho co so" (de co bang mapping Chi nhanh Offline) truoc do.
 router.post(
   "/doi-soat/zvp/upload-combo",
-  requireAdmin, upload.fields([
+  requireDataEntry, upload.fields([
     { name: "fileOrders", maxCount: 1 },
     { name: "fileFee", maxCount: 1 },
   ]),
@@ -676,9 +954,9 @@ router.post(
       if (!fileOrders || !fileFee) {
         throw new Error('Vui long chon ca 2 file: "OrderDetails..." va "DuLieuBaoCaoPhiTheoGDThanhToan...".');
       }
-      if (!store.zvp_gian_list || store.zvp_gian_list.length === 0) {
+      if (!store.zvp_online_product_map || Object.keys(store.zvp_online_product_map).length === 0) {
         throw new Error(
-          'Chua co danh sach gian -- hay tai len file "Tong hop Zalo App" (sheet "gian hang xuat HD") o muc 1 truoc, it nhat 1 lan.'
+          'Chua co bang tra "Ten san pham -> Ma cong trinh" cho Online -- hay tai len file co sheet "noi" o muc 1b truoc, it nhat 1 lan.'
         );
       }
       if (!store.zvp_offline_diem_map || Object.keys(store.zvp_offline_diem_map).length === 0) {
@@ -690,7 +968,7 @@ router.post(
       const orderMap = parseOrderDetailsWorkbook(fileOrders.buffer);
       const parsed = parseFeeReportWorkbook(fileFee.buffer, orderMap);
 
-      const onlineResolved = resolveOnlineGross(parsed.online, store.zvp_gian_list);
+      const onlineResolved = resolveOnlineGrossByProductMap(parsed.online, store.zvp_online_product_map);
       const offlineResolved = resolveDiemGross(parsed.offline, store.zvp_offline_diem_map);
 
       const comboName = `${fileOrders.originalname} + ${fileFee.originalname}`;
@@ -707,7 +985,7 @@ router.post(
             codes: onlineResolved.codes,
             grossByCode: onlineResolved.grossByCode,
             netByCode: onlineResolved.netByCode,
-            unmapped: onlineResolved.unmapped,
+            unmapped: onlineResolved.unmappedProducts,
           });
           seedGianMappingDefaults(store, onlineResolved.codes);
           addedAny = true;
@@ -746,8 +1024,8 @@ router.post(
       if (parsed.online.unmatchedOrders.length > 0) {
         successMsg += ` CANH BAO: ${parsed.online.unmatchedOrders.length} giao dich Online khong tim thay don hang tuong ung trong file OrderDetails (${parsed.online.unmatchedOrders.slice(0, 5).join(", ")}) -- co the do file OrderDetails chua du ngay.`;
       }
-      if (onlineResolved.unmapped.length > 0) {
-        successMsg += ` CANH BAO Online: ${onlineResolved.unmapped.length} san pham chua khop gian (${onlineResolved.unmapped.slice(0, 5).join(", ")}).`;
+      if (onlineResolved.unmappedProducts.length > 0) {
+        successMsg += ` CANH BAO Online: ${onlineResolved.unmappedProducts.length} TEN SAN PHAM MOI chua co trong bang "noi" (${onlineResolved.unmappedProducts.join(" | ")}) -- cho chi biet Ma cong trinh dung de them vao muc 1b.`;
       }
       if (offlineResolved.unmapped.length > 0) {
         successMsg += ` CANH BAO Offline: ${offlineResolved.unmapped.length} diem chua khop gian (${offlineResolved.unmapped.join(", ")}).`;

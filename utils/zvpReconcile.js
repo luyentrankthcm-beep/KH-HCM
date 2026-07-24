@@ -425,6 +425,121 @@ function parsePayooWorkbook(buffer) {
   return { sheetName, dates: Array.from(dates).sort(), codes: Array.from(codes), grossByCode, netByCode, rowsMatched: matched };
 }
 
+// ---------- Payoo: tai file THO truc tiep tu cong Payoo/VNPay, khong can
+// gop tay vao "Danh muc ten diem" moi lan (Luyen, 2026-07-24: "cho phép úp
+// này lên chỗ Payoo đi để có gì tôi úp lên đó cập nhật luôn tất cả điều bỏ
+// qua cái trùng nha") ----------
+// Khac voi parsePayooWorkbook (doc file TONG HOP cua Luyen, sheet ten co
+// "Payoo", da co san cot phu "Gian hang"/"Loc ngay"), ham nay doc THANG file
+// export goc tu cong ("BÁO CÁO GIAO DỊCH BÁN HÀNG HỢP TÁC VỚI PAYOO" -- sheet
+// thuong ten "Báo cáo", tieu de/tong o vai dong dau) -- khong loc theo TEN
+// SHEET (co the la "Báo cáo" bat ky), ma quet header THUC SU (co the nam o
+// dong 2-15 tuy file) co du cot "Số tiền thanh toán", "Ngày giao dịch", va
+// "Cửa hàng"/"Mã cửa hàng". Tra ve TUNG giao dich rieng le (kem 1 khoa duy
+// nhat moi dong -- uu tien "Số tham chiếu"/"Mã giao dịch ĐVTT"/"Mã QR", neu ca
+// 3 deu trong thi ghep ngay+gio+so tien+STT lam khoa du phong) thay vi gop
+// san theo ngay|gian nhu parsePayooWorkbook, de caller tu khu trung theo TUNG
+// GIAO DICH (xem store.zvp_payoo_raw_tx trong routes/doisoat-zvp.js) -- an
+// toan ngay ca khi Luyen tai chong 2 file khac dinh dang cung ngay (vd bao
+// cao "Giao dich ban hang" co ca the+QR, va bao cao "Giao dich QR" rieng chi
+// co QR -- CUNG 1 giao dich QR se trung khoa, chi tinh 1 lan).
+function parsePayooRawReport(buffer) {
+  const wbLite = XLSX.read(buffer, { type: "buffer", bookSheets: true });
+  for (const sheetName of wbLite.SheetNames) {
+    const wb = XLSX.read(buffer, { type: "buffer", sheets: [sheetName] });
+    const ws = wb.Sheets[sheetName];
+    const grid = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: null });
+
+    let headerRowIdx = -1;
+    let cols = {};
+    for (let r = 0; r < Math.min(grid.length, 15); r++) {
+      const row = grid[r] || [];
+      const idx = {};
+      row.forEach((v, c) => {
+        if (!v || typeof v !== "string") return;
+        const s = normText(v);
+        if (idx.grossCol === undefined && s.includes("so tien thanh toan")) idx.grossCol = c;
+        if (idx.grossColAlt === undefined && s.includes("so tien giao dich")) idx.grossColAlt = c;
+        if (idx.feeCol === undefined && s.includes("phi xu ly giao dich")) idx.feeCol = c;
+        if (idx.netCol === undefined && s.includes("thanh tien")) idx.netCol = c;
+        if (idx.dateCol === undefined && (s === "ngay giao dich" || s === "ngay thanh toan")) idx.dateCol = c;
+        if (idx.invalidCol === undefined && s.includes("ly do gd khong hop le")) idx.invalidCol = c;
+        if (idx.trangThaiCol === undefined && s === "trang thai") idx.trangThaiCol = c;
+        if (idx.gianCol === undefined && s === "cua hang") idx.gianCol = c;
+        if (idx.gianCol === undefined && s === "ten cua hang") idx.gianCol = c;
+        if (idx.thamChieuCol === undefined && s.includes("so tham chieu")) idx.thamChieuCol = c;
+        if (idx.dvttCol === undefined && s.includes("ma giao dich dvtt")) idx.dvttCol = c;
+        if (idx.qrCol === undefined && s === "ma qr") idx.qrCol = c;
+      });
+      const grossIdx = idx.grossCol !== undefined ? idx.grossCol : idx.grossColAlt;
+      if (grossIdx !== undefined && idx.dateCol !== undefined && idx.gianCol !== undefined) {
+        headerRowIdx = r;
+        cols = idx;
+        break;
+      }
+    }
+    if (headerRowIdx < 0) continue; // sheet nay khong phai sheet du lieu -- thu sheet tiep theo
+
+    const grossCol = cols.grossCol !== undefined ? cols.grossCol : cols.grossColAlt;
+    const dates = new Set();
+    const codes = new Set();
+    const transactions = [];
+    let matched = 0;
+    let skippedInvalid = 0;
+    for (let r = headerRowIdx + 1; r < grid.length; r++) {
+      const row = grid[r] || [];
+      const invalidReason = cols.invalidCol !== undefined ? row[cols.invalidCol] : null;
+      if (invalidReason) {
+        skippedInvalid++;
+        continue;
+      }
+      if (cols.trangThaiCol !== undefined) {
+        const trangThai = String(row[cols.trangThaiCol] || "");
+        if (trangThai && !/thanh cong/i.test(normText(trangThai))) {
+          skippedInvalid++;
+          continue;
+        }
+      }
+      const gian = String(row[cols.gianCol] || "").trim();
+      if (!gian) continue;
+      const gross = grossCol !== undefined ? Number(row[grossCol]) || 0 : 0;
+      if (!gross) continue;
+      const dateRaw = cols.dateCol !== undefined ? row[cols.dateCol] : null;
+      const date = toIsoDate(dateRaw);
+      if (!date) continue;
+      const fee = cols.feeCol !== undefined ? Number(row[cols.feeCol]) || 0 : 0;
+      const net = cols.netCol !== undefined ? Number(row[cols.netCol]) || 0 : gross - fee;
+
+      const thamChieu = cols.thamChieuCol !== undefined ? String(row[cols.thamChieuCol] || "").trim() : "";
+      const dvtt = cols.dvttCol !== undefined ? String(row[cols.dvttCol] || "").trim() : "";
+      const qr = cols.qrCol !== undefined ? String(row[cols.qrCol] || "").trim() : "";
+      const dateTimeRaw = dateRaw instanceof Date ? dateRaw.toISOString() : String(dateRaw);
+      // Khoa duy nhat: uu tien ma tham chieu/DVTT/QR THAT (khong doi giua cac
+      // bao cao khac dinh dang cho CUNG 1 giao dich, xem vi du doi chieu that
+      // trong ghi chu tren ham nay) -- chi khi CA 3 deu trong (hiem, giao dich
+      // loi/thieu du lieu) moi ghep ngay gio + so tien + so dong lam du phong.
+      const txKey = thamChieu || dvtt || qr || `${dateTimeRaw}|${gross}|${r}`;
+
+      matched++;
+      dates.add(date);
+      codes.add(gian);
+      transactions.push({ txKey, date, gian, gross, fee, net });
+    }
+    if (matched === 0) continue;
+    return {
+      sheetName,
+      dates: Array.from(dates).sort(),
+      codes: Array.from(codes),
+      transactions,
+      rowsMatched: matched,
+      rowsSkippedInvalid: skippedInvalid,
+    };
+  }
+  throw new Error(
+    'Khong tim thay bang du lieu giao dich Payoo hop le trong file nay (can cot "Số tiền thanh toán"/"Số tiền giao dịch", "Ngày giao dịch", "Cửa hàng").'
+  );
+}
+
 function parsePayooDiemMapping(buffer) {
   const wbLite = XLSX.read(buffer, { type: "buffer", bookSheets: true });
   const sheetName = wbLite.SheetNames.find((n) => /danh\s*muc.*ten\s*diem/i.test(normText(n)));
@@ -1119,6 +1234,123 @@ function resolveDiemGross(parsed, diemMap) {
   return { dates: parsed.dates, codes: Array.from(codes), grossByCode, netByCode, unmapped: Array.from(unmapped) };
 }
 
+// Luyen, 2026-07-24: "bây giờ khó hơn nhá tôi thấy có chỗ tải rồi nhưng chưa
+// chính sát lắm giờ tôi sẽ thiết lập lại chính sát hơn chi tiết ... đưa lên
+// đối soát dựa trên tên sản phẩm của đơn đó mua trên file Order có chỗ cột
+// Tên sản phẩm là của gian nào dựa vào file hehehehehe sheet nối rồi gắn mã
+// công trình vô ... còn cái nào sau này có tên sản phẩm mới bạn cảnh báo tên
+// sản phẩm đó cho tôi để biết mã công trình nhá" -- thay vi fuzzy keyword
+// matching (buildOnlineProductMatcher, co the doan sai khi 2 san pham trung
+// tu khoa), Luyen tu duy tri 1 bang tra CHINH XAC "Ten san pham" -> "Ma cong
+// trinh" (sheet "noi" trong file rieng cua chi) -- xem parseOnlineProductMapSheet
+// ben duoi. Ham nay dung bang do de tra cuu THAY VI fuzzy: khop CHINH XAC
+// (chi trim + gop khoang trang, KHONG bo dau -- Luyen muon "chinh xac hon",
+// bo dau se lam long chinh xac), san pham nao KHONG co trong bang thi KHONG
+// doan (tra ve unmappedProducts de canh bao, giong het "unmapped" cua
+// resolveDiemGross) thay vi im lang gan sai hoac bo qua.
+function normalizeProductKey(s) {
+  return String(s || "").trim().replace(/\s+/g, " ");
+}
+
+// Parses the "noi" ("nối") sheet: 2 cot "Ten san pham" / "Ma cong trinh"
+// (co the co them cot tham khao rieng nhu "Ma cong trinh co san", bo qua --
+// KHONG duoc nham voi cot "Ma cong trinh" chinh vi cung chua "ma cong
+// trinh" nhu 1 substring, nen loai tru rieng cot nao co them "co san").
+function parseOnlineProductMapSheet(buffer) {
+  const wbLite = XLSX.read(buffer, { type: "buffer", bookSheets: true });
+  const sheetName = wbLite.SheetNames.find((n) => normText(n).includes("noi"));
+  if (!sheetName) return { sheetName: null, rows: [] };
+  const wb = XLSX.read(buffer, { type: "buffer", sheets: [sheetName] });
+  const ws = wb.Sheets[sheetName];
+  const grid = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: null });
+
+  let headerRowIdx = -1;
+  let cols = {};
+  for (let r = 0; r < Math.min(grid.length, 5); r++) {
+    const row = grid[r] || [];
+    const idx = {};
+    row.forEach((v, c) => {
+      if (!v || typeof v !== "string") return;
+      const s = normText(v);
+      if (idx.tenSanPham === undefined && s.includes("ten san pham")) idx.tenSanPham = c;
+      if (idx.maCongTrinh === undefined && s.includes("ma cong trinh") && !s.includes("co san")) idx.maCongTrinh = c;
+    });
+    if (idx.tenSanPham !== undefined && idx.maCongTrinh !== undefined) {
+      headerRowIdx = r;
+      cols = idx;
+      break;
+    }
+  }
+  if (headerRowIdx < 0) return { sheetName, rows: [] };
+
+  const rows = [];
+  for (let r = headerRowIdx + 1; r < grid.length; r++) {
+    const row = grid[r] || [];
+    const tenSanPham = row[cols.tenSanPham] ? String(row[cols.tenSanPham]).trim() : "";
+    const maCongTrinh = row[cols.maCongTrinh] ? normCode(row[cols.maCongTrinh]) : "";
+    if (!tenSanPham || !maCongTrinh) continue;
+    rows.push({ tenSanPham, maCongTrinh });
+  }
+  return { sheetName, rows };
+}
+
+// mergedInto: store.zvp_online_product_map -- moi lan tai file "noi" moi
+// GHI DE (khong xoa cac dong cu neu ten san pham do khong con trong file
+// lan nay, vi Luyen chi them dong moi vao cuoi file, khong xoa dong cu).
+// isCse: suy ra tu store.zvp_gian_list theo cung 1 quy tac "chi tin CSE khi
+// TOAN BO cac dong hien co cua ma cong trinh do deu la CSE" da dung cho
+// cseOverrideCodes (xem chu thich o reconcileZvpChannel) -- vi ban "noi"
+// khong co cot rieng danh dau CSE, ma nhieu ma cong trinh (vd "AE HUE KVCN",
+// "AM HP KVCN") tren thuc te la HON HOP (vua co hoa don TK 131 vua co 1388),
+// nen chi tin CSE=true khi chac chan 100% (khong co dong nao TK 131 tung
+// ghi nhan cho ma do), con lai mac dinh false (TK 131) -- an toan hon doan.
+function inferIsCseForCode(maCongTrinh, gianList) {
+  const matches = (gianList || []).filter((g) => normCode(g.maCongTrinh) === maCongTrinh);
+  if (matches.length === 0) return false;
+  return matches.every((g) => g.isCse === true);
+}
+
+function mergeOnlineProductMap(existingMap, rows, gianList) {
+  const map = Object.assign({}, existingMap || {});
+  let added = 0;
+  let updated = 0;
+  for (const r of rows) {
+    const key = normalizeProductKey(r.tenSanPham);
+    const isCse = inferIsCseForCode(r.maCongTrinh, gianList);
+    const cur = map[key];
+    if (!cur) {
+      added++;
+    } else if (cur.maCongTrinh !== r.maCongTrinh || cur.isCse !== isCse) {
+      updated++;
+    }
+    map[key] = { maCongTrinh: r.maCongTrinh, isCse };
+  }
+  return { map, added, updated };
+}
+
+function resolveOnlineGrossByProductMap(parsed, productMap) {
+  const grossByCode = {};
+  const netByCode = {};
+  const codes = new Set();
+  const unmappedProducts = new Set();
+  for (const key of Object.keys(parsed.grossByProduct)) {
+    const sep = key.indexOf("|");
+    const date = key.slice(0, sep);
+    const product = key.slice(sep + 1);
+    const mapped = productMap[normalizeProductKey(product)];
+    if (!mapped) {
+      unmappedProducts.add(product);
+      continue;
+    }
+    const code = mapped.isCse ? mapped.maCongTrinh + FF_SUFFIX : mapped.maCongTrinh;
+    codes.add(code);
+    const newKey = `${date}|${code}`;
+    grossByCode[newKey] = (grossByCode[newKey] || 0) + parsed.grossByProduct[key];
+    netByCode[newKey] = (netByCode[newKey] || 0) + (parsed.netByProduct[key] || 0);
+  }
+  return { dates: parsed.dates, codes: Array.from(codes), grossByCode, netByCode, unmappedProducts: Array.from(unmappedProducts) };
+}
+
 function resolveOnlineGross(parsed, gianList) {
   const matcher = buildOnlineProductMatcher(gianList);
   const grossByCode = {};
@@ -1209,7 +1441,13 @@ function reconcileZvpChannel(settlements, grossData, invoiceData, gianMapping, m
     }
   }
 
-  const allSettlements = settlements.concat(buildPendingDaySettlements(settlements, grossData));
+  // Chi Nhan, 2026-07-24: Luyen xac nhan Zalo/VNPay/Payoo cung tra tien tre 1
+  // ngay giong Momo (doi chieu du lieu that: "Khoản về ngày 22/07" luon di
+  // kem "doanh thu 21/07" cho ca 3 kenh online/offline/payoo) -- truyen 1 de
+  // dong "gia" (chua co ngan hang) cung hien dung nhan ngay du kien (23/07
+  // cho doanh thu 22/07), khong con trung nhan voi dong THAT cua ngay truoc
+  // do nua. Xem ghi chu day du tai buildPendingDaySettlements (utils/momoReconcile.js).
+  const allSettlements = settlements.concat(buildPendingDaySettlements(settlements, grossData, 1));
   const results = [];
   for (const s of allSettlements) {
     const days = dateRange(s.fromIso, s.toIso);
@@ -1355,6 +1593,7 @@ function parseOrderDetailsWorkbook(buffer) {
       const s = normText(v);
       if (idx.orderNo === undefined && s.includes("ma don hang")) idx.orderNo = c;
       if (idx.product === undefined && s.includes("ten san pham")) idx.product = c;
+      if (idx.channel === undefined && s.includes("kenh ban hang")) idx.channel = c;
     });
     if (idx.orderNo !== undefined && idx.product !== undefined) {
       headerRowIdx = r;
@@ -1366,9 +1605,19 @@ function parseOrderDetailsWorkbook(buffer) {
     throw new Error('Khong doc duoc dong tieu de (can cot "Ma don hang" va "Ten san pham") trong file OrderDetails.');
   }
 
+  // Luyen, 2026-07-24: "à quên chỗ kênh bán á bỏ cái HUB nha lấy zalo thôi
+  // á" -- file OrderDetails gom ca don "Zalo" (Zalo Mini App, kenh dang doi
+  // soat) VA don "HUB" (kenh ban hang khac, khong lien quan) -- CHI lay dong
+  // "Zalo" cho orderMap, bo qua HUB de khong bao gio lo nham san pham cua 1
+  // kenh khac vao doi soat Online (dau chua thay trung so don hang giua 2
+  // kenh tren du lieu thuc te, van loc cho chac).
   const orderMap = {};
   for (let r = headerRowIdx + 1; r < grid.length; r++) {
     const row = grid[r] || [];
+    if (cols.channel !== undefined) {
+      const channel = String(row[cols.channel] || "").trim();
+      if (channel && normText(channel) !== "zalo") continue;
+    }
     const rawOrderNo = row[cols.orderNo];
     if (!rawOrderNo) continue;
     const orderNo = String(rawOrderNo).replace(/[^0-9]/g, "");
@@ -1493,6 +1742,118 @@ function parseFeeReportWorkbook(buffer, orderMap) {
   };
 }
 
+// Luyen, 2026-07-24: "chỗ offline á có thể tôi tải đối soát này bạn lên đối
+// soát vnpay offline cho tôi nhá á dựa vào điểm thu để lấy ra gian và ngày
+// giao dịch phí hay là tổng tiền á lấy các giao dịch thành công nhá và bỏ qua
+// điểm thu FUNZONE MINI APP nhá và thêm trên wed úp cái dữ liệu này lên nha
+// thêm dạng này á" -- upload THO rieng cho VNPay Offline, dung THANG file
+// "Du lieu bao cao phi theo GD thanh toan" (cung dinh dang voi
+// parseFeeReportWorkbook o tren, dung chung cho combo Online+Offline) nhung
+// KHONG can file OrderDetails di kem (file do chi dung de tra ten san pham
+// cho phan Online/Zalo Mini App -- khong lien quan Offline). Chi lay phan
+// Offline (moi "Diem thu" KHAC "FUNZONE MINI APP", con FUNZONE MINI APP la
+// Online nen bo qua theo dung yeu cau), tra ve TUNG GIAO DICH rieng (khong
+// gop san theo ngay+ma) de khu trung qua store.zvp_offline_raw_tx (cung 1
+// kieu voi store.zvp_payoo_raw_tx o tren) -- dung "Ma giao dich" lam khoa
+// (xac nhan 100% duy nhat, khong blank, tren file thuc te 24/07/2026).
+// "Trang thai": tren file thuc te cot nay 100% rong (chua thay VNPay dien gi
+// ca) nhung van kiem tra PHONG THU cho file tuong lai -- CHI bo qua 1 dong
+// khi cot nay CO GIA TRI ro rang va gia tri do KHONG chua "thanh cong" (vd
+// "that bai", "huy", "loi"); con rong hoac chua "thanh cong" thi van lay
+// (dung yeu cau "lấy các giao dịch thành công").
+function parseVnpayOfflineFeeReport(buffer) {
+  const wbLite = XLSX.read(buffer, { type: "buffer", bookSheets: true });
+  const sheetName =
+    wbLite.SheetNames.find((n) => normText(n).includes("sheet1")) ||
+    wbLite.SheetNames.find((n) => !/config/i.test(n)) ||
+    wbLite.SheetNames[0];
+  const wb = XLSX.read(buffer, { type: "buffer", sheets: [sheetName] });
+  const ws = wb.Sheets[sheetName];
+  const grid = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: null });
+
+  let headerRowIdx = -1;
+  let cols = {};
+  for (let r = 0; r < Math.min(grid.length, 6); r++) {
+    const row = grid[r] || [];
+    const idx = {};
+    row.forEach((v, c) => {
+      if (!v || typeof v !== "string") return;
+      const s = normText(v);
+      if (idx.diemThu === undefined && s.includes("diem thu") && !s.includes("ma diem thu")) idx.diemThu = c;
+      if (idx.chiNhanh === undefined && s.includes("chi nhanh")) idx.chiNhanh = c;
+      if (idx.maGiaoDich === undefined && s.includes("ma giao dich")) idx.maGiaoDich = c;
+      if (idx.grossCol === undefined && s.includes("so tien hach toan thu ho")) idx.grossCol = c;
+      if (idx.netCol === undefined && s.includes("so tien sau khi tru phi")) idx.netCol = c;
+      if (idx.feeCol === undefined && s.includes("so tien phi thu ho")) idx.feeCol = c;
+      if (idx.dateCol === undefined && s.includes("ngay hach toan thu ho")) idx.dateCol = c;
+      // "Trang thai" dung khop CHINH XAC (khong phai substring) de khong bi
+      // nham voi "Trang thai tra gop"/cac cot "Trang thai ..." khac dung
+      // truoc no trong file thuc te.
+      if (idx.statusCol === undefined && s === "trang thai") idx.statusCol = c;
+    });
+    if (idx.diemThu !== undefined && idx.grossCol !== undefined && idx.dateCol !== undefined) {
+      headerRowIdx = r;
+      cols = idx;
+      break;
+    }
+  }
+  if (headerRowIdx < 0) {
+    throw new Error('Khong doc duoc dong tieu de trong file "Du lieu bao cao phi theo GD thanh toan".');
+  }
+
+  const transactions = [];
+  let excludedFunzone = 0;
+  let excludedFailedStatus = 0;
+  let noTxKeyFallbackUsed = 0;
+  let fallbackSeq = 0;
+
+  for (let r = headerRowIdx + 1; r < grid.length; r++) {
+    const row = grid[r] || [];
+    const diemThu = cols.diemThu !== undefined ? String(row[cols.diemThu] || "").trim() : "";
+    if (!diemThu) continue;
+    if (/^FUNZONE MINI APP$/i.test(diemThu)) {
+      excludedFunzone++;
+      continue; // Online (Zalo Mini App) -- khong phai Offline, bo qua theo dung yeu cau.
+    }
+    const statusRaw = cols.statusCol !== undefined ? String(row[cols.statusCol] || "").trim() : "";
+    if (statusRaw && !normText(statusRaw).includes("thanh cong")) {
+      excludedFailedStatus++;
+      continue;
+    }
+    const gross = cols.grossCol !== undefined ? Number(row[cols.grossCol]) || 0 : 0;
+    if (!gross) continue;
+    const netRaw = cols.netCol !== undefined ? row[cols.netCol] : null;
+    const fee = cols.feeCol !== undefined ? Number(row[cols.feeCol]) || 0 : 0;
+    const net = (netRaw !== null && netRaw !== undefined && netRaw !== "") ? (Number(netRaw) || 0) : (gross - fee);
+    const dateRaw = cols.dateCol !== undefined ? row[cols.dateCol] : null;
+    const date = toIsoDate(dateRaw);
+    if (!date) continue;
+    const chiNhanh = cols.chiNhanh !== undefined ? String(row[cols.chiNhanh] || "").trim() : diemThu;
+    if (!chiNhanh) continue;
+
+    let txKey = cols.maGiaoDich !== undefined ? String(row[cols.maGiaoDich] || "").trim() : "";
+    if (!txKey) {
+      // Du phong (file thuc te 24/07/2026 khong gap truong hop nay -- "Ma
+      // giao dich" xac nhan 100% co gia tri) -- khoa gop theo ngay+chi
+      // nhanh+so tien+dong, de van khu trung duoc trong 1 lan tai neu file
+      // tuong lai co dong thieu Ma giao dich.
+      fallbackSeq++;
+      noTxKeyFallbackUsed++;
+      txKey = `NOKEY|${date}|${chiNhanh}|${gross}|${fallbackSeq}`;
+    }
+
+    transactions.push({ txKey, date, chiNhanh, gross, fee, net });
+  }
+
+  return {
+    sheetName,
+    transactions,
+    excludedFunzone,
+    excludedFailedStatus,
+    noTxKeyFallbackUsed,
+  };
+}
+
 // ---------- Shared invoice upload: 1 file (MTT) -> ca 4 kenh cung luc ----------
 // Luyen upload 1 file danh sach hoa don duy nhat tren TRANG NAO CUNG DUOC (Momo
 // hoac Zalo/VNPay/Payoo) va no cap nhat luon ca 4 danh sach (momo, zalo, vnpay,
@@ -1520,6 +1881,7 @@ module.exports = {
   parseOfflineVnpayWorkbook,
   parseDiemMappingSheet,
   parsePayooWorkbook,
+  parsePayooRawReport,
   parsePayooDiemMapping,
   parseOnlineVnpayWorkbook,
   parseGianXuatHdSheet,
@@ -1535,9 +1897,13 @@ module.exports = {
   extractKeywords,
   resolveDiemGross,
   resolveOnlineGross,
+  parseOnlineProductMapSheet,
+  mergeOnlineProductMap,
+  resolveOnlineGrossByProductMap,
   reconcileZvp,
   parseOrderDetailsWorkbook,
   parseFeeReportWorkbook,
+  parseVnpayOfflineFeeReport,
   toIsoDate,
   isoToDmy,
   normCode,

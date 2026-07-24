@@ -81,6 +81,33 @@ function emptyStore() {
     zvp_gian_list: [], // [{ tenDiem, maCongTrinh, isCse }] from "gian hang xuat HD"
     zvp_offline_diem_map: {}, // { "Chi nhanh": { maCongTrinh, isCse } } from "gian hang VNpay co so"
     zvp_payoo_diem_map: {}, // { "Chi nhanh": { maCongTrinh, isCse } } from Payoo's own "Danh muc ten diem" sheet
+    // Chi Nhan, 2026-07-24: "giờ tôi sẽ thiết lập lại chính sát hơn ... dựa
+    // vào file hehehehehe sheet nối rồi gắn mã công trình vô ... còn cái nào
+    // sau này có tên sản phẩm mới bạn cảnh báo tên sản phẩm đó cho tôi" --
+    // bang tra CHINH XAC (khong fuzzy) "Ten san pham" (dung nguyen van, chi
+    // trim khoang trang, KHONG bo dau) -> { maCongTrinh, isCse } cho kenh
+    // Online/Zalo Mini App, thay the buildOnlineProductMatcher (fuzzy) trong
+    // luong upload-combo -- san pham nao khong co trong bang nay se duoc bao
+    // "san pham moi" thay vi doan. Xem parseOnlineProductMapSheet /
+    // resolveOnlineGrossByProductMap trong utils/zvpReconcile.js.
+    zvp_online_product_map: {},
+    // Chi Nhan, 2026-07-24: Luyen muon tai THANG file export goc tu cong
+    // Payoo/VNPay (khong can gop tay vao "Danh muc ten diem" moi lan nua) --
+    // xem parsePayooRawReport trong utils/zvpReconcile.js va route
+    // /doi-soat/zvp/upload-payoo-raw. Luu TUNG giao dich rieng le (khong gop
+    // theo ngay|ma nhu zvp_payoo_uploads) de khu trung XUYEN SUOT MOI LAN
+    // TAI, du la 2 file KHAC dinh dang cho CUNG 1 giao dich (vd bao cao
+    // "Giao dich ban hang" gom ca the+QR, va bao cao "Giao dich QR" rieng chi
+    // co QR -- cung giao dich se trung "txKey", chi tinh 1 lan, khong cong
+    // don). { "<txKey>": { date, gian, gross, fee, net } }
+    zvp_payoo_raw_tx: {},
+    // Chi Nhan, 2026-07-24: cung 1 kieu voi zvp_payoo_raw_tx o tren, nhung
+    // cho VNPay Offline -- Luyen tai THANG file "Du lieu bao cao phi theo GD
+    // thanh toan" (khong can file OrderDetails di kem, file do chi dung cho
+    // phan Online). Xem parseVnpayOfflineFeeReport trong utils/zvpReconcile.js
+    // va route /doi-soat/zvp/upload-offline-raw. { "<Ma giao dich>": { date,
+    // chiNhanh, gross, fee, net } }
+    zvp_offline_raw_tx: {},
     // Master gian catalog, uploaded daily by Luyen as its own file (sheet
     // "gian "): one table covering ALL channels (Momo, Viet QR, Zalo Mini
     // App, VNPay Co so, Payoo QR/the) with columns raw-text -> Ma cong trinh

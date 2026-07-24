@@ -1072,7 +1072,18 @@ function resolveGianGrossPrefix(rawRows, storeNameMap, gianCandidates) {
   return { codes: Array.from(codes), grossByCode, unmapped };
 }
 
-// diemAlias: same shared table as Momo/ZVP (store.invoice_diem_alias).
+// diemAlias: same shared table as Momo/ZVP (store.invoice_diem_alias). Chi
+// Nhan, 2026-07-24 (fix): bang nay dung CHUNG cho ca Momo/ZVP/VietQR, nhung 1
+// alias (vd "LM NHA TRANG KVC" -> "FARM LOTTE NHA TRANG") co the la ma GOC
+// dung cho kenh nay (VietQR/BIDV7702 -- gross van con ghi "LM NHA TRANG KVC",
+// chua doi ten ben do) nhung lai la ma DA DOI TEN can thiet cho kenh khac
+// (Momo -- gross ben do dung dung "FARM LOTTE NHA TRANG"). Neu CHI index theo
+// effectiveMaDiem (da alias), hoa don se "bien mat" khoi kenh nao con dung ma
+// GOC (verified: hoa don 10547/22-07 co maDiem "LM NHA TRANG KVC", trung KHOP
+// voi gross cua chinh kenh nay, nhung bi day sang key "FARM LOTTE NHA TRANG"
+// nen khong con khop nua). Fix: index hoa don duoi CA HAI key (ma goc VA ma da
+// alias, neu khac nhau) -- kenh nao co gross dung ma nao se tu tim thay, an
+// toan vi 2 ma nay khong bao gio CUNG co gross trong CUNG 1 kenh/ngay.
 function reconcileVietQr(settlements, grossData, invoiceData, gianMapping, manualMatches, diemAlias) {
   const alias = diemAlias || {};
   const invoicesByDiemDay = {};
@@ -1080,6 +1091,7 @@ function reconcileVietQr(settlements, grossData, invoiceData, gianMapping, manua
     if (!inv.ngayHd || !inv.days || inv.days.length === 0) continue;
     const [invY, invMo, invD] = inv.ngayHd.split("-").map(Number);
     const effectiveMaDiem = alias[inv.maDiem] || inv.maDiem;
+    const diemKeysToIndex = effectiveMaDiem === inv.maDiem ? [effectiveMaDiem] : [effectiveMaDiem, inv.maDiem];
     for (const day of inv.days) {
       let y = invY;
       let mo = invMo;
@@ -1091,9 +1103,11 @@ function reconcileVietQr(settlements, grossData, invoiceData, gianMapping, manua
         }
       }
       const iso = `${y}-${String(mo).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-      const key = `${effectiveMaDiem}|${iso}`;
-      if (!invoicesByDiemDay[key]) invoicesByDiemDay[key] = [];
-      invoicesByDiemDay[key].push(inv);
+      for (const diemKey of diemKeysToIndex) {
+        const key = `${diemKey}|${iso}`;
+        if (!invoicesByDiemDay[key]) invoicesByDiemDay[key] = [];
+        invoicesByDiemDay[key].push(inv);
+      }
     }
   }
 

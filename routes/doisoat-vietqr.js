@@ -94,6 +94,11 @@ const UPDATED_NOTE = " Ket qua doi soat ben duoi da tu cap nhat theo du lieu moi
 // ap dung ca hoa don cu (con ghi "JP SC VIVO") lan hoa don moi ve sau.
 const GIAN_MERGE_DEFAULTS = {
   "JP SC VIVO": { maCongTrinh: "SC VIVO KVCM", isCse: true },
+  // Luyen, 2026-07-24: "2 cái Phan Thiết này là 1 á cộng lại cho tôi nha" --
+  // "FARM LOTTE PHAN THIET" chi la 4 ma cua hang (gan qua nut "Gan ma cong
+  // trinh" cho ma cua hang MOI) thuc ra la CUNG 1 diem voi "LOTTE PHAN
+  // THIET", khong phai gian rieng. Gop vinh vien vao "LOTTE PHAN THIET".
+  "FARM LOTTE PHAN THIET": { maCongTrinh: "LOTTE PHAN THIET", isCse: false },
 };
 
 // Luyen, 2026-07-20: mot so ten "Mã công trình" hien tren bang doi soat Viet
@@ -121,6 +126,37 @@ const MA_CONG_TRINH_DISPLAY_ALIAS_DEFAULTS = {
   "LM NHA TRANG KVC": "FARM LOTTE NHA TRANG",
   "JP vicom 3.2 BIDV": "VC 3/2 JP-Posh",
   "VINCOM GAND PARK": "JP-POSH GRAND PARK",
+};
+
+// Chi Nhan, 2026-07-24: giong het KNOWN_INVOICE_DIEM_ALIASES ben routes/
+// doisoat.js (Momo) -- Luyen xac nhan qua anh chup + doi chieu so tien/ngay
+// khop tuyet doi (BIDV7702 ngay 22/07: SENSE CT PVĐ 500k, POSH LOTTE PHÚ THỌ
+// 230k, POSH MN GALAXY KINH DƯƠNG VƯƠNG 80k, POSH MN GALAXY QUANG TRUNG 60k,
+// KNG BÀ RỊA 70k -- deu khop dung gross cua dung gian nay). SEED SAN qua
+// ensureChannelShape (chay MOI LAN load()) thay vi chi ghi 1 lan vao
+// store.json truc tiep -- vi Luyen dang chay server local rieng (khong chung
+// tien trinh voi may cua toi), moi lan Luyen tai file/luu gi do server cua
+// Luyen se ghi de store.json bang ban store CU trong bo nho no dang giu
+// (chua thay 5 dong nay), lam mat trang 3 lan lien tiep du toi da them thu
+// cong qua script. Seed qua code (chay lai moi request, giong GIAN_MERGE_DEFAULTS/
+// MA_CONG_TRINH_DISPLAY_ALIAS_DEFAULTS o tren) thi KHONG THE mat duoc nua, chi
+// can server cua Luyen restart 1 lan de nap code moi la tu dong co lai vinh vien.
+// Luyen, 2026-07-24 (lan 2): "hải phòng có 2 cái ngày 23 mà" -- Luyen xac
+// nhan qua anh chup hoa don: "AM HP KVCN" (Funzone Hai Phong, hoa don 2297)
+// la CSE that, NHUNG "SNOWFUN AEON HẢI PHÒNG" (hoa don 2298, san pham "SNOW
+// FUN" -- KHAC voi "Funzone" -- KHONG danh dau CSE tren sheet cua chi) la
+// mot san pham RIENG, KHONG CSE, cung ma cong trinh AM HP KVCN nhung khac TK
+// (131). Da thu doi alias nay sang "AM HP KVCN__FF" (lan sua truoc, SAI) --
+// tra lai dung "AM HP KVCN" (KHONG __FF) de khop voi dong PLAIN 360.000d
+// (dung bang gross cua rieng san pham "...SALE 20% - SNOW FUN" -- xac nhan
+// qua doi chieu parseFeeReportWorkbook, khop chinh xac 360.000d).
+const INVOICE_DIEM_ALIAS_DEFAULTS = {
+  "SENSE CT PVĐ PHCM": "SENSE PVD PHCM",
+  "POSH LOTTE PHÚ THỌ": "LOTTE PHU THO PHCM",
+  "POSH MN GALAXY KINH DƯƠNG VƯƠNG": "GALAXY KINH DUONG VUONG PHCM",
+  "POSH MN GALAXY QUANG TRUNG": "GALAXY QUANG TRUNG PHCM",
+  "KNG BÀ RỊA": "KNG BA RIA PHCM",
+  "SNOWFUN AEON HẢI PHÒNG": "AM HP KVCN",
 };
 
 function ensureChannelShape(store) {
@@ -172,6 +208,24 @@ function ensureChannelShape(store) {
   Object.keys(GIAN_MERGE_DEFAULTS).forEach((k) => {
     if (!store.viet_qr_gian_merge[k]) store.viet_qr_gian_merge[k] = GIAN_MERGE_DEFAULTS[k];
   });
+  if (!store.invoice_diem_alias) store.invoice_diem_alias = {};
+  Object.keys(INVOICE_DIEM_ALIAS_DEFAULTS).forEach((k) => {
+    const cur = store.invoice_diem_alias[k];
+    // Ghi de ca truong hop tu-anh-xa-chinh-no (vd "SENSE CT PVĐ PHCM" ->
+    // "SENSE CT PVĐ PHCM") -- day la dau vet cua 1 lan luu form "Anh xa"
+    // truoc khi biet dung ma nao (hoac ban store cu bi ghi de lai qua race
+    // condition, xem ghi chu tai INVOICE_DIEM_ALIAS_DEFAULTS), khong phai
+    // Luyen co y dinh giu nguyen ten do.
+    if (!cur || cur === k) {
+      store.invoice_diem_alias[k] = INVOICE_DIEM_ALIAS_DEFAULTS[k];
+    }
+  });
+  // Luyen, 2026-07-24 (lan 2): dao nguoc lai sua sai truoc do -- neu ban store
+  // nao van con gia tri __FF (tu lan sua dau, da xac nhan la SAI), tra ve
+  // "AM HP KVCN" (KHONG __FF) dung nhu INVOICE_DIEM_ALIAS_DEFAULTS o tren.
+  if (store.invoice_diem_alias["SNOWFUN AEON HẢI PHÒNG"] === "AM HP KVCN__FF") {
+    store.invoice_diem_alias["SNOWFUN AEON HẢI PHÒNG"] = "AM HP KVCN";
+  }
   Object.keys(MA_CONG_TRINH_DISPLAY_ALIAS_DEFAULTS).forEach((k) => {
     if (!store.ma_cong_trinh_display_alias[k]) {
       store.ma_cong_trinh_display_alias[k] = MA_CONG_TRINH_DISPLAY_ALIAS_DEFAULTS[k];
@@ -457,12 +511,29 @@ function buildChannelReconciliation(store, channelKey) {
   if (cfg.parseMode !== "mn") {
     const matcherProbe = buildOnlineProductMatcher(gianCandidates);
     const seenSelfNames = new Set(gianCandidates.map((c) => normText(c.maCongTrinh)));
+    // Chi Nhan, 2026-07-24 (fix): tenDiem cua 1 hoa don that (vd "AE Tân Phú
+    // ghế") co the toan tu ngan (<=3 ky tu sau khi bo dau: "tan","phu","ghe")
+    // nen matcherProbe (buildOnlineProductMatcher, yeu cau keyword qualifying
+    // >=4 ky tu de tranh nham) KHONG BAO GIO tu khop duoc VOI CHINH NO, du
+    // trung tuyet doi tung chu. Neu 1 "Ma cua hang" khac (thuong la cac ma
+    // chua co ten that, matchText mac dinh/rac) TINH CO co matchText giong
+    // HET tenDiem nay, no van vuot qua ca 2 check (seenSelfNames theo
+    // maCongTrinh + matcherProbe fuzzy) va bi day vao lam "self" candidate
+    // TRUNG applyGianRedirectToInvoices's map (key = normText(tenDiem)) --
+    // vi selfCandidates duoc concat VAO SAU, no GHI DE len candidate that,
+    // khien MOI hoa don cua gian that (vd AM TP PHCM) bi chuyen huong nham
+    // sang 1 Ma cong trinh "ma" (vd "Aeon Tân Phú BIDV") khong co doanh thu
+    // nao, hien "Chưa có HĐ" du hoa don + doanh thu deu dung. Fix: kiem tra
+    // THEM trung tuyet doi (normText) theo TEN DIEM cua cac candidate CO SAN
+    // (khong chi maCongTrinh) truoc khi cho phep them self-candidate.
+    const existingTenDiemExact = new Set(gianCandidates.map((c) => normText(c.tenDiem || "")));
     const selfCandidates = [];
     Object.values(storeNames).forEach((info) => {
       const mt = ((info && info.matchText) || "").trim();
       if (!mt) return;
       const key = normText(mt);
       if (seenSelfNames.has(key)) return;
+      if (existingTenDiemExact.has(key)) return; // trung tuyet doi voi 1 gian THAT da co, khong tao ban sao
       if (matcherProbe(mt)) return; // da khop duoc voi candidate co san, khong can fallback
       seenSelfNames.add(key);
       // Chi Nhan, 2026-07-24: Luyen yeu cau "gộp hết" -- nhieu Ma cua hang la
@@ -537,6 +608,37 @@ function buildChannelReconciliation(store, channelKey) {
     refLateMatches = refResolved.lateMatches;
     refUnmappedStoreCodes = refResolved.unmappedStoreCodes;
     refUnmappedTenDiem = refResolved.unmappedTenDiem;
+  }
+
+  // Chi Nhan, 2026-07-24: gop gross cua ma DA MERGE (GIAN_MERGE_DEFAULTS/
+  // store.viet_qr_gian_merge, vd "FARM LOTTE PHAN THIET" -> "LOTTE PHAN
+  // THIET") vao dung ma dich. Khoi mergeGianListWithMaster/applyGianRedirectToInvoices
+  // o tren CHI doi duoc hoa don + gianCandidates (duong fuzzy resolveGianGross),
+  // KHONG cham duoc gross tu resolveGianGrossByBankRef (khop theo So tham
+  // chieu, hoac gan qua "Gan ma cong trinh" cho ma cua hang MOI -- ca 2 deu
+  // co the tra ve thang mot ma da bi merge) -- neu khong gop lai o day, 1
+  // gian bi merge van hien 2 dong rieng ben doanh thu (ngan hang) trong khi
+  // hoa don goc chi co 1, gay "Chua co HD" gia tao mai mai.
+  if (mergeKeys.length > 0) {
+    const mergedGrossByCode = {};
+    const mergedCodes = new Set();
+    Object.keys(resolved.grossByCode).forEach((key) => {
+      const sep = key.indexOf("|");
+      const day = key.slice(0, sep);
+      let code = key.slice(sep + 1);
+      const hadFF = code.endsWith(FF_SUFFIX);
+      const baseCode = hadFF ? code.slice(0, -FF_SUFFIX.length) : code;
+      const merge = gianMerge[baseCode];
+      if (merge) {
+        const targetIsCse = merge.isCse === true || merge.isCse === false ? merge.isCse : hadFF;
+        code = targetIsCse ? merge.maCongTrinh + FF_SUFFIX : merge.maCongTrinh;
+      }
+      const newKey = `${day}|${code}`;
+      mergedGrossByCode[newKey] = (mergedGrossByCode[newKey] || 0) + resolved.grossByCode[key];
+      mergedCodes.add(code);
+    });
+    resolved.grossByCode = mergedGrossByCode;
+    resolved.codes = Array.from(mergedCodes);
   }
 
   seedGianMappingDefaults(store, resolved.codes);

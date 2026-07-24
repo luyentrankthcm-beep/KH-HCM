@@ -140,6 +140,50 @@
 
     <section class="panel">
       <details>
+        <summary style="font-weight:700;color:#111;cursor:pointer;">1c. Bảng tra "Tên sản phẩm → Mã công trình" cho Online (chính xác, không đoán)</summary>
+        <div style="margin-top:12px;">
+      <p class="muted">
+        Dùng để khớp gian cho mục 2b (tải combo 2 file thô OrderDetails + DuLieuBaoCaoPhi) — khớp CHÍNH XÁC theo
+        đúng tên sản phẩm, không đoán theo từ khóa. Sản phẩm nào chưa có trong bảng sẽ được cảnh báo (không tự gán)
+        để chị xác nhận đúng mã công trình rồi thêm vào bên dưới.
+        <% if (!hasOnlineProductMap) { %>
+          <strong>Cần tải file có sheet "nối" (Tên sản phẩm / Mã công trình) ít nhất 1 lần trước khi dùng mục 2b.</strong>
+        <% } %>
+      </p>
+      <form method="POST" action="/doi-soat/zvp/upload-online-product-map" enctype="multipart/form-data" class="form-inline">
+        <input type="file" name="file" accept=".xlsx,.xls" required />
+        <button type="submit" class="btn btn-primary">Tải lên file có sheet "nối"</button>
+      </form>
+      <details style="margin-top:12px;">
+        <summary class="muted" style="cursor:pointer;">Đang có <%= Object.keys(onlineProductMap).length %> sản phẩm trong bảng tra (bấm để xem/thêm)</summary>
+        <table class="table" style="margin-top:10px;">
+          <thead><tr><th>Tên sản phẩm</th><th>Mã công trình</th><th>CSE?</th></tr></thead>
+          <tbody>
+            <% Object.keys(onlineProductMap).forEach(function(prod) { %>
+            <tr>
+              <td style="font-size:12px;"><%= prod %></td>
+              <td><%= onlineProductMap[prod].maCongTrinh %></td>
+              <td><%= onlineProductMap[prod].isCse ? 'CSE (1388)' : '' %></td>
+            </tr>
+            <% }) %>
+            <% if (Object.keys(onlineProductMap).length === 0) { %>
+            <tr><td colspan="3" class="muted">Chưa có sản phẩm nào trong bảng tra.</td></tr>
+            <% } %>
+          </tbody>
+        </table>
+        <form method="POST" action="/doi-soat/zvp/online-product-map/add" class="form-inline" style="margin-top:10px;">
+          <input type="text" name="tenSanPham" placeholder="Tên sản phẩm (đúng như trên OrderDetails)" style="min-width:320px;" required />
+          <input type="text" name="maCongTrinh" placeholder="Mã công trình" style="width:160px;" required />
+          <label style="font-size:13px;"><input type="checkbox" name="isCse" /> CSE (chia sẻ 1388)</label>
+          <button type="submit" class="btn btn-secondary">Thêm</button>
+        </form>
+      </details>
+        </div>
+      </details>
+    </section>
+
+    <section class="panel">
+      <details>
         <summary style="font-weight:700;color:#111;cursor:pointer;">2. Tải file "VNPay thu hộ cơ sở" (Offline / QR)</summary>
         <div style="margin-top:12px;">
       <p class="muted">File chứa sheet "dữ liệu VNpay cơ sở KH..." + sheet mapping "gian hàng VNpay cơ sở KH...".</p>
@@ -182,9 +226,11 @@
         <div style="margin-top:12px;">
       <p class="muted">
         Không cần tự gộp vào file "Tổng hợp" nữa — chọn cả 2 file tải trực tiếp từ cổng VNPay/Zalo cùng lúc,
-        web tự lọc: "Điểm thu" = FUNZONE MINI APP → Online (Zalo Mini App), các điểm còn lại → Offline.
-        <% if (!hasGianList || !hasOfflineDiemMap) { %>
-          <strong>Cần tải file ở mục 1 (danh sách gian) và mục 2 (mapping điểm Offline) ít nhất 1 lần trước khi dùng mục này.</strong>
+        web tự lọc: "Điểm thu" = FUNZONE MINI APP → Online (Zalo Mini App), các điểm còn lại → Offline. Online được
+        khớp gian CHÍNH XÁC theo tên sản phẩm (bảng tra ở mục 1c), không đoán theo từ khóa — sản phẩm nào chưa có
+        trong bảng tra sẽ được cảnh báo riêng, không tự gán mã công trình.
+        <% if (!hasOnlineProductMap || !hasOfflineDiemMap) { %>
+          <strong>Cần tải file ở mục 1c (bảng tra sản phẩm Online) và mục 2 (mapping điểm Offline) ít nhất 1 lần trước khi dùng mục này.</strong>
         <% } %>
       </p>
       <form method="POST" action="/doi-soat/zvp/upload-combo" enctype="multipart/form-data">
@@ -197,6 +243,28 @@
           <input type="file" name="fileFee" accept=".xlsx,.xls" required />
         </div>
         <button type="submit" class="btn btn-primary">Tải lên cả 2 file</button>
+      </form>
+        </div>
+      </details>
+    </section>
+
+    <section class="panel">
+      <details>
+        <summary style="font-weight:700;color:#111;cursor:pointer;">2c. Hoặc: chỉ tải riêng file "Đối soát" Offline (không cần file OrderDetails)</summary>
+        <div style="margin-top:12px;">
+      <p class="muted">
+        Chỉ cần 1 file "DuLieuBaoCaoPhiTheoGDThanhToan..." — web tự lấy phần Offline (bỏ qua "Điểm thu" =
+        FUNZONE MINI APP vì đó là Online), tra gian theo "Chi nhánh", lấy ngày/phí/tổng tiền của các giao dịch
+        thành công.
+        <% if (!hasOfflineDiemMap) { %>
+          <strong>Cần tải file ở mục 2 (mapping điểm Offline) ít nhất 1 lần trước khi dùng mục này.</strong>
+        <% } %>
+        Tải chồng nhiều lần cho cùng khoảng ngày cũng an toàn — giao dịch trùng (theo Mã giao dịch) tự động
+        bị bỏ qua, không cộng dồn.
+      </p>
+      <form method="POST" action="/doi-soat/zvp/upload-offline-raw" enctype="multipart/form-data" class="form-inline">
+        <input type="file" name="file" accept=".xlsx,.xls" required />
+        <button type="submit" class="btn btn-primary">Tải lên</button>
       </form>
         </div>
       </details>
@@ -235,6 +303,24 @@
           </tbody>
         </table>
       </details>
+        </div>
+      </details>
+    </section>
+
+    <section class="panel">
+      <details>
+        <summary style="font-weight:700;color:#111;cursor:pointer;">3b. Hoặc: tải nhanh file thô Payoo/VNPay (không cần "Danh mục tên điểm" mỗi lần)</summary>
+        <div style="margin-top:12px;">
+      <p class="muted">
+        Tải thẳng file gốc tải từ cổng ("BÁO CÁO GIAO DỊCH BÁN HÀNG HỢP TÁC VỚI PAYOO" hoặc "BÁO CÁO GIAO DỊCH QR") --
+        dùng lại bảng "Chi nhánh → Mã công trình" đã có từ mục 3, không cần ghép tay. Tải chồng nhiều file/nhiều định
+        dạng cho cùng khoảng ngày cũng an toàn -- giao dịch trùng (theo Số tham chiếu/Mã giao dịch) tự động bị bỏ qua,
+        không cộng dồn.
+      </p>
+      <form method="POST" action="/doi-soat/zvp/upload-payoo-raw" enctype="multipart/form-data" class="form-inline">
+        <input type="file" name="file" accept=".xlsx,.xls" required />
+        <button type="submit" class="btn btn-primary">Tải lên</button>
+      </form>
         </div>
       </details>
     </section>
