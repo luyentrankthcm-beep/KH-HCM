@@ -450,7 +450,20 @@ function buildChannelReconciliation(store, channelKey) {
       if (seenSelfNames.has(key)) return;
       if (matcherProbe(mt)) return; // da khop duoc voi candidate co san, khong can fallback
       seenSelfNames.add(key);
-      selfCandidates.push({ tenDiem: mt, maCongTrinh: mt, isCse: false });
+      // Chi Nhan, 2026-07-24: Luyen yeu cau "gộp hết" -- nhieu Ma cua hang la
+      // cac may/quay QR KHAC NHAU tai CUNG 1 diem ban (vd "LM VT 01".."LM VT
+      // 06" deu la "LOTTE VŨNG TÀU", "lotte gò vấp 01".."08" deu la "LOTTE GÒ
+      // VẤP"...) truoc day moi ma tao 1 "self" candidate voi maCongTrinh =
+      // TOAN BO matchText (rieng cho tung may), nen hien thanh nhieu dong
+      // rieng le du la CUNG 1 diem that. Dung "Tên điểm bán" (phan ten CHUNG,
+      // khong doi giua cac may cung diem) lam ma cong trinh OUTPUT thay vi ca
+      // matchText, de tu dong gop lai; "tenDiem" (dung de fuzzy-khop VOI
+      // CHINH dong nay khi resolveGianGross chay) van giu nguyen matchText
+      // DAY DU rieng cho tung may, khong anh huong do chinh xac khop tung
+      // giao dich. Neu khong co Tên điểm bán rieng (chi co Tên cửa hàng), giu
+      // nguyen hanh vi cu (moi ma 1 dong rieng).
+      const groupCode = (info && info.tenDiemBan && info.tenDiemBan.trim()) || mt;
+      selfCandidates.push({ tenDiem: mt, maCongTrinh: groupCode, isCse: false });
     });
     if (selfCandidates.length > 0) gianCandidates = gianCandidates.concat(selfCandidates);
   }
