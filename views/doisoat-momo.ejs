@@ -362,6 +362,18 @@ Các dòng mờ (KH mới, chưa xuất MISA) bên dưới sẽ tự động b�
             <tr><th>Mã công trình (gian)</th><th>TK Có</th><th>Doanh thu gộp</th><th>Tiền về NH (net)</th><th>Số HĐ khớp</th><th>Tổng tiền HĐ</th><th>Trạng thái</th></tr>
           </thead>
           <tbody>
+            <% var _sumGross = r.lines.reduce(function(s,l){ return s + l.gross; }, 0); %>
+            <% var _sumNet = r.lines.reduce(function(s,l){ return s + l.net; }, 0); %>
+            <% var _sumInvTotal = r.lines.reduce(function(s,l){ return s + l.invoiceTotal; }, 0); %>
+            <tr style="font-weight:bold; background:#eef6ff;">
+              <td>Tổng cộng</td>
+              <td>—</td>
+              <td><%= _sumGross.toLocaleString('vi-VN') %> đ</td>
+              <td><%= _sumNet.toLocaleString('vi-VN') %> đ</td>
+              <td>—</td>
+              <td><%= _sumInvTotal.toLocaleString('vi-VN') %> đ</td>
+              <td>—</td>
+            </tr>
             <% r.lines.forEach(function(l) { %>
             <tr<%= l.tkCo === 'SKIP' ? ' style="opacity:0.6;"' : '' %>>
               <td><%= l.label || l.code %></td>
