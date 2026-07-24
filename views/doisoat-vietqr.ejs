@@ -679,9 +679,13 @@
             %>
             <tr data-day="<%= r.settlementDate %>" onclick="vqrJumpToDay('<%= ch %>','<%= r.settlementDate %>')" style="cursor:pointer;<%= r.locked ? ' opacity:0.6;' : '' %>">
               <td><%= r.settlementDate %><%= r.locked ? ' 🔒' : '' %></td>
+              <% if (r.pendingBank) { %>
+              <td colspan="3"><span class="badge badge-warn" title="Đã có doanh thu/gian, chưa có giao dịch ngân hàng khớp ngày này">⏳ Chưa có ngân hàng</span></td>
+              <% } else { %>
               <td><%= r.bankAmount.toLocaleString('vi-VN') %> đ</td>
               <td><%= r.totalNetComputed.toLocaleString('vi-VN') %> đ</td>
               <td class="<%= Math.abs(r.diffVsBank) < 1000 ? 'text-pos' : 'text-neg' %>"><%= r.diffVsBank.toLocaleString('vi-VN') %> đ</td>
+              <% } %>
               <td class="<%= Math.abs(invDiffSum) < 1000 ? 'text-pos' : 'text-neg' %>"><%= invDiffSum.toLocaleString('vi-VN') %> đ</td>
             </tr>
             <% }) %>
@@ -693,14 +697,18 @@
         %>
         <details id="vqr-day-<%= ch %>-<%= r.settlementDate %>" style="background:#fafbfc; border:1px solid #eee; border-radius:8px; margin-top:8px; padding:8px 12px;">
           <summary style="cursor:pointer; font-size:13px; display:flex; justify-content:space-between; flex-wrap:wrap; gap:6px;">
-            <span style="font-weight:600;">Ngày <%= r.settlementDate %><%= r.locked ? ' 🔒 (đã khóa sổ)' : '' %></span>
+            <span style="font-weight:600;">Ngày <%= r.settlementDate %><%= r.locked ? ' 🔒 (đã khóa sổ)' : '' %><% if (r.pendingBank) { %> <span class="badge badge-warn">⏳ Chưa có ngân hàng</span><% } %></span>
             <span>
+              <% if (r.pendingBank) { %>
+              Tính từ dữ liệu tải lên: <strong><%= r.totalNetComputed.toLocaleString('vi-VN') %> đ</strong>
+              <% } else { %>
               Ngân hàng: <strong><%= r.bankAmount.toLocaleString('vi-VN') %> đ</strong>
               &nbsp;|&nbsp; Tính từ dữ liệu tải lên: <strong><%= r.totalNetComputed.toLocaleString('vi-VN') %> đ</strong>
               &nbsp;|&nbsp;
               <span class="<%= Math.abs(r.diffVsBank) < 1000 ? 'text-pos' : 'text-neg' %>">
                 Lệch Ngân hàng↔Dữ liệu: <%= r.diffVsBank.toLocaleString('vi-VN') %> đ
               </span>
+              <% } %>
               &nbsp;|&nbsp;
               <span class="<%= Math.abs(invDiffSum) < 1000 ? 'text-pos' : 'text-neg' %>">
                 Lệch Dữ liệu↔Hóa đơn: <%= invDiffSum.toLocaleString('vi-VN') %> đ

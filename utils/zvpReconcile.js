@@ -32,6 +32,7 @@ const normText = m.normText;
 const dateRange = m.dateRange;
 const displayCode = m.displayCode;
 const FF_SUFFIX = m.FF_SUFFIX;
+const buildPendingDaySettlements = m.buildPendingDaySettlements;
 
 // ---------- Settlement extraction from bank statement (ACB31268) ----------
 
@@ -1208,8 +1209,9 @@ function reconcileZvpChannel(settlements, grossData, invoiceData, gianMapping, m
     }
   }
 
+  const allSettlements = settlements.concat(buildPendingDaySettlements(settlements, grossData));
   const results = [];
-  for (const s of settlements) {
+  for (const s of allSettlements) {
     const days = dateRange(s.fromIso, s.toIso);
     const gianLines = {};
     for (const day of days) {
@@ -1295,7 +1297,8 @@ function reconcileZvpChannel(settlements, grossData, invoiceData, gianMapping, m
       to: s.toIso,
       bankAmount: s.amount,
       totalNetComputed: totalNet,
-      diffVsBank: totalNet - s.amount,
+      diffVsBank: s.pendingBank ? null : totalNet - s.amount,
+      pendingBank: !!s.pendingBank,
       lines: lines.sort((a, b) => b.gross - a.gross),
     });
   }

@@ -799,8 +799,9 @@ function reconcileMomo(settlements, grossData, invoiceData, gianMapping, diemAli
     }
   }
 
+  const allSettlements = settlements.concat(buildPendingDaySettlements(settlements, grossData));
   const results = [];
-  for (const s of settlements) {
+  for (const s of allSettlements) {
     const days = dateRange(s.fromIso, s.toIso);
     const gianLines = {};
     for (const day of days) {
@@ -900,11 +901,58 @@ function reconcileMomo(settlements, grossData, invoiceData, gianMapping, diemAli
       to: s.toIso,
       bankAmount: s.amount,
       totalNetComputed: totalNet,
-      diffVsBank: totalNet - s.amount,
+      diffVsBank: s.pendingBank ? null : totalNet - s.amount,
+      pendingBank: !!s.pendingBank,
       lines: lines.sort((a, b) => b.gross - a.gross),
     });
   }
   return results;
+}
+
+// ---------- Pending-bank rows (dung chung cho Momo/ZVP/VietQR) ----------
+// Luyen, 2026-07-24: "tôi có tải dữ liệu nên rồi á check cho tôi lên bảng
+// luôn đi không cần chờ ngân hàng đâu ... lên số với gian trước đi nào có
+// ngân hàng đối chiếu sau" -- truoc gio moi dong doi soat chi hien ra khi co
+// 1 "settlement" (khoan tien ve ngan hang) THAT tuong ung, nen 1 ngay da co
+// doanh thu tai len (va co the da co hoa don khop) nhung ngan hang CHUA ve
+// (hoac sao ke chua tai) se AN HOAN TOAN khoi trang, du du lieu gian/doanh
+// thu/hoa don da san sang tu lau.
+//
+// Ham nay quet grossData.grossByCode (key "NGAY|MA") de tim moi NGAY co
+// doanh thu > 0 nhung KHONG nam trong bat ky khoang ngay settlement THAT nao
+// (dateRange(fromIso,toIso) cua tung settlement) -- moi ngay con thieu duoc
+// tao thanh 1 "settlement gia" rieng (fromIso=toIso=ngay do), danh dau
+// pendingBank:true va amount:null, de cac ham reconcile*Channel xu ly y het
+// mot settlement that (van dò hoa don, tinh TK Co, doanh thu... binh thuong)
+// -- chi khac la khong co so tien ngan hang de doi chieu/tinh Chenh lech,
+// hien "Chua co ngan hang" thay vi mot con so. Khi sao ke ve sau va tao ra
+// settlement THAT bao gom dung ngay do, ngay do se tu dong chuyen sang dong
+// binh thuong (khong con la "gia" nua) tu lan render tiep theo, khong lo bi
+// dung 2 lan.
+function buildPendingDaySettlements(settlements, grossData) {
+  const covered = new Set();
+  for (const s of settlements || []) {
+    for (const day of dateRange(s.fromIso, s.toIso)) covered.add(day);
+  }
+  const pendingDays = new Set();
+  const grossByCode = (grossData && grossData.grossByCode) || {};
+  for (const key of Object.keys(grossByCode)) {
+    const val = grossByCode[key];
+    if (!val || val <= 0) continue;
+    const day = key.split("|")[0];
+    if (!covered.has(day)) pendingDays.add(day);
+  }
+  return Array.from(pendingDays)
+    .sort()
+    .map((day) => ({
+      date: day,
+      amount: null,
+      fromIso: day,
+      toIso: day,
+      pendingBank: true,
+      id: "pending-" + day,
+      txIds: [],
+    }));
 }
 
 module.exports = {
@@ -916,6 +964,7 @@ module.exports = {
   resolveKhMoiFeeTransactionGross,
   reconcileMomo,
   extractMomoSettlements,
+  buildPendingDaySettlements,
   toIsoDate,
   isoToDmy,
   normCode,

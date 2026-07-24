@@ -457,6 +457,13 @@ router.get("/doi-soat/momo", (req, res) => {
     .map((r) => {
       const lines = r.lines.filter((l) => (activeCompany === "kh_moi" ? l.tkCo === "SKIP" : l.tkCo !== "SKIP"));
       if (activeCompany !== "kh_moi") return { ...r, lines };
+      // pendingBank (chua co giao dich ngan hang that cho ngay nay -- xem
+      // buildPendingDaySettlements) -- giu nguyen diffVsBank = null, KHONG
+      // tinh/hap thu lam tron o day (khong co r.bankAmount that de so sanh).
+      if (r.pendingBank) {
+        const totalNetComputed = lines.reduce((sum, l) => sum + l.net, 0);
+        return { ...r, lines, totalNetComputed, diffVsBank: null };
+      }
       let totalNetComputed = lines.reduce((sum, l) => sum + l.net, 0);
       let diffVsBank = totalNetComputed - r.bankAmount;
       if (diffVsBank !== 0 && Math.abs(diffVsBank) <= ROUNDING_ABSORB_THRESHOLD && lines.length > 0) {
@@ -922,6 +929,11 @@ router.get("/doi-soat/momo/export.xlsx", (req, res) => {
 
   const rows = [];
   reconciled
+    // pendingBank (Luyen, 2026-07-24): dong nay CHUA co giao dich ngan hang
+    // that khop ngay -- chi hien de xem/theo doi truoc, KHONG dua vao file
+    // xuat Misa cho den khi tien that ve ngan hang (tranh hach toan "thu tien
+    // gui" truoc khi tien thuc su vao TK).
+    .filter((r) => !r.pendingBank)
     .sort((a, b) => (a.settlementDate > b.settlementDate ? 1 : -1))
     .forEach((r) => {
       // BUG (phat hien 2026-07-20, Luyen: "dien giai luc nao cung vay, khong

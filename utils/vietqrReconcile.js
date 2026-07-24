@@ -26,6 +26,7 @@ const normCode = m.normCode;
 const normText = m.normText;
 const displayCode = m.displayCode;
 const FF_SUFFIX = m.FF_SUFFIX;
+const buildPendingDaySettlements = m.buildPendingDaySettlements;
 const zvp = require("./zvpReconcile");
 const buildOnlineProductMatcher = zvp.buildOnlineProductMatcher;
 const extractDayList = null; // (kept for clarity -- VietQR days come straight from bank tx dates, not a day-list tag)
@@ -921,8 +922,9 @@ function reconcileVietQr(settlements, grossData, invoiceData, gianMapping, manua
     }
   }
 
+  const allSettlements = settlements.concat(buildPendingDaySettlements(settlements, grossData));
   const results = [];
-  for (const s of settlements) {
+  for (const s of allSettlements) {
     const day = s.date;
     const gianLines = {};
     for (const rawCode of grossData.codes) {
@@ -1020,7 +1022,8 @@ function reconcileVietQr(settlements, grossData, invoiceData, gianMapping, manua
       to: day,
       bankAmount: s.amount,
       totalNetComputed: totalGross,
-      diffVsBank: totalGross - s.amount,
+      diffVsBank: s.pendingBank ? null : totalGross - s.amount,
+      pendingBank: !!s.pendingBank,
       lines: lines.sort((a, b) => b.gross - a.gross),
     });
   }

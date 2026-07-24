@@ -958,6 +958,10 @@ function buildExportRows(reconciledList, startNo, lyDoThu, suffixKenh, maDoiTuon
   let seq = startNo;
   const rows = [];
   reconciledList
+    // pendingBank (Luyen, 2026-07-24): dong nay CHUA co giao dich ngan hang
+    // that khop ngay -- chi hien de xem/theo doi truoc, KHONG dua vao file
+    // xuat Misa cho den khi tien that ve ngan hang.
+    .filter((r) => !r.pendingBank)
     .sort((a, b) => (a.settlementDate > b.settlementDate ? 1 : -1))
     .forEach((r) => {
       const exportableLines = r.lines.filter((l) => l.tkCo !== "SKIP");

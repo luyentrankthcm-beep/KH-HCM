@@ -424,14 +424,21 @@
         <% list.filter(function(r){ return r.lines.length > 0; }).forEach(function(r) { %>
         <div class="panel" style="background:#fafbfc; box-shadow:none; border:1px solid #eee;<%= r.locked ? ' opacity:0.6;' : '' %>">
           <h2 style="display:flex; justify-content:space-between; font-size:14px;">
-            <span>Khoản về ngày <%= r.settlementDate %><%= r.locked ? ' 🔒 (đã khóa sổ)' : '' %> (doanh thu <%= r.from %><%= r.from !== r.to ? ' → ' + r.to : '' %>)</span>
             <span>
+              Khoản về ngày <%= r.settlementDate %><%= r.locked ? ' 🔒 (đã khóa sổ)' : '' %> (doanh thu <%= r.from %><%= r.from !== r.to ? ' → ' + r.to : '' %>)
+              <% if (r.pendingBank) { %><span class="badge badge-warn" title="Đã có doanh thu/gian, chưa có giao dịch ngân hàng khớp ngày này — sẽ tự cập nhật khi sao kê về.">⏳ Chưa có ngân hàng</span><% } %>
+            </span>
+            <span>
+              <% if (r.pendingBank) { %>
+              Tính từ dữ liệu tải lên: <strong><%= r.totalNetComputed.toLocaleString('vi-VN') %> đ</strong>
+              <% } else { %>
               Ngân hàng: <strong><%= r.bankAmount.toLocaleString('vi-VN') %> đ</strong>
               &nbsp;|&nbsp; Tính từ dữ liệu tải lên: <strong><%= r.totalNetComputed.toLocaleString('vi-VN') %> đ</strong>
               &nbsp;|&nbsp;
               <span class="<%= Math.abs(r.diffVsBank) < 1000 ? 'text-pos' : 'text-neg' %>">
                 Chênh lệch: <%= r.diffVsBank.toLocaleString('vi-VN') %> đ
               </span>
+              <% } %>
             </span>
           </h2>
           <table class="table">
