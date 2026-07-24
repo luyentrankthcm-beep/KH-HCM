@@ -211,4 +211,99 @@ router.post("/he-thong/sao-luu/khoi-phuc-giao-dich", requireAdmin, upload.single
   }
 });
 
+// Chi Nhan, 2026-07-24: Luyen chay 1 ban OFFLINE (may rieng, du lieu Viet QR
+// day du hon -- vd raw_uploads/hoa don di ve xa hon) song song voi ban ONLINE
+// (Railway, du lieu Viet QR co the thieu 1 doan ngay nao do chua kip tai
+// len). "dong-bo-mot-phan" o tren THAY THE TOAN BO mang cua kenh (nguy hiem
+// neu ban online da co du lieu MOI HON ban offline cho nhung ngay SAU thoi
+// diem chup file offline -- se bi xoa mat). Muc nay MERGE (chi THEM phan con
+// thieu, KHONG xoa/ghi de bat ky gi ban online da co san):
+//  - viet_qr_raw_uploads[ch]: cong THEM cac "lan tai" (batch) cua file
+//    offline vao mang hien co (gan id MOI de tranh trung id), giu nguyen cac
+//    lan tai da co cua ban online -- viec khu trung LAP O TUNG DONG giao dich
+//    (theo vqrCode/ngay) da co san trong mergeRawRows() luc doc, nen gop
+//    them 1 batch cu KHONG lam nhan doi doanh thu.
+//  - viet_qr_store_names[ch]: CHI dien vao nhung ma cua hang ban online CHUA
+//    CO (khong ghi de len ma da co, tranh mat cap nhat gan day tren online).
+//  - viet_qr_invoices[ch]: cong them hoa don chua co (khop trung theo
+//    soHd|ngayHd|maDiem, giong het logic /upload-hoadon dang dung).
+router.post("/he-thong/sao-luu/dong-bo-mot-phan-gop", requireAdmin, upload.single("file"), (req, res) => {
+  try {
+    if (!req.file) throw new Error("Vui long chon 1 file sao luu (.json) tai tu ban offline.");
+    const text = req.file.buffer.toString("utf8");
+    let parsed;
+    try {
+      parsed = JSON.parse(text);
+    } catch (e) {
+      throw new Error("File nay khong phai file JSON hop le.");
+    }
+    const channels = (req.body.channels || "")
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    if (channels.length === 0) {
+      throw new Error('Thieu kenh Viet QR can gop (vd "bidv7702").');
+    }
+
+    const store = load();
+    const summary = [];
+
+    channels.forEach((ch) => {
+      // 1) raw_uploads: cong them batch, gan id moi.
+      if (!store.viet_qr_raw_uploads) store.viet_qr_raw_uploads = {};
+      if (!store.viet_qr_raw_uploads[ch]) store.viet_qr_raw_uploads[ch] = [];
+      const offlineBatches = (parsed.viet_qr_raw_uploads && parsed.viet_qr_raw_uploads[ch]) || [];
+      let addedBatches = 0;
+      let addedRows = 0;
+      offlineBatches.forEach((batch) => {
+        store.viet_qr_raw_uploads[ch].push({
+          ...batch,
+          id: nextId(store, "viet_qr_raw_uploads_seq"),
+          file_name: `[gop tu offline] ${batch.file_name || ""}`,
+        });
+        addedBatches += 1;
+        addedRows += (batch.rows || []).length;
+      });
+
+      // 2) store_names: chi dien vao ma chua co, khong ghi de.
+      if (!store.viet_qr_store_names) store.viet_qr_store_names = {};
+      if (!store.viet_qr_store_names[ch]) store.viet_qr_store_names[ch] = {};
+      const offlineStoreNames = (parsed.viet_qr_store_names && parsed.viet_qr_store_names[ch]) || {};
+      let addedStoreNames = 0;
+      Object.keys(offlineStoreNames).forEach((maCuaHang) => {
+        if (store.viet_qr_store_names[ch][maCuaHang] !== undefined) return;
+        store.viet_qr_store_names[ch][maCuaHang] = offlineStoreNames[maCuaHang];
+        addedStoreNames += 1;
+      });
+
+      // 3) invoices: cong them hoa don chua co, khop trung theo soHd|ngayHd|maDiem.
+      if (!store.viet_qr_invoices) store.viet_qr_invoices = {};
+      if (!store.viet_qr_invoices[ch]) store.viet_qr_invoices[ch] = [];
+      const offlineInvoices = (parsed.viet_qr_invoices && parsed.viet_qr_invoices[ch]) || [];
+      const existingInvKeys = new Set(store.viet_qr_invoices[ch].map((i) => `${i.soHd}|${i.ngayHd}|${i.maDiem}`));
+      let addedInvoices = 0;
+      offlineInvoices.forEach((inv) => {
+        const k = `${inv.soHd}|${inv.ngayHd}|${inv.maDiem}`;
+        if (existingInvKeys.has(k)) return;
+        existingInvKeys.add(k);
+        store.viet_qr_invoices[ch].push(inv);
+        addedInvoices += 1;
+      });
+
+      summary.push(
+        `${ch}: +${addedBatches} lần tải (${addedRows} dòng QR), +${addedStoreNames} mã cửa hàng mới, +${addedInvoices} hóa đơn mới`
+      );
+    });
+
+    save(store);
+    res.render("backup", {
+      userName: req.session.userName,
+      error: null,
+      success: `Đã gộp thêm dữ liệu từ file offline cho kênh: ${summary.join("; ")}. Dữ liệu online đã có KHÔNG bị xoá/ghi đè.`,
+    });
+  } catch (e) {
+    res.render("backup", { userName: req.session.userName, error: e.message, success: null });
+  }
+});
+
 module.exports = router;

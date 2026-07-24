@@ -51,7 +51,22 @@
     </section>
 
     <section class="panel">
-      <h2>4. Khôi phục giao dịch 1 ngân hàng theo khoảng ngày từ file sao lưu</h2>
+      <h2>4. Gộp thêm dữ liệu Viet QR (1 kênh) từ file offline -- AN TOÀN, không xoá/ghi đè</h2>
+      <p class="muted">
+        Dùng khi bản chạy trên máy (offline) có dữ liệu Viet QR (dữ liệu tải lên/mã cửa hàng/hóa đơn) đầy đủ hơn
+        bản online cho 1 kênh (ví dụ bidv7702) -- mục này CHỈ THÊM phần online còn thiếu, KHÔNG xoá hay ghi đè bất
+        cứ gì online đã có sẵn (an toàn hơn mục "Đồng bộ một phần" phía trên, mục đó thay thế toàn bộ nên có thể
+        làm mất dữ liệu mới hơn bên online nếu có).
+      </p>
+      <form method="POST" action="/he-thong/sao-luu/dong-bo-mot-phan-gop" enctype="multipart/form-data" class="form-inline">
+        <input type="file" name="file" accept=".json" required />
+        <input type="text" name="channels" placeholder="vd: bidv7702" required style="width:140px;" />
+        <button type="submit" class="btn btn-secondary">Gộp thêm (an toàn)</button>
+      </form>
+    </section>
+
+    <section class="panel">
+      <h2>5. Khôi phục giao dịch 1 ngân hàng theo khoảng ngày từ file sao lưu</h2>
       <p class="muted">
         Dùng khi giao dịch (sao kê) của 1 ngân hàng trong 1 khoảng ngày bị lỗi/trùng lặp (ví dụ do tải lại sao kê
         nhiều lần lúc sửa lỗi), muốn lấy lại đúng dữ liệu sạch từ 1 file sao lưu cũ hơn cho ĐÚNG ngân hàng và
