@@ -607,10 +607,25 @@ router.post("/doi-soat/momo/upload-tong", requireDataEntry, upload.single("file"
       // xem utils/momoReconcile.js parseKhMoiFeeTransactionWorkbook). Thu
       // parser nay TRUOC (chi khop dung khi file THAT SU co du cac cot can
       // thiet, nem loi va roi ve parser "Tong Momo Gop/flat" cu neu khong).
+      // Luyen, 2026-07-24: "check tại sao lệch 250k" -- phat hien khoan ve
+      // 23/07 (doanh thu 22/07) cua KH Cu bi lech dung bang chenh lech giua
+      // phi co dinh 1,1% (dung thuc te cua KH Cu, xac nhan qua toan bo cac
+      // ngay khac trong thang deu khop tuyet doi) va phi uoc tinh theo Nguon
+      // tien cua parser ben duoi (chi dung cho KH Moi). Goc re: parser nay
+      // duoc thu truoc cho MOI file .xlsx bat ke dang xem cong ty nao, nen 1
+      // file "Transaction report" (co cot Nguon tien) tai len luc dang xem KH
+      // Cu van bi parse va sinh netByCode, ghi de nham len phi co dinh dung
+      // cua KH Cu. Chi cho phep parser theo Nguon tien chay khi THAT SU dang
+      // xem KH Moi (noi duy nhat dung phi bien doi 1%/1,2%/0,3%) -- KH Cu luon
+      // roi thang ve parser "Tong Momo Gop/flat" ben duoi du file co du cot
+      // Nguon tien hay khong.
       let usedFeeParser = false;
       let feeUnmapped = [];
       let parsed;
       try {
+        if (activeCompany !== "kh_moi") {
+          throw new Error("KH Cu dung phi co dinh 1,1%, khong ap dung parser tinh phi theo Nguon tien.");
+        }
         const { transactions } = parseKhMoiFeeTransactionWorkbook(req.file.buffer);
         const resolved = resolveKhMoiFeeTransactionGross(transactions, store.cua_hang_mapping);
         parsed = {
