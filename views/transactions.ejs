@@ -8,6 +8,20 @@
   <main class="container">
     <h1>Giao dịch / Sao kê — <%= COMPANIES[activeCompany].label %></h1>
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+    <% if (typeof success !== 'undefined' && success) { %><div class="alert alert-success"><%= success %></div><% } %>
+
+    <% if (typeof duplicateSummary !== 'undefined' && duplicateSummary) { %>
+    <div class="alert" style="border:1px solid #e33; background:#fff5f5;">
+      <strong>⚠️ Phát hiện giao dịch trùng lặp cho ngân hàng đang lọc:</strong>
+      <%= duplicateSummary.groupCount %> nhóm giao dịch bị nhập trùng, dư <strong><%= duplicateSummary.excessCount %></strong> dòng,
+      tổng số tiền bị cộng thừa <strong><%= duplicateSummary.excessAmount.toLocaleString('vi-VN') %> đ</strong>.
+      Thường xảy ra khi tải lại sao kê nhiều lần trong lúc dữ liệu cũ chưa được dọn đúng cách.
+      <form method="POST" action="/transactions/dedupe/<%= filters.bank_id %>" style="margin-top:8px;"
+            onsubmit="return confirm('Xoá ' + <%= duplicateSummary.excessCount %> + ' dòng trùng lặp (giữ lại 1 dòng đúng cho mỗi giao dịch thật)? Không thể hoàn tác.');">
+        <button type="submit" class="btn btn-secondary">Dọn giao dịch trùng lặp ngay</button>
+      </form>
+    </div>
+    <% } %>
 
     <section class="panel">
       <h2>Tải file sao kê tải trực tiếp từ ngân hàng (.xlsx/.xls)</h2>

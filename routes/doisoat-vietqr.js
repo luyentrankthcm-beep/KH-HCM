@@ -108,10 +108,19 @@ const GIAN_MERGE_DEFAULTS = {
 // Posh, dung ma chuan "GO AU CO PHCM" (xem danh sach cong trinh KH Moi).
 // "AE Tân Phú ghế" -> "AM TP PHCM", "Lotte mart Nam Sài Gòn" -> "LOTTE Q7
 // (NSG) PHM": Luyen xac nhan them 2026-07-20.
+// "LM NHA TRANG KVC" -> "FARM LOTTE NHA TRANG", "JP vicom 3.2 BIDV" -> "VC
+// 3/2 JP-Posh", "VINCOM GAND PARK" -> "JP-POSH GRAND PARK": Luyen xac nhan
+// 2026-07-24 qua anh chup danh sach cong trinh chuan (Danh_sach_cong_trinh.xlsx,
+// KH Moi) -- 2 ma dau la khop tuyet doi trong danh sach nhung ten thuc te qua
+// khac nen findBestMaCongTrinh khong tu tim ra; "VINCOM GAND PARK" la nham
+// (chinh la diem "JP-POSH GRAND PARK" da co ma, khong phai diem rieng).
 const MA_CONG_TRINH_DISPLAY_ALIAS_DEFAULTS = {
   "Go Âu Cơ (EB Tân Phú)": "GO AU CO PHCM",
   "AE Tân Phú ghế": "AM TP PHCM",
   "Lotte mart Nam Sài Gòn": "LOTTE Q7 (NSG) PHM",
+  "LM NHA TRANG KVC": "FARM LOTTE NHA TRANG",
+  "JP vicom 3.2 BIDV": "VC 3/2 JP-Posh",
+  "VINCOM GAND PARK": "JP-POSH GRAND PARK",
 };
 
 function ensureChannelShape(store) {

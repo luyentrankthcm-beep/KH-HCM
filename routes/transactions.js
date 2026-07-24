@@ -2,7 +2,7 @@ const express = require("express");
 const multer = require("multer");
 const XLSX = require("xlsx");
 const { load, save, nextId } = require("../store");
-const { requireLogin, requireDataEntry } = require("../middleware/auth");
+const { requireLogin, requireDataEntry, requireAdmin } = require("../middleware/auth");
 const { parsePastedTransactions, parseAmount, parseDate } = require("../utils/parse");
 const { parseBankStatement, computeThuChi } = require("../utils/bankStatementParser");
 const { getCompany } = require("../utils/companies");
@@ -116,6 +116,46 @@ function computeThuChiTotals(allFilteredRows) {
   return { totalThu, totalChi };
 }
 
+// Chi Nhan, 2026-07-24: Luyen phat hien tong "Ngan hang" cua 1 ngay bi cong
+// SAI cao gap nhieu lan so tien that (235 trieu thay vi ~21 trieu that cua
+// ngay 22/07, BIDV7702) -- goc re: qua nhieu lan tai lai sao ke trong luc do
+// bug "So chung tu bi nham la So tham chieu" (xem utils/bankStatementParser.js)
+// khien tu-sua (self-heal, xem /transactions/upload-statement) chi don duoc
+// CUNG mot lan tai (dung dung 1 khoang ngay), con cac lan tai KHAC (pham vi
+// ngay khac nhau moi lan, do Luyen thu nhieu file khac nhau trong luc debug)
+// khong nam trong dung khoang [firstDate,lastDate] cua lan tai MOI NHAT nen
+// khong duoc don, de lai nhieu ban ghi TRUNG (cung 1 giao dich that nhung
+// Reference khac nhau -- 1 ban ghi cu voi "So chung tu" sai, 1 ban ghi moi
+// voi "So tham chieu" dung). Vi Reference KHAC nhau nen khong the dedup theo
+// Reference; nhung Ngay+So tien+Loai+Dien giai CHAC CHAN giong het nhau cho
+// CUNG 1 giao dich that (Dien giai doc tu 1 cot co dinh, khong phu thuoc bug
+// Reference) -- dung 4 truong nay lam khoa nhom de tim ban trung.
+function findDuplicateGroups(store, bankId) {
+  const groups = new Map();
+  store.transactions.forEach((t) => {
+    if (t.bank_id !== bankId) return;
+    const key = `${t.date}|${t.amount}|${t.type}|${t.description}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(t);
+  });
+  const dupGroups = [];
+  groups.forEach((rows) => {
+    if (rows.length > 1) dupGroups.push(rows);
+  });
+  dupGroups.sort((a, b) => (a[0].date < b[0].date ? 1 : a[0].date > b[0].date ? -1 : 0));
+  return dupGroups;
+}
+
+function summarizeDuplicates(dupGroups) {
+  let excessCount = 0;
+  let excessAmount = 0;
+  dupGroups.forEach((rows) => {
+    excessCount += rows.length - 1;
+    excessAmount += rows[0].amount * (rows.length - 1);
+  });
+  return { groupCount: dupGroups.length, excessCount, excessAmount };
+}
+
 router.get("/transactions", (req, res) => {
   const store = load();
   const activeCompany = getCompany(req);
@@ -137,6 +177,14 @@ router.get("/transactions", (req, res) => {
   const totalThu = allFiltered.filter((t) => t.type === "thu").reduce((s, t) => s + Number(t.amount || 0), 0);
   const totalChi = allFiltered.filter((t) => t.type === "chi").reduce((s, t) => s + Number(t.amount || 0), 0);
 
+  // Chi Nhan, 2026-07-24: chi tinh khi da loc dung 1 ngan hang cu the (tranh
+  // quet toan bo store.transactions moi lan mo trang /transactions chung).
+  let duplicateSummary = null;
+  if (bank_id) {
+    const dupGroups = findDuplicateGroups(store, Number(bank_id));
+    if (dupGroups.length > 0) duplicateSummary = summarizeDuplicates(dupGroups);
+  }
+
   res.render("transactions", {
     banks,
     rows,
@@ -148,7 +196,9 @@ router.get("/transactions", (req, res) => {
     uploadResult: null,
     maCongTrinhMaster: maCongTrinhMasterFor(store, activeCompany),
     maCongTrinhResult: null,
-    error: null,
+    duplicateSummary,
+    error: req.query.error || null,
+    success: req.query.success || null,
   });
 });
 
@@ -433,6 +483,51 @@ router.post("/transactions/upload-statement", requireDataEntry, upload.single("f
     maCongTrinhResult: null,
     error: null,
   });
+});
+
+// Chi Nhan, 2026-07-24: don giao dich TRUNG LAP cho 1 ngan hang (xem
+// findDuplicateGroups o tren) -- moi nhom trung giu lai DUNG 1 dong (uu tien
+// dong co Reference "trong" hop le (khong phai chuoi thuan so kieu "So chung
+// tu" cu -- xem utils/bankStatementParser.js) hon dong Reference thuan so cu;
+// neu ca 2 dong deu cung loai, giu dong created_at moi nhat), xoa cac dong con
+// lai trong nhom. requireAdmin (thao tac xoa hang loat, khong the hoan tac).
+function looksLikeStaleNumericRef(ref) {
+  return /^\d{1,10}$/.test(String(ref || ""));
+}
+router.post("/transactions/dedupe/:bank_id", requireAdmin, (req, res) => {
+  const store = load();
+  const bankIdNum = Number(req.params.bank_id);
+  try {
+    const dupGroups = findDuplicateGroups(store, bankIdNum);
+    if (dupGroups.length === 0) {
+      return res.redirect(`/transactions?bank_id=${bankIdNum}&success=` + encodeURIComponent("Khong tim thay giao dich trung lap nao."));
+    }
+    const idsToRemove = new Set();
+    let removedCount = 0;
+    let removedAmount = 0;
+    dupGroups.forEach((rows) => {
+      const sorted = [...rows].sort((a, b) => {
+        const aGood = a.reference && !looksLikeStaleNumericRef(a.reference) ? 1 : 0;
+        const bGood = b.reference && !looksLikeStaleNumericRef(b.reference) ? 1 : 0;
+        if (aGood !== bGood) return bGood - aGood; // uu tien reference "tot" hon len truoc
+        return (b.created_at || "").localeCompare(a.created_at || ""); // moi nhat truoc
+      });
+      // Giu lai sorted[0], xoa phan con lai.
+      sorted.slice(1).forEach((t) => {
+        idsToRemove.add(t.id);
+        removedCount += 1;
+        removedAmount += t.amount;
+      });
+    });
+    store.transactions = store.transactions.filter((t) => !idsToRemove.has(t.id));
+    save(store);
+    res.redirect(
+      `/transactions?bank_id=${bankIdNum}&success=` +
+        encodeURIComponent(`Đã xoá ${removedCount} dòng trùng lặp, giảm ${removedAmount.toLocaleString("vi-VN")}đ bị cộng thừa.`)
+    );
+  } catch (e) {
+    res.redirect(`/transactions?bank_id=${bankIdNum}&error=` + encodeURIComponent(e.message));
+  }
 });
 
 // Upload danh sach "Ma cong trinh" chuan (rieng theo tung cong ty dang chon).
