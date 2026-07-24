@@ -81,8 +81,19 @@
          moi dong Chi Phi + tai khoan ngan hang (xem routes/chi-phi.js,
          routes/banks.js). Mien Bac bat dau trong, cho Luyen tu lien ket ngan
          hang/nguon du lieu rieng sau. -->
-    <a href="/chi-phi/mien-nam">Chi Phí Miền Nam</a>
-    <a href="/chi-phi/mien-bac">Chi Phí Miền Bắc</a>
+    <!-- Luyen, 2026-07-24: "chỗ chi phí miền nam bắc đi đừng tách ra vậy nhìn
+         nó rối lắm thêm giống chỗ hợp đồng á" -- gop 2 muc rieng lai thanh 1
+         dropdown "Chi Phí" giong y het kieu Phap danh o duoi, thay vi 2 link
+         doc rieng tren thanh menu. Duong dan/trang dich khong doi. -->
+    <div class="nav-dropdown" id="navDropdownChiPhi">
+      <button type="button" class="nav-dropdown-toggle" onclick="toggleNavDropdown('navDropdownChiPhi')">
+        Chi Phí <span class="caret">▾</span>
+      </button>
+      <div class="nav-dropdown-menu">
+        <a href="/chi-phi/mien-nam">Chi Phí Miền Nam</a>
+        <a href="/chi-phi/mien-bac">Chi Phí Miền Bắc</a>
+      </div>
+    </div>
     <!-- Luyen, 2026-07-19: muc "Phap danh" moi -- 2 trang hop dong, hien
          dang la khung rong (bang + nut them dong) cho Luyen nhap tay, se bo
          sung them cot/truong theo yeu cau chi tiet sau. -->
@@ -101,7 +112,9 @@
     <% } %>
   </nav>
   <div class="nav-user">
-    <% if (typeof isAdmin !== "undefined" && !isAdmin) { %>
+    <% if (typeof userRole !== "undefined" && userRole === "nhap_lieu") { %>
+    <span class="viewer-badge" title="Tai khoan Nhap lieu: duoc them/sua/tai len du lieu, khong duoc xoa hay dung cau hinh he thong">✏️ Nhập liệu</span>
+    <% } else if (typeof isAdmin !== "undefined" && !isAdmin) { %>
     <span class="viewer-badge" title="Tai khoan chi xem: khong the sua, xoa hay tai len du lieu">👁 Chỉ xem</span>
     <% } %>
     <span><%= userName %></span>
@@ -316,7 +329,7 @@
   });
 </script>
 <%- include('panel-toggle') %>
-<% if (typeof isAdmin !== "undefined" && !isAdmin) { %>
+<% if (typeof userRole !== "undefined" && userRole === "viewer") { %>
 <script>
   // Chi Nhan (2026-07-21): tai khoan "chi xem" -- an bot moi form/nut thao
   // tac ghi/sua/xoa/tai len (chi de UI do nhin, khong phai lop bao ve chinh:
@@ -333,6 +346,28 @@
       var action = form.getAttribute("action") || "";
       if (ALLOWED_ACTIONS.some(function (a) { return action.indexOf(a) === 0; })) return;
       form.style.display = "none";
+    });
+  })();
+</script>
+<% } else if (typeof userRole !== "undefined" && userRole === "nhap_lieu") { %>
+<script>
+  // Luyen (2026-07-24): tai khoan "Nhap lieu" -- duoc them/sua/tai len du
+  // lieu nghiep vu binh thuong (KHONG an cac form do), chi an cac form
+  // XOA/CLEAR va cac form CAU HINH he thong (khoa so, mapping TK Co/TK No,
+  // an gian, sua CSE...) ma backend cung tu choi (xem middleware/auth.js
+  // requireAdmin/requireDataEntry) -- day CUNG chi la UI cho do nhin, lop
+  // bao ve chinh van o backend, phong khi 1 form nao do lot khoi danh sach
+  // nhan dien duoi day.
+  (function () {
+    var HIDE_IF_ACTION_CONTAINS = [
+      "/delete", "/xoa", "/clear",
+      "/khoa-so", "/mapping", "/gian-hidden", "/online-gian-fix", "/vendor-tk",
+    ];
+    document.querySelectorAll('form[method="POST" i]').forEach(function (form) {
+      var action = form.getAttribute("action") || "";
+      if (HIDE_IF_ACTION_CONTAINS.some(function (a) { return action.indexOf(a) !== -1; })) {
+        form.style.display = "none";
+      }
     });
   })();
 </script>

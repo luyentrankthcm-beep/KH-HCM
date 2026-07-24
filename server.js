@@ -56,6 +56,10 @@ app.use((req, res, next) => {
   // an bot nut/form thao tac cho tai khoan "chi xem" de do roi mat, KHONG
   // phai lop bao ve chinh).
   res.locals.isAdmin = !!(req.session && req.session.role === "admin");
+  // Luyen (2026-07-24): them quyen "Nhap lieu" -- userRole dung cho UI (badge
+  // trong nav.ejs) de phan biet 3 quyen, KHONG phai lop bao ve chinh (xem
+  // middleware/auth.js requireAdmin/requireDataEntry cho chan o backend).
+  res.locals.userRole = (req.session && req.session.role) || "viewer";
   next();
 });
 

@@ -65,10 +65,29 @@ function requireAdmin(req, res, next) {
   if (req.session && req.session.role === "admin") {
     return next();
   }
-  const msg = "Tai khoan nay chi duoc xem, khong co quyen chinh sua/xoa/tai len du lieu.";
+  const msg = "Tai khoan nay khong co quyen thao tac nay (chi Quan tri moi lam duoc -- xoa, khoa so, cau hinh TK/mapping, tai khoan/ngan hang...).";
   const back = req.get("Referer") || "/";
   const sep = back.includes("?") ? "&" : "?";
   return res.redirect(back + sep + "error=" + encodeURIComponent(msg));
 }
 
-module.exports = { requireLogin, requireAdmin };
+// Luyen (2026-07-24): them quyen thu 3 "Nhap lieu" -- duoc them/sua/tai len
+// du lieu nghiep vu (giao dich, doi soat Momo/Zalo-VNPay-Payoo/VietQR, chi
+// phi, cong no...) NHUNG khong duoc xoa bat cu gi, va khong duoc dung toi
+// cac trang cau hinh he thong (Tai khoan, Ngan hang, Phap danh hop dong,
+// mapping TK Co/TK No, khoa so, an gian...) -- nhung trang/thao tac do van
+// chi dung requireAdmin nhu cu (khong doi gi), chi NHUNG route ro rang la
+// "nhap du lieu" (tai file len, them/sua 1 dong cu the, dien ma con thieu
+// cho 1 dong/giao dich cu the) moi doi sang requireDataEntry o duoi day.
+function requireDataEntry(req, res, next) {
+  if (AUTH_DISABLED) return next();
+  if (req.session && (req.session.role === "admin" || req.session.role === "nhap_lieu")) {
+    return next();
+  }
+  const msg = "Tai khoan nay chi duoc xem, khong co quyen nhap/sua/tai len du lieu.";
+  const back = req.get("Referer") || "/";
+  const sep = back.includes("?") ? "&" : "?";
+  return res.redirect(back + sep + "error=" + encodeURIComponent(msg));
+}
+
+module.exports = { requireLogin, requireAdmin, requireDataEntry };

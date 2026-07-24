@@ -1,7 +1,7 @@
 const express = require("express");
 const multer = require("multer");
 const { load, save, nextId } = require("../store");
-const { requireLogin, requireAdmin } = require("../middleware/auth");
+const { requireLogin, requireAdmin, requireDataEntry } = require("../middleware/auth");
 const { buildAllFlatLines, buildAgingRows } = require("../utils/overviewAggregate");
 const { parseMisaCongNoXlsx } = require("../utils/misaCongNo");
 
@@ -135,7 +135,7 @@ router.get("/cong-no/khach-hang", (req, res) => {
 
 // ---------- Cong no nhap tay (da doi soat xong tu truoc, co so hoa don theo
 // gian) -- 4 cot co ban theo yeu cau Luyen: Gian, Ngay, So tien, So HD. ----------
-router.post("/cong-no/thu-cong", requireAdmin, (req, res) => {
+router.post("/cong-no/thu-cong", requireDataEntry, (req, res) => {
   const store = load();
   ensureManualShape(store);
   try {
@@ -168,7 +168,7 @@ router.post("/cong-no/thu-cong/:id/delete", requireAdmin, (req, res) => {
 });
 
 // ---------- Doi soat MISA cong no (131) vs Ngan hang ----------
-router.post("/cong-no/upload-misa", requireAdmin, upload.single("file"), (req, res) => {
+router.post("/cong-no/upload-misa", requireDataEntry, upload.single("file"), (req, res) => {
   const store = load();
   ensureMisaShape(store);
   try {
@@ -189,7 +189,7 @@ router.post("/cong-no/upload-misa", requireAdmin, upload.single("file"), (req, r
   }
 });
 
-router.post("/cong-no/misa-mapping", requireAdmin, (req, res) => {
+router.post("/cong-no/misa-mapping", requireDataEntry, (req, res) => {
   const store = load();
   ensureMisaShape(store);
   try {

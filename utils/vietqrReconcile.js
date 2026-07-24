@@ -63,13 +63,16 @@ function extractVqrCode(text) {
 // token se loai NHAM ca doanh thu QR that. Dung dung dac diem MOMO (ma
 // KH###KVCMN#### hoac REM tu M-Service) de loai TRU, giu lai tat ca con lai.
 const MOMO_TX_PATTERN = /KH\d+KVCMN\d+|DICH\s+VU\s+DI\s+DONG\s+TRUC\s+TUYEN/i;
+// Tach rieng buoc loc (dung chung cho ca extractVietQrSettlements o duoi VA
+// resolveGianGrossByBankRef, xem ghi chu tai do) khoi buoc gop theo ngay.
+function extractVietQrThuTransactions(transactions) {
+  return transactions.filter(
+    (t) => t.type === "thu" && !t.excludeFromVietQrRecon && t.date && !MOMO_TX_PATTERN.test(t.description || "")
+  );
+}
 function extractVietQrSettlements(transactions) {
   const byDate = {};
-  for (const t of transactions) {
-    if (t.type !== "thu") continue;
-    if (t.excludeFromVietQrRecon) continue;
-    if (!t.date) continue;
-    if (MOMO_TX_PATTERN.test(t.description || "")) continue;
+  for (const t of extractVietQrThuTransactions(transactions)) {
     if (!byDate[t.date]) {
       byDate[t.date] = { date: t.date, fromIso: t.date, toIso: t.date, amount: 0, txIds: [] };
     }
@@ -179,6 +182,10 @@ function findVietQrDataSheet(wbLite, buffer) {
         if (idx.trangThai === undefined && s.includes("trang thai")) idx.trangThai = c;
         if (idx.maCuaHang === undefined && s.includes("ma cua hang")) idx.maCuaHang = c;
         if (idx.noiDung === undefined && s.includes("noi dung tt")) idx.noiDung = c;
+        // Chi Nhan, 2026-07-24: them cot "Ma tham chieu" -- can rieng cho
+        // tinh nang khop voi "So tham chieu" ben sao ke ngan hang (kenh
+        // BIDV7702 tu 22/07 tro di, xem resolveGianGrossByBankRef ben duoi).
+        if (idx.maThamChieu === undefined && s.includes("ma tham chieu")) idx.maThamChieu = c;
       });
       if (idx.soTien !== undefined && idx.maCuaHang !== undefined && idx.noiDung !== undefined) {
         return { sheetName, grid, headerRowIdx: r, cols: idx };
@@ -211,7 +218,8 @@ function parseVietQrRawWorkbook(buffer) {
     const vqrCode = extractVqrCode(noiDung);
     const thoiGianRaw = cols.thoiGian !== undefined ? row[cols.thoiGian] : null;
     const date = parseVqrDate(thoiGianRaw);
-    rows.push({ vqrCode, maCuaHang, amount, date, raw: noiDung });
+    const refCode = cols.maThamChieu !== undefined ? String(row[cols.maThamChieu] || "").trim() : "";
+    rows.push({ vqrCode, maCuaHang, amount, date, raw: noiDung, refCode });
   }
 
   return { sheetName, rows };
@@ -287,6 +295,52 @@ function parseCuaHangSheet(buffer) {
     }
   }
   return map;
+}
+
+// ---------- "Ten diem- Ma cong trinh" master table (BIDV7702, tu 22/07/2026) ----------
+// Chi Nhan, 2026-07-24: bang tra cuu THU CONG rieng cua Luyen -- 2 cot that
+// su ("ten diem ban", "ma cong trinh"), cac cot con lai (C/D/E) chi la du
+// lieu rac/danh sach dropdown validation cua Excel, khong lien quan, phai bo
+// qua. Dung de tra ma cong trinh CHINH XAC (khong fuzzy) tu ten diem ban da
+// tra duoc qua "Ma cua hang" -> "Cua hang"/"store-export" o tren, danh rieng
+// cho tinh nang khop theo "So tham chieu" ngan hang (xem resolveGianGrossByBankRef).
+function parseTenDiemMaCongTrinhSheet(buffer) {
+  const wbLite = XLSX.read(buffer, { type: "buffer", bookSheets: true });
+  for (const sheetName of wbLite.SheetNames) {
+    const t = normText(sheetName);
+    if (!(t.includes("ten diem") && t.includes("ma cong trinh"))) continue;
+    const wb = XLSX.read(buffer, { type: "buffer", sheets: [sheetName] });
+    const ws = wb.Sheets[sheetName];
+    const grid = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: null });
+    let headerRowIdx = -1;
+    let cols = {};
+    for (let r = 0; r < Math.min(grid.length, 6); r++) {
+      const row = grid[r] || [];
+      const idx = {};
+      row.forEach((v, c) => {
+        if (!v || typeof v !== "string") return;
+        const s = normText(v);
+        if (idx.tenDiem === undefined && s.includes("ten diem")) idx.tenDiem = c;
+        if (idx.maCongTrinh === undefined && s.includes("ma cong trinh")) idx.maCongTrinh = c;
+      });
+      if (idx.tenDiem !== undefined && idx.maCongTrinh !== undefined) {
+        headerRowIdx = r;
+        cols = idx;
+        break;
+      }
+    }
+    if (headerRowIdx < 0) continue;
+    const map = {}; // normText(ten diem) -> ma cong trinh (nguyen ban, chua chuan hoa)
+    for (let r = headerRowIdx + 1; r < grid.length; r++) {
+      const row = grid[r] || [];
+      const tenDiem = String(row[cols.tenDiem] || "").trim();
+      const maCongTrinh = String(row[cols.maCongTrinh] || "").trim();
+      if (!tenDiem || !maCongTrinh) continue;
+      map[normText(tenDiem)] = maCongTrinh;
+    }
+    if (Object.keys(map).length > 0) return { sheetName, map };
+  }
+  throw new Error('Khong tim thay sheet "Ten diem- Ma cong trinh" hop le (can cot "Ten diem ban" va "Ma cong trinh") trong file nay.');
 }
 
 // ---------- Invoice list (shared MTT-style sheet, filtered by a bank-specific tag) ----------
@@ -539,6 +593,105 @@ function resolveGianGross(rawRows, storeNameMap, gianCandidates, nocodeAssignmen
   });
   blankRows.sort((a, b) => (a.date || "").localeCompare(b.date || ""));
   return { codes: Array.from(codes), grossByCode, unmapped, unmappedDetails, blankRows };
+}
+
+// ---------- BIDV7702: khop theo "So tham chieu" ngan hang (tu 22/07/2026) ----------
+// Chi Nhan, 2026-07-24 (yeu cau Luyen): "check từ số tham chiếu qua ngân
+// hàng lấy ngân hàng làm chuẩn". Khac voi resolveGianGross o tren (fuzzy
+// text, van dung cho cac ngay TRUOC 22/07), tu 22/07 tro di NGAN HANG la
+// chuan: moi giao dich "thu" tren sao ke duoc gan vao dung 1 dong QR co CUNG
+// "Ma tham chieu" (ca 2 file deu co cot nay -- xem findVietQrDataSheet/
+// parseVietQrRawWorkbook va utils/bankStatementParser.js), roi tra Ma cua
+// hang -> Ten diem ban (qua storeNameMap, giong het truoc gio) -> Ma cong
+// trinh (qua bang tra cuu rieng "Ten diem- Ma cong trinh", KHOP TUYET DOI
+// sau khi chuan hoa, KHONG fuzzy). 3 truong hop canh bao theo dung yeu cau:
+//  1) Giao dich ngan hang KHONG tim thay Ma tham chieu nao khop (o bat ky
+//     ngay nao) -> unmatchedBankTx (canh bao do).
+//  2) Tim thay nhung o NGAY KHAC voi ngay ngan hang bao tien ve (tien den QR
+//     tu ngay truoc, ngan hang moi ghi nhan tien sau) -> van cong doanh thu
+//     vao dung NGAY NGAN HANG (ngan hang la chuan), nhung them 1 canh bao
+//     rieng -- lateMatches (hien dong xanh, chi mang tinh thong bao).
+//  3) Ma cua hang MOI (chua co trong storeNameMap) hoac Ten diem ban chua co
+//     trong bang tra cuu Ma cong trinh -> unmappedStoreCodes/unmappedTenDiem.
+function resolveGianGrossByBankRef(bankTxs, rawRows, storeNameMap, tenDiemToProjectMap) {
+  const refIndex = new Map(); // Ma tham chieu -> [rawRow, ...]
+  rawRows.forEach((row) => {
+    const ref = (row.refCode || "").trim();
+    if (!ref) return;
+    if (!refIndex.has(ref)) refIndex.set(ref, []);
+    refIndex.get(ref).push(row);
+  });
+
+  const grossByCode = {};
+  const codes = new Set();
+  const unmatchedBankTx = [];
+  const lateMatches = [];
+  const unmappedStoreCodesAgg = new Map();
+  const unmappedTenDiemAgg = new Map();
+
+  for (const tx of bankTxs) {
+    const ref = (tx.reference || "").trim();
+    const candidates = ref ? refIndex.get(ref) || [] : [];
+    // Uu tien dong QR CUNG NGAY voi giao dich ngan hang; neu khong co, lay
+    // dong som nhat trong so cac dong trung ma (de bao "tien den tre" nhat quan).
+    let raw = candidates.find((r) => r.date === tx.date);
+    if (!raw && candidates.length > 0) {
+      raw = candidates.slice().sort((a, b) => (a.date || "").localeCompare(b.date || ""))[0];
+    }
+    if (!raw) {
+      unmatchedBankTx.push({
+        date: tx.date,
+        amount: tx.amount,
+        reference: tx.reference || "",
+        description: tx.description || "",
+      });
+      continue;
+    }
+    if (raw.date && raw.date !== tx.date) {
+      lateMatches.push({
+        bankDate: tx.date,
+        rawDate: raw.date,
+        reference: ref,
+        amount: tx.amount,
+        maCuaHang: raw.maCuaHang || "",
+      });
+    }
+    const storeInfo = storeNameMap[raw.maCuaHang];
+    if (!storeInfo) {
+      const agg = unmappedStoreCodesAgg.get(raw.maCuaHang) || { maCuaHang: raw.maCuaHang || "", count: 0, total: 0 };
+      agg.count += 1;
+      agg.total += tx.amount;
+      unmappedStoreCodesAgg.set(raw.maCuaHang, agg);
+      continue;
+    }
+    const tenDiem = (storeInfo.tenDiemBan || storeInfo.matchText || "").trim();
+    const maCongTrinh = tenDiem ? tenDiemToProjectMap[normText(tenDiem)] : undefined;
+    if (!maCongTrinh) {
+      const key = tenDiem || raw.maCuaHang;
+      const agg = unmappedTenDiemAgg.get(key) || {
+        tenDiemBan: tenDiem,
+        maCuaHang: raw.maCuaHang || "",
+        count: 0,
+        total: 0,
+      };
+      agg.count += 1;
+      agg.total += tx.amount;
+      unmappedTenDiemAgg.set(key, agg);
+      continue;
+    }
+    codes.add(maCongTrinh);
+    const key = `${tx.date}|${maCongTrinh}`;
+    grossByCode[key] = (grossByCode[key] || 0) + tx.amount;
+  }
+
+  return {
+    codes: Array.from(codes),
+    grossByCode,
+    unmatchedBankTx: unmatchedBankTx.sort((a, b) => (a.date || "").localeCompare(b.date || "")),
+    lateMatches: lateMatches.sort((a, b) => (a.bankDate || "").localeCompare(b.bankDate || "")),
+    unmappedStoreCodes: Array.from(unmappedStoreCodesAgg.values()).sort((a, b) => b.total - a.total),
+    unmappedTenDiem: Array.from(unmappedTenDiemAgg.values()).sort((a, b) => b.total - a.total),
+  };
 }
 
 // ---------- Viet QR MN (BIDV7702 / KH Moi's own "VIETQR MN 7702.xlsx"
@@ -1069,12 +1222,15 @@ function reconcileVietQr(settlements, grossData, invoiceData, gianMapping, manua
 module.exports = {
   extractVqrCode,
   extractVietQrSettlements,
+  extractVietQrThuTransactions,
   parseVietQrRawWorkbook,
   parseCuaHangSheet,
   parseStoreExportSheet,
+  parseTenDiemMaCongTrinhSheet,
   parseInvoiceWorkbookByTag,
   buildGianCandidatesFromInvoices,
   resolveGianGross,
+  resolveGianGrossByBankRef,
   reconcileVietQr,
   parseVietQrMnRawWorkbook,
   parseMaCuaHangAppSheet,

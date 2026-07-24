@@ -8,8 +8,11 @@
   <main class="container">
     <h1>Quản lý tài khoản đăng nhập</h1>
     <p class="muted" style="margin-top:-10px;">
-      <strong>Quản trị</strong>: xem, sửa, xóa, tải lên được mọi thứ. <strong>Chỉ xem</strong>: chỉ xem số liệu và
-      chọn bộ lọc/công ty, không sửa/xóa/tải lên được gì (mọi nút thao tác sẽ tự ẩn khi đăng nhập bằng tài khoản này).
+      <strong>Quản trị</strong>: xem, sửa, xóa, tải lên được mọi thứ, kể cả Tài khoản/Ngân hàng/Pháp danh và các bảng
+      cấu hình (TK Có/Nợ, khóa sổ, ẩn gian...). <strong>Nhập liệu</strong>: được thêm/sửa/tải lên dữ liệu ở mọi trang
+      nghiệp vụ (giao dịch, đối soát Momo/Zalo-VNPay-Payoo/Viet QR, chi phí, công nợ...), nhưng KHÔNG được xóa bất cứ
+      gì và không vào được các trang cấu hình hệ thống (Tài khoản, Ngân hàng, Pháp danh, khóa sổ, mapping TK). <strong>Chỉ
+      xem</strong>: chỉ xem số liệu và chọn bộ lọc/công ty, không sửa/xóa/tải lên được gì.
     </p>
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
     <% if (success) { %><div class="alert alert-success"><%= success %></div><% } %>
@@ -27,6 +30,7 @@
               <form method="POST" action="/he-thong/nguoi-dung/<%= u.id %>/role" class="form-inline">
                 <select name="role" onchange="this.form.submit()">
                   <option value="admin" <%= (u.role || 'admin') === 'admin' ? 'selected' : '' %>>Quản trị</option>
+                  <option value="nhap_lieu" <%= u.role === 'nhap_lieu' ? 'selected' : '' %>>Nhập liệu</option>
                   <option value="viewer" <%= u.role === 'viewer' ? 'selected' : '' %>>Chỉ xem</option>
                 </select>
               </form>
@@ -73,7 +77,8 @@
         <input type="password" name="password" placeholder="Mật khẩu (từ 6 ký tự)" minlength="6" required />
         <select name="role">
           <option value="admin">Quản trị (toàn quyền)</option>
-          <option value="viewer" selected>Chỉ xem</option>
+          <option value="nhap_lieu" selected>Nhập liệu</option>
+          <option value="viewer">Chỉ xem</option>
         </select>
         <button type="submit" class="btn btn-primary">Tạo tài khoản</button>
       </form>

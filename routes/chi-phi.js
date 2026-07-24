@@ -2,7 +2,7 @@ const express = require("express");
 const multer = require("multer");
 const XLSX = require("xlsx");
 const { load, save, nextId } = require("../store");
-const { requireLogin, requireAdmin } = require("../middleware/auth");
+const { requireLogin, requireDataEntry } = require("../middleware/auth");
 const { getCompany } = require("../utils/companies");
 const {
   parseChiPhiSheetWorkbook,
@@ -247,7 +247,7 @@ function isAjaxChiPhiRequest(req) {
   return req.get("X-Requested-With") === "XMLHttpRequest";
 }
 
-router.post("/chi-phi/:id/hach-toan", requireAdmin, (req, res) => {
+router.post("/chi-phi/:id/hach-toan", requireDataEntry, (req, res) => {
   const store = load();
   ensureShape(store);
   const r = store.chi_phi.find((x) => String(x.id) === req.params.id);
@@ -271,7 +271,7 @@ router.post("/chi-phi/:id/hach-toan", requireAdmin, (req, res) => {
 // TT TIEN MAT bi chan captcha/khong mo duoc link) van chua co so hoa don tu
 // dong tra ra duoc, can Luyen tu dien tay sau khi tra cuu/xem hoa don giay.
 // Cho sua truc tiep tu bang danh sach, khong can vao form rieng.
-router.post("/chi-phi/:id/so-hoa-don", requireAdmin, (req, res) => {
+router.post("/chi-phi/:id/so-hoa-don", requireDataEntry, (req, res) => {
   const store = load();
   ensureShape(store);
   const r = store.chi_phi.find((x) => String(x.id) === req.params.id);
@@ -319,7 +319,7 @@ router.post("/chi-phi/:id/so-hoa-don", requireAdmin, (req, res) => {
 // thu huong", khong nam trong sao ke ngan hang) nen luon bi de trong. Truoc
 // gio khong co cach dien NCC qua web -- them route sua truc tiep, cung 1
 // kieu voi so-hoa-don/link-hoa-don/so-tien o tren.
-router.post("/chi-phi/:id/ncc", requireAdmin, (req, res) => {
+router.post("/chi-phi/:id/ncc", requireDataEntry, (req, res) => {
   const store = load();
   ensureShape(store);
   const r = store.chi_phi.find((x) => String(x.id) === req.params.id);
@@ -350,7 +350,7 @@ router.post("/chi-phi/:id/ncc", requireAdmin, (req, res) => {
 // dich ngan hang goc (co the bi nhap sai tu luc nhap giao dich); truoc gio
 // khong co cach sua so tien 1 dong Chi Phi da co san. Them route sua truc
 // tiep tu bang danh sach, cung 1 kieu voi so-hoa-don/link-hoa-don o tren.
-router.post("/chi-phi/:id/so-tien", requireAdmin, (req, res) => {
+router.post("/chi-phi/:id/so-tien", requireDataEntry, (req, res) => {
   const store = load();
   ensureShape(store);
   const r = store.chi_phi.find((x) => String(x.id) === req.params.id);
@@ -391,7 +391,7 @@ router.post("/chi-phi/:id/so-tien", requireAdmin, (req, res) => {
 // Luyen, 2026-07-22: "tìm hóa đơn qua Gmail lưu Drive rồi gán lên đây" -- can
 // route rieng de cap nhat link hoa don (link Google Drive) cho 1 dong Chi Phi
 // da co san, khong dung chung voi /so-hoa-don (chi sua so hoa don thu cong).
-router.post("/chi-phi/:id/link-hoa-don", requireAdmin, (req, res) => {
+router.post("/chi-phi/:id/link-hoa-don", requireDataEntry, (req, res) => {
   const store = load();
   ensureShape(store);
   const r = store.chi_phi.find((x) => String(x.id) === req.params.id);
@@ -423,7 +423,7 @@ router.post("/chi-phi/:id/link-hoa-don", requireAdmin, (req, res) => {
   res.redirect("/chi-phi/" + mienSeg(r.mien) + "?" + qs.join("&"));
 });
 
-router.post("/chi-phi/:mien(mien-nam|mien-bac)", requireAdmin, (req, res) => {
+router.post("/chi-phi/:mien(mien-nam|mien-bac)", requireDataEntry, (req, res) => {
   const store = load();
   ensureShape(store);
   const activeCompany = getCompany(req);
@@ -600,7 +600,7 @@ function buildChiPhiResultMessage(prefix, result, skippedSheets) {
   return msg;
 }
 
-router.post("/chi-phi/upload", requireAdmin, upload.single("file"), (req, res) => {
+router.post("/chi-phi/upload", requireDataEntry, upload.single("file"), (req, res) => {
   const store = load();
   ensureShape(store);
   try {
@@ -650,7 +650,7 @@ const MTD_MB_AUTO_SHEET_XLSX_URL =
   process.env.MTD_MB_AUTO_SHEET_XLSX_URL ||
   "https://docs.google.com/spreadsheets/d/132gDgtxG_3X-WlkS4LLksLsuYd_7YRYNeUQoflsy2Ic/export?format=xlsx";
 
-router.post("/chi-phi/:mien(mien-nam|mien-bac)/cap-nhat-tu-sheet", requireAdmin, async (req, res) => {
+router.post("/chi-phi/:mien(mien-nam|mien-bac)/cap-nhat-tu-sheet", requireDataEntry, async (req, res) => {
   const store = load();
   ensureShape(store);
   const mien = mienFromSeg(req.params.mien);
@@ -743,7 +743,7 @@ router.post("/chi-phi/:mien(mien-nam|mien-bac)/cap-nhat-tu-sheet", requireAdmin,
 // de tranh nhoi hang loat dong ngoai pham vi dang dung). Dedup bang truong
 // rieng "bankTxId" (id giao dich nguon) luu tren moi dong Chi Phi da tao --
 // chay lai (hang ngay) se tu bo qua giao dich da xu ly, khong tao trung.
-router.post("/chi-phi/:mien(mien-nam|mien-bac)/quet-ngan-hang", requireAdmin, (req, res) => {
+router.post("/chi-phi/:mien(mien-nam|mien-bac)/quet-ngan-hang", requireDataEntry, (req, res) => {
   const store = load();
   ensureShape(store);
   const mien = mienFromSeg(req.params.mien);
@@ -855,7 +855,7 @@ router.post("/chi-phi/:mien(mien-nam|mien-bac)/quet-ngan-hang", requireAdmin, (r
 // tu dong bi bo qua o lan bam sau, vi luc do da co linkHoaDon).
 const GMAIL_AUTO_MAX_ROWS_PER_RUN = 25;
 
-router.post("/chi-phi/:mien(mien-nam|mien-bac)/tim-hoa-don-gmail", requireAdmin, async (req, res) => {
+router.post("/chi-phi/:mien(mien-nam|mien-bac)/tim-hoa-don-gmail", requireDataEntry, async (req, res) => {
   const store = load();
   ensureShape(store);
   const activeCompany = getCompany(req);

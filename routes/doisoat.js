@@ -3,7 +3,7 @@ const multer = require("multer");
 const XLSX = require("xlsx");
 const AdmZip = require("adm-zip");
 const { load, save, nextId } = require("../store");
-const { requireLogin, requireAdmin } = require("../middleware/auth");
+const { requireLogin, requireAdmin, requireDataEntry } = require("../middleware/auth");
 const {
   parseTongMomoWorkbook,
   parseInvoiceWorkbook,
@@ -560,7 +560,7 @@ function ensureNo1388(store) {
   return changed;
 }
 
-router.post("/doi-soat/momo/upload-tong", requireAdmin, upload.single("file"), (req, res) => {
+router.post("/doi-soat/momo/upload-tong", requireDataEntry, upload.single("file"), (req, res) => {
   const store = load();
   const activeCompany = getCompany(req);
   const momoCfg = MOMO_CHANNELS[activeCompany];
@@ -662,7 +662,7 @@ router.post("/doi-soat/momo/upload-tong", requireAdmin, upload.single("file"), (
 // Upload 1 file danh sach hoa don (MTT) tren trang Momo cung cap nhat luon ca
 // 3 danh sach hoa don Zalo/VNPay/Payoo (dung chung parseSharedInvoiceWorkbook
 // voi trang /doi-soat/zvp) -- khong can upload lai file nay tren trang kia.
-router.post("/doi-soat/momo/upload-hoadon", requireAdmin, upload.single("file"), (req, res) => {
+router.post("/doi-soat/momo/upload-hoadon", requireDataEntry, upload.single("file"), (req, res) => {
   const store = load();
   const activeCompany = getCompany(req);
   const momoCfg = MOMO_CHANNELS[activeCompany];
@@ -737,7 +737,7 @@ router.post("/doi-soat/momo/mapping", requireAdmin, (req, res) => {
 // PHU") nhung thuc chat cung 1 Ma Cong Trinh voi doanh thu (vd "AM TP KVCM")
 // -- ap dung ngay luc doi soat, khong can tai lai file hoa don. Bang nay
 // dung CHUNG voi trang doi-soat/zvp (store.invoice_diem_alias). ----------
-router.post("/doi-soat/momo/diem-alias", requireAdmin, (req, res) => {
+router.post("/doi-soat/momo/diem-alias", requireDataEntry, (req, res) => {
   const store = load();
   try {
     const { sourceCode, targetCode } = req.body;
@@ -767,7 +767,7 @@ router.post("/doi-soat/momo/diem-alias/delete", requireAdmin, (req, res) => {
 // store.cua_hang_mapping (KHONG theo companyKey) vi day la 1 danh muc
 // gian/mat bang CHUNG, khong phai rieng cong ty nao -- ap dung ngay cho ca
 // trang KH Cu va KH Moi, khong can tai lai file zip (xem applyCuaHangAlias).
-router.post("/doi-soat/momo/cuahang-map", requireAdmin, (req, res) => {
+router.post("/doi-soat/momo/cuahang-map", requireDataEntry, (req, res) => {
   const store = load();
   try {
     const { rawCode, targetCode } = req.body;

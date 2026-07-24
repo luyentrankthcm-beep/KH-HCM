@@ -6,6 +6,20 @@ const { requireLogin, requireAdmin } = require("../middleware/auth");
 const router = express.Router();
 router.use(requireLogin);
 
+// 3 quyen: "admin" (Quan tri, toan quyen), "nhap_lieu" (Nhap lieu -- them/sua/
+// tai len duoc du lieu nghiep vu, khong xoa/khong dung toi cau hinh he
+// thong), "viewer" (Chi xem). Xem middleware/auth.js requireDataEntry cho
+// danh sach cu the cac thao tac "nhap lieu" duoc phep.
+const VALID_ROLES = ["admin", "nhap_lieu", "viewer"];
+function normalizeRole(v) {
+  return VALID_ROLES.includes(v) ? v : "viewer";
+}
+function roleLabel(role) {
+  if (role === "admin") return "Quan tri";
+  if (role === "nhap_lieu") return "Nhap lieu";
+  return "Chi xem";
+}
+
 // Chi Nhan (2026-07-21): "1 tai khoan quan tri duoc cap nhat/xem/lam tat ca
 // chinh sua, 1 tai khoan chi duoc xem chon bo loc khong duoc xoa hay tai len
 // bat cu gi". Trang nay CHI danh cho quan tri vien -- ke ca xem danh sach tai
@@ -57,7 +71,7 @@ router.post("/he-thong/nguoi-dung", (req, res) => {
     const username = (req.body.username || "").trim();
     const name = (req.body.name || "").trim();
     const password = req.body.password || "";
-    const role = req.body.role === "viewer" ? "viewer" : "admin";
+    const role = normalizeRole(req.body.role);
     if (!username || !name) throw new Error("Vui long dien Ten dang nhap va Ten hien thi.");
     if (!password || password.length < 6) throw new Error("Mat khau phai tu 6 ky tu tro len.");
     if (store.users.some((u) => u.username.toLowerCase() === username.toLowerCase())) {
@@ -72,7 +86,7 @@ router.post("/he-thong/nguoi-dung", (req, res) => {
       created_at: new Date().toISOString(),
     });
     save(store);
-    res.redirect("/he-thong/nguoi-dung?success=" + encodeURIComponent(`Da tao tai khoan "${username}" (${role === "admin" ? "Quan tri" : "Chi xem"}).`));
+    res.redirect("/he-thong/nguoi-dung?success=" + encodeURIComponent(`Da tao tai khoan "${username}" (${roleLabel(role)}).`));
   } catch (e) {
     res.redirect("/he-thong/nguoi-dung?error=" + encodeURIComponent(e.message));
   }
@@ -84,8 +98,8 @@ router.post("/he-thong/nguoi-dung/:id/role", (req, res) => {
   try {
     const user = store.users.find((u) => String(u.id) === req.params.id);
     if (!user) throw new Error("Khong tim thay tai khoan.");
-    const role = req.body.role === "viewer" ? "viewer" : "admin";
-    // Khong cho tu ha quyen chinh minh xuong "chi xem" -- tranh tu khoa minh
+    const role = normalizeRole(req.body.role);
+    // Khong cho tu ha quyen chinh minh xuong "chi xem"/"nhap lieu" -- tranh tu khoa minh
     // khoi cac trang quan tri (vd chinh trang nay) ma khong con ai co the
     // vao lai doi nguoc lai (neu do la tai khoan quan tri duy nhat).
     if (String(user.id) === String(req.session.userId) && role !== "admin") {

@@ -265,6 +265,104 @@
     </section>
     <% } %>
 
+    <% if (typeof allRefUnmatchedBankTx !== 'undefined' && allRefUnmatchedBankTx.length > 0) { %>
+    <section class="panel" style="border:1px solid #e33; background:#fff5f5;">
+      <h2>⚠️ Giao dịch ngân hàng KHÔNG khớp được Mã tham chiếu nào (<%= allRefUnmatchedBankTx.length %>)</h2>
+      <p class="muted">
+        Từ 22/07 trở đi, web khớp gian theo đúng "Mã tham chiếu" giữa sao kê ngân hàng và dữ liệu QR bạn tải lên
+        (lấy ngân hàng làm chuẩn). Các giao dịch dưới đây có tiền về ngân hàng nhưng không tìm thấy mã tham chiếu
+        khớp trong bất kỳ ngày nào của dữ liệu QR đã tải — kiểm tra lại đã tải đủ file "dữ liệu tải lên" chưa,
+        hoặc mã tham chiếu 2 bên có đúng không.
+      </p>
+      <table class="table">
+        <thead><tr><th>Ngày</th><th>Ngân hàng</th><th>Số tiền</th><th>Số tham chiếu</th><th>Diễn giải</th></tr></thead>
+        <tbody>
+          <% allRefUnmatchedBankTx.forEach(function(r) { %>
+          <tr>
+            <td><%= r.date %></td>
+            <td><%= r.channelLabel %></td>
+            <td><%= r.amount.toLocaleString('vi-VN') %> đ</td>
+            <td style="font-size:11px;"><%= r.reference || '(không có)' %></td>
+            <td style="font-size:11px;"><%= r.description %></td>
+          </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </section>
+    <% } %>
+
+    <% if (typeof allRefLateMatches !== 'undefined' && allRefLateMatches.length > 0) { %>
+    <section class="panel" style="border:1px solid #3b82f6; background:#eff6ff;">
+      <h2>ℹ️ Khớp Mã tham chiếu nhưng thuộc dữ liệu QR của NGÀY KHÁC (<%= allRefLateMatches.length %>)</h2>
+      <p class="muted">
+        Các giao dịch dưới đây ngân hàng báo tiền về vào 1 ngày, nhưng mã tham chiếu lại khớp với đơn QR của ngày
+        khác (thường là đơn ra trước, tiền về ngân hàng sau) — doanh thu vẫn được cộng đúng vào ngày NGÂN HÀNG báo
+        (lấy ngân hàng làm chuẩn), dòng này chỉ để bạn biết vì sao có chênh lệch ngày.
+      </p>
+      <table class="table">
+        <thead><tr><th>Ngày ngân hàng</th><th>Ngân hàng</th><th>Ngày dữ liệu QR</th><th>Số tham chiếu</th><th>Số tiền</th><th>Mã cửa hàng</th></tr></thead>
+        <tbody>
+          <% allRefLateMatches.forEach(function(r) { %>
+          <tr>
+            <td><%= r.bankDate %></td>
+            <td><%= r.channelLabel %></td>
+            <td><%= r.rawDate %></td>
+            <td style="font-size:11px;"><%= r.reference %></td>
+            <td><%= r.amount.toLocaleString('vi-VN') %> đ</td>
+            <td><%= r.maCuaHang %></td>
+          </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </section>
+    <% } %>
+
+    <% if (typeof allRefUnmappedStoreCodes !== 'undefined' && allRefUnmappedStoreCodes.length > 0) { %>
+    <section class="panel" style="border:1px solid #e33; background:#fff5f5;">
+      <h2>⚠️ Mã cửa hàng MỚI, chưa có trong danh sách điểm bán (<%= allRefUnmappedStoreCodes.length %>)</h2>
+      <p class="muted">
+        Các mã cửa hàng dưới đây xuất hiện trong giao dịch khớp mã tham chiếu, nhưng chưa có trong file "Danh sách
+        điểm bán" đã tải — chưa xác định được tên điểm/mã công trình nên doanh thu đang bị loại. Tải bổ sung file
+        điểm bán mới nhất rồi thử lại.
+      </p>
+      <table class="table">
+        <thead><tr><th>Mã cửa hàng</th><th>Số GD</th><th>Tổng tiền</th></tr></thead>
+        <tbody>
+          <% allRefUnmappedStoreCodes.forEach(function(r) { %>
+          <tr>
+            <td><%= r.maCuaHang %></td>
+            <td><%= r.count %></td>
+            <td><%= r.total.toLocaleString('vi-VN') %> đ</td>
+          </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </section>
+    <% } %>
+
+    <% if (typeof allRefUnmappedTenDiem !== 'undefined' && allRefUnmappedTenDiem.length > 0) { %>
+    <section class="panel" style="border:1px solid #e33; background:#fff5f5;">
+      <h2>⚠️ Tên điểm bán chưa có Mã công trình tương ứng (<%= allRefUnmappedTenDiem.length %>)</h2>
+      <p class="muted">
+        Đã tra được tên điểm bán qua Mã cửa hàng, nhưng tên điểm này chưa có trong sheet "Tên điểm- Mã công trình" —
+        bổ sung dòng tương ứng vào file rồi tải lại (qua nút tải "Dữ liệu Viet QR" như bình thường).
+      </p>
+      <table class="table">
+        <thead><tr><th>Tên điểm bán</th><th>Mã cửa hàng</th><th>Số GD</th><th>Tổng tiền</th></tr></thead>
+        <tbody>
+          <% allRefUnmappedTenDiem.forEach(function(r) { %>
+          <tr>
+            <td><%= r.tenDiemBan || '(không có tên)' %></td>
+            <td><%= r.maCuaHang %></td>
+            <td><%= r.count %></td>
+            <td><%= r.total.toLocaleString('vi-VN') %> đ</td>
+          </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </section>
+    <% } %>
+
     <% if (typeof allNocodeAssignments !== 'undefined' && allNocodeAssignments.length > 0) { %>
     <section class="panel">
       <h2>Các giao dịch không mã đã gán (<%= allNocodeAssignments.length %>)</h2>

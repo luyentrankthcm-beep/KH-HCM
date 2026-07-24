@@ -2,7 +2,7 @@ const express = require("express");
 const multer = require("multer");
 const XLSX = require("xlsx");
 const { load, save, nextId } = require("../store");
-const { requireLogin, requireAdmin } = require("../middleware/auth");
+const { requireLogin, requireAdmin, requireDataEntry } = require("../middleware/auth");
 const {
   extractZvpSettlements,
   parseInvoiceWorkbookByTag,
@@ -399,7 +399,7 @@ router.post("/doi-soat/zvp/online-gian-fix", requireAdmin, (req, res) => {
 });
 
 // ---------- Upload: file "Tong hop Zalo App" (gian hang xuat HD + Doi soat Vnpay Online) ----------
-router.post("/doi-soat/zvp/upload-online", requireAdmin, upload.single("file"), (req, res) => {
+router.post("/doi-soat/zvp/upload-online", requireDataEntry, upload.single("file"), (req, res) => {
   const store = load();
   try {
     if (!req.file) throw new Error("Vui long chon 1 file de tai len.");
@@ -494,7 +494,7 @@ router.post("/doi-soat/zvp/upload-online", requireAdmin, upload.single("file"), 
 });
 
 // ---------- Upload: file VNPay Offline ("du lieu VNpay co so KHxxx" + "gian hang VNpay co so KHxxx") ----------
-router.post("/doi-soat/zvp/upload-offline", requireAdmin, upload.single("file"), (req, res) => {
+router.post("/doi-soat/zvp/upload-offline", requireDataEntry, upload.single("file"), (req, res) => {
   const store = load();
   try {
     if (!req.file) throw new Error("Vui long chon 1 file de tai len.");
@@ -542,7 +542,7 @@ router.post("/doi-soat/zvp/upload-offline", requireAdmin, upload.single("file"),
 });
 
 // ---------- Upload: file Payoo ("Du lieu Payoo co so KHxxx" + "Danh muc ten diem") ----------
-router.post("/doi-soat/zvp/upload-payoo", requireAdmin, upload.single("file"), (req, res) => {
+router.post("/doi-soat/zvp/upload-payoo", requireDataEntry, upload.single("file"), (req, res) => {
   const store = load();
   try {
     if (!req.file) throw new Error("Vui long chon 1 file de tai len.");
@@ -763,7 +763,7 @@ router.post(
 // Upload 1 file tren TRANG NAY cung cap nhat luon ca hoa don Momo (dung chung
 // parseSharedInvoiceWorkbook voi trang /doi-soat/momo) -- khong can upload lai
 // file nay tren trang kia.
-router.post("/doi-soat/zvp/upload-hoadon", requireAdmin, upload.single("file"), (req, res) => {
+router.post("/doi-soat/zvp/upload-hoadon", requireDataEntry, upload.single("file"), (req, res) => {
   const store = load();
   try {
     if (!req.file) throw new Error("Vui long chon 1 file de tai len.");
@@ -843,7 +843,7 @@ router.post("/doi-soat/zvp/mapping", requireAdmin, (req, res) => {
 // PHU") nhung thuc chat cung 1 Ma Cong Trinh voi doanh thu (vd "AM TP KVCM")
 // -- ap dung ngay luc doi soat, khong can tai lai file hoa don. Bang nay
 // dung CHUNG voi trang doi-soat/momo (store.invoice_diem_alias). ----------
-router.post("/doi-soat/zvp/diem-alias", requireAdmin, (req, res) => {
+router.post("/doi-soat/zvp/diem-alias", requireDataEntry, (req, res) => {
   const store = load();
   try {
     const { sourceCode, targetCode } = req.body;
@@ -899,7 +899,7 @@ router.post("/doi-soat/zvp/invoices/clear", requireAdmin, (req, res) => {
 // Dung cho truong hop 1 gian khong di qua dò hoa don tu dong cho ky doi soat
 // nay (vd hoa don chi duoc xuat ngay hom sau, ngoai khoang ngay cua ky nay),
 // nhung Luyen da tu kiem tra va biet chac hoa don nao bu cho khoan tien nay.
-router.post("/doi-soat/zvp/manual-match", requireAdmin, (req, res) => {
+router.post("/doi-soat/zvp/manual-match", requireDataEntry, (req, res) => {
   const store = load();
   try {
     const { channel, settlementDate, code, invoiceNumbers, amount, grossAdjustment, note } = req.body;

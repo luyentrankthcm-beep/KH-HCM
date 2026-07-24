@@ -2,16 +2,19 @@ const express = require("express");
 const multer = require("multer");
 const XLSX = require("xlsx");
 const { load, save, nextId } = require("../store");
-const { requireLogin, requireAdmin } = require("../middleware/auth");
+const { requireLogin, requireAdmin, requireDataEntry } = require("../middleware/auth");
 const {
   extractVqrCode,
   extractVietQrSettlements,
+  extractVietQrThuTransactions,
   parseVietQrRawWorkbook,
   parseCuaHangSheet,
   parseStoreExportSheet,
+  parseTenDiemMaCongTrinhSheet,
   parseInvoiceWorkbookByTag,
   buildGianCandidatesFromInvoices,
   resolveGianGross,
+  resolveGianGrossByBankRef,
   reconcileVietQr,
   parseVietQrMnRawWorkbook,
   parseMaCuaHangAppSheet,
@@ -71,6 +74,12 @@ const CHANNELS = {
     // tu Liobank, khong qua QR) tu dong cong vao "AM TP PHCM" thay vi nam mai
     // trong unmapped, ap dung luon ca cho du lieu tai len sau nay.
     defaultBlankCode: "AM TP PHCM",
+    // Chi Nhan, 2026-07-24 (Luyen yeu cau): "từ 22/07 trở về trước giữ nguyên
+    // dữ liệu ... từ 22 trở đi" -- tu ngay nay tro di, khop gian bang "So tham
+    // chieu" ngan hang (khop tuyet doi) thay vi fuzzy text nhu truoc, xem
+    // resolveGianGrossByBankRef trong utils/vietqrReconcile.js. Cac ngay TRUOC
+    // ngay nay van dung y nguyen cach cu (resolveGianGross ben tren).
+    refMatchFrom: "2026-07-22",
   },
 };
 const CHANNEL_KEYS = Object.keys(CHANNELS);
@@ -128,6 +137,13 @@ function ensureChannelShape(store) {
   // van tiep tuc ghi truc tiep vao viet_qr_store_names nhu cu.
   if (!store.viet_qr_store_uploads) store.viet_qr_store_uploads = {};
   if (!store.viet_qr_store_names_baseline) store.viet_qr_store_names_baseline = {};
+  // Chi Nhan, 2026-07-24: bang tra cuu "Ten diem ban -> Ma cong trinh" rieng
+  // cho tinh nang khop theo So tham chieu ngan hang (BIDV7702 tu 22/07) --
+  // key da chuan hoa qua normText(tenDiem), xem parseTenDiemMaCongTrinhSheet/
+  // resolveGianGrossByBankRef trong utils/vietqrReconcile.js. Ghi de truc
+  // tiep (khong luu lich su tung lan tai, khac voi viet_qr_store_uploads) --
+  // giam pham vi, Luyen chua yeu cau xem lai/hoan tac rieng bang nay.
+  if (!store.viet_qr_ten_diem_master) store.viet_qr_ten_diem_master = {};
   // Luyen, 2026-07-21: "không cần chỉnh cái cũ khóa cho tôi" -- muon 1 tinh
   // nang "khoa so" that su (tung yeu cau 2 lan truoc: "khóa sổ cho tôi chỉ
   // nạp cái mới thôi"), khong phai sua tay tung dong lech cu. Luu 1 ngay
@@ -153,6 +169,7 @@ function ensureChannelShape(store) {
     if (!store.viet_qr_manual_matches[ch]) store.viet_qr_manual_matches[ch] = {};
     if (!store.viet_qr_nocode_assignments[ch]) store.viet_qr_nocode_assignments[ch] = {};
     if (!store.viet_qr_store_uploads[ch]) store.viet_qr_store_uploads[ch] = [];
+    if (!store.viet_qr_ten_diem_master[ch]) store.viet_qr_ten_diem_master[ch] = {};
     if (!store.viet_qr_store_names_baseline[ch]) {
       // Chup 1 lan duy nhat: du lieu diem ban HIEN CO ngay truoc khi tinh
       // nang lich su/xoa nay ton tai, de khong mat du lieu cu.
@@ -457,6 +474,42 @@ function buildChannelReconciliation(store, channelKey) {
   // master gian sheet fixes the code everywhere else.
   invoices = applyGianRedirectToInvoices(invoices, gianCandidates);
 
+  // Chi Nhan, 2026-07-24: BIDV7702 tu 22/07 tro di khop gian bang "So tham
+  // chieu" ngan hang (khop tuyet doi, ngan hang la chuan) thay vi fuzzy text
+  // -- xem ghi chu tai CHANNELS.bidv7702.refMatchFrom o tren va
+  // resolveGianGrossByBankRef trong utils/vietqrReconcile.js. Cac ngay TRUOC
+  // ngay cutover van giu y nguyen ket qua "resolved" (fuzzy) da tinh o tren;
+  // chi THAY THE gross cho cac ngay >= cutover bang so ngan hang.
+  let refUnmatchedBankTx = [];
+  let refLateMatches = [];
+  let refUnmappedStoreCodes = [];
+  let refUnmappedTenDiem = [];
+  if (cfg.refMatchFrom) {
+    const bankThuTxs = extractVietQrThuTransactions(txs).filter((t) => t.date >= cfg.refMatchFrom);
+    const tenDiemMaster = store.viet_qr_ten_diem_master[channelKey] || {};
+    const refResolved = resolveGianGrossByBankRef(bankThuTxs, rawRows, storeNames, tenDiemMaster);
+
+    const filteredGrossByCode = {};
+    const filteredCodes = new Set();
+    Object.keys(resolved.grossByCode).forEach((key) => {
+      const day = key.slice(0, key.indexOf("|"));
+      if (day >= cfg.refMatchFrom) return; // se duoc thay bang so ngan hang phia duoi
+      filteredGrossByCode[key] = resolved.grossByCode[key];
+      filteredCodes.add(key.slice(key.indexOf("|") + 1));
+    });
+    Object.keys(refResolved.grossByCode).forEach((key) => {
+      filteredGrossByCode[key] = refResolved.grossByCode[key];
+      filteredCodes.add(key.slice(key.indexOf("|") + 1));
+    });
+    resolved.codes = Array.from(filteredCodes);
+    resolved.grossByCode = filteredGrossByCode;
+
+    refUnmatchedBankTx = refResolved.unmatchedBankTx;
+    refLateMatches = refResolved.lateMatches;
+    refUnmappedStoreCodes = refResolved.unmappedStoreCodes;
+    refUnmappedTenDiem = refResolved.unmappedTenDiem;
+  }
+
   seedGianMappingDefaults(store, resolved.codes);
 
   const manualMatches = store.viet_qr_manual_matches[channelKey] || {};
@@ -572,6 +625,13 @@ function buildChannelReconciliation(store, channelKey) {
     crossMatchSuggestions: findCrossMatchSuggestions(reconciled, channelKey),
     invoiceDiemAlias,
     unmatchedInvoiceCodes: Array.from(unmatchedInvoiceCodesSet).sort(),
+    // Canh bao rieng cho co che khop theo So tham chieu ngan hang (xem
+    // CHANNELS.bidv7702.refMatchFrom o tren) -- rong ([]) voi cac kenh khong
+    // bat tinh nang nay.
+    refUnmatchedBankTx,
+    refLateMatches,
+    refUnmappedStoreCodes,
+    refUnmappedTenDiem,
   };
 }
 
@@ -769,6 +829,24 @@ router.get("/doi-soat/vietqr", (req, res) => {
     });
   });
 
+  // Canh bao rieng cho co che khop theo "So tham chieu" ngan hang (BIDV7702
+  // tu 22/07, xem CHANNELS.bidv7702.refMatchFrom) -- gop qua tat ca kenh dang
+  // xem giong cac mang allXxx khac, rong voi kenh khong bat tinh nang nay.
+  const allRefUnmatchedBankTx = [];
+  const allRefLateMatches = [];
+  const allRefUnmappedStoreCodes = [];
+  const allRefUnmappedTenDiem = [];
+  activeKeys.forEach((ch) => {
+    (built[ch].refUnmatchedBankTx || []).forEach((r) => allRefUnmatchedBankTx.push({ channel: ch, channelLabel: CHANNELS[ch].label, ...r }));
+    (built[ch].refLateMatches || []).forEach((r) => allRefLateMatches.push({ channel: ch, channelLabel: CHANNELS[ch].label, ...r }));
+    (built[ch].refUnmappedStoreCodes || []).forEach((r) => allRefUnmappedStoreCodes.push({ channel: ch, channelLabel: CHANNELS[ch].label, ...r }));
+    (built[ch].refUnmappedTenDiem || []).forEach((r) => allRefUnmappedTenDiem.push({ channel: ch, channelLabel: CHANNELS[ch].label, ...r }));
+  });
+  allRefUnmatchedBankTx.sort((a, b) => (a.date || "").localeCompare(b.date || ""));
+  allRefLateMatches.sort((a, b) => (a.bankDate || "").localeCompare(b.bankDate || ""));
+  allRefUnmappedStoreCodes.sort((a, b) => b.total - a.total);
+  allRefUnmappedTenDiem.sort((a, b) => b.total - a.total);
+
   // Luyen, 2026-07-19: "co nut xoa hay chinh sua cac phan dien" -- liet ke lai
   // cac GD-khong-ma DA gan (truoc gio gan xong la bien mat, khong xem/xoa lai
   // duoc) kem nut Xoa de tra ve dien "chua gan" neu gan nham.
@@ -831,6 +909,10 @@ router.get("/doi-soat/vietqr", (req, res) => {
     allCrossMatchSuggestions,
     allNocodeAssignments,
     allStoreGroups,
+    allRefUnmatchedBankTx,
+    allRefLateMatches,
+    allRefUnmappedStoreCodes,
+    allRefUnmappedTenDiem,
     error: req.query.error || null,
     success: req.query.success || null,
   });
@@ -839,7 +921,7 @@ router.get("/doi-soat/vietqr", (req, res) => {
 // ---------- Cross-match: 1 gian du hoa don + 1 gian thieu hoa don CUNG NGAY,
 // cung 1 so tien -- Luyen xac nhan tung cap qua nut nay (khong tu dong ap
 // dung) truoc khi ghi de thanh 2 ban ghi manual-match. ----------
-router.post("/doi-soat/vietqr/cross-match/:channel", requireAdmin, (req, res) => {
+router.post("/doi-soat/vietqr/cross-match/:channel", requireDataEntry, (req, res) => {
   const store = load();
   ensureChannelShape(store);
   const channelKey = req.params.channel;
@@ -890,7 +972,7 @@ router.post("/doi-soat/vietqr/cross-match/:channel", requireAdmin, (req, res) =>
 // ap dung LAI TUNG DUNG LOGIC nhu route don o tren (khong tu che, van doi
 // chieu lai voi ket qua doi soat MOI NHAT truoc khi ghi -- neu 1 gian da
 // thay doi/khong con dung nua thi bo qua item do, khong lam hong ca lo).
-router.post("/doi-soat/vietqr/cross-match-all", requireAdmin, (req, res) => {
+router.post("/doi-soat/vietqr/cross-match-all", requireDataEntry, (req, res) => {
   const store = load();
   ensureChannelShape(store);
   try {
@@ -968,7 +1050,7 @@ router.post("/doi-soat/vietqr/cross-match-all", requireAdmin, (req, res) => {
 });
 
 // ---------- Upload: raw QR export file (contains BOTH the transaction log sheet AND the "Cua hang" store-catalog sheet) ----------
-router.post("/doi-soat/vietqr/upload-raw/:channel", requireAdmin, upload.single("file"), (req, res) => {
+router.post("/doi-soat/vietqr/upload-raw/:channel", requireDataEntry, upload.single("file"), (req, res) => {
   const store = load();
   ensureChannelShape(store);
   const channelKey = req.params.channel;
@@ -998,6 +1080,19 @@ router.post("/doi-soat/vietqr/upload-raw/:channel", requireAdmin, upload.single(
       storeMap = {};
     }
 
+    // Chi Nhan, 2026-07-24: file "du lieu tai len" moi cho BIDV7702 (tu
+    // 22/07) co kem theo 1 sheet "Ten diem- Ma cong trinh" trong CUNG file --
+    // nap luon qua nut nay, best-effort giong storeMap o tren (khong bat buoc
+    // phai co, cac kenh/lan tai khac khong co sheet nay van hoat dong binh
+    // thuong).
+    let tenDiemMasterMap = {};
+    try {
+      const parsedMaster = parseTenDiemMaCongTrinhSheet(req.file.buffer);
+      tenDiemMasterMap = parsedMaster.map;
+    } catch (eMaster) {
+      tenDiemMasterMap = {};
+    }
+
     store.viet_qr_raw_uploads[channelKey].push({
       id: nextId(store, "viet_qr_raw_uploads_seq") || Date.now(),
       uploaded_at: new Date().toISOString(),
@@ -1008,14 +1103,20 @@ router.post("/doi-soat/vietqr/upload-raw/:channel", requireAdmin, upload.single(
     if (Object.keys(storeMap).length > 0) {
       store.viet_qr_store_names[channelKey] = Object.assign({}, store.viet_qr_store_names[channelKey], storeMap);
     }
+    if (Object.keys(tenDiemMasterMap).length > 0) {
+      store.viet_qr_ten_diem_master[channelKey] = Object.assign(
+        {},
+        store.viet_qr_ten_diem_master[channelKey],
+        tenDiemMasterMap
+      );
+    }
     save(store);
 
-    res.redirect(
-      "/doi-soat/vietqr?success=" +
-        encodeURIComponent(
-          `Da nap "${parsed.sheetName}": ${parsed.rows.length} giao dich QR, ${Object.keys(storeMap).length} cua hang.${UPDATED_NOTE}`
-        )
-    );
+    let msg = `Da nap "${parsed.sheetName}": ${parsed.rows.length} giao dich QR, ${Object.keys(storeMap).length} cua hang.${UPDATED_NOTE}`;
+    if (Object.keys(tenDiemMasterMap).length > 0) {
+      msg += ` Da nap them ${Object.keys(tenDiemMasterMap).length} dong "Ten diem- Ma cong trinh".`;
+    }
+    res.redirect("/doi-soat/vietqr?success=" + encodeURIComponent(msg));
   } catch (e) {
     res.redirect("/doi-soat/vietqr?error=" + encodeURIComponent(e.message));
   }
@@ -1027,7 +1128,7 @@ router.post("/doi-soat/vietqr/upload-raw/:channel", requireAdmin, upload.single(
 // ma cua hang la MOI (chua tung thay) hoac DOI ten diem ban so voi lan
 // truoc, canh bao ngay trong thong bao de Luyen kiem tra xem co phai gian
 // moi can gan vao ngan hang dang up hay khong. ----------
-router.post("/doi-soat/vietqr/upload-store/:channel", requireAdmin, upload.single("file"), (req, res) => {
+router.post("/doi-soat/vietqr/upload-store/:channel", requireDataEntry, upload.single("file"), (req, res) => {
   const store = load();
   ensureChannelShape(store);
   const channelKey = req.params.channel;
@@ -1138,7 +1239,7 @@ router.post("/doi-soat/vietqr/khoa-so/:channel", requireAdmin, (req, res) => {
 // (giu nguyen tenCuaHang/tenDiemBan cu neu co de con hien thi, chi doi
 // matchText -- dung dung field ma resolveGianGross dung de khop fuzzy) ap
 // dung ngay, khong can tai lai file "store_export"/"Cua hang".
-router.post("/doi-soat/vietqr/store-map/:channel", requireAdmin, (req, res) => {
+router.post("/doi-soat/vietqr/store-map/:channel", requireDataEntry, (req, res) => {
   const store = load();
   ensureChannelShape(store);
   const channelKey = req.params.channel;
@@ -1170,7 +1271,7 @@ router.post("/doi-soat/vietqr/store-map/:channel", requireAdmin, (req, res) => {
 // ca nhom, nen phai luu theo tung vqrCode (xem viet_qr_nocode_assignments,
 // resolveGianGross doc lai o utils/vietqrReconcile.js). ap dung ngay, khong
 // can tai lai file.
-router.post("/doi-soat/vietqr/nocode-assign/:channel", requireAdmin, (req, res) => {
+router.post("/doi-soat/vietqr/nocode-assign/:channel", requireDataEntry, (req, res) => {
   const store = load();
   ensureChannelShape(store);
   const channelKey = req.params.channel;
@@ -1213,7 +1314,7 @@ router.post("/doi-soat/vietqr/nocode-assign/:channel/:vqrCode/delete", requireAd
 });
 
 // ---------- Upload: danh sach hoa don dung chung (file MTT), gan 3 tag Viet QR cung luc ----------
-router.post("/doi-soat/vietqr/upload-hoadon", requireAdmin, upload.single("file"), (req, res) => {
+router.post("/doi-soat/vietqr/upload-hoadon", requireDataEntry, upload.single("file"), (req, res) => {
   const store = load();
   ensureChannelShape(store);
   try {
@@ -1259,7 +1360,7 @@ router.post("/doi-soat/vietqr/mapping", requireAdmin, (req, res) => {
 });
 
 // ---------- Alias: dung CHUNG voi Momo/ZVP (store.invoice_diem_alias) ----------
-router.post("/doi-soat/vietqr/diem-alias", requireAdmin, (req, res) => {
+router.post("/doi-soat/vietqr/diem-alias", requireDataEntry, (req, res) => {
   const store = load();
   try {
     const { sourceCode, targetCode } = req.body;
@@ -1302,7 +1403,7 @@ router.post("/doi-soat/vietqr/invoices/clear", requireAdmin, (req, res) => {
 });
 
 // ---------- Manual match: dong "Chua co HD" da xac nhan la co HD bu ----------
-router.post("/doi-soat/vietqr/manual-match", requireAdmin, (req, res) => {
+router.post("/doi-soat/vietqr/manual-match", requireDataEntry, (req, res) => {
   const store = load();
   ensureChannelShape(store);
   try {

@@ -2,7 +2,7 @@ const express = require("express");
 const multer = require("multer");
 const XLSX = require("xlsx");
 const { load, save, nextId } = require("../store");
-const { requireLogin, requireAdmin } = require("../middleware/auth");
+const { requireLogin, requireAdmin, requireDataEntry } = require("../middleware/auth");
 const {
   parseChiPhiRawWorkbook,
   resolveVendor,
@@ -337,7 +337,7 @@ router.post("/doi-soat/chi-phi/khoa-so", requireAdmin, (req, res) => {
 // dung kenh theo TEN SHEET (chua "8651" hoac "9997"), khong can tach file/tai
 // rieng tung tai khoan. Sheet nao khong khop ten kenh nao thi bao loi ro rang
 // thay vi am tham bo qua hoac gan nham tai khoan.
-router.post("/doi-soat/chi-phi/upload", requireAdmin, upload.single("file"), (req, res) => {
+router.post("/doi-soat/chi-phi/upload", requireDataEntry, upload.single("file"), (req, res) => {
   const store = load();
   ensureShape(store);
   try {
@@ -397,7 +397,7 @@ router.post("/doi-soat/chi-phi/upload/:channel/:id/delete", requireAdmin, (req, 
 
 // ---------- Uploat lai danh sach NCC (Ma NCC/Ten NCC/MST) -- thay the ban 884
 // NCC "KH cu" di kem app khi Luyen co ban moi hon (them NCC, sua ten, doi ma...) ----------
-router.post("/doi-soat/chi-phi/upload-ncc", requireAdmin, upload.single("file"), (req, res) => {
+router.post("/doi-soat/chi-phi/upload-ncc", requireDataEntry, upload.single("file"), (req, res) => {
   const store = load();
   ensureShape(store);
   try {
@@ -424,7 +424,7 @@ router.post("/doi-soat/chi-phi/upload-ncc", requireAdmin, upload.single("file"),
 // Thay the toan bo ban cu moi lan tai len (giong cach lam voi danh sach NCC),
 // vi day la "ban day du hien tai" Luyen xuat lai tu he thong hoa don dien tu,
 // khong phai tang du lieu can gop theo tung lan. ----------
-router.post("/doi-soat/chi-phi/upload-invoice", requireAdmin, upload.single("file"), (req, res) => {
+router.post("/doi-soat/chi-phi/upload-invoice", requireDataEntry, upload.single("file"), (req, res) => {
   const store = load();
   ensureShape(store);
   try {
@@ -450,7 +450,7 @@ router.post("/doi-soat/chi-phi/upload-invoice", requireAdmin, upload.single("fil
 // ---------- Tai bang lenh chi UNC -- doi chieu Ten NCC + So tien de lay Dien
 // giai sach hon dong sao ke ngan hang thuc te. Thay the toan bo ban cu moi
 // lan tai len, cung ly do nhu tren. ----------
-router.post("/doi-soat/chi-phi/upload-unc", requireAdmin, upload.single("file"), (req, res) => {
+router.post("/doi-soat/chi-phi/upload-unc", requireDataEntry, upload.single("file"), (req, res) => {
   const store = load();
   ensureShape(store);
   try {
@@ -490,7 +490,7 @@ router.post("/doi-soat/chi-phi/vendor-tk", requireAdmin, (req, res) => {
 });
 
 // ---------- Gan/sua Ma cong trinh cho 1 dong cu the (khi tu dong khong xac dinh duoc hoac xac dinh sai) ----------
-router.post("/doi-soat/chi-phi/gian-override", requireAdmin, (req, res) => {
+router.post("/doi-soat/chi-phi/gian-override", requireDataEntry, (req, res) => {
   const store = load();
   ensureShape(store);
   try {
@@ -510,7 +510,7 @@ router.post("/doi-soat/chi-phi/gian-override", requireAdmin, (req, res) => {
 
 // ---------- Gan tay Ma NCC theo tung NCC (Ten doi ung) khi khong tu khop duoc
 // (khong co trong danh sach, hoac trung ten voi nhieu NCC) ----------
-router.post("/doi-soat/chi-phi/vendor-ncc", requireAdmin, (req, res) => {
+router.post("/doi-soat/chi-phi/vendor-ncc", requireDataEntry, (req, res) => {
   const store = load();
   ensureShape(store);
   try {
