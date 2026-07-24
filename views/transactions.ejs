@@ -177,6 +177,20 @@
         Chi: <strong class="text-neg"><%= totalChi.toLocaleString('vi-VN') %> đ</strong>
       </div>
 
+      <% if (typeof isAdmin !== 'undefined' && isAdmin && filters.bank_id) { %>
+      <% var _cnt = typeof filteredCount !== 'undefined' ? filteredCount : rows.length; %>
+      <form method="POST" action="/transactions/xoa-loc" style="margin:6px 0 14px;"
+            onsubmit="return confirm('Xoá TOÀN BỘ ' + <%= _cnt %> + ' dòng giao dịch đang lọc (ngân hàng + khoảng ngày + loại đang chọn)? Không thể hoàn tác, chỉ dùng khi muốn xoá sạch để tải lại sao kê đúng từ đầu.');">
+        <input type="hidden" name="bank_id" value="<%= filters.bank_id %>" />
+        <input type="hidden" name="from" value="<%= filters.from %>" />
+        <input type="hidden" name="to" value="<%= filters.to %>" />
+        <input type="hidden" name="type" value="<%= filters.type %>" />
+        <button type="submit" class="btn" style="background:#e33; color:#fff; border:none;">
+          Xoá toàn bộ <%= _cnt %> dòng đang lọc
+        </button>
+      </form>
+      <% } %>
+
       <p class="muted" style="margin:6px 0 10px;">
         Mẹo: giữ <strong>Ctrl</strong> (hoặc <strong>Cmd</strong> trên Mac) rồi bấm vào nhiều dòng để cộng tổng số tiền các dòng đã chọn.
       </p>

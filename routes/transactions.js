@@ -190,6 +190,7 @@ router.get("/transactions", (req, res) => {
     rows,
     totalThu,
     totalChi,
+    filteredCount: allFiltered.length,
     filters: { bank_id: bank_id || "", from: from || "", to: to || "", type: type || "" },
     userName: req.session.userName,
     pasteResult: null,
@@ -528,6 +529,41 @@ router.post("/transactions/dedupe/:bank_id", requireAdmin, (req, res) => {
   } catch (e) {
     res.redirect(`/transactions?bank_id=${bankIdNum}&error=` + encodeURIComponent(e.message));
   }
+});
+
+// Luyen, 2026-07-24: "thêm chỗ xóa các giao dịch đã lọc ra á xóa đồng loạt" --
+// sao ke 1 ngan hang/1 ngay bi loi/trung nang (vd 235tr thay vi ~21tr thuc te
+// cua BIDV7702 ngay 22/07) can 1 cach xoa SACH toan bo giao dich dang loc de
+// tai lai file sao ke DUNG tu dau, thay vi phai bam "Sua" tung dong 1 (khong
+// co gioi han so dong). Xoa THEO DUNG bo loc dang ap dung tren trang (ngan
+// hang + tu ngay + den ngay + loai Thu/Chi) -- bat buoc phai chon 1 ngan hang
+// cu the (khong cho xoa khi dang xem "Tat ca ngan hang") de tranh xoa nham
+// toan bo du lieu nhieu ngan hang cung luc. Admin-only vi la thao tac xoa
+// hang loat khong the hoan tac.
+router.post("/transactions/xoa-loc", requireAdmin, (req, res) => {
+  const { bank_id, from, to, type } = req.body;
+  if (!bank_id) {
+    return res.redirect("/transactions?error=" + encodeURIComponent("Phai chon 1 ngan hang cu the truoc khi xoa hang loat."));
+  }
+  const store = load();
+  const bankIdNum = Number(bank_id);
+  const before = store.transactions.length;
+  let removedAmount = 0;
+  store.transactions = store.transactions.filter((t) => {
+    if (t.bank_id !== bankIdNum) return true;
+    if (from && t.date < from) return true;
+    if (to && t.date > to) return true;
+    if ((type === "thu" || type === "chi") && t.type !== type) return true;
+    removedAmount += t.amount;
+    return false;
+  });
+  const removedCount = before - store.transactions.length;
+  save(store);
+  const qs = `bank_id=${encodeURIComponent(bank_id)}&from=${encodeURIComponent(from || "")}&to=${encodeURIComponent(to || "")}&type=${encodeURIComponent(type || "")}`;
+  res.redirect(
+    `/transactions?${qs}&success=` +
+      encodeURIComponent(`Đã xoá ${removedCount} dòng giao dịch theo bộ lọc, tổng ${removedAmount.toLocaleString("vi-VN")}đ.`)
+  );
 });
 
 // Upload danh sach "Ma cong trinh" chuan (rieng theo tung cong ty dang chon).
