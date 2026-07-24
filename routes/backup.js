@@ -1,6 +1,6 @@
 const express = require("express");
 const multer = require("multer");
-const { load, save, DATA_FILE } = require("../store");
+const { load, save, nextId, DATA_FILE } = require("../store");
 const { requireLogin, requireAdmin } = require("../middleware/auth");
 
 const router = express.Router();
@@ -16,7 +16,13 @@ const upload = multer({
 // du lieu tu ban chay o may (offline) sang ban chay online, hoac khi can
 // khoi phuc sau su co.
 router.get("/he-thong/sao-luu", (req, res) => {
-  res.render("backup", { userName: req.session.userName, error: null, success: null });
+  const store = load();
+  res.render("backup", {
+    userName: req.session.userName,
+    banks: [...store.banks].sort((a, b) => a.name.localeCompare(b.name)),
+    error: null,
+    success: null,
+  });
 });
 
 router.get("/he-thong/sao-luu/tai-xuong", (req, res) => {
@@ -122,6 +128,83 @@ router.post("/he-thong/sao-luu/dong-bo-mot-phan", requireAdmin, upload.single("f
       success: `Da dong bo tu file offline (chi Momo KH Cu/Moi + kenh Viet QR: ${channels.join(", ")}): ${summary.join(
         "; "
       )}. Cac trang/du lieu khac cua ban online giu nguyen.`,
+    });
+  } catch (e) {
+    res.render("backup", { userName: req.session.userName, error: e.message, success: null });
+  }
+});
+
+// Chi Nhan, 2026-07-24: Luyen phat hien du lieu giao dich (sao ke ngan hang)
+// cua BIDV7702 bi lech/trung lap trong luc debug lien tuc tai lai sao ke
+// (bug "So chung tu bi nham So tham chieu" -- xem utils/bankStatementParser.js).
+// Luyen co 1 file sao luu CU HON, sach hon (truoc khi cac lan tai lap gay
+// loi), muon dung DUNG PHAN GIAO DICH cua 1 ngan hang trong 1 khoang ngay tu
+// file do de thay the lai cho dung, KHONG dong den giao dich cua ngan hang
+// khac hay ngay khac ngoai khoang da chon -- khac voi "dong-bo-mot-phan" o
+// tren (chi xu ly Momo + kenh Viet QR, khong dong den transactions).
+//
+// Khop ngan hang qua TEN (khong phai id) vi id co the KHAC nhau giua file
+// sao luu va du lieu dang chay (thu tu tao ngan hang co the khac giua 2 lan).
+router.post("/he-thong/sao-luu/khoi-phuc-giao-dich", requireAdmin, upload.single("file"), (req, res) => {
+  try {
+    if (!req.file) throw new Error("Vui long chon 1 file sao luu (.json) de lay du lieu.");
+    const { bank_id, from, to } = req.body;
+    if (!bank_id) throw new Error("Vui long chon ngan hang can khoi phuc.");
+    if (!from || !to) throw new Error("Vui long chon du ca ngay bat dau va ngay ket thuc.");
+    if (from > to) throw new Error("Ngay bat dau phai truoc ngay ket thuc.");
+
+    const text = req.file.buffer.toString("utf8");
+    let backup;
+    try {
+      backup = JSON.parse(text);
+    } catch (e) {
+      throw new Error("File nay khong phai file JSON hop le.");
+    }
+    if (!Array.isArray(backup.banks) || !Array.isArray(backup.transactions)) {
+      throw new Error("File nay khong dung cau truc file sao luu K&H Bank Tracker (thieu banks/transactions).");
+    }
+
+    const store = load();
+    const liveBank = store.banks.find((b) => b.id === Number(bank_id));
+    if (!liveBank) throw new Error("Khong tim thay ngan hang nay tren ban dang chay.");
+    const backupBank = backup.banks.find((b) => b.name === liveBank.name);
+    if (!backupBank) {
+      throw new Error(`File sao luu nay khong co ngan hang "${liveBank.name}".`);
+    }
+
+    const backupRowsInRange = backup.transactions.filter(
+      (t) => t.bank_id === backupBank.id && t.date >= from && t.date <= to
+    );
+    if (backupRowsInRange.length === 0) {
+      throw new Error(`File sao luu khong co giao dich nao cua "${liveBank.name}" trong khoang ${from} den ${to}.`);
+    }
+
+    const before = store.transactions.length;
+    store.transactions = store.transactions.filter(
+      (t) => !(t.bank_id === liveBank.id && t.date >= from && t.date <= to)
+    );
+    const removedCount = before - store.transactions.length;
+
+    backupRowsInRange.forEach((t) => {
+      store.transactions.push({
+        id: nextId(store, "transactions"),
+        bank_id: liveBank.id,
+        date: t.date,
+        description: t.description,
+        amount: t.amount,
+        type: t.type,
+        reference: t.reference || "",
+        created_at: t.created_at || new Date().toISOString(),
+        created_by: req.session.userName || "",
+        restored_from_backup_at: new Date().toISOString(),
+      });
+    });
+    save(store);
+
+    res.render("backup", {
+      userName: req.session.userName,
+      error: null,
+      success: `Đã khôi phục giao dịch "${liveBank.name}" từ ${from} đến ${to}: xoá ${removedCount} dòng cũ, nạp lại ${backupRowsInRange.length} dòng đúng từ file sao lưu.`,
     });
   } catch (e) {
     res.render("backup", { userName: req.session.userName, error: e.message, success: null });

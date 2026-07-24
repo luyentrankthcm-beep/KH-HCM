@@ -49,6 +49,28 @@
         <button type="submit" class="btn btn-secondary">Đồng bộ một phần</button>
       </form>
     </section>
+
+    <section class="panel">
+      <h2>4. Khôi phục giao dịch 1 ngân hàng theo khoảng ngày từ file sao lưu</h2>
+      <p class="muted">
+        Dùng khi giao dịch (sao kê) của 1 ngân hàng trong 1 khoảng ngày bị lỗi/trùng lặp (ví dụ do tải lại sao kê
+        nhiều lần lúc sửa lỗi), muốn lấy lại đúng dữ liệu sạch từ 1 file sao lưu cũ hơn cho ĐÚNG ngân hàng và
+        ĐÚNG khoảng ngày đó thôi -- các ngân hàng khác và các ngày ngoài khoảng đã chọn giữ nguyên, không đụng tới.
+      </p>
+      <form method="POST" action="/he-thong/sao-luu/khoi-phuc-giao-dich" enctype="multipart/form-data" class="form-inline"
+            onsubmit="return confirm('Sẽ XOÁ giao dịch hiện có của ngân hàng và khoảng ngày đã chọn, rồi nạp lại đúng dữ liệu trong file sao lưu cho khoảng đó. Không thể hoàn tác. Chắc chắn tiếp tục?');">
+        <select name="bank_id" required>
+          <option value="">-- Chọn ngân hàng --</option>
+          <% (typeof banks !== 'undefined' ? banks : []).forEach(function(b) { %>
+          <option value="<%= b.id %>"><%= b.name %></option>
+          <% }) %>
+        </select>
+        <input type="date" name="from" required title="Từ ngày" />
+        <input type="date" name="to" required title="Đến ngày" />
+        <input type="file" name="file" accept=".json" required />
+        <button type="submit" class="btn btn-secondary">Khôi phục giao dịch</button>
+      </form>
+    </section>
   </main>
 </body>
 </html>
