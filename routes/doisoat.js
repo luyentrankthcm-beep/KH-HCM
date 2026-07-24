@@ -674,6 +674,24 @@ router.post("/doi-soat/momo/upload-tong", requireDataEntry, upload.single("file"
   }
 });
 
+// Luyen, 2026-07-24: "sao vẫn bị cộng nhầm hóa đơn vậy" -- 5 hoa don
+// 9977-9981 (khoan ve 2026-07-20, KVC ESTELLA/AE TAN AN KVC/FARM LOTTE PHAN
+// THIET/FARM LOTTE NHA TRANG/TUTU MN AEON MALL TAN AN) da bi xoa 1 lan nhung
+// TAI XUAT HIEN LAI sau khi Luyen tai len lai 1 file MTT cu hon (upload la
+// CONG DON, khong biet ban da xoa la co chu y nen tai lai la them lai y het).
+// Xac nhan qua file "MTT 24.07.xlsx" (moi nhat, 2026-07-24): ca 5 so HD nay
+// THAT RA khong con gan tag "momo" nua (vd 9977 la "VietQR POSH MB 18,19",
+// diem "GO BAC GIANG PHN", khong lien quan ESTELLA) -- day la tag CU/SAI tu 1
+// phien ban MTT truoc do. Chan VINH VIEN 5 dong nay o day (khong chi xoa 1
+// lan) de bat ky lan tai file MTT cu nao sau nay cung khong the tai them lai.
+const MOMO_INVOICE_BLOCKLIST = new Set([
+  "9977|2026-07-20|DIY ESTELLA KVC",
+  "9978|2026-07-20|LM PHAN THIẾT KVC",
+  "9979|2026-07-20|LM NHA TRANG KVC",
+  "9980|2026-07-20|TUTU MN AEON MALL TÂN AN",
+  "9981|2026-07-20|AE TAN AN KVC",
+]);
+
 // Upload 1 file danh sach hoa don (MTT) tren trang Momo cung cap nhat luon ca
 // 3 danh sach hoa don Zalo/VNPay/Payoo (dung chung parseSharedInvoiceWorkbook
 // voi trang /doi-soat/zvp) -- khong can upload lai file nay tren trang kia.
@@ -688,9 +706,14 @@ router.post("/doi-soat/momo/upload-hoadon", requireDataEntry, upload.single("fil
 
     const existingKeysMomo = new Set(store[momoCfg.invoicesKey].map((i) => `${i.soHd}|${i.ngayHd}|${i.maDiem}`));
     let addedMomo = 0;
+    let blockedMomo = 0;
     for (const inv of shared.momo) {
       const key = `${inv.soHd}|${inv.ngayHd}|${inv.maDiem}`;
       if (existingKeysMomo.has(key)) continue;
+      if (MOMO_INVOICE_BLOCKLIST.has(key)) {
+        blockedMomo++;
+        continue;
+      }
       existingKeysMomo.add(key);
       store[momoCfg.invoicesKey].push(inv);
       addedMomo++;
@@ -718,6 +741,9 @@ router.post("/doi-soat/momo/upload-hoadon", requireDataEntry, upload.single("fil
 
     save(store);
     let msg = `Da nap sheet "${shared.sheetName}": them moi ${addedMomo} HD momo (${momoCfg.label}).`;
+    if (blockedMomo > 0) {
+      msg += ` (Bo qua ${blockedMomo} HD da xac dinh la gan nham tag momo tu truoc, khong tinh lai.)`;
+    }
     if (activeCompany === "kh_cu") {
       msg += ` ${addedCounts.zalo} HD zalo, ${addedCounts.vnpay} HD vnpay, ${addedCounts.payoo} HD payoo (da cap nhat cho ca 2 trang Doi soat Momo va Zalo/VNPay/Payoo).`;
     }
