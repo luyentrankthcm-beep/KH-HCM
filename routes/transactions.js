@@ -349,10 +349,26 @@ router.post("/transactions/upload-statement", requireDataEntry, upload.single("f
   const candidatesHaveRef = candidates.some((c) => c.reference);
   let healedRemoved = 0;
   if (candidatesHaveRef) {
+    // Chi Nhan, 2026-07-24: sua tiep 1 bug rieng vua phat hien -- truoc day
+    // "So chung tu" (so phieu tuan tu, vd "75918") bi nham thanh reference
+    // thay vi "So tham chieu" that (dung de khop VietQR theo Ma tham chieu,
+    // xem utils/vietqrReconcile.js) tren cac file co CA HAI cot nay (BIDV7702).
+    // Nhung dong DA LUU truoc khi sua bug se mang gia tri reference SAI (kieu
+    // so ngan, thuan so) nen khong the tu nhan lai o buoc "existingRefs" ben
+    // duoi -- can coi nhung dong do NHU THE KHONG CO reference (giong het
+    // truong hop "!t.reference" da xu ly san o day) de duoc xoa+nap lai voi
+    // reference DUNG, nhung CHI khi lan tai nay thuc su doc duoc "So tham
+    // chieu" that (refIsPrimary) -- tranh dong cham nham toi cac ngan hang
+    // khac von CHI CO "So chung tu" hop le (khong phai loi voi ho).
+    const looksLikeStaleNumericRef = (ref) => /^\d{1,10}$/.test(String(ref || ""));
+    const shouldHealStaleNumericRef = !!parsed.refIsPrimary;
     const before = store.transactions.length;
-    store.transactions = store.transactions.filter(
-      (t) => !(t.bank_id === bankIdNum && !t.reference && t.date >= firstDate && t.date <= lastDate)
-    );
+    store.transactions = store.transactions.filter((t) => {
+      if (t.bank_id !== bankIdNum || t.date < firstDate || t.date > lastDate) return true;
+      if (!t.reference) return false;
+      if (shouldHealStaleNumericRef && looksLikeStaleNumericRef(t.reference)) return false;
+      return true;
+    });
     healedRemoved = before - store.transactions.length;
   }
 

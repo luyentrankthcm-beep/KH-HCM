@@ -95,12 +95,21 @@ const DESC_HEADER_PATTERNS = [
 // transactions from different customers). "Ma giao dich"/"Trans.Code" is
 // deliberately excluded here -- on BIDV exports that column just holds a
 // transaction-type code like "DD" repeated on every row, not a unique ID.
-const REF_HEADER_PATTERNS = [
-  "so tham chieu",
-  "so chung tu",
-  "so ct",
-  "reference",
-];
+//
+// Chi Nhan, 2026-07-24: "Số tham chiếu" (dung de khop voi "Ma tham chieu"
+// ben file QR, xem resolveGianGrossByBankRef trong utils/vietqrReconcile.js)
+// PHAI duoc uu tien hon "Số chứng từ"/"So CT" -- file that BIDV7702 co CA HAI
+// cot nay CUNG luc, va "Số chứng từ" (so phieu tuan tu vd "75918", "75919")
+// luon nam TRUOC "Số tham chiếu" theo thu tu cot trong file thuc te, nen
+// PATTERN_LIST.some() + "lay cot dau tien khop" (thu tu quet TRAI SANG PHAI)
+// truoc day luon chon nham "Số chứng từ" lam .reference, khien no KHONG BAO
+// GIO khop duoc voi "Ma tham chieu" ben file QR (2 gia tri hoan toan khac
+// nhau ban chat: 1 ben la so phieu ke toan, 1 ben la ma giao dich QR that).
+// Tach rieng nhom pattern "chinh xac" (so tham chieu/reference) uu tien hon
+// nhom "du phong" (so chung tu/so ct) -- chi dung du phong khi KHONG co cot
+// nao khop nhom chinh trong ca dong tieu de.
+const REF_HEADER_PATTERNS_PRIMARY = ["so tham chieu", "reference"];
+const REF_HEADER_PATTERNS_FALLBACK = ["so chung tu", "so ct"];
 
 function findHeaderRow(grid) {
   for (let r = 0; r < Math.min(grid.length, 20); r++) {
@@ -108,17 +117,20 @@ function findHeaderRow(grid) {
     let dateCol = -1;
     let balCol = -1;
     let descCol = -1;
-    let refCol = -1;
+    let refColPrimary = -1;
+    let refColFallback = -1;
     row.forEach((cell, c) => {
       if (cell === null || cell === undefined || typeof cell !== "string") return;
       const h = normHeader(cell);
       if (dateCol === -1 && DATE_HEADER_PATTERNS.some((p) => h.includes(p))) dateCol = c;
       if (balCol === -1 && BALANCE_HEADER_PATTERNS.some((p) => h.includes(p))) balCol = c;
       if (descCol === -1 && DESC_HEADER_PATTERNS.some((p) => h.includes(p))) descCol = c;
-      if (refCol === -1 && REF_HEADER_PATTERNS.some((p) => h.includes(p))) refCol = c;
+      if (refColPrimary === -1 && REF_HEADER_PATTERNS_PRIMARY.some((p) => h.includes(p))) refColPrimary = c;
+      if (refColFallback === -1 && REF_HEADER_PATTERNS_FALLBACK.some((p) => h.includes(p))) refColFallback = c;
     });
+    const refCol = refColPrimary !== -1 ? refColPrimary : refColFallback;
     if (dateCol !== -1 && balCol !== -1) {
-      return { headerRowIdx: r, dateCol, balCol, descCol, refCol };
+      return { headerRowIdx: r, dateCol, balCol, descCol, refCol, refIsPrimary: refColPrimary !== -1 };
     }
   }
   return null;
@@ -163,7 +175,7 @@ function parseBankStatement(buffer, sheetNameHint) {
       'Khong nhan dien duoc file sao ke: can co cot "Ngay giao dich" (hoac "Ngay hieu luc") va cot "So du".'
     );
   }
-  let { headerRowIdx, dateCol, balCol, descCol, refCol } = found;
+  let { headerRowIdx, dateCol, balCol, descCol, refCol, refIsPrimary } = found;
   const maxCol = (grid[headerRowIdx] || []).length;
   if (descCol === -1) {
     descCol = guessDescCol(grid, headerRowIdx, dateCol, balCol, maxCol);
@@ -193,7 +205,14 @@ function parseBankStatement(buffer, sheetNameHint) {
     throw new Error("Khong doc duoc dong giao dich nao trong file (kiem tra lai dinh dang).");
   }
 
-  return { sheetName, rows };
+  // Chi Nhan, 2026-07-24: co "refIsPrimary" de goi noi (routes/transactions.js)
+  // biet cot reference vua doc duoc la "So tham chieu" that (dang alnum co
+  // gach ngang, dung de khop VietQR) hay chi la "So chung tu" du phong (chuoi
+  // so tuan tu ngan, vd "75918") -- can phan biet de tu sua nhung dong DA
+  // LUU TRUOC DAY bang gia tri SAI (bug cu: "So chung tu" bi nham la
+  // reference) ma khong lam sai nhung ngan hang khac von chi CO san "So
+  // chung tu" (hop le voi ho, khong phai loi).
+  return { sheetName, rows, refIsPrimary: !!refIsPrimary };
 }
 
 // Turn balance-anchored rows into thu/chi transactions.
