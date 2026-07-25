@@ -205,6 +205,20 @@ function parseBankStatement(buffer, sheetNameHint) {
     throw new Error("Khong doc duoc dong giao dich nao trong file (kiem tra lai dinh dang).");
   }
 
+  // Luyen, 2026-07-25: "tại giao dịch kia bị lỗi á không tải về được bạn đọc
+  // tạm file này nhá" -- file thay the tai truc tiep tu internet banking
+  // ("THÔNG TIN LỊCH SỬ GIAO DỊCH...") xuat theo thu tu MOI NHAT TRUOC (dong
+  // dau la giao dich gan nhat), NGUOC voi cac file sao ke Luyen hay tai
+  // truoc gio (CU NHAT TRUOC). computeThuChi() gia dinh `rows` di theo thu tu
+  // THOI GIAN TANG DAN (dong dau = giao dich cu nhat) de tinh dung delta so
+  // du tung dong -- neu doc file "moi nhat truoc" ma khong dao lai, MOI delta
+  // se bi tinh NGUOC (thu thanh chi, chi thanh thu, sai het so tien). Tu dong
+  // phat hien + dao lai o day (thay vi doi hoi Luyen phai tu sap xep file
+  // truoc khi tai) de ca 2 dinh dang deu ra ket qua dung.
+  if (rows.length > 1 && rows[0].date > rows[rows.length - 1].date) {
+    rows.reverse();
+  }
+
   // Chi Nhan, 2026-07-24: co "refIsPrimary" de goi noi (routes/transactions.js)
   // biet cot reference vua doc duoc la "So tham chieu" that (dang alnum co
   // gach ngang, dung de khop VietQR) hay chi la "So chung tu" du phong (chuoi
