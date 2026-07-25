@@ -111,7 +111,11 @@
           <input type="month" name="thang" value="<%= thangFilter %>" style="margin-left:6px;" />
         </label>
         <button type="submit" class="btn btn-secondary">Lọc theo tháng</button>
-        <% if (thangFilter) { %><a class="link-btn" href="/phap-danh/hop-dong-thue-gian-hang<%= loaiFilter ? '?loai=' + encodeURIComponent(loaiFilter) : '' %>">Bỏ lọc tháng</a><% } %>
+        <!-- Luyen, 2026-07-25: mac dinh trang nay LUON loc theo 1 thang nao do
+             (thang hien tai neu chua chon gi -- xem resolveThangFilter ben
+             routes/phap-danh.js), nen luon can 1 duong thoat ro rang ve "Tat
+             ca", khac voi truoc day (chi hien nut nay khi CO thangFilter). -->
+        <a class="link-btn" href="/phap-danh/hop-dong-thue-gian-hang?thang=all<%= loaiFilter ? '&loai=' + encodeURIComponent(loaiFilter) : '' %>">Xem tất cả các tháng</a>
         <input type="text" id="ganSearchBox" placeholder="🔎 Tìm theo tên gian / tên điểm nội bộ..." style="margin-left:auto; min-width:260px; padding:8px 12px; border:1px solid var(--color-hairline); border-radius:var(--radius-md);" oninput="filterGianRows(this.value)" />
       </form>
       <div class="gian-card-grid" id="gianTable">
@@ -138,8 +142,30 @@
             <% if (r.maKH) { %><div class="gian-card-field"><span class="gian-card-field-label">Mã KH:</span><span class="gian-card-field-value"><%= r.maKH %></span></div><% } %>
             <% if (r.benChoThue) { %><div class="gian-card-field"><span class="gian-card-field-label">Bên cho thuê:</span><span class="gian-card-field-value"><%= r.benChoThue %></span></div><% } %>
             <% if (r.hinhThucHopTac) { %><div class="gian-card-field"><span class="gian-card-field-label">Hình thức HT:</span><span class="gian-card-field-value"><%= r.hinhThucHopTac %></span></div><% } %>
-            <% if (r.thoiHanHopDong) { %><div class="gian-card-field"><span class="gian-card-field-label">Thời hạn HĐ:</span><span class="gian-card-field-value" style="white-space:pre-line;"><%= r.thoiHanHopDong %></span></div><% } %>
-            <% if (r.tienThueThang) { %><div class="gian-card-field"><span class="gian-card-field-label">Tiền thuê/tháng:</span><span class="gian-card-field-value"><%= r.tienThueThang.toLocaleString('vi-VN') %> đ</span></div><% } %>
+            <%
+              // Luyen, 2026-07-25: "có thể hiển thị dữ liệu từ chỗ trống bên
+              // trái ... hiển thị từ hợp đồng lấy ra các thông tin nhá" -- 2
+              // truong nay truoc gio CHI hien khi Luyen tu go tay
+              // (thoiHanHopDong/tienThueThang), de trong het du sheet HCM da
+              // co san ngayBatDauHD/ngayHetHanHD/tongTienThueThangHCM. Dung
+              // tam cac gia tri tu sheet lam du phong khi chua nhap tay, ghi
+              // chu ro "(từ hợp đồng)" de Luyen biet day la so tu dong doc
+              // duoc, chua phai so da tu xac nhan.
+              var thoiHanDisplay = r.thoiHanHopDong;
+              var thoiHanFromSheet = false;
+              if (!thoiHanDisplay && (r.ngayBatDauHD || r.ngayHetHanHD)) {
+                thoiHanDisplay = (r.ngayBatDauHD || '?') + ' — ' + (r.ngayHetHanHD || '?');
+                thoiHanFromSheet = true;
+              }
+              var tienThueDisplay = r.tienThueThang ? r.tienThueThang.toLocaleString('vi-VN') + ' đ' : '';
+              var tienThueFromSheet = false;
+              if (!tienThueDisplay && r.tongTienThueThangHCM) {
+                tienThueDisplay = typeof r.tongTienThueThangHCM === 'number' ? r.tongTienThueThangHCM.toLocaleString('vi-VN') + ' đ' : r.tongTienThueThangHCM;
+                tienThueFromSheet = true;
+              }
+            %>
+            <% if (thoiHanDisplay) { %><div class="gian-card-field"><span class="gian-card-field-label">Thời hạn HĐ:</span><span class="gian-card-field-value" style="white-space:pre-line;"><%= thoiHanDisplay %><% if (thoiHanFromSheet) { %> <span class="muted" style="font-size:11px;">(từ hợp đồng)</span><% } %></span></div><% } %>
+            <% if (tienThueDisplay) { %><div class="gian-card-field"><span class="gian-card-field-label">Tiền thuê/tháng:</span><span class="gian-card-field-value"><%= tienThueDisplay %><% if (tienThueFromSheet) { %> <span class="muted" style="font-size:11px;">(từ hợp đồng)</span><% } %></span></div><% } %>
             <% if (r.ghiChu) { %>
             <div class="gian-card-field">
               <span class="gian-card-field-label">Ghi chú:</span>
@@ -176,7 +202,7 @@
               </details>
             </div>
             <% } %>
-            <% if (!r.tenDiemNoiBo && !r.maCongTrinh && !r.benChoThue && !r.thoiHanHopDong && !r.tienThueThang && !r.ghiChu) { %>
+            <% if (!r.tenDiemNoiBo && !r.maCongTrinh && !r.benChoThue && !thoiHanDisplay && !tienThueDisplay && !r.ghiChu) { %>
             <div class="gian-card-empty-note">Chưa có thông tin chi tiết — bấm để tự điền.</div>
             <% } %>
           </div>

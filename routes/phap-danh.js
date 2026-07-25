@@ -135,12 +135,26 @@ function monthOverlaps(r, thang) {
   return bd <= monthEnd && hh >= monthStart;
 }
 
+// Luyen, 2026-07-25: "ưu tiên hiển thị tháng 7" -- mac dinh loc theo THANG
+// HIEN TAI ngay khi vao trang (thay vi hien het ca 100+ gian moi lan vao),
+// nhung van cho xem "Tat ca" qua 1 lua chon ro rang. Vi input HTML type=month
+// khong co gia tri nao dai dien cho "khong loc" (rong = chua chon, khong
+// phai "tat ca"), dung sentinel "all" o query string de phan biet 2 truong
+// hop: KHONG co "thang" trong URL (vao trang lan dau, tab moi...) -> mac dinh
+// thang nay; co "thang=all" ro rang (bam nut "Bỏ lọc tháng") -> tat ca.
+function resolveThangFilter(req) {
+  const currentMonthStr = new Date().toISOString().slice(0, 7);
+  const raw = req.query.thang;
+  if (raw === "all") return "";
+  return raw || currentMonthStr;
+}
+
 router.get("/phap-danh/hop-dong-thue-gian-hang", (req, res) => {
   const store = load();
   ensureShape(store);
   const activeCompany = getCompany(req);
   const loaiFilter = req.query.loai || "";
-  const thangFilter = req.query.thang || "";
+  const thangFilter = resolveThangFilter(req);
   const todayStr = new Date().toISOString().slice(0, 10);
   let rows = store.phap_danh_hop_dong_thue
     .map(ensureThueDefaults)
@@ -441,12 +455,23 @@ router.post("/phap-danh/hop-dong-thue-gian-hang/cap-nhat-tu-sheet", requireAdmin
       const soHopDong = groupRows[0].soHopDong;
       const congTy = groupRows.map((r) => r.congTy).find((v) => v) || "kh_cu";
       const fields = buildThueGianFieldsFromRows(diaDiem, groupRows, SOURCE_TAG);
+      // Luyen, 2026-07-25: "mình đang là người thuê địa điểm của họ ... các
+      // hợp đồng đã có thì chắc chắn nó sẽ có NCC rồi thì thêm vào cho tôi
+      // với" -- sheet nguon (cot tenKH/mstKH) da co san ten/MST cua BEN CHO
+      // THUE (chu khong phai KH cua minh, giong het cach hieu o Hop Dong NCC
+      // ben duoi), nhung truoc gio khong duoc dien vao benChoThue/mstBenChoThue
+      // (2 truong nay truoc gio CHI dien tay). Tu nay tu dong dien tu sheet
+      // NHUNG CHI khi con trong (khong ghi de neu Luyen da tu sua tay khac di).
+      const benChoThueSheet = groupRows.map((r) => r.tenKH).find((v) => v) || "";
+      const mstBenChoThueSheet = groupRows.map((r) => r.mstKH).find((v) => v) || "";
       const matchKey = soHopDong + "||" + congTy;
       const existing = existingBySoHopDong.get(matchKey);
       if (existing) {
         // Gian da co, khop dung qua soHopDongHCM -- CHI ghi de cac truong lay
         // tu sheet, TUYET DOI khong dung vao cac truong Luyen tu nhap tay.
         Object.assign(existing, fields);
+        if (!existing.benChoThue && benChoThueSheet) existing.benChoThue = benChoThueSheet;
+        if (!existing.mstBenChoThue && mstBenChoThueSheet) existing.mstBenChoThue = mstBenChoThueSheet;
         updatedExisting++;
         updatedNames.push(existing.gian || diaDiem);
       } else {
@@ -462,13 +487,13 @@ router.post("/phap-danh/hop-dong-thue-gian-hang/cap-nhat-tu-sheet", requireAdmin
           gian: diaDiem,
           maCongTrinh: "",
           maKH: "",
-          benChoThue: "",
-          mstBenChoThue: "",
+          benChoThue: benChoThueSheet,
+          mstBenChoThue: mstBenChoThueSheet,
           hinhThucHopTac: "",
           trangThaiHoatDong: "",
           thoiHanHopDong: "",
           tienThueThang: 0,
-          ghiChu: `Import tự động từ ${SOURCE_TAG} -- CHỊ CẦN TỰ ĐIỀN: Loại hình, Bên cho thuê, Thời hạn HĐ, Tiền thuê/tháng, và đổi lại tên "Gian" cho đúng quy ước (sheet ghi tên/mã thô).`,
+          ghiChu: `Import tự động từ ${SOURCE_TAG} -- CHỊ CẦN TỰ ĐIỀN: Loại hình, Thời hạn HĐ, Tiền thuê/tháng, và đổi lại tên "Gian" cho đúng quy ước (sheet ghi tên/mã thô).`,
           dieuKhoanThanhToan: "",
           hinhThucThuTien: "",
           ...fields,
