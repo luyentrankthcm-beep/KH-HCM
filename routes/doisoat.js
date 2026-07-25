@@ -11,6 +11,7 @@ const {
   resolveRawPortalGross,
   parseKhMoiFeeTransactionWorkbook,
   resolveKhMoiFeeTransactionGross,
+  resolveKhCuFixedFeeTransactionGross,
   reconcileMomo,
   extractMomoSettlements,
   isoToDmy,
@@ -615,21 +616,32 @@ router.post("/doi-soat/momo/upload-tong", requireDataEntry, upload.single("file"
       // duoc thu truoc cho MOI file .xlsx bat ke dang xem cong ty nao, nen 1
       // file "Transaction report" (co cot Nguon tien) tai len luc dang xem KH
       // Cu van bi parse va sinh netByCode, ghi de nham len phi co dinh dung
-      // cua KH Cu. Chi cho phep parser theo Nguon tien chay khi THAT SU dang
-      // xem KH Moi (noi duy nhat dung phi bien doi 1%/1,2%/0,3%) -- KH Cu luon
-      // roi thang ve parser "Tong Momo Gop/flat" ben duoi du file co du cot
-      // Nguon tien hay khong.
+      // cua KH Cu.
+      //
+      // Luyen, 2026-07-25: "sao tôi không gửi đối soát momo kh cũ file này
+      // lên đc vậy bạn dựa vào mã cửa hàng để đưa vô còn phí kh cũ cố định á
+      // cộng lại số tiền là ra tổng á" -- file "Transaction report" thô KH Cu
+      // co CUNG cau truc cot voi KH Moi (Thoi gian/So tien/Ma cua hang/Trang
+      // thai/Nguon tien), nen dung LAI parseKhMoiFeeTransactionWorkbook de
+      // doc giao dich, nhung resolve bang resolveKhCuFixedFeeTransactionGross
+      // (phi CO DINH 1,1%, KHONG doi theo Nguon tien) thay vi
+      // resolveKhMoiFeeTransactionGross. Tach ro 2 nhanh theo activeCompany
+      // de KHONG bao gio ap phi bien doi cho KH Cu hay phi co dinh cho KH
+      // Moi.
       let usedFeeParser = false;
       let feeUnmapped = [];
       let parsed;
       try {
-        if (activeCompany !== "kh_moi") {
-          throw new Error("KH Cu dung phi co dinh 1,1%, khong ap dung parser tinh phi theo Nguon tien.");
-        }
         const { transactions } = parseKhMoiFeeTransactionWorkbook(req.file.buffer);
-        const resolved = resolveKhMoiFeeTransactionGross(transactions, store.cua_hang_mapping);
+        const resolved =
+          activeCompany === "kh_moi"
+            ? resolveKhMoiFeeTransactionGross(transactions, store.cua_hang_mapping)
+            : resolveKhCuFixedFeeTransactionGross(transactions, store.cua_hang_mapping);
         parsed = {
-          sheetName: "MoMo Transaction report (co phi theo nguon tien)",
+          sheetName:
+            activeCompany === "kh_moi"
+              ? "MoMo Transaction report (co phi theo nguon tien)"
+              : "MoMo Transaction report (phi co dinh 1,1%)",
           dates: resolved.dates,
           codes: resolved.codes,
           grossByCode: resolved.grossByCode,
@@ -659,7 +671,11 @@ router.post("/doi-soat/momo/upload-tong", requireDataEntry, upload.single("file"
       Object.assign(store.cua_hang_mapping, parsed.cuaHangMap || {});
       save(store);
       if (usedFeeParser) {
-        successMsg = `Da nap "${req.file.originalname}" (bao cao giao dich MoMo, ${parsed.dates[0]} - ${parsed.dates[parsed.dates.length - 1]}), tu dong tinh phi THAT theo nguon tien (Vi MoMo 1%, Vi tra sau 1.2%, con lai 0.3%) cho ${parsed.codes.length} ma. Ket qua doi soat ben duoi da tu cap nhat theo du lieu moi.`;
+        const feeDesc =
+          activeCompany === "kh_moi"
+            ? "tu dong tinh phi THAT theo nguon tien (Vi MoMo 1%, Vi tra sau 1.2%, con lai 0.3%)"
+            : "tu dong tinh phi co dinh 1,1%";
+        successMsg = `Da nap "${req.file.originalname}" (bao cao giao dich MoMo, ${parsed.dates[0]} - ${parsed.dates[parsed.dates.length - 1]}), ${feeDesc} cho ${parsed.codes.length} ma. Ket qua doi soat ben duoi da tu cap nhat theo du lieu moi.`;
         if (feeUnmapped.length > 0) {
           successMsg += ` CANH BAO: ${feeUnmapped.length} ma cua hang chua map duoc Ma Cong Trinh (${feeUnmapped.join(", ")}) -- doanh thu/phi cua cac ma nay dang hien o dong "CHUA MAP: ..." trong bang duoi, hay tai 1 file "Tong Momo Gop" co chua cac ma cua hang nay de he thong tu hoc mapping.`;
         }

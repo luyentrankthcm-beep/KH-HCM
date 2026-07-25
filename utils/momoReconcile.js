@@ -535,6 +535,44 @@ function parseKhMoiFeeTransactionWorkbook(buffer) {
   return { transactions };
 }
 
+// Luyen, 2026-07-25: "sao tôi không gửi đối soát momo kh cũ file này lên đc
+// vậy bạn dựa vào mã cửa hàng để đưa vô còn phí kh cũ cố định á cộng lại số
+// tiền là ra tổng á" -- KH Cu dung file "Transaction report" giong het cau
+// truc KH Moi (Thoi gian/So tien/Ma cua hang/Trang thai/Nguon tien), NHUNG
+// phi la CO DINH 1,1% (khong doi theo Nguon tien nhu KH Moi). Dung lai
+// parseKhMoiFeeTransactionWorkbook de doc giao dich (dung dinh dang file),
+// nhung BO QUA t.fee (tinh bang cong thuc bien doi cua KH Moi) va tu tinh
+// lai phi co dinh 1,1% (he so 0.989 tren gross, dung voi quy uoc "net = HD *
+// 0,989" da dung cho KH Cu o noi khac trong file nay).
+const KH_CU_FIXED_FEE_RATE = 0.011; // 1,1% co dinh, khong doi theo Nguon tien
+function resolveKhCuFixedFeeTransactionGross(transactions, cuaHangMapping) {
+  const dateSet = new Set();
+  const codesSeen = new Set();
+  const grossByCode = {};
+  const netByCode = {};
+  const unmapped = new Set();
+
+  for (const t of transactions) {
+    const known = cuaHangMapping[t.maCuaHang];
+    const code = known ? known.code : `CHUA MAP: ${t.maCuaHang}`;
+    if (!known) unmapped.add(t.maCuaHang);
+    dateSet.add(t.date);
+    codesSeen.add(code);
+    const key = `${t.date}|${code}`;
+    const fee = Math.round(t.amount * KH_CU_FIXED_FEE_RATE);
+    grossByCode[key] = (grossByCode[key] || 0) + t.amount;
+    netByCode[key] = (netByCode[key] || 0) + (t.amount - fee);
+  }
+
+  return {
+    dates: Array.from(dateSet).sort(),
+    codes: Array.from(codesSeen),
+    grossByCode,
+    netByCode,
+    unmapped: Array.from(unmapped),
+  };
+}
+
 // Giong resolveRawPortalGross nhung tinh THEM feeByCode/netByCode (net =
 // gross - phi) tu cac giao dich da co san phi (xem parseKhMoiFeeTransactionWorkbook).
 function resolveKhMoiFeeTransactionGross(transactions, cuaHangMapping) {
@@ -979,6 +1017,7 @@ module.exports = {
   resolveRawPortalGross,
   parseKhMoiFeeTransactionWorkbook,
   resolveKhMoiFeeTransactionGross,
+  resolveKhCuFixedFeeTransactionGross,
   reconcileMomo,
   extractMomoSettlements,
   buildPendingDaySettlements,
