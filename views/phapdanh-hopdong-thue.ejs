@@ -32,6 +32,33 @@
       .icon-upload-btn:hover { box-shadow: 0 2px 8px rgba(0,0,0,.1); transform: translateY(-1px); }
       .icon-upload-btn .icon-upload-btn-icon { font-size: 26px; line-height: 1; }
       .icon-upload-btn .icon-upload-btn-label { font-size: 12px; font-weight: 600; white-space: nowrap; }
+
+      /* Luyen, 2026-07-25: "mỗi cái 1 khung cho tôi với chỉnh đẹp đẹp xíu sao
+         mà không có dữ liệu cái nó xấu quá vậy" -- doi tu bang day dac (nhieu
+         o trong vi da so gian moi import chua dien tay) sang 1 the/khung rieng
+         cho moi gian, CHI hien truong nao co du lieu (an han truong trong,
+         khong con thay 1 rung o trong xau xi nhu bang cu). */
+      .gian-card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; margin-top: 4px; }
+      .gian-card {
+        background: linear-gradient(160deg, #ffffff 0%, #f2fbfe 100%);
+        border: 1px solid rgba(169, 214, 229, 0.5);
+        border-radius: var(--radius-lg);
+        padding: 16px 18px;
+        box-shadow: var(--shadow-soft);
+        display: flex; flex-direction: column; gap: 8px;
+      }
+      .gian-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+      .gian-card-title { font-size: 16px; font-weight: 700; color: var(--color-ink); line-height: 1.3; }
+      .gian-card-tags { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 2px; }
+      .gian-card-tag { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: var(--radius-lg); background: var(--color-fog); color: var(--color-charcoal); white-space: nowrap; }
+      .gian-card-fields { display: flex; flex-direction: column; gap: 5px; font-size: 13px; }
+      .gian-card-field { display: flex; gap: 6px; }
+      .gian-card-field-label { color: var(--color-graphite); flex-shrink: 0; white-space: nowrap; }
+      .gian-card-field-value { color: var(--color-ink); word-break: break-word; }
+      .gian-card-empty-note { font-size: 12.5px; color: var(--color-graphite); font-style: italic; }
+      .gian-card-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 6px; padding-top: 10px; border-top: 1px dashed var(--color-hairline); font-size: 12px; }
+      .gian-card-actions form { display: flex; align-items: center; gap: 4px; }
+      .gian-card-actions input[type="text"] { width: 110px; font-size: 11px; padding: 3px 6px; }
     </style>
     <div style="margin-bottom:16px;">
       <form method="POST" action="/phap-danh/hop-dong-thue-gian-hang/cap-nhat-tu-sheet" style="display:inline-block;">
@@ -87,109 +114,106 @@
         <% if (thangFilter) { %><a class="link-btn" href="/phap-danh/hop-dong-thue-gian-hang<%= loaiFilter ? '?loai=' + encodeURIComponent(loaiFilter) : '' %>">Bỏ lọc tháng</a><% } %>
         <input type="text" id="ganSearchBox" placeholder="🔎 Tìm theo tên gian / tên điểm nội bộ..." style="margin-left:auto; min-width:260px; padding:8px 12px; border:1px solid var(--color-hairline); border-radius:var(--radius-md);" oninput="filterGianRows(this.value)" />
       </form>
-      <div class="table-scroll">
-        <table class="table" id="gianTable">
-          <thead>
-            <tr>
-              <th>Loại hình</th><th>Gian</th><th>Tên điểm nội bộ</th><th>Mã công trình</th><th>Mã KH</th>
-              <th>Bên cho thuê (NCC)</th><th>Hình thức HT</th><th>Hình thức thu tiền</th><th>Doanh thu chia sẻ (TK)</th><th>Mã viết tắt (Chi Phí)</th><th>Trạng thái HĐ</th><th>Thời hạn hợp đồng</th>
-              <th>Tiền thuê/tháng</th><th>Ghi chú</th><th>Hợp đồng (sheet HCM)</th><th></th>
-            </tr>
-          </thead>
-          <tbody>
-            <% rows.forEach(function(r) { %>
-            <tr data-search="<%= (r.gian + ' ' + r.tenDiemNoiBo + ' ' + r.maCongTrinh).toLowerCase() %>">
-              <td><%= r.loaiHinh %></td>
-              <td><strong><%= r.gian %></strong></td>
-              <td><%= r.tenDiemNoiBo %></td>
-              <td><%= r.maCongTrinh %></td>
-              <td><%= r.maKH %></td>
-              <td style="max-width:260px;"><%= r.benChoThue %></td>
-              <td><%= r.hinhThucHopTac %></td>
-              <td style="font-size:12px; max-width:200px;">
-                <% if (r.hinhThucThuTien) { %><span class="badge badge-chi" title="<%= r.hinhThucThuTien %>">Mall giữ tiền</span><% } %>
-              </td>
-              <td style="font-size:12px;">
-                <!-- Luyen, 2026-07-23: "có tàu bình tân với nhà ma bình dương hay
-                     ghost bình dương cũng là doanh thu chia sẻ ... cho thêm thủ
-                     công cũng được" -- tich chon tay, khong phu thuoc dieu khoan
-                     hop dong co ghi ro hay khong. Dung de tinh cot Tài khoản
-                     (131/1388) ben trang Chi Phí. -->
-                <form method="POST" action="/phap-danh/hop-dong-thue-gian-hang/<%= r.id %>/doanh-thu-chia-se" style="display:inline;">
-                  <input type="hidden" name="loai" value="<%= loaiFilter %>" />
-                  <input type="hidden" name="thang" value="<%= thangFilter %>" />
-                  <input type="hidden" name="doanhThuChiaSe" value="<%= r.doanhThuChiaSe ? '0' : '1' %>" />
-                  <button type="submit" class="link-btn" title="Bấm để đổi trạng thái doanh thu chia sẻ (TK 1388)">
-                    <%= r.doanhThuChiaSe ? '☑ 1388' : '☐ 131' %>
-                  </button>
-                </form>
-              </td>
-              <td style="font-size:12px; min-width:160px;">
-                <!-- Luyen, 2026-07-23 (lan 2): "có thể viết tắc á" -- Luyen tu
-                     dien cac ma viet tat (cach nhau boi dau phay) Chi Phi hay
-                     dung cho gian nay (vd "TAU BT, TÀU BT"), de khop CHINH XAC
-                     thay vi fuzzy doan nham. -->
-                <form method="POST" action="/phap-danh/hop-dong-thue-gian-hang/<%= r.id %>/alias-gian" style="display:flex; gap:4px;">
-                  <input type="hidden" name="loai" value="<%= loaiFilter %>" />
-                  <input type="hidden" name="thang" value="<%= thangFilter %>" />
-                  <input type="text" name="aliasGian" value="<%= r.aliasGian %>" placeholder="vd TAU BT, GHOST AMBD" style="width:130px; font-size:11px; padding:2px 4px;" />
-                  <button type="submit" class="link-btn" style="font-size:11px;" title="Lưu mã viết tắt">Lưu</button>
-                </form>
-              </td>
-              <td>
+      <div class="gian-card-grid" id="gianTable">
+        <% rows.forEach(function(r) { %>
+        <div class="gian-card" data-search="<%= (r.gian + ' ' + r.tenDiemNoiBo + ' ' + r.maCongTrinh).toLowerCase() %>">
+          <div class="gian-card-head">
+            <div>
+              <div class="gian-card-title"><%= r.gian %></div>
+              <div class="gian-card-tags">
+                <% if (r.loaiHinh) { %><span class="gian-card-tag"><%= r.loaiHinh %></span><% } %>
                 <% if (r.trangThaiHD === 'Còn hoạt động') { %><span class="badge badge-thu">Còn hoạt động</span>
                 <% } else if (r.trangThaiHD === 'Hết hạn') { %><span class="badge badge-chi">Hết hạn</span>
-                <% } else { %><span class="muted" style="font-size:12px;">Không rõ</span>
+                <% } else { %><span class="muted" style="font-size:12px;">Không rõ trạng thái</span>
                 <% } %>
-              </td>
-              <td style="font-size:12px; max-width:220px; white-space:pre-line;"><%= r.thoiHanHopDong %></td>
-              <td><%= (r.tienThueThang || 0).toLocaleString('vi-VN') %> đ</td>
-              <td style="max-width:160px; font-size:12px;">
-                <% if (r.ghiChu && r.ghiChu.length > 40) { %>
+                <% if (r.hinhThucThuTien) { %><span class="badge badge-chi" title="<%= r.hinhThucThuTien %>">Mall giữ tiền</span><% } %>
+                <span class="gian-card-tag" title="Tài khoản Chi Phí"><%= r.doanhThuChiaSe ? 'TK 1388' : 'TK 131' %></span>
+              </div>
+            </div>
+          </div>
+
+          <div class="gian-card-fields">
+            <% if (r.tenDiemNoiBo) { %><div class="gian-card-field"><span class="gian-card-field-label">Tên điểm nội bộ:</span><span class="gian-card-field-value"><%= r.tenDiemNoiBo %></span></div><% } %>
+            <% if (r.maCongTrinh) { %><div class="gian-card-field"><span class="gian-card-field-label">Mã công trình:</span><span class="gian-card-field-value"><%= r.maCongTrinh %></span></div><% } %>
+            <% if (r.maKH) { %><div class="gian-card-field"><span class="gian-card-field-label">Mã KH:</span><span class="gian-card-field-value"><%= r.maKH %></span></div><% } %>
+            <% if (r.benChoThue) { %><div class="gian-card-field"><span class="gian-card-field-label">Bên cho thuê:</span><span class="gian-card-field-value"><%= r.benChoThue %></span></div><% } %>
+            <% if (r.hinhThucHopTac) { %><div class="gian-card-field"><span class="gian-card-field-label">Hình thức HT:</span><span class="gian-card-field-value"><%= r.hinhThucHopTac %></span></div><% } %>
+            <% if (r.thoiHanHopDong) { %><div class="gian-card-field"><span class="gian-card-field-label">Thời hạn HĐ:</span><span class="gian-card-field-value" style="white-space:pre-line;"><%= r.thoiHanHopDong %></span></div><% } %>
+            <% if (r.tienThueThang) { %><div class="gian-card-field"><span class="gian-card-field-label">Tiền thuê/tháng:</span><span class="gian-card-field-value"><%= r.tienThueThang.toLocaleString('vi-VN') %> đ</span></div><% } %>
+            <% if (r.ghiChu) { %>
+            <div class="gian-card-field">
+              <span class="gian-card-field-label">Ghi chú:</span>
+              <span class="gian-card-field-value">
+                <% if (r.ghiChu.length > 60) { %>
                 <details>
-                  <summary style="cursor:pointer;"><%= r.ghiChu.slice(0, 40) %>…</summary>
+                  <summary style="cursor:pointer; display:inline;"><%= r.ghiChu.slice(0, 60) %>…</summary>
                   <div style="white-space:pre-line; margin-top:4px;"><%= r.ghiChu %></div>
                 </details>
                 <% } else { %><%= r.ghiChu %><% } %>
-              </td>
-              <td style="min-width:220px;">
-                <% if (r.soHopDongHCM || r.tienCocDamBao || r.linkHopDongDuDau || r.linkHopDongChuaDuDau) { %>
-                <details>
-                  <summary style="cursor:pointer; font-size:12px;">
-                    Cọc: <%= r.tienCocDamBao ? (typeof r.tienCocDamBao === 'number' ? r.tienCocDamBao.toLocaleString('vi-VN') + ' đ' : r.tienCocDamBao) : '(chưa rõ)' %>
-                    — Xem HĐ
-                  </summary>
-                  <div style="font-size:12px; margin-top:6px; line-height:1.5; max-width:320px; white-space:pre-line;">
-                    <div><strong>Số HĐ:</strong> <%= r.soHopDongHCM || '(không có)' %></div>
-                    <div><strong>Ngày ký:</strong> <%= r.ngayKyHD || '?' %> — <strong>Bắt đầu:</strong> <%= r.ngayBatDauHD || '?' %> — <strong>Hết hạn:</strong> <%= r.ngayHetHanHD || '?' %><% if (r.baoHanHD) { %> (<%= r.baoHanHD %>)<% } %></div>
-                    <div><strong>Tiền cọc thi công:</strong> <%= r.tienCocThiCong ? (typeof r.tienCocThiCong === 'number' ? r.tienCocThiCong.toLocaleString('vi-VN') + ' đ' : r.tienCocThiCong) : '(không có)' %></div>
-                    <div><strong>Tiền thuê/tháng:</strong> <%= r.tongTienThueThangHCM || '(không có)' %></div>
-                    <% if (r.linkHopDongDuDau) { %><div><a href="<%= r.linkHopDongDuDau %>" target="_blank" rel="noopener">Link HĐ đủ dấu ↗</a></div><% } %>
-                    <% if (r.linkHopDongChuaDuDau) { %><div><a href="<%= r.linkHopDongChuaDuDau %>" target="_blank" rel="noopener">Link HĐ chưa đủ dấu ↗</a></div><% } %>
-                    <% if (r.dieuKhoanThanhToan) { %>
-                    <div style="margin-top:6px; padding-top:6px; border-top:1px dashed var(--color-hairline);">
-                      <strong>Điều khoản thanh toán (từ hợp đồng):</strong><br /><%= r.dieuKhoanThanhToan %>
-                    </div>
-                    <% } %>
-                    <div class="muted" style="margin-top:6px;"><%= r.sheetHCMThamKhao %> (địa điểm ghi "<%= r.sheetHCMDiaDiemGoc %>")</div>
-                  </div>
-                </details>
-                <% } else { %>
-                <span class="muted" style="font-size:12px;">chưa khớp</span>
-                <% } %>
-              </td>
-              <td>
-                <form method="POST" action="/phap-danh/hop-dong-thue-gian-hang/<%= r.id %>/delete" onsubmit="return confirm('Xóa gian này?');">
-                  <button type="submit" class="link-btn link-danger">Xóa</button>
-                </form>
-              </td>
-            </tr>
-            <% }) %>
-            <% if (rows.length === 0) { %>
-            <tr><td colspan="17" class="muted">Chưa có gian nào.</td></tr>
+              </span>
+            </div>
             <% } %>
-          </tbody>
-        </table>
+            <% if (r.soHopDongHCM || r.tienCocDamBao || r.linkHopDongDuDau || r.linkHopDongChuaDuDau) { %>
+            <div class="gian-card-field">
+              <details>
+                <summary style="cursor:pointer;">
+                  Xem hợp đồng (sheet HCM) — Cọc: <%= r.tienCocDamBao ? (typeof r.tienCocDamBao === 'number' ? r.tienCocDamBao.toLocaleString('vi-VN') + ' đ' : r.tienCocDamBao) : '(chưa rõ)' %>
+                </summary>
+                <div style="margin-top:6px; line-height:1.5; white-space:pre-line;">
+                  <div><strong>Số HĐ:</strong> <%= r.soHopDongHCM || '(không có)' %></div>
+                  <div><strong>Ngày ký:</strong> <%= r.ngayKyHD || '?' %> — <strong>Bắt đầu:</strong> <%= r.ngayBatDauHD || '?' %> — <strong>Hết hạn:</strong> <%= r.ngayHetHanHD || '?' %><% if (r.baoHanHD) { %> (<%= r.baoHanHD %>)<% } %></div>
+                  <div><strong>Tiền cọc thi công:</strong> <%= r.tienCocThiCong ? (typeof r.tienCocThiCong === 'number' ? r.tienCocThiCong.toLocaleString('vi-VN') + ' đ' : r.tienCocThiCong) : '(không có)' %></div>
+                  <div><strong>Tiền thuê/tháng (sheet):</strong> <%= r.tongTienThueThangHCM || '(không có)' %></div>
+                  <% if (r.linkHopDongDuDau) { %><div><a href="<%= r.linkHopDongDuDau %>" target="_blank" rel="noopener">Link HĐ đủ dấu ↗</a></div><% } %>
+                  <% if (r.linkHopDongChuaDuDau) { %><div><a href="<%= r.linkHopDongChuaDuDau %>" target="_blank" rel="noopener">Link HĐ chưa đủ dấu ↗</a></div><% } %>
+                  <% if (r.dieuKhoanThanhToan) { %>
+                  <div style="margin-top:6px; padding-top:6px; border-top:1px dashed var(--color-hairline);">
+                    <strong>Điều khoản thanh toán:</strong><br /><%= r.dieuKhoanThanhToan %>
+                  </div>
+                  <% } %>
+                  <div class="muted" style="margin-top:6px;"><%= r.sheetHCMThamKhao %> (địa điểm ghi "<%= r.sheetHCMDiaDiemGoc %>")</div>
+                </div>
+              </details>
+            </div>
+            <% } %>
+            <% if (!r.tenDiemNoiBo && !r.maCongTrinh && !r.benChoThue && !r.thoiHanHopDong && !r.tienThueThang && !r.ghiChu) { %>
+            <div class="gian-card-empty-note">Chưa có thông tin chi tiết — bấm để tự điền.</div>
+            <% } %>
+          </div>
+
+          <div class="gian-card-actions">
+            <!-- Luyen, 2026-07-23: "có tàu bình tân với nhà ma bình dương hay
+                 ghost bình dương cũng là doanh thu chia sẻ ... cho thêm thủ
+                 công cũng được" -- tich chon tay, khong phu thuoc dieu khoan
+                 hop dong co ghi ro hay khong. Dung de tinh cot Tài khoản
+                 (131/1388) ben trang Chi Phí. -->
+            <form method="POST" action="/phap-danh/hop-dong-thue-gian-hang/<%= r.id %>/doanh-thu-chia-se">
+              <input type="hidden" name="loai" value="<%= loaiFilter %>" />
+              <input type="hidden" name="thang" value="<%= thangFilter %>" />
+              <input type="hidden" name="doanhThuChiaSe" value="<%= r.doanhThuChiaSe ? '0' : '1' %>" />
+              <button type="submit" class="link-btn" title="Bấm để đổi trạng thái doanh thu chia sẻ (TK 1388)">
+                <%= r.doanhThuChiaSe ? '☑ Doanh thu chia sẻ' : '☐ Đánh dấu doanh thu chia sẻ' %>
+              </button>
+            </form>
+            <!-- Luyen, 2026-07-23 (lan 2): "có thể viết tắc á" -- Luyen tu
+                 dien cac ma viet tat (cach nhau boi dau phay) Chi Phi hay
+                 dung cho gian nay (vd "TAU BT, TÀU BT"), de khop CHINH XAC
+                 thay vi fuzzy doan nham. -->
+            <form method="POST" action="/phap-danh/hop-dong-thue-gian-hang/<%= r.id %>/alias-gian">
+              <input type="hidden" name="loai" value="<%= loaiFilter %>" />
+              <input type="hidden" name="thang" value="<%= thangFilter %>" />
+              <input type="text" name="aliasGian" value="<%= r.aliasGian %>" placeholder="Mã viết tắt (Chi Phí)" />
+              <button type="submit" class="link-btn" title="Lưu mã viết tắt">Lưu</button>
+            </form>
+            <form method="POST" action="/phap-danh/hop-dong-thue-gian-hang/<%= r.id %>/delete" onsubmit="return confirm('Xóa gian này?');">
+              <button type="submit" class="link-btn link-danger">Xóa</button>
+            </form>
+          </div>
+        </div>
+        <% }) %>
+        <% if (rows.length === 0) { %>
+        <div class="muted">Chưa có gian nào.</div>
+        <% } %>
       </div>
     </section>
   </main>
@@ -199,8 +223,8 @@
     // khong can goi lai server.
     function filterGianRows(q) {
       var needle = (q || "").trim().toLowerCase();
-      document.querySelectorAll("#gianTable tbody tr[data-search]").forEach(function (tr) {
-        tr.style.display = !needle || tr.getAttribute("data-search").indexOf(needle) !== -1 ? "" : "none";
+      document.querySelectorAll("#gianTable [data-search]").forEach(function (card) {
+        card.style.display = !needle || card.getAttribute("data-search").indexOf(needle) !== -1 ? "" : "none";
       });
     }
   </script>
