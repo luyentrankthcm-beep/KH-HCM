@@ -384,7 +384,14 @@ function parseInvoiceSheetByName(buffer, sheetName, tagRe) {
       // "Posh Estella", "AE Tân Phú ghế").
       if (idx.maDiem === undefined && s.includes("ma diem tren")) idx.maDiem = c;
       if (idx.maDiem === undefined && s.includes("ma diem ghi chu")) idx.maDiem = c;
-      if (s.includes("tong tt hd") || (s.includes("tong") && s.includes("hd"))) idx.tongTt = c;
+      // Luyen, 2026-07-27: thieu "idx.tongTt === undefined" (khac voi tat ca
+      // cot khac o day) khien cot SAU CUNG trong dong header co chua ca "tong"
+      // va "hd" (kieu khop long leo) DE LEN cot dung "Tong TT HD" -- verified
+      // qua HD 10966 (07-25, AM TP PHCM): so tien that 14.980.000d nhung bi
+      // doc thanh 6.745.026.882d, dung voi 1 cot tong hop/cong don khac cung
+      // dong header vo tinh cung chua "tong" + "hd". Fix: chi lay cot DAU
+      // TIEN khop (giong tat ca cac cot khac ben duoi).
+      if (idx.tongTt === undefined && (s.includes("tong tt hd") || (s.includes("tong") && s.includes("hd")))) idx.tongTt = c;
       if (idx.dichVuThuHo === undefined && s.includes("thu ho")) idx.dichVuThuHo = c;
       if (idx.hinhThuc === undefined && s.includes("hinh thuc hop tac")) idx.hinhThuc = c;
       // Ten diem (cot TEN mo ta): "Tên điểm xuất hóa đơn" (KH Cu) hoac "Mã
