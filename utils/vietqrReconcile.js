@@ -536,8 +536,22 @@ function buildGianCandidatesFromInvoices(invoices) {
 // thi cong luon doanh thu cac dong nay vao do, ap dung tu dong cho ca du lieu
 // tai sau nay (khong can lam lai tay). Chi ap dung cho dong THUC SU khong co
 // ma cua hang (isBlankCode) va khong khop duoc gian nao qua fuzzy matcher.
-function resolveGianGross(rawRows, storeNameMap, gianCandidates, nocodeAssignments, defaultBlankCode) {
+// Chi Nhan (2026-07-27): "các hóa đơn này map sai hết rồi" -- phat hien 1
+// gian THAT (vd San bay Cam Ranh, kenh MB11521268) co the co NHIEU ten diem
+// ban khac nhau tren cac may/thiet bi khac nhau (vd "POSH Sân bay Cam ranh",
+// "1 JP SB Cam Ranh.new", "POSH Sân bay Quốc Tế Cam Ranh") -- ten nao du
+// giong voi ten tren hoa don ("Sân bay Cam Ranh - Nhà ga quốc tế") thi fuzzy
+// match dung ("CHKQT CAM RANH"), ten nao khac qua (thieu tu "quoc te" v.v.)
+// thi KHONG khop duoc, bi tu tao thanh 1 "gian" rieng theo dung ten no (co
+// che self-fallback), lam doanh thu 1 gian THAT bi xe le ra nhieu dong khac
+// nhau -- hoa don chi khop voi 1 trong so do, con lai bi bao "Lech"/"thieu
+// HD" gia tao. tenDiemOverride (dung lai chinh bang "Ten diem - Ma cong
+// trinh" cua BIDV7702, key = normText(tenDiemBan)) cho phep gan THANG ten
+// diem ban -> Ma cong trinh dung, bo qua fuzzy match hoan toan, khong can
+// doi ten tren may POS that (van con nhieu ten khac nhau ve sau).
+function resolveGianGross(rawRows, storeNameMap, gianCandidates, nocodeAssignments, defaultBlankCode, tenDiemOverride) {
   const matcher = buildOnlineProductMatcher(gianCandidates);
+  const override = tenDiemOverride || {};
   const grossByCode = {};
   const codes = new Set();
   const assignments = nocodeAssignments || {};
@@ -568,6 +582,14 @@ function resolveGianGross(rawRows, storeNameMap, gianCandidates, nocodeAssignmen
     }
     const storeInfo = storeNameMap[row.maCuaHang];
     const matchText = storeInfo ? storeInfo.matchText : row.maCuaHang;
+    const tenDiemBanKey = storeInfo && storeInfo.tenDiemBan ? normText(storeInfo.tenDiemBan) : "";
+    const overrideCode = tenDiemBanKey ? override[tenDiemBanKey] : undefined;
+    if (overrideCode) {
+      codes.add(overrideCode);
+      const key = `${row.date}|${overrideCode}`;
+      grossByCode[key] = (grossByCode[key] || 0) + row.amount;
+      continue;
+    }
     const match = matcher(matchText);
     if (!match) {
       // Luyen, 2026-07-19: "ngày nào ngân hàng trả tiền dư so với hệ thống

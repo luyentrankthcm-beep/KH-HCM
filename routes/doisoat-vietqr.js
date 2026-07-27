@@ -574,7 +574,14 @@ function buildChannelReconciliation(store, channelKey) {
   const resolved =
     cfg.parseMode === "mn"
       ? resolveGianGrossPrefix(rawRows, storeNames, gianCandidates)
-      : resolveGianGross(rawRows, storeNames, gianCandidates, nocodeAssignments, cfg.defaultBlankCode);
+      : resolveGianGross(
+          rawRows,
+          storeNames,
+          gianCandidates,
+          nocodeAssignments,
+          cfg.defaultBlankCode,
+          store.viet_qr_ten_diem_master[channelKey]
+        );
 
   // Redirect each invoice's own "Ma diem tren misa thue" through the SAME
   // gianCandidates map (keyed by invoice's own "Ten diem xuat hoa don"),
