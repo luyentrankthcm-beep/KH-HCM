@@ -201,6 +201,15 @@ function ensureChannelShape(store) {
   // bi tru khoi "Ngan hang" o buildChannelReconciliation neu khong gan),
   // nhung Luyen tu xac dinh duoc dung gian. Xem resolveGianGrossByBankRef.
   if (!store.viet_qr_ref_override) store.viet_qr_ref_override = {};
+  // Chi Nhan, 2026-07-27: "thêm cho tôi 1 nút cập nhật viet qr ... vào ngân
+  // hàng nhận tiền như 7702 chọn thời gian đối soát rồi tải về" -- moi kenh
+  // (BIDV7704/77020/MB11521268/BIDV7702) ung voi 1 tai khoan rieng tren cong
+  // doi tac doitac.vietqr.vn, can luu lai dung "bankId" cua tai khoan do (chi
+  // tu lay tren trang doi tac, dan vao 1 lan) de nut "Cap nhat VietQR" mo
+  // dung tai khoan + dung ngay hom nay, khong phai tu chon lai moi lan. Chi
+  // luu ID tai khoan (khong phai mat khau/API key), Chi Nhan van tu dang
+  // nhap + bam "Xuat Excel" + tai file len nhu cu (chua tu dong tai/day file).
+  if (!store.viet_qr_partner_bank_id) store.viet_qr_partner_bank_id = {};
   // Luyen, 2026-07-21: "không cần chỉnh cái cũ khóa cho tôi" -- muon 1 tinh
   // nang "khoa so" that su (tung yeu cau 2 lan truoc: "khóa sổ cho tôi chỉ
   // nạp cái mới thôi"), khong phai sua tay tung dong lech cu. Luu 1 ngay
@@ -1089,6 +1098,7 @@ router.get("/doi-soat/vietqr", (req, res) => {
     allRefUnmappedStoreCodes,
     allRefUnmappedTenDiem,
     maCongTrinhOptions: (store.ma_cong_trinh_master && store.ma_cong_trinh_master[activeCompany] && store.ma_cong_trinh_master[activeCompany].rows) || [],
+    partnerBankId: store.viet_qr_partner_bank_id || {},
     error: req.query.error || null,
     success: req.query.success || null,
   });
@@ -1136,6 +1146,29 @@ router.post("/doi-soat/vietqr/gan-ma-tham-chieu/:channel", requireDataEntry, (re
     res.redirect(
       "/doi-soat/vietqr?success=" +
         encodeURIComponent(`Da gan so tham chieu "${reference}" -> "${maCongTrinh}". Ket qua doi soat da tu cap nhat.`)
+    );
+  } catch (e) {
+    res.redirect("/doi-soat/vietqr?error=" + encodeURIComponent(e.message));
+  }
+});
+
+// Chi Nhan, 2026-07-27: "thêm cho tôi 1 nút cập nhật viet qr ... bên phải
+// của tài khoản nào thì lọc tài khoản đó" -- luu lai bankId (chi la ID tai
+// khoan tren cong doi tac doitac.vietqr.vn, KHONG phai mat khau/token dang
+// nhap) ung voi tung kenh, de nut "Cap nhat VietQR" o giao dien mo dung URL
+// loc san tai khoan + ngay hom nay, khong con phai tu chon lai tai khoan
+// tren trang doi tac moi lan.
+router.post("/doi-soat/vietqr/partner-bank-id/:channel", requireDataEntry, (req, res) => {
+  const store = load();
+  ensureChannelShape(store);
+  const channelKey = req.params.channel;
+  try {
+    if (!CHANNELS[channelKey]) throw new Error("Kenh khong hop le.");
+    const { bankId } = req.body;
+    store.viet_qr_partner_bank_id[channelKey] = (bankId || "").trim();
+    save(store);
+    res.redirect(
+      "/doi-soat/vietqr?success=" + encodeURIComponent(`Da luu bankId cho ${CHANNELS[channelKey].label}.`)
     );
   } catch (e) {
     res.redirect("/doi-soat/vietqr?error=" + encodeURIComponent(e.message));

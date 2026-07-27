@@ -63,10 +63,48 @@
           }, 3000);
         });
       })();
+
+      // Chi Nhan, 2026-07-27: "thêm cho tôi 1 nút cập nhật viet qr ... vào
+      // ngân hàng nhận tiền như 7702 chọn thời gian đối soát rồi tải về" --
+      // mo trang cong doi tac doitac.vietqr.vn dung tai khoan (bankId da luu
+      // rieng cho tung kenh) + dung khoang thoi gian "hom nay tu 00:00 den
+      // gio hien tai" (giong y URL vi du Chi Nhan gui). Chi con tu dang nhap
+      // (neu chua) + bam "Xuat Excel" + tai file do len nhu thao tac cu --
+      // CHUA tu dong tai/day file (can them thong tin ve co che dang nhap
+      // cong doi tac truoc khi lam phan do).
+      function openVietQrPartner(bankId) {
+        var now = new Date();
+        function pad(n) { return String(n).padStart(2, "0"); }
+        var dateStr = pad(now.getDate()) + "-" + pad(now.getMonth() + 1) + "-" + now.getFullYear();
+        var fromDate = dateStr + " 00:00";
+        var toDate = dateStr + " " + pad(now.getHours()) + ":" + pad(now.getMinutes());
+        var url = "https://doitac.vietqr.vn/transactions/payment?page=1&pageSize=20&search=&status=1" +
+          "&fromDate=" + encodeURIComponent(fromDate) +
+          "&toDate=" + encodeURIComponent(toDate) +
+          "&bankId=" + encodeURIComponent(bankId);
+        window.open(url, "_blank");
+      }
     </script>
 
-    <% channels.forEach(function(chInfo) { var ch = chInfo.key; %>
+    <% channels.forEach(function(chInfo) { var ch = chInfo.key; var partnerBid = (typeof partnerBankId !== 'undefined' && partnerBankId[ch]) || ''; %>
     <section class="panel">
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; margin-bottom:10px;">
+        <strong style="color:#111;"><%= chInfo.label %></strong>
+        <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+          <% if (partnerBid) { %>
+          <button type="button" class="btn btn-secondary" onclick="openVietQrPartner('<%= partnerBid %>')" title="Mở doitac.vietqr.vn đúng tài khoản này + đúng ngày hôm nay, bấm 'Xuất Excel' rồi tải file đó lên như thao tác cũ">Cập nhật VietQR</button>
+          <form method="POST" action="/doi-soat/vietqr/partner-bank-id/<%= ch %>" class="form-inline" style="gap:4px;">
+            <input type="text" name="bankId" value="<%= partnerBid %>" style="width:110px; font-size:11px;" title="bankId trên doitac.vietqr.vn" />
+            <button type="submit" class="link-btn" style="font-size:11px;">Sửa bankId</button>
+          </form>
+          <% } else { %>
+          <form method="POST" action="/doi-soat/vietqr/partner-bank-id/<%= ch %>" class="form-inline" style="gap:4px;">
+            <input type="text" name="bankId" placeholder="Dán bankId từ doitac.vietqr.vn (chọn đúng tài khoản, copy phần bankId= trong URL)..." style="min-width:280px; font-size:12px;" required />
+            <button type="submit" class="btn btn-secondary" style="font-size:12px;">Lưu bankId để dùng nút Cập nhật VietQR</button>
+          </form>
+          <% } %>
+        </div>
+      </div>
       <details>
         <summary style="font-weight:700;color:#111;cursor:pointer;">Tải file dữ liệu Viet QR — <%= chInfo.label %></summary>
         <div style="margin-top:12px;">
