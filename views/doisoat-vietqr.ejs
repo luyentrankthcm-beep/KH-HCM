@@ -275,7 +275,7 @@
         hoặc mã tham chiếu 2 bên có đúng không.
       </p>
       <table class="table">
-        <thead><tr><th>Ngày</th><th>Ngân hàng</th><th>Số tiền</th><th>Số tham chiếu</th><th>Diễn giải</th></tr></thead>
+        <thead><tr><th>Ngày</th><th>Ngân hàng</th><th>Số tiền</th><th>Số tham chiếu</th><th>Diễn giải</th><th>Gán vào gian</th></tr></thead>
         <tbody>
           <% allRefUnmatchedBankTx.forEach(function(r) { %>
           <tr>
@@ -284,6 +284,25 @@
             <td><%= r.amount.toLocaleString('vi-VN') %> đ</td>
             <td style="font-size:11px;"><%= r.reference || '(không có)' %></td>
             <td style="font-size:11px;"><%= r.description %></td>
+            <td>
+              <!-- Chi Nhan (2026-07-27): "100k đối soát dc đưa vô [gian] cho
+              tôi nhá" -- truoc day route /gan-ma-tham-chieu/:channel da co
+              san (Luyen, 2026-07-27) nhung KHONG co form o UI, chi goi duoc
+              qua code truc tiep. Them form o day de tu gan duoc bang tay,
+              doc ky Dien giai de biet dung tien nay cua gian nao (vd "JP VC
+              3 2" = VC 3/2 JP-POSH) truoc khi go ma, tranh gan nham vao
+              "Tan Phu" mac dinh neu Dien giai chi ro gian khac. -->
+              <% if (r.reference) { %>
+              <form method="POST" action="/doi-soat/vietqr/gan-ma-tham-chieu/<%= r.channel %>" class="form-inline">
+                <input type="hidden" name="reference" value="<%= r.reference %>" />
+                <input type="text" name="maCongTrinh" list="dl-ma-cong-trinh" autocomplete="off"
+                  placeholder="Gõ để lọc, chọn mã công trình..." style="min-width:220px;" required />
+                <button type="submit" class="btn btn-secondary">Lưu</button>
+              </form>
+              <% } else { %>
+              <span class="muted">Không có Số tham chiếu, không gán riêng được.</span>
+              <% } %>
+            </td>
           </tr>
           <% }) %>
         </tbody>
