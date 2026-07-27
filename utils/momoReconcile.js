@@ -983,6 +983,13 @@ function reconcileMomo(settlements, grossData, invoiceData, gianMapping, diemAli
 // gross/hoa don khong doi). Mac dinh 0 (VietQR/ZVP giu nguyen hanh vi cu,
 // chua co bang chung ve do lech rieng cua ho) -- Momo truyen 1 (xem
 // reconcileMomo goi ham nay o tren).
+// Chu Nhat=0, Thu Bay=6 (UTC, khop voi cach dateRange/addDays da dung ngay
+// string "YYYY-MM-DD" lam moc UTC 00:00 xuyen suot file nay).
+function isWeekendDay(dayStr) {
+  const dow = new Date(dayStr + "T00:00:00Z").getUTCDay();
+  return dow === 0 || dow === 6;
+}
+
 function buildPendingDaySettlements(settlements, grossData, labelDayOffset) {
   const offset = labelDayOffset || 0;
   const covered = new Set();
@@ -997,17 +1004,45 @@ function buildPendingDaySettlements(settlements, grossData, labelDayOffset) {
     const day = key.split("|")[0];
     if (!covered.has(day)) pendingDays.add(day);
   }
-  return Array.from(pendingDays)
-    .sort()
-    .map((day) => ({
-      date: offset ? addDays(day, offset) : day,
+  const sortedDays = Array.from(pendingDays).sort();
+
+  // Luyen, 2026-07-27: "hôm thứ 2 xuất cộng của thứ 7 chủ nhật á cộng cho
+  // tôi nhé" -- Momo/ZVP/VNPay khong xu ly giao dich cuoi tuan, nen khoan
+  // tien ngan hang THAT ve vao Thu 2 la 1 khoan GOM CA doanh thu Thu 7 +
+  // Chu Nhat lam mot (khong co 2 giao dich rieng cho 2 ngay do). Neu van
+  // tach moi ngay cuoi tuan thanh 1 dong "gia" (chua co ngan hang) rieng
+  // nhu ngay thuong, se KHONG BAO GIO khop duoc voi 1 giao dich ngan hang
+  // gop chung do -- gop CAC NGAY CUOI TUAN LIEN TIEP (Thu 7, Chu Nhat, va
+  // ca ngay le/nghi xen giua neu co) thanh 1 dong "gia" duy nhat; ngay
+  // thuong (Thu 2-6) van giu rieng tung ngay nhu truoc.
+  const groups = [];
+  let current = [];
+  for (const day of sortedDays) {
+    if (isWeekendDay(day)) {
+      current.push(day);
+    } else {
+      if (current.length) {
+        groups.push(current);
+        current = [];
+      }
+      groups.push([day]);
+    }
+  }
+  if (current.length) groups.push(current);
+
+  return groups.map((group) => {
+    const firstDay = group[0];
+    const lastDay = group[group.length - 1];
+    return {
+      date: offset ? addDays(lastDay, offset) : lastDay,
       amount: null,
-      fromIso: day,
-      toIso: day,
+      fromIso: firstDay,
+      toIso: lastDay,
       pendingBank: true,
-      id: "pending-" + day,
+      id: "pending-" + firstDay + (lastDay !== firstDay ? "_" + lastDay : ""),
       txIds: [],
-    }));
+    };
+  });
 }
 
 module.exports = {
