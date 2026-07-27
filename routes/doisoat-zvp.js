@@ -169,15 +169,16 @@ function buildReconciliation(store) {
   const payooMerged = applyGianRedirectToResolvedGross(payooMergedRaw, store.zvp_gian_list);
 
   const manualMatches = store.zvp_manual_matches || { online: {}, offline: {}, payoo: {} };
-  // Single source of truth for "gian nay la CSE (doanh thu chia se)": the
-  // shared gian list already used to resolve Online revenue. Passed into
-  // every channel so Offline/Payoo revenue for a CSE gian is normalized onto
-  // the SAME __FF code its invoices use, even if the separate Offline/Payoo
-  // mapping sheet itself didn't mark that gian as CSE (see cseOverrideCodes
-  // comment in utils/zvpReconcile.js).
-  const cseOverrideCodes = new Set(
-    (store.zvp_gian_list || []).filter((g) => g.isCse).map((g) => g.maCongTrinh)
-  );
+  // Chi Nhan (2026-07-27): "ngân hàng đối soát tất cả điều là 131 và không
+  // chia theo chia sẻ hay không chia sẻ nữa" -- TK Co da luon la 131 cho moi
+  // gian roi (seedGianMappingDefaults), nen KHONG con tach rieng dong CSE
+  // (__FF) nua o bat ky buoc nao. cseOverrideCodes truoc day dung de CHU
+  // DONG gan them hau to __FF cho 1 gian duoc danh dau CSE tren zvp_gian_list
+  // -- gio luon de TRONG (Set rong) de reconcileZvpChannel khong bao gio tu
+  // tao/giu lai split nay nua, du du lieu goc (gross/hoa don) co con hau to
+  // __FF cu tu truoc khi doi (da duoc don sach 1 lan qua script migrate) hay
+  // khong.
+  const cseOverrideCodes = new Set();
   // Redirect each invoice's own "Ma diem tren misa thue" through the SAME
   // zvp_gian_list mapping already used for Online revenue (see
   // applyGianRedirectToInvoices in utils/zvpReconcile.js), keyed by the
@@ -703,7 +704,8 @@ router.post("/doi-soat/zvp/upload-offline-raw", requireDataEntry, upload.single(
         unmapped.add(tx.chiNhanh);
         continue;
       }
-      const code = mapped.isCse ? mapped.maCongTrinh + FF_SUFFIX : mapped.maCongTrinh;
+      // Chi Nhan (2026-07-27): khong con tach CSE/khong-CSE thanh 2 dong rieng.
+      const code = mapped.maCongTrinh;
       codes.add(code);
       dates.add(tx.date);
       const key = `${tx.date}|${code}`;
@@ -856,7 +858,8 @@ router.post("/doi-soat/zvp/upload-payoo-raw", requireDataEntry, upload.single("f
         unmapped.add(tx.gian);
         continue;
       }
-      const code = mapped.isCse ? mapped.maCongTrinh + FF_SUFFIX : mapped.maCongTrinh;
+      // Chi Nhan (2026-07-27): khong con tach CSE/khong-CSE thanh 2 dong rieng.
+      const code = mapped.maCongTrinh;
       codes.add(code);
       dates.add(tx.date);
       const key = `${tx.date}|${code}`;
@@ -939,9 +942,10 @@ router.post("/doi-soat/zvp/upload-gian-master", requireAdmin, upload.single("fil
       }
     });
 
+    // Chi Nhan (2026-07-27): khong con tach CSE/khong-CSE thanh 2 dong rieng.
     seedGianMappingDefaults(
       store,
-      rows.map((r) => (r.isCse ? r.maCongTrinh + FF_SUFFIX : r.maCongTrinh))
+      rows.map((r) => r.maCongTrinh)
     );
 
     save(store);

@@ -424,9 +424,9 @@ function parseInvoiceSheetByName(buffer, sheetName, tagRe) {
     const ngayHdRaw = cols.ngayHd !== undefined ? row[cols.ngayHd] : null;
     let maDiem = normCode(cols.maDiem !== undefined ? row[cols.maDiem] : null);
     const hinhThuc = cols.hinhThuc !== undefined ? String(row[cols.hinhThuc] || "").toUpperCase() : "";
-    if (hinhThuc.includes("CSE") && !maDiem.endsWith(FF_SUFFIX)) {
-      maDiem = maDiem + FF_SUFFIX;
-    }
+    // Chi Nhan (2026-07-27): "không chia theo chia sẻ hay không chia sẻ nữa"
+    // -- ngung gan hau to FF_SUFFIX theo "Hinh thuc hop tac" (CSE), khong con
+    // tach dong CSE/khong-CSE nua.
     const tenDiem = cols.tenDiem !== undefined ? String(row[cols.tenDiem] || "").trim() : "";
 
     invoices.push({
@@ -489,9 +489,11 @@ function buildGianCandidatesFromInvoices(invoices) {
   const byCode = {};
   for (const inv of invoices) {
     if (!inv.maDiem || !inv.tenDiem) continue;
-    const baseCode = inv.maDiem.endsWith(FF_SUFFIX) ? inv.maDiem.slice(0, -FF_SUFFIX.length) : inv.maDiem;
+    // Chi Nhan (2026-07-27): maDiem khong con bao gio bi gan hau to FF_SUFFIX
+    // nua (khong con tach CSE/khong-CSE), nen dung thang inv.maDiem.
+    const baseCode = stripCseSuffix(inv.maDiem);
     if (!byCode[baseCode]) {
-      byCode[baseCode] = { tenDiem: inv.tenDiem, maCongTrinh: baseCode, isCse: inv.maDiem.endsWith(FF_SUFFIX) };
+      byCode[baseCode] = { tenDiem: inv.tenDiem, maCongTrinh: baseCode, isCse: false };
     }
   }
   return Object.values(byCode);
@@ -585,7 +587,8 @@ function resolveGianGross(rawRows, storeNameMap, gianCandidates, nocodeAssignmen
       }
       continue;
     }
-    const code = match.isCse ? match.maCongTrinh + FF_SUFFIX : match.maCongTrinh;
+    // Chi Nhan (2026-07-27): khong con tach CSE/khong-CSE thanh 2 dong rieng.
+    const code = match.maCongTrinh;
     codes.add(code);
     const key = `${row.date}|${code}`;
     grossByCode[key] = (grossByCode[key] || 0) + row.amount;
@@ -905,7 +908,8 @@ function resolveGianGrossPrefix(rawRows, storeNameMap, gianCandidates) {
       unmappedAgg.set(label, agg);
       continue;
     }
-    const code = match.isCse ? match.maCongTrinh + FF_SUFFIX : match.maCongTrinh;
+    // Chi Nhan (2026-07-27): khong con tach CSE/khong-CSE thanh 2 dong rieng.
+    const code = match.maCongTrinh;
     codes.add(code);
     const key = `${row.date}|${code}`;
     grossByCode[key] = (grossByCode[key] || 0) + row.amount;
@@ -1083,7 +1087,8 @@ function resolveGianGrossPrefix(rawRows, storeNameMap, gianCandidates) {
       unmappedAgg.set(label, agg);
       continue;
     }
-    const code = match.isCse ? match.maCongTrinh + FF_SUFFIX : match.maCongTrinh;
+    // Chi Nhan (2026-07-27): khong con tach CSE/khong-CSE thanh 2 dong rieng.
+    const code = match.maCongTrinh;
     codes.add(code);
     const key = `${row.date}|${code}`;
     grossByCode[key] = (grossByCode[key] || 0) + row.amount;
@@ -1106,14 +1111,26 @@ function resolveGianGrossPrefix(rawRows, storeNameMap, gianCandidates) {
 // nen khong con khop nua). Fix: index hoa don duoi CA HAI key (ma goc VA ma da
 // alias, neu khac nhau) -- kenh nao co gross dung ma nao se tu tim thay, an
 // toan vi 2 ma nay khong bao gio CUNG co gross trong CUNG 1 kenh/ngay.
+// Chi Nhan (2026-07-27): "ngân hàng đối soát tất cả điều là 131 và không
+// chia theo chia sẻ hay không chia sẻ nữa" -- thay vi doi theo tung noi tao
+// ra hau to __FF (gan tren hoa don theo "Hinh thuc hop tac", ep buoc qua
+// gianMerge isCse, hay qua resolveGianGross), chuan hoa (bo hau to) NGAY TAI
+// DAY -- diem hoi tu duy nhat truoc khi gom nhom/hien thi -- de dam bao gop
+// dung CSE + khong-CSE lam 1 du du lieu di qua duong nao.
+function stripCseSuffix(code) {
+  return code && code.endsWith(FF_SUFFIX) ? code.slice(0, -FF_SUFFIX.length) : code;
+}
+
 function reconcileVietQr(settlements, grossData, invoiceData, gianMapping, manualMatches, diemAlias) {
   const alias = diemAlias || {};
   const invoicesByDiemDay = {};
   for (const inv of invoiceData.invoices) {
     if (!inv.ngayHd || !inv.days || inv.days.length === 0) continue;
     const [invY, invMo, invD] = inv.ngayHd.split("-").map(Number);
-    const effectiveMaDiem = alias[inv.maDiem] || inv.maDiem;
-    const diemKeysToIndex = effectiveMaDiem === inv.maDiem ? [effectiveMaDiem] : [effectiveMaDiem, inv.maDiem];
+    const effectiveMaDiem = stripCseSuffix(alias[inv.maDiem] || inv.maDiem);
+    const maDiemNormalized = stripCseSuffix(inv.maDiem);
+    const diemKeysToIndex =
+      effectiveMaDiem === maDiemNormalized ? [effectiveMaDiem] : [effectiveMaDiem, maDiemNormalized];
     for (const day of inv.days) {
       let y = invY;
       let mo = invMo;
@@ -1142,30 +1159,17 @@ function reconcileVietQr(settlements, grossData, invoiceData, gianMapping, manua
       const key = `${day}|${rawCode}`;
       const gross = grossData.grossByCode[key];
       if (gross && gross > 0) {
-        if (!gianLines[rawCode]) {
-          gianLines[rawCode] = { code: rawCode, gross: 0, invoices: new Set(), effectiveCode: rawCode };
+        // Chi Nhan (2026-07-27): gop dong CSE/khong-CSE lam 1 -- luon gom
+        // nhom theo ma DA BO hau to __FF, bat ke rawCode goc co hau to hay
+        // khong (giu nguyen grossData.grossByCode de tra cuu dung so tien,
+        // chi doi ma dung de GOM NHOM/hien thi).
+        const bucketCode = stripCseSuffix(rawCode);
+        if (!gianLines[bucketCode]) {
+          gianLines[bucketCode] = { code: bucketCode, gross: 0, invoices: new Set(), effectiveCode: bucketCode };
         }
-        gianLines[rawCode].gross += gross;
-        let invs = invoicesByDiemDay[`${rawCode}|${day}`] || [];
-        // A gian's "Hinh thuc hop tac" (CSE hay khong) co the doi giua chung
-        // (vd: mot diem tu 131 chuyen sang 1388/chia se tu 1 ngay nao do ve
-        // sau) trong khi ma resolve ben doanh thu (grossData.codes) van dong
-        // cung mot trang thai CSE co dinh (lay tu HD DAU TIEN tung thay).
-        // Neu khong tim thay HD nao khop dung rawCode cho ngay nay, thu tim
-        // o bien the CSE nguoc lai (co/khong co __FF) CHI cho ngay do -- neu
-        // co, dung luon HD do va coi trang thai CSE cua NGAY DO theo dung HD
-        // (khong doi lai cac ngay khac). Verified against BIDV7704 "Sân bay
-        // Phú Quốc" tu ngay 07/07 tro di (xac nhan tu Luyen: CSE tu ngay 7).
-        if (invs.length === 0) {
-          const baseCode = rawCode.endsWith(FF_SUFFIX) ? rawCode.slice(0, -FF_SUFFIX.length) : rawCode;
-          const altCode = rawCode === baseCode ? baseCode + FF_SUFFIX : baseCode;
-          const altInvs = invoicesByDiemDay[`${altCode}|${day}`] || [];
-          if (altInvs.length > 0) {
-            invs = altInvs;
-            gianLines[rawCode].effectiveCode = altCode;
-          }
-        }
-        for (const inv of invs) gianLines[rawCode].invoices.add(inv.soHd);
+        gianLines[bucketCode].gross += gross;
+        const invs = invoicesByDiemDay[`${bucketCode}|${day}`] || [];
+        for (const inv of invs) gianLines[bucketCode].invoices.add(inv.soHd);
       }
     }
     const lines = Object.values(gianLines).map((g) => {

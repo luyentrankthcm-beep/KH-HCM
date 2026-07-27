@@ -472,14 +472,11 @@ function buildChannelReconciliation(store, channelKey) {
       const baseCode = hadFF ? inv.maDiem.slice(0, -FF_SUFFIX.length) : inv.maDiem;
       const merge = gianMerge[baseCode];
       if (!merge) return inv;
-      // isCse: true/false FORCES that CSE status onto every invoice (full
-      // identity merge -- e.g. JP SC VIVO, genuinely CSE tu dau). isCse null/
-      // undefined means "rename only" -- keep each invoice's OWN CSE status
-      // as-is (e.g. Sân bay Phú Quốc -> CHKQT PHU QUOC: just the Misa export
-      // code changes, the day-7-onward CSE split -- handled separately by
-      // reconcileVietQr's per-day fallback -- must NOT be flattened here).
-      const targetIsCse = merge.isCse === true || merge.isCse === false ? merge.isCse : hadFF;
-      const newMaDiem = targetIsCse ? merge.maCongTrinh + FF_SUFFIX : merge.maCongTrinh;
+      // Chi Nhan (2026-07-27): "ngan hang doi soat tat ca deu la 131 va khong
+      // chia theo chia se hay khong chia se nua" -- khong con gan hau to
+      // FF_SUFFIX nua du merge.isCse la gi; van giu nguyen phan doi ten/gop
+      // nhan dang (baseCode -> merge.maCongTrinh).
+      const newMaDiem = merge.maCongTrinh;
       if (newMaDiem === inv.maDiem) return inv;
       return { ...inv, maDiem: newMaDiem };
     });
@@ -638,8 +635,9 @@ function buildChannelReconciliation(store, channelKey) {
       const baseCode = hadFF ? code.slice(0, -FF_SUFFIX.length) : code;
       const merge = gianMerge[baseCode];
       if (merge) {
-        const targetIsCse = merge.isCse === true || merge.isCse === false ? merge.isCse : hadFF;
-        code = targetIsCse ? merge.maCongTrinh + FF_SUFFIX : merge.maCongTrinh;
+        // Chi Nhan (2026-07-27): khong con tach CSE/khong-CSE thanh 2 dong
+        // rieng, nen khong gan hau to FF_SUFFIX nua o day.
+        code = merge.maCongTrinh;
       }
       const newKey = `${day}|${code}`;
       mergedGrossByCode[newKey] = (mergedGrossByCode[newKey] || 0) + resolved.grossByCode[key];
@@ -736,8 +734,9 @@ function buildChannelReconciliation(store, channelKey) {
     const groups = {};
     const order = [];
     r.lines.forEach((l) => {
-      const isCse = l.code.endsWith(FF_SUFFIX);
-      const key = `${l.maCongTrinh} ${isCse ? 1 : 0}`;
+      // Chi Nhan (2026-07-27): khong con chia theo chia se (CSE)/khong chia
+      // se nua -- gop thang theo Ma Cong Trinh.
+      const key = l.maCongTrinh;
       if (!groups[key]) {
         groups[key] = [];
         order.push(key);
@@ -863,11 +862,12 @@ router.get("/doi-soat/vietqr", (req, res) => {
     // nhu "SB CAN THO PHCM"). Nhieu "code" khac nhau co the CUNG quy ve 1
     // TEN MA CONG TRINH sau khi hien thi (displayMaCongTrinhFor so khop voi
     // danh sach cong trinh chuan), nen truoc day hien thanh nhieu dong TRUNG
-    // TEN nhau thay vi gop lam 1 -- gio gop theo TEN DA QUY VE (maCongTrinh +
-    // isCse) ngay tu dau, cong don doanh thu/hoa don cua tat ca cac code con
-    // lai vao chung 1 dong duy nhat cho tung ngay.
+    // TEN nhau thay vi gop lam 1 -- gio gop theo TEN DA QUY VE (maCongTrinh)
+    // ngay tu dau, cong don doanh thu/hoa don cua tat ca cac code con lai
+    // vao chung 1 dong duy nhat cho tung ngay. Chi Nhan (2026-07-27): khong
+    // con tach rieng theo chia se (CSE)/khong chia se nua.
     const cellMap = {}; // groupKey -> { date -> merged cell data }
-    const groupInfo = {}; // groupKey -> { maCongTrinh, isCse }
+    const groupInfo = {}; // groupKey -> { maCongTrinh, isCse: always false now }
     // Chi Nhan, 2026-07-22 (fix khan): displayMaCongTrinhFor goi
     // findBestMaCongTrinh, la 1 vong lap fuzzy-match qua TOAN BO danh sach
     // cong trinh chuan (co the vai tram dong) -- truoc day chi goi 1 LAN cho
@@ -885,9 +885,10 @@ router.get("/doi-soat/vietqr", (req, res) => {
     rows.forEach((r) => {
       r.lines.forEach((l) => {
         const maCongTrinh = resolveMaCongTrinh(l.code);
-        const isCse = l.code.endsWith(FF_SUFFIX);
-        const groupKey = `${maCongTrinh} ${isCse ? 1 : 0}`;
-        groupInfo[groupKey] = { maCongTrinh, isCse };
+        // Chi Nhan (2026-07-27): khong con chia theo chia se (CSE)/khong
+        // chia se nua -- gop thang theo ten Ma Cong Trinh da quy ve.
+        const groupKey = maCongTrinh;
+        groupInfo[groupKey] = { maCongTrinh, isCse: false };
         if (!cellMap[groupKey]) cellMap[groupKey] = {};
         const existing = cellMap[groupKey][r.settlementDate];
         if (!existing) {

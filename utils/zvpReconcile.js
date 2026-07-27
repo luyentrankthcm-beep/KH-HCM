@@ -217,9 +217,13 @@ function parseInvoiceWorkbookByTag(buffer, tag) {
     const ngayHdRaw = cols.ngayHd !== undefined ? row[cols.ngayHd] : null;
     let maDiem = normCode(cols.maDiem !== undefined ? row[cols.maDiem] : null);
     const hinhThuc = cols.hinhThuc !== undefined ? String(row[cols.hinhThuc] || "").toUpperCase() : "";
-    if (hinhThuc.includes("CSE") && !maDiem.endsWith(FF_SUFFIX)) {
-      maDiem = maDiem + FF_SUFFIX;
-    }
+    // Chi Nhan (2026-07-27): "ngân hàng đối soát tất cả điều là 131 và không
+    // chia theo chia sẻ hay không chia sẻ nữa" -- TK Co da luon la 131 cho moi
+    // gian (seedGianMappingDefaults) nen khong con ly do de tach rieng doanh
+    // thu/hoa don CSE khoi khong-CSE nua. Ngung gan hau to FF_SUFFIX cho hoa
+    // don theo "Hinh thuc hop tac" -- hinhThuc van duoc doc/giu lai o day
+    // (khong xoa bien, phong khi can dung lai) nhung khong con anh huong den
+    // maDiem/viec gop nhom nua.
 
     invoices.push({
       soHd: cols.soHd !== undefined ? row[cols.soHd] : null,
@@ -969,7 +973,9 @@ function resolveProductCatalogGross(parsedRows, gianList) {
         learnedGian.push({ tenDiem: row.tenGianXuatHd, maCongTrinh: row.maCongTrinh, isCse: false });
       }
     }
-    const code = isCse ? effectiveMaCongTrinh + FF_SUFFIX : effectiveMaCongTrinh;
+    // Chi Nhan (2026-07-27): khong con tach rieng CSE/khong-CSE thanh 2 dong
+    // nua (TK Co da luon la 131 cho ca 2) -- gop chung vao 1 ma cong trinh.
+    const code = effectiveMaCongTrinh;
     for (const [iso, v] of Object.entries(row.byDate)) {
       dates.add(iso);
       codes.add(code);
@@ -1225,7 +1231,8 @@ function resolveDiemGross(parsed, diemMap) {
       unmapped.add(diemRaw);
       continue;
     }
-    const code = mapped.isCse ? mapped.maCongTrinh + FF_SUFFIX : mapped.maCongTrinh;
+    // Chi Nhan (2026-07-27): khong con tach CSE/khong-CSE thanh 2 dong rieng.
+    const code = mapped.maCongTrinh;
     codes.add(code);
     const newKey = `${date}|${code}`;
     grossByCode[newKey] = (grossByCode[newKey] || 0) + parsed.grossByCode[key];
@@ -1342,7 +1349,8 @@ function resolveOnlineGrossByProductMap(parsed, productMap) {
       unmappedProducts.add(product);
       continue;
     }
-    const code = mapped.isCse ? mapped.maCongTrinh + FF_SUFFIX : mapped.maCongTrinh;
+    // Chi Nhan (2026-07-27): khong con tach CSE/khong-CSE thanh 2 dong rieng.
+    const code = mapped.maCongTrinh;
     codes.add(code);
     const newKey = `${date}|${code}`;
     grossByCode[newKey] = (grossByCode[newKey] || 0) + parsed.grossByProduct[key];
@@ -1366,7 +1374,8 @@ function resolveOnlineGross(parsed, gianList) {
       unmapped.add(product);
       continue;
     }
-    const code = match.isCse ? match.maCongTrinh + FF_SUFFIX : match.maCongTrinh;
+    // Chi Nhan (2026-07-27): khong con tach CSE/khong-CSE thanh 2 dong rieng.
+    const code = match.maCongTrinh;
     codes.add(code);
     const newKey = `${date}|${code}`;
     grossByCode[newKey] = (grossByCode[newKey] || 0) + parsed.grossByProduct[key];
