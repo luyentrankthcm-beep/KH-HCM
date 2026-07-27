@@ -818,6 +818,9 @@
               Tính từ dữ liệu tải lên: <strong><%= r.totalNetComputed.toLocaleString('vi-VN') %> đ</strong>
               <% } else { %>
               Ngân hàng: <strong><%= r.bankAmount.toLocaleString('vi-VN') %> đ</strong>
+              <% if (r.bankAmountExcluded) { %>
+              <span class="muted" title="Đã trừ các giao dịch không có Mã tham chiếu VietQR khớp (lãi ngân hàng, chuyển khoản khác...) khỏi tổng Ngân hàng của ngày này.">(đã trừ <%= r.bankAmountExcluded.toLocaleString('vi-VN') %> đ không phải VietQR)</span>
+              <% } %>
               &nbsp;|&nbsp; Tính từ dữ liệu tải lên: <strong><%= r.totalNetComputed.toLocaleString('vi-VN') %> đ</strong>
               &nbsp;|&nbsp;
               <span class="<%= Math.abs(r.diffVsBank) < 1000 ? 'text-pos' : 'text-neg' %>">
@@ -830,6 +833,11 @@
               </span>
             </span>
           </summary>
+          <% if (r.tanPhuSuggestion) { %>
+          <p class="badge badge-warn" style="display:block; margin-top:8px; font-size:12px; padding:6px 10px;">
+            ⚠️ Sau khi trừ giao dịch không phải VietQR, Ngân hàng ngày này vẫn còn dư <strong><%= r.tanPhuSuggestion.amount.toLocaleString('vi-VN') %> đ</strong> so với dữ liệu đối soát — có nên gộp khoản này vào gian <strong><%= r.tanPhuSuggestion.targetCode %></strong> (Tân Phú) không?
+          </p>
+          <% } %>
           <table class="table" style="margin-top:8px;">
             <thead>
               <tr><th>Mã công trình (gian)</th><th>TK Có</th><th>Doanh thu</th><th>Số HĐ khớp</th><th>Tổng tiền HĐ</th><th>Trạng thái</th></tr>

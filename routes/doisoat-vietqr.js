@@ -653,6 +653,41 @@ function buildChannelReconciliation(store, channelKey) {
     store.invoice_diem_alias
   );
 
+  // Luyen, 2026-07-27: "các giao dịch không phải của vietqr thì trừ ra nhá
+  // cái nào có mã tham chiếu á" -- tu ngay cutover (refMatchFrom), 1 giao
+  // dich "thu" tren sao ke KHONG khop duoc So tham chieu nao voi bat ky
+  // gian nao (vd "Thanh toan lai thang 07/2026" tu ngan hang, chuyen khoan
+  // IBFT ca nhan...) khong phai tien VietQR that su -- da duoc gom san
+  // trong refUnmatchedBankTx (canh bao) nhung truoc gio CHUA tru khoi tong
+  // "Ngan hang" cua doi soat, lam Lech gia (ngan hang > du lieu tai len chi
+  // vi cong nham cac dong khong lien quan). Tru dung so tien nay khoi
+  // bankAmount cua NGAY tuong ung roi tinh lai diffVsBank. Neu SAU KHI tru
+  // ngan hang van con nhieu hon du lieu doi soat (tien VietQR that nhung
+  // chua gian nao nhan), goi y gop vao "gian Tan Phu" (AM TP PHCM -- ma mac
+  // dinh cho giao dich khong xac dinh duoc gian tren kenh nay, xem
+  // cfg.defaultBlankCode) kem dung so tien du.
+  if (cfg.refMatchFrom) {
+    const excludedByDate = {};
+    refUnmatchedBankTx.forEach((tx) => {
+      excludedByDate[tx.date] = (excludedByDate[tx.date] || 0) + tx.amount;
+    });
+    reconciled.forEach((r) => {
+      if (r.settlementDate < cfg.refMatchFrom) return;
+      const excluded = excludedByDate[r.settlementDate] || 0;
+      if (excluded > 0) {
+        r.bankAmount -= excluded;
+        r.bankAmountExcluded = excluded;
+      }
+      if (!r.pendingBank) {
+        r.diffVsBank = r.totalNetComputed - r.bankAmount;
+        const leftover = r.bankAmount - r.totalNetComputed;
+        if (leftover > 1000) {
+          r.tanPhuSuggestion = { amount: leftover, targetCode: "AM TP PHCM" };
+        }
+      }
+    });
+  }
+
   // Doi ten hien thi ve dung ten chuan (neu co danh sach chuan cho cong ty
   // nay) -- xem ghi chu tai displayMaCongTrinhFor o tren. Chi doi field hien
   // thi maCongTrinh, khong dong den code/effectiveCode dung de doi soat.
