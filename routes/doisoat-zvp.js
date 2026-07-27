@@ -244,6 +244,18 @@ function buildReconciliation(store) {
   store.zvp_payoo_uploads.forEach((u) => {
     if (u.unmapped && u.unmapped.length) unmappedWarnings.push(`Payoo "${u.file_name}": chua khop diem ${u.unmapped.join(", ")}`);
   });
+  // Luyen, 2026-07-27: canh bao TON TAI (khong chi flash 1 lan) cho cac GD
+  // Online bi bo qua vi khong tim thay so don hang trong file OrderDetails --
+  // day la DOANH THU THAT bi mat, khac voi "unmapped ten san pham" (van con
+  // duoc auto-learn/dem). Chi hien tong so + vai so don hang mau, khong lam
+  // day trang neu co qua nhieu.
+  store.zvp_online_uploads.forEach((u) => {
+    if (u.unmatchedOrders && u.unmatchedOrders.length) {
+      unmappedWarnings.push(
+        `Online "${u.file_name}": ${u.unmatchedOrders.length} giao dich KHONG tim thay so don hang trong file OrderDetails (vd: ${u.unmatchedOrders.slice(0, 5).join(", ")}) -- doanh thu cac GD nay CHUA duoc tinh vao Doanh thu gop, can tai lai OrderDetails moi hon + file phi nay qua muc "Tai len combo".`
+      );
+    }
+  });
 
   // Gian tren "Danh muc ten san pham" ma auto-learn da tu tao ma cong trinh
   // rieng (ten gian == ma cong trinh, vi chua khop duoc voi gian nao co san
@@ -986,6 +998,16 @@ router.post(
             grossByCode: onlineResolved.grossByCode,
             netByCode: onlineResolved.netByCode,
             unmapped: onlineResolved.unmappedProducts,
+            // Luyen, 2026-07-27: "sao gian AMTP ... nó có 14tr thôi mà" (khong
+            // phai cai nay, day la ZVP Online) -- van de thuc te phat hien:
+            // giao dich FUNZONE MINI APP khong tim thay so don hang tuong ung
+            // trong file OrderDetails bi BO QUA HOAN TOAN (khong con ten san
+            // pham de auto-learn Ma cong trinh nhu truong hop unmappedProducts
+            // o tren), chi bao 1 LAN qua flash message roi mat -- luu lai day
+            // de hien lai thanh canh bao TON TAI tren trang, tranh mat doanh
+            // thu ma khong ai biet (verified: file Fee Report 27/07 co 449/484
+            // GD Online khong khop vi OrderDetails dung la ban cu 24/07).
+            unmatchedOrders: parsed.online.unmatchedOrders,
           });
           seedGianMappingDefaults(store, onlineResolved.codes);
           addedAny = true;

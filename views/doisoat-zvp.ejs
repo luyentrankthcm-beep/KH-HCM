@@ -107,6 +107,17 @@
       </details>
     </section>
 
+    <% if (unmappedWarnings && unmappedWarnings.length > 0) { %>
+    <section class="panel">
+      <h2>⚠️ Cảnh báo chưa khớp / doanh thu có thể bị thiếu</h2>
+      <ul>
+        <% unmappedWarnings.forEach(function(w) { %>
+        <li class="badge badge-warn" style="display:block; margin-bottom:6px; white-space:normal;"><%= w %></li>
+        <% }) %>
+      </ul>
+    </section>
+    <% } %>
+
     <% if (pendingOnlineGian && pendingOnlineGian.length > 0) { %>
     <section class="panel">
       <h2>1b. Rà soát gian mới tự động ghi nhận (Online)</h2>
