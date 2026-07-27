@@ -170,10 +170,38 @@
         <table class="table" style="margin-top:10px;">
           <thead><tr><th>Tên sản phẩm</th><th>Mã công trình</th><th>CSE?</th></tr></thead>
           <tbody>
-            <% Object.keys(onlineProductMap).forEach(function(prod) { %>
-            <tr>
-              <td style="font-size:12px;"><%= prod %></td>
-              <td><%= onlineProductMap[prod].maCongTrinh %></td>
+            <%
+              // Chi Nhan (2026-07-27): "thêm tên sản phẩm cho tôi vào mục 1c
+              // ... cảnh báo trên đầu tên sản phẩm mới chưa có" -- san pham
+              // MOI (tu dong them, chua co Ma cong trinh) duoc day len DAU
+              // danh sach + to mau canh bao, de chi thay ngay va dien vao,
+              // khong phai cuon tim giua hang tram dong da xong.
+              var prodKeys = Object.keys(onlineProductMap).sort(function (a, b) {
+                var aMissing = !(onlineProductMap[a].maCongTrinh || '').trim();
+                var bMissing = !(onlineProductMap[b].maCongTrinh || '').trim();
+                if (aMissing !== bMissing) return aMissing ? -1 : 1;
+                return 0;
+              });
+            %>
+            <% prodKeys.forEach(function(prod) { %>
+            <% var isMissing = !(onlineProductMap[prod].maCongTrinh || '').trim(); %>
+            <tr style="<%= isMissing ? 'background:#fff3cd;' : '' %>">
+              <td style="font-size:12px;">
+                <%= prod %>
+                <% if (isMissing) { %><span class="badge badge-warn" style="margin-left:6px;">Mới - chưa có mã</span><% } %>
+              </td>
+              <td>
+                <% if (isMissing) { %>
+                <form method="POST" action="/doi-soat/zvp/online-product-map/add" class="form-inline" style="gap:4px;">
+                  <input type="hidden" name="tenSanPham" value="<%= prod %>" />
+                  <input type="text" name="maCongTrinh" placeholder="Mã công trình" required style="width:140px;" />
+                  <label style="font-size:12px;"><input type="checkbox" name="isCse" /> CSE</label>
+                  <button type="submit" class="btn btn-secondary" style="padding:2px 10px; font-size:12px;">Lưu</button>
+                </form>
+                <% } else { %>
+                  <%= onlineProductMap[prod].maCongTrinh %>
+                <% } %>
+              </td>
               <td><%= onlineProductMap[prod].isCse ? 'CSE (1388)' : '' %></td>
             </tr>
             <% }) %>

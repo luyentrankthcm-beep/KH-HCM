@@ -257,6 +257,21 @@ function buildReconciliation(store) {
     }
   });
 
+  // Chi Nhan (2026-07-27): "cảnh báo trên đầu tên sản phẩm mới chưa có" --
+  // ten san pham moi duoc tu dong them vao zvp_online_product_map (o route
+  // upload-combo) voi Ma cong trinh de TRONG -- canh bao TON TAI o day (khong
+  // chi flash 1 lan) cho toi khi chi dien xong, de khong bi quen mat sau khi
+  // dong thong bao. Bang o muc 1c cung tu day cac dong con trong Ma cong
+  // trinh len dau danh sach (xem view) de de tim.
+  const productMapMissingCode = Object.keys(store.zvp_online_product_map || {}).filter(
+    (k) => !(store.zvp_online_product_map[k].maCongTrinh || "").trim()
+  );
+  if (productMapMissingCode.length > 0) {
+    unmappedWarnings.push(
+      `Bảng tra sản phẩm Online (mục 1c): ${productMapMissingCode.length} sản phẩm MỚI chưa có Mã công trình (${productMapMissingCode.slice(0, 8).join(" | ")}${productMapMissingCode.length > 8 ? "..." : ""}) -- chị điền Mã công trình vào bảng ở mục 1c rồi tải lại combo 2 file 1 lần nữa.`
+    );
+  }
+
   // Gian tren "Danh muc ten san pham" ma auto-learn da tu tao ma cong trinh
   // rieng (ten gian == ma cong trinh, vi chua khop duoc voi gian nao co san
   // luc tai. Luyen tu quyet dinh qua form "Sua ma gian" o muc 1b.
@@ -983,8 +998,31 @@ router.post(
       const onlineResolved = resolveOnlineGrossByProductMap(parsed.online, store.zvp_online_product_map);
       const offlineResolved = resolveDiemGross(parsed.offline, store.zvp_offline_diem_map);
 
+      // Chi Nhan (2026-07-27): "nếu có tên sản phẩm mới trong file này các
+      // ngày mới á thì bạn thêm tên sản phẩm cho tôi vào mục 1c cho tôi đi
+      // nha và tôi sẽ điền mã công trình" -- truoc day ten san pham moi
+      // (chua co trong bang tra) chi bi CANH BAO 1 lan qua flash message roi
+      // mat, khong luu lai vao bang o muc 1c, nen moi lan tai file moi lai
+      // phai doi cho Claude/nguoi khac bao lai ten san pham. Tu dong them
+      // ngay vao zvp_online_product_map voi Ma cong trinh de TRONG (chi tu
+      // dien vao, khong doan) -- dong trong nay se duoc hien canh bao rieng +
+      // day len dau bang o muc 1c (xem GET /doi-soat/zvp va view) de de tim.
+      let addedNewProductMapEntries = false;
+      (onlineResolved.unmappedProducts || []).forEach((prod) => {
+        const key = String(prod).trim().replace(/\s+/g, " ");
+        if (!store.zvp_online_product_map[key]) {
+          store.zvp_online_product_map[key] = { maCongTrinh: "", isCse: false };
+          addedNewProductMapEntries = true;
+        }
+      });
+
       const comboName = `${fileOrders.originalname} + ${fileFee.originalname}`;
-      let addedAny = false;
+      // Chi Nhan (2026-07-27): dam bao van luu (save) cac dong san pham moi
+      // vua tu dong them o tren ngay ca khi ca 2 file nay khong co ma cong
+      // trinh nao duoc ghi nhan (vd toan bo la san pham moi, chua khop duoc
+      // gi) -- neu khong se roi vao nhanh "khong co gi moi de luu" ben duoi
+      // va mat luon cac dong moi vua them (khong duoc ghi xuong dia).
+      let addedAny = addedNewProductMapEntries;
 
       if (onlineResolved.codes.length > 0) {
         if (!isDuplicateRecentUpload(store.zvp_online_uploads, comboName, onlineResolved.grossByCode)) {
@@ -1047,7 +1085,7 @@ router.post(
         successMsg += ` CANH BAO: ${parsed.online.unmatchedOrders.length} giao dich Online khong tim thay don hang tuong ung trong file OrderDetails (${parsed.online.unmatchedOrders.slice(0, 5).join(", ")}) -- co the do file OrderDetails chua du ngay.`;
       }
       if (onlineResolved.unmappedProducts.length > 0) {
-        successMsg += ` CANH BAO Online: ${onlineResolved.unmappedProducts.length} TEN SAN PHAM MOI chua co trong bang "noi" (${onlineResolved.unmappedProducts.join(" | ")}) -- cho chi biet Ma cong trinh dung de them vao muc 1b.`;
+        successMsg += ` CANH BAO Online: ${onlineResolved.unmappedProducts.length} TEN SAN PHAM MOI chua co Ma cong trinh (${onlineResolved.unmappedProducts.join(" | ")}) -- da tu dong them vao bang o muc 1c (dong de trong o dau bang), chi dien Ma cong trinh dung vao do roi tai lai 2 file nay 1 lan nua de ap dung cho doanh thu.`;
       }
       if (offlineResolved.unmapped.length > 0) {
         successMsg += ` CANH BAO Offline: ${offlineResolved.unmapped.length} diem chua khop gian (${offlineResolved.unmapped.join(", ")}).`;
