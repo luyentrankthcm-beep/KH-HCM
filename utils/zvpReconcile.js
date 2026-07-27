@@ -1447,6 +1447,23 @@ function reconcileZvpChannel(settlements, grossData, invoiceData, gianMapping, m
   // dong "gia" (chua co ngan hang) cung hien dung nhan ngay du kien (23/07
   // cho doanh thu 22/07), khong con trung nhan voi dong THAT cua ngay truoc
   // do nua. Xem ghi chu day du tai buildPendingDaySettlements (utils/momoReconcile.js).
+  // Luyen, 2026-07-27: tra gross theo (ma cong trinh HIEN THI, 1 ngay bat ky)
+  // -- can de chia ty le HD gop nhieu ngay (xem ghi chu o invoiceTotal ben
+  // duoi). grossData.grossByCode luu theo rawCode (TRUOC khi ap dung
+  // cseOverride/FF_SUFFIX), nen thu ca dang co/khong co hau to de chac chan
+  // khop dung, giong cach code/rawCode duoc doi chieu o vong lap ben duoi.
+  function grossForCodeAtIso(code, iso) {
+    let v = grossData.grossByCode[`${iso}|${code}`];
+    if (v) return v;
+    if (code.endsWith(FF_SUFFIX)) {
+      v = grossData.grossByCode[`${iso}|${code.slice(0, -FF_SUFFIX.length)}`];
+      if (v) return v;
+    } else {
+      v = grossData.grossByCode[`${iso}|${code}${FF_SUFFIX}`];
+      if (v) return v;
+    }
+    return 0;
+  }
   const allSettlements = settlements.concat(buildPendingDaySettlements(settlements, grossData, 1));
   const results = [];
   for (const s of allSettlements) {
@@ -1471,9 +1488,41 @@ function reconcileZvpChannel(settlements, grossData, invoiceData, gianMapping, m
     }
     const lines = Object.values(gianLines).map((g) => {
       const invoiceList = Array.from(g.invoices);
+      // Luyen, 2026-07-27: "SC VIVO KVCM lech 4.245.000" / "AM HP KVCN (CSE)
+      // lech -1.000.000" -- 1 HD co the gop nhieu ngay (vd 1 ngay thuoc dong
+      // gop cuoi tuan nay, 1 ngay khac thuoc 1 dong settlement KHAC da tinh
+      // rieng -- vd Thu 6 truoc do), nhung truoc day dong nay CONG NGUYEN ca
+      // so tien HD (dem trung phan thuoc ngay/dong khac), giong dung bug da
+      // fix ben VietQR (utils/vietqrReconcile.js, 2026-07-27). Fix tuong tu:
+      // chia ty le theo % gross cua CHINH gian nay trong CAC NGAY THUOC DONG
+      // NAY so voi tong gross ca cac ngay HD do gop, dam bao khong dem trung.
       const invoiceTotal = invoiceList.reduce((sum, soHd) => {
         const inv = invoiceData.invoices.find((i) => i.soHd === soHd);
-        return sum + (inv ? inv.tongTt : 0);
+        if (!inv) return sum;
+        if (!inv.days || inv.days.length <= 1 || !inv.ngayHd) return sum + inv.tongTt;
+        const [invY, invMo, invD] = inv.ngayHd.split("-").map(Number);
+        const settlementDaySet = new Set(days);
+        let totalGrossAcrossDays = 0;
+        let thisSettlementGross = 0;
+        for (const d of inv.days) {
+          let y = invY;
+          let mo = invMo;
+          if (d > 20 && invD <= 3) {
+            mo -= 1;
+            if (mo === 0) {
+              mo = 12;
+              y -= 1;
+            }
+          }
+          const iso = `${y}-${String(mo).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+          const gr = grossForCodeAtIso(g.code, iso);
+          if (settlementDaySet.has(iso)) thisSettlementGross += gr;
+          totalGrossAcrossDays += gr;
+        }
+        // Khong co du lieu doanh thu o ngay nao (hiem) -- giu hanh vi cu (cong
+        // nguyen) de khong lam mat canh bao "Lech" that su.
+        if (totalGrossAcrossDays <= 0) return sum + inv.tongTt;
+        return sum + inv.tongTt * (thisSettlementGross / totalGrossAcrossDays);
       }, 0);
       const line = {
         code: g.code,
