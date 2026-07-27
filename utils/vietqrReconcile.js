@@ -1163,11 +1163,47 @@ function reconcileVietQr(settlements, grossData, invoiceData, gianMapping, manua
     }
     const lines = Object.values(gianLines).map((g) => {
       const invoiceList = Array.from(g.invoices);
+      const effCode = g.effectiveCode || g.code;
+      // Luyen, 2026-07-27: "bên momo hay các gian khác xuất hóa đơn cũng gộp
+      // thứ 2 xuất cho thứ 7 CN ... 2 cái lệch này là xuất chung 1 hóa đơn 2
+      // ngày T7 CN" -- khac voi Momo/ZVP (settlement CHINH no gop lai thanh 1
+      // dong "gia" khi dang cho ngan hang), VietQR moi settlement ngay la THAT
+      // (tien ve rieng tung ngay), nen KHONG gop dong lai duoc -- nhung 1 hoa
+      // don co the vAn duoc xuat GOP cho nhieu ngay doanh thu (inv.days co >1
+      // phan tu). Truoc day moi ngay trong so do deu cong NGUYEN so tien HD
+      // vao invoiceTotal cua rieng minh (dem trung toan bo tren tung ngay),
+      // gay "Lech" gia tren TAT CA cac ngay du tong hop don da khop dung. Chia
+      // ty le so tien HD theo % doanh thu (gross) cua CHINH gian nay trong
+      // tung ngay so voi tong doanh thu ca cac ngay hoa don do gop, dam bao
+      // tong cong don lai vAn dung bang so tien HD that, khong con dem trung.
       const invoiceTotal = invoiceList.reduce((sum, soHd) => {
         const inv = invoiceData.invoices.find((i) => i.soHd === soHd);
-        return sum + (inv ? inv.tongTt : 0);
+        if (!inv) return sum;
+        if (!inv.days || inv.days.length <= 1 || !inv.ngayHd) return sum + inv.tongTt;
+        const [invY, invMo, invD] = inv.ngayHd.split("-").map(Number);
+        let totalGrossAcrossDays = 0;
+        let thisDayGross = 0;
+        for (const d of inv.days) {
+          let y = invY;
+          let mo = invMo;
+          if (d > 20 && invD <= 3) {
+            mo -= 1;
+            if (mo === 0) {
+              mo = 12;
+              y -= 1;
+            }
+          }
+          const iso = `${y}-${String(mo).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+          const gr = grossData.grossByCode[`${iso}|${effCode}`] || 0;
+          if (iso === day) thisDayGross = gr;
+          totalGrossAcrossDays += gr;
+        }
+        // Khong co du lieu doanh thu o ngay nao trong so hoa don gop (hiem,
+        // vd chua tai du lieu ngay do) -- giu nguyen hanh vi cu (cong nguyen)
+        // de khong lam mat canh bao "Lech" that su.
+        if (totalGrossAcrossDays <= 0) return sum + inv.tongTt;
+        return sum + inv.tongTt * (thisDayGross / totalGrossAcrossDays);
       }, 0);
-      const effCode = g.effectiveCode || g.code;
       const line = {
         code: g.code,
         maCongTrinh: displayCode(effCode),
