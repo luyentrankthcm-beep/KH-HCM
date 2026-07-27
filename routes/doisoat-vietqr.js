@@ -195,6 +195,12 @@ function ensureChannelShape(store) {
   // resolveGianGrossByBankRef trong utils/vietqrReconcile.js), khong can doi
   // upload lai file "Danh sach diem ban" + file "Ten diem - Ma cong trinh".
   if (!store.viet_qr_store_code_override) store.viet_qr_store_code_override = {};
+  // Luyen, 2026-07-27: "100k của dư ngân hàng nếu chưa có bên dữ liệu thì
+  // đưa vô gian AMTP cho tôi" -- gan THANG 1 So tham chieu ngan hang -> 1 Ma
+  // cong trinh, dung khi giao dich ngan hang khong co dong QR nao khop (se
+  // bi tru khoi "Ngan hang" o buildChannelReconciliation neu khong gan),
+  // nhung Luyen tu xac dinh duoc dung gian. Xem resolveGianGrossByBankRef.
+  if (!store.viet_qr_ref_override) store.viet_qr_ref_override = {};
   // Luyen, 2026-07-21: "không cần chỉnh cái cũ khóa cho tôi" -- muon 1 tinh
   // nang "khoa so" that su (tung yeu cau 2 lan truoc: "khóa sổ cho tôi chỉ
   // nạp cái mới thôi"), khong phai sua tay tung dong lech cu. Luu 1 ngay
@@ -239,6 +245,7 @@ function ensureChannelShape(store) {
     if (!store.viet_qr_nocode_assignments[ch]) store.viet_qr_nocode_assignments[ch] = {};
     if (!store.viet_qr_store_uploads[ch]) store.viet_qr_store_uploads[ch] = [];
     if (!store.viet_qr_ten_diem_master[ch]) store.viet_qr_ten_diem_master[ch] = {};
+    if (!store.viet_qr_ref_override[ch]) store.viet_qr_ref_override[ch] = {};
     if (!store.viet_qr_store_names_baseline[ch]) {
       // Chup 1 lan duy nhat: du lieu diem ban HIEN CO ngay truoc khi tinh
       // nang lich su/xoa nay ton tai, de khong mat du lieu cu.
@@ -587,7 +594,8 @@ function buildChannelReconciliation(store, channelKey) {
     const bankThuTxs = extractVietQrThuTransactions(txs).filter((t) => t.date >= cfg.refMatchFrom);
     const tenDiemMaster = store.viet_qr_ten_diem_master[channelKey] || {};
     const storeCodeOverride = store.viet_qr_store_code_override[channelKey] || {};
-    const refResolved = resolveGianGrossByBankRef(bankThuTxs, rawRows, storeNames, tenDiemMaster, storeCodeOverride);
+    const refOverride = store.viet_qr_ref_override[channelKey] || {};
+    const refResolved = resolveGianGrossByBankRef(bankThuTxs, rawRows, storeNames, tenDiemMaster, storeCodeOverride, refOverride);
 
     const filteredGrossByCode = {};
     const filteredCodes = new Set();
@@ -1103,6 +1111,30 @@ router.post("/doi-soat/vietqr/gan-ma-cua-hang/:channel", requireDataEntry, (req,
     res.redirect(
       "/doi-soat/vietqr?success=" +
         encodeURIComponent(`Da gan ma cua hang "${maCuaHang}" -> "${maCongTrinh}". Ket qua doi soat da tu cap nhat.`)
+    );
+  } catch (e) {
+    res.redirect("/doi-soat/vietqr?error=" + encodeURIComponent(e.message));
+  }
+});
+
+// Luyen, 2026-07-27: "100k của dư ngân hàng nếu chưa có bên dữ liệu thì đưa
+// vô gian AMTP cho tôi" -- gan THANG 1 So tham chieu ngan hang (giao dich
+// hoan toan khong co dong QR nao khop, se bi tru khoi "Ngan hang" boi buoc
+// loc giao dich khong phai VietQR neu khong gan) -> 1 Ma cong trinh, ap
+// dung ngay khong can cho file QR nao khop them. Xem resolveGianGrossByBankRef.
+router.post("/doi-soat/vietqr/gan-ma-tham-chieu/:channel", requireDataEntry, (req, res) => {
+  const store = load();
+  ensureChannelShape(store);
+  const channelKey = req.params.channel;
+  try {
+    if (!CHANNELS[channelKey]) throw new Error("Kenh khong hop le.");
+    const { reference, maCongTrinh } = req.body;
+    if (!reference || !maCongTrinh) throw new Error("Thieu so tham chieu hoac ma cong trinh de gan.");
+    store.viet_qr_ref_override[channelKey][reference.trim()] = maCongTrinh;
+    save(store);
+    res.redirect(
+      "/doi-soat/vietqr?success=" +
+        encodeURIComponent(`Da gan so tham chieu "${reference}" -> "${maCongTrinh}". Ket qua doi soat da tu cap nhat.`)
     );
   } catch (e) {
     res.redirect("/doi-soat/vietqr?error=" + encodeURIComponent(e.message));

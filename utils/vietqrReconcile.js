@@ -622,8 +622,16 @@ function resolveGianGross(rawRows, storeNameMap, gianCandidates, nocodeAssignmen
 // cho phep gan THANG 1 Ma cua hang -> 1 Ma cong trinh, bo qua ca 2 buoc gian
 // tiep tren, ap dung ngay khong can tai lai file nao. Kiem tra TRUOC storeNameMap
 // nen luon uu tien neu da gan thu cong.
-function resolveGianGrossByBankRef(bankTxs, rawRows, storeNameMap, tenDiemToProjectMap, storeCodeOverride) {
+// refOverride: Luyen, 2026-07-27 -- gan THANG 1 So tham chieu ngan hang ->
+// 1 Ma cong trinh, dung cho giao dich ngan hang THAT SU khong co dong QR
+// nao khop (vd file "Danh sach diem ban"/rawRows khong co dong nao co Ma
+// tham chieu do -- se roi vao unmatchedBankTx va bi tru khoi "Ngan hang"
+// boi buildChannelReconciliation neu khong co override nay), nhung Luyen
+// tu xac dinh duoc dung tien do thuoc gian nao. Kiem tra TRUOC ca buoc tim
+// rawRow theo ref, nen boi qua hoan toan yeu cau phai co dong QR khop.
+function resolveGianGrossByBankRef(bankTxs, rawRows, storeNameMap, tenDiemToProjectMap, storeCodeOverride, refOverride) {
   const override = storeCodeOverride || {};
+  const refOv = refOverride || {};
   const refIndex = new Map(); // Ma tham chieu -> [rawRow, ...]
   rawRows.forEach((row) => {
     const ref = (row.refCode || "").trim();
@@ -641,6 +649,13 @@ function resolveGianGrossByBankRef(bankTxs, rawRows, storeNameMap, tenDiemToProj
 
   for (const tx of bankTxs) {
     const ref = (tx.reference || "").trim();
+    const refOverrideCode = ref ? refOv[ref] : undefined;
+    if (refOverrideCode) {
+      codes.add(refOverrideCode);
+      const key = `${tx.date}|${refOverrideCode}`;
+      grossByCode[key] = (grossByCode[key] || 0) + tx.amount;
+      continue;
+    }
     const candidates = ref ? refIndex.get(ref) || [] : [];
     // Uu tien dong QR CUNG NGAY voi giao dich ngan hang; neu khong co, lay
     // dong som nhat trong so cac dong trung ma (de bao "tien den tre" nhat quan).
