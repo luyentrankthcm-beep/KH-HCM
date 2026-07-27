@@ -186,6 +186,16 @@ function findVietQrDataSheet(wbLite, buffer) {
         // tinh nang khop voi "So tham chieu" ben sao ke ngan hang (kenh
         // BIDV7702 tu 22/07 tro di, xem resolveGianGrossByBankRef ben duoi).
         if (idx.maThamChieu === undefined && s.includes("ma tham chieu")) idx.maThamChieu = c;
+        // Chi Nhan, 2026-07-27: "lấy giao dịch viet qr đối soát thôi đừng
+        // giao dịch nào cũng lấy" -- file xuat tu doitac.vietqr.vn co rieng
+        // cot "Loai giao dich" (KHAC voi cot "Loai" = Giao dich den/di o
+        // tren) voi gia tri "QR giao dich" cho giao dich VietQR that, nhung
+        // cung co the la "Vang lai" (giao dich khac, khong phai QR -- vd
+        // chuyen khoan ca nhan/noi dung khong lien quan don hang, khong co
+        // Ma cua hang) -- truoc gio cot nay bi bo qua hoan toan nen "Vang
+        // lai" van duoc tinh vao doanh thu, gay du "Tinh tu du lieu tai len"
+        // so voi "Ngan hang" that. Tu gio chi giu dong "QR giao dich".
+        if (idx.loaiGiaoDich === undefined && s.includes("loai giao dich")) idx.loaiGiaoDich = c;
       });
       if (idx.soTien !== undefined && idx.maCuaHang !== undefined && idx.noiDung !== undefined) {
         return { sheetName, grid, headerRowIdx: r, cols: idx };
@@ -210,6 +220,13 @@ function parseVietQrRawWorkbook(buffer) {
     if (trangThai !== null && trangThai !== undefined && !/thanh cong/i.test(normText(String(trangThai)))) continue;
     const loai = cols.loai !== undefined ? row[cols.loai] : null;
     if (loai !== null && loai !== undefined && !normText(String(loai)).includes("giao dich den")) continue;
+    // Chi Nhan, 2026-07-27: chi giu giao dich THAT SU la VietQR ("QR giao
+    // dich") -- loai "Vang lai" (chuyen khoan/noi dung khac, khong qua QR,
+    // thuong khong co Ma cua hang that -- vd Noi dung TT "massage", Ma cua
+    // hang "-") van la tien that vao tai khoan nhung KHONG phai doanh thu
+    // ban hang qua QR, phai loai khoi doi soat VietQR.
+    const loaiGiaoDich = cols.loaiGiaoDich !== undefined ? row[cols.loaiGiaoDich] : null;
+    if (loaiGiaoDich !== null && loaiGiaoDich !== undefined && !normText(String(loaiGiaoDich)).includes("qr")) continue;
     const amount = cols.soTien !== undefined ? Number(row[cols.soTien]) || 0 : 0;
     if (!amount) continue;
     const maCuaHang = cols.maCuaHang !== undefined ? String(row[cols.maCuaHang] || "").trim() : "";
