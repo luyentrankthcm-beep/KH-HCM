@@ -183,7 +183,7 @@
                 return 0;
               });
             %>
-            <% prodKeys.forEach(function(prod) { %>
+            <% prodKeys.forEach(function(prod, prodIdx) { %>
             <% var isMissing = !(onlineProductMap[prod].maCongTrinh || '').trim(); %>
             <tr style="<%= isMissing ? 'background:#fff3cd;' : '' %>">
               <td style="font-size:12px;">
@@ -199,7 +199,21 @@
                   <button type="submit" class="btn btn-secondary" style="padding:2px 10px; font-size:12px;">Lưu</button>
                 </form>
                 <% } else { %>
-                  <%= onlineProductMap[prod].maCongTrinh %>
+                  <!-- Chi Nhan (2026-07-27): "tôi gán sai rồi cho tôi nút sửa
+                  đi" -- truoc day 1 khi da co Ma cong trinh (kh con "moi") thi
+                  chi hien text tinh, khong co cach nao sua neu gan nham; gio
+                  them nut "Sua" toggle hien form (dung lai route upsert san
+                  co /online-product-map/add, khong can route rieng). -->
+                  <span id="prodLocked-<%= prodIdx %>">
+                    <%= onlineProductMap[prod].maCongTrinh %>
+                    <button type="button" class="btn btn-secondary" style="padding:1px 8px; font-size:11px; margin-left:6px;" onclick="document.getElementById('prodLocked-<%= prodIdx %>').style.display='none'; document.getElementById('prodForm-<%= prodIdx %>').style.display='inline-flex';">Sửa</button>
+                  </span>
+                  <form id="prodForm-<%= prodIdx %>" method="POST" action="/doi-soat/zvp/online-product-map/add" class="form-inline" style="display:none; gap:4px;">
+                    <input type="hidden" name="tenSanPham" value="<%= prod %>" />
+                    <input type="text" name="maCongTrinh" value="<%= onlineProductMap[prod].maCongTrinh %>" required style="width:140px;" />
+                    <label style="font-size:12px;"><input type="checkbox" name="isCse" <%= onlineProductMap[prod].isCse ? 'checked' : '' %> /> CSE</label>
+                    <button type="submit" class="btn btn-secondary" style="padding:2px 10px; font-size:12px;">Lưu</button>
+                  </form>
                 <% } %>
               </td>
               <td><%= onlineProductMap[prod].isCse ? 'CSE (1388)' : '' %></td>
