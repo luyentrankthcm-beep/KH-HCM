@@ -11,11 +11,19 @@ const {
   parseGianSheetWorkbook,
   matchByMstOrName,
   matchGianViaUncContent,
+  matchGianViaChiPhiLedger,
   classifyPhanLoai,
   matchTenHangHoa,
   normVN,
 } = require("../utils/hoaDonDauVaoEnrich");
 const chiPhi = require("./doisoat-chiphi");
+// Chi Nhan, 2026-07-29: "đi tìm từ 3 unc gg sheet á lấy ra gian cho tôi" --
+// store.chi_phi (routes/chi-phi.js) da dong bo san tu 3 Google Sheet "UNC",
+// co san cot gian/ncc/soHoaDon/soTien -- dung lam nguon do them Gian Hang
+// (xem matchGianViaChiPhiLedger). Va rentPaymentMatcher de xac dinh Tai
+// khoan Co (1388/331) tu ten gian tim duoc, dung LAI logic da co san o
+// chi-phi.js (computeTaiKhoanChiPhi) thay vi doan lai tu dau.
+const { findContractForGianText, buildGianAliasIndex, isDoanhThuChiaSeRecord } = require("../utils/rentPaymentMatcher");
 // Chi Nhan, 2026-07-28: "check trên UNC ra tên gian" -- khi khong khop duoc
 // Gian Hang qua Google Sheet (theo Ten NCC/MST), thu tim tiep qua bang lenh
 // chi UNC (chi_phi_unc_list, cung du lieu voi trang Doi Soat Chi Phi): khop
@@ -215,32 +223,63 @@ function groupRowsByInvoice(rows) {
   });
 }
 
+// Chi Nhan, 2026-07-29: "thêm bộ lọc ... lọc theo tk 154 156 242 hay các lọc
+// theo gian có/nhiều gian ... hiển thị 30 hóa đơn thôi trang 1 trang 2" --
+// them 3 bo loc moi (Tai khoan No, Gian: da co/chua co) + phan trang 30 hoa
+// don/trang. Loc Tai khoan No ap dung O CAP TUNG DONG hang hoa (truoc khi
+// gop hien thi theo hoa don), vi 1 hoa don gop nhieu mat hang co the khac
+// Tai khoan No nhau -- giu dung dong khop, cac dong khac cua cung hoa don bi
+// loai (giong nguyen tac loc thang o tren). Loc Gian + phan trang ap dung SAU
+// khi da gop theo hoa don (gianHang la khai niem chung ca hoa don).
 router.get("/hoa-don-dau-vao", (req, res) => {
   const store = load();
   ensureShape(store);
   const activeCompany = getCompany(req);
   const hachToanFilter = req.query.hachToan || ""; // "" = tat ca, "1" = da hach toan, "0" = chua hach toan
   const thangFilter = req.query.thang || "";
+  const tkNoFilter = req.query.tkNo || ""; // "" = tat ca, hoac 1 ma TK No cu the (vd "154")
+  const gianFilter = req.query.gian || ""; // "" = tat ca, "1" = da co Gian Hang, "0" = chua co
+  const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+  const PAGE_SIZE = 30;
 
   const allRows = store.hoa_don_dau_vao.map(ensureDefaults).filter((r) => r.congTy === activeCompany);
   const totalForCompany = groupRowsByInvoice(allRows).length;
 
   const monthSet = new Set();
+  const tkNoSet = new Set();
   allRows.forEach((r) => {
     const m = (r.ngayHD || "").slice(0, 7);
     if (m) monthSet.add(m);
+    if ((r.taiKhoanNo || "").trim()) tkNoSet.add(r.taiKhoanNo.trim());
   });
   const availableMonths = [...monthSet].sort().reverse();
+  const availableTkNo = [...tkNoSet].sort();
 
   let rows = allRows;
   if (thangFilter) rows = rows.filter((r) => (r.ngayHD || "").slice(0, 7) === thangFilter);
+  if (tkNoFilter) rows = rows.filter((r) => (r.taiKhoanNo || "").trim() === tkNoFilter);
 
   let groupedRows = groupRowsByInvoice(rows);
   if (hachToanFilter === "1") groupedRows = groupedRows.filter((r) => r.daHachToan);
   else if (hachToanFilter === "0") groupedRows = groupedRows.filter((r) => !r.daHachToan);
+  if (gianFilter === "1") groupedRows = groupedRows.filter((r) => (r.gianHang || "").trim());
+  else if (gianFilter === "0") groupedRows = groupedRows.filter((r) => !(r.gianHang || "").trim());
   groupedRows.sort((a, b) => (a.ngayHD < b.ngayHD ? 1 : -1));
   const tongTien = groupedRows.reduce((s, r) => s + (r.soTien || 0), 0);
   const daChiCount = groupedRows.filter((r) => r.daChiTien).length;
+
+  const totalMatching = groupedRows.length;
+  const totalPages = Math.max(1, Math.ceil(totalMatching / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const pageRows = groupedRows.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
+  // Giu nguyen tat ca bo loc dang chon khi chuyen trang (chi doi "page").
+  const qs = [];
+  if (thangFilter) qs.push("thang=" + encodeURIComponent(thangFilter));
+  if (hachToanFilter) qs.push("hachToan=" + encodeURIComponent(hachToanFilter));
+  if (tkNoFilter) qs.push("tkNo=" + encodeURIComponent(tkNoFilter));
+  if (gianFilter) qs.push("gian=" + encodeURIComponent(gianFilter));
+  const baseQs = qs.join("&");
 
   const nccMeta = store.hoa_don_dau_vao_ncc_meta;
   const hangHoaMeta = store.hoa_don_dau_vao_hang_hoa_meta;
@@ -250,13 +289,20 @@ router.get("/hoa-don-dau-vao", (req, res) => {
 
   res.render("hoa-don-dau-vao", {
     userName: req.session.userName,
-    rows: groupedRows,
+    rows: pageRows,
     totalForCompany,
+    totalMatching,
     hachToanFilter,
     thangFilter,
+    tkNoFilter,
+    gianFilter,
     availableMonths,
+    availableTkNo,
     tongTien,
     daChiCount,
+    currentPage,
+    totalPages,
+    baseQs,
     nccMeta,
     hangHoaMeta,
     gianMeta,
@@ -449,6 +495,19 @@ router.post("/hoa-don-dau-vao/upload", requireDataEntry, upload.single("file"), 
 // dong hien thi (xem groupRowsByInvoice o tren) -- nut "hạch toán"/"Xóa" tren
 // 1 dong hien thi phai ap dung cho TOAN BO cac dong GOC trong nhom do (id cua
 // tung dong duoc gop lai truyen qua truong "ids", cach nhau boi dau phay).
+// Chi Nhan, 2026-07-29: gop chung cach dung lai cac bo loc (thang/hachToan/
+// tkNo/gian/page) khi redirect ve sau moi hanh dong tren 1 dong -- tranh nhay
+// ve trang 1/mat bo loc dang xem sau khi bam Da chi/Hach toan/Luu/Xoa.
+function buildRedirectQs(body) {
+  const qs = [];
+  if (body.hachToan) qs.push("hachToan=" + encodeURIComponent(body.hachToan));
+  if (body.thang) qs.push("thang=" + encodeURIComponent(body.thang));
+  if (body.tkNo) qs.push("tkNo=" + encodeURIComponent(body.tkNo));
+  if (body.gian) qs.push("gian=" + encodeURIComponent(body.gian));
+  if (body.page) qs.push("page=" + encodeURIComponent(body.page));
+  return qs;
+}
+
 router.post("/hoa-don-dau-vao/hach-toan", requireDataEntry, (req, res) => {
   const store = load();
   ensureShape(store);
@@ -458,9 +517,7 @@ router.post("/hoa-don-dau-vao/hach-toan", requireDataEntry, (req, res) => {
     if (ids.includes(String(r.id))) r.daHachToan = daHachToan;
   });
   save(store);
-  const qs = [];
-  if (req.body.hachToan) qs.push("hachToan=" + encodeURIComponent(req.body.hachToan));
-  if (req.body.thang) qs.push("thang=" + encodeURIComponent(req.body.thang));
+  const qs = buildRedirectQs(req.body);
   qs.push("success=" + encodeURIComponent("Đã cập nhật trạng thái hạch toán."));
   res.redirect("/hoa-don-dau-vao?" + qs.join("&"));
 });
@@ -476,9 +533,7 @@ router.post("/hoa-don-dau-vao/da-chi-tien", requireDataEntry, (req, res) => {
     if (ids.includes(String(r.id))) r.daChiTien = daChiTien;
   });
   save(store);
-  const qs = [];
-  if (req.body.hachToan) qs.push("hachToan=" + encodeURIComponent(req.body.hachToan));
-  if (req.body.thang) qs.push("thang=" + encodeURIComponent(req.body.thang));
+  const qs = buildRedirectQs(req.body);
   qs.push("success=" + encodeURIComponent("Đã cập nhật trạng thái chi tiền."));
   res.redirect("/hoa-don-dau-vao?" + qs.join("&"));
 });
@@ -535,9 +590,7 @@ router.post("/hoa-don-dau-vao/sua", requireDataEntry, (req, res) => {
     });
   });
   save(store);
-  const qs = [];
-  if (req.body.hachToan) qs.push("hachToan=" + encodeURIComponent(req.body.hachToan));
-  if (req.body.thang) qs.push("thang=" + encodeURIComponent(req.body.thang));
+  const qs = buildRedirectQs(req.body);
   qs.push("success=" + encodeURIComponent("Đã lưu."));
   res.redirect("/hoa-don-dau-vao?" + qs.join("&"));
 });
@@ -669,11 +722,48 @@ router.post("/hoa-don-dau-vao/cap-nhat-gian", requireDataEntry, async (req, res)
       });
     }
 
+    // Chi Nhan, 2026-07-29: "đi tìm từ 3 unc gg sheet á lấy ra gian cho tôi" --
+    // dong nao van chua co Gian Hang thi do tiep qua store.chi_phi (trang
+    // "Chi Phí", đã tự động đồng bộ sẵn từ 3 Google Sheet UNC thật: "ĐI ỦY
+    // NHIỆM CHI KVC + MTĐ MN"/"Tạo lệnh UNC KVC MB"/"TẠO LỆNH UNC MTĐ MB") --
+    // khop theo Số hóa đơn truoc (chac chan nhat), khong co thi khop Tên NCC +
+    // Số tiền. Neu tim duoc gian, tra cuu tiep Hợp Đồng Thuê Gian Hàng (Pháp
+    // Danh) de xac dinh Tài khoản Có (1388 neu la doanh thu chia se, con lai
+    // 331) -- dung LAI logic co san o chi-phi.js (computeTaiKhoanChiPhi) thay
+    // vi doan lai tu dau.
+    let filledViaChiPhi = 0;
+    const chiPhiForCompany = (store.chi_phi || []).filter((c) => c.congTy === activeCompany && (c.gian || "").trim());
+    if (chiPhiForCompany.length > 0) {
+      const gianListForTaiKhoan = store.phap_danh_hop_dong_thue || [];
+      const aliasIndex = buildGianAliasIndex(gianListForTaiKhoan);
+      store.hoa_don_dau_vao.forEach((r) => {
+        if (r.congTy !== activeCompany || r.gianHang) return;
+        const g = matchGianViaChiPhiLedger(r, chiPhiForCompany);
+        if (!g) return;
+        r.gianHang = g;
+        filledViaChiPhi++;
+        if (!r.taiKhoanCo) {
+          const rec = findContractForGianText(g, gianListForTaiKhoan, aliasIndex);
+          if (rec) {
+            const chiaSe = isDoanhThuChiaSeRecord(rec);
+            r.taiKhoanCo = chiaSe ? "1388" : "331";
+            if (!r.hinhThucHopTac) r.hinhThucHopTac = chiaSe ? "CSE" : "Thuê";
+          }
+        }
+      });
+    }
+
     save(store);
-    const uncNote = filledViaUnc > 0 ? `, dò thêm qua UNC được ${filledViaUnc} dòng` : uncList.length === 0 ? " (chưa có dữ liệu UNC để dò thêm, tải lên ở trang Đối soát Chi Phí)" : "";
+    const uncNote = filledViaUnc > 0 ? `, dò thêm qua UNC (file tải lên) được ${filledViaUnc} dòng` : "";
+    const chiPhiNote =
+      filledViaChiPhi > 0
+        ? `, dò thêm qua sổ Chi Phí (3 sheet UNC) được ${filledViaChiPhi} dòng`
+        : chiPhiForCompany.length === 0
+        ? " (sổ Chi Phí chưa có dòng nào có Gian cho công ty này để dò thêm)"
+        : "";
     res.redirect(
       "/hoa-don-dau-vao?success=" +
-        encodeURIComponent(`Đã đọc Google Sheet (${sheetsRead.join(", ")}): điền Gian Hàng/Tài khoản Có cho ${filled} dòng đang trống${uncNote}.`)
+        encodeURIComponent(`Đã đọc Google Sheet (${sheetsRead.join(", ")}): điền Gian Hàng/Tài khoản Có cho ${filled} dòng đang trống${uncNote}${chiPhiNote}.`)
     );
   } catch (e) {
     res.redirect("/hoa-don-dau-vao?error=" + encodeURIComponent(e.message));

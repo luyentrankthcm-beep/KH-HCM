@@ -115,8 +115,12 @@
 
     <section class="panel">
       <div class="panel-head">
-        <h2>Danh sách (<%= rows.length %> hóa đơn)</h2>
+        <h2>Danh sách (<%= totalMatching %> hóa đơn<% if (totalMatching !== totalForCompany) { %>, tổng <%= totalForCompany %><% } %>)</h2>
       </div>
+      <!-- Chi Nhan, 2026-07-29: "thêm bộ lọc ... lọc tk 154 156 242 hay các
+           lọc theo gian có/chưa có gian" -- them 2 bo loc moi (Tai khoan No
+           lay dong theo du lieu thuc te dang co, Gian: da co/chua co), doi
+           select nao cung tu submit lai form (giu nguyen cac bo loc khac). -->
       <form method="GET" action="/hoa-don-dau-vao" class="form-inline-tight" style="margin-bottom:10px;">
         <label class="form-inline-tight" style="gap:6px;">Tháng
           <select name="thang" onchange="this.form.submit()">
@@ -131,6 +135,21 @@
             <option value="">Tất cả</option>
             <option value="1" <%= hachToanFilter === '1' ? 'selected' : '' %>>Đã hạch toán</option>
             <option value="0" <%= hachToanFilter === '0' ? 'selected' : '' %>>Chưa hạch toán</option>
+          </select>
+        </label>
+        <label class="form-inline-tight" style="gap:6px;">Tài khoản Nợ
+          <select name="tkNo" onchange="this.form.submit()">
+            <option value="">Tất cả</option>
+            <% availableTkNo.forEach(function(tk) { %>
+            <option value="<%= tk %>" <%= tkNoFilter === tk ? 'selected' : '' %>><%= tk %></option>
+            <% }) %>
+          </select>
+        </label>
+        <label class="form-inline-tight" style="gap:6px;">Gian Hàng
+          <select name="gian" onchange="this.form.submit()">
+            <option value="">Tất cả</option>
+            <option value="1" <%= gianFilter === '1' ? 'selected' : '' %>>Đã có Gian</option>
+            <option value="0" <%= gianFilter === '0' ? 'selected' : '' %>>Chưa có Gian</option>
           </select>
         </label>
       </form>
@@ -172,6 +191,9 @@
                   <input type="hidden" name="ids" value="<%= r.idsCsv %>" />
                   <input type="hidden" name="thang" value="<%= thangFilter %>" />
                   <input type="hidden" name="hachToan" value="<%= hachToanFilter %>" />
+                  <input type="hidden" name="tkNo" value="<%= tkNoFilter %>" />
+                  <input type="hidden" name="gian" value="<%= gianFilter %>" />
+                  <input type="hidden" name="page" value="<%= currentPage %>" />
                   <input type="hidden" name="daChiTien" value="<%= r.daChiTien ? '0' : '1' %>" />
                   <button type="submit" class="link-btn">
                     <% if (r.daChiTien) { %><span class="badge badge-thu">Đã chi</span><% } else { %><span class="badge badge-warn">Chưa chi</span><% } %>
@@ -183,6 +205,9 @@
                   <input type="hidden" name="ids" value="<%= r.idsCsv %>" />
                   <input type="hidden" name="thang" value="<%= thangFilter %>" />
                   <input type="hidden" name="hachToan" value="<%= hachToanFilter %>" />
+                  <input type="hidden" name="tkNo" value="<%= tkNoFilter %>" />
+                  <input type="hidden" name="gian" value="<%= gianFilter %>" />
+                  <input type="hidden" name="page" value="<%= currentPage %>" />
                   <input type="hidden" name="daHachToan" value="<%= r.daHachToan ? '0' : '1' %>" />
                   <button type="submit" class="link-btn">
                     <% if (r.daHachToan) { %><span class="badge badge-thu">Đã hạch toán</span><% } else { %><span class="badge">Chưa hạch toán</span><% } %>
@@ -221,6 +246,9 @@
                     <input type="hidden" name="ids" value="<%= r.idsCsv %>" />
                     <input type="hidden" name="thang" value="<%= thangFilter %>" />
                     <input type="hidden" name="hachToan" value="<%= hachToanFilter %>" />
+                    <input type="hidden" name="tkNo" value="<%= tkNoFilter %>" />
+                    <input type="hidden" name="gian" value="<%= gianFilter %>" />
+                    <input type="hidden" name="page" value="<%= currentPage %>" />
                     <p class="muted" style="margin:0 0 6px;">Tích chọn ô nào muốn đổi, không tích thì giữ nguyên giá trị cũ.</p>
                     <div class="hddv-edit-grid">
                       <label class="hddv-edit-item">
@@ -278,6 +306,22 @@
           </tbody>
         </table>
       </div>
+      <!-- Chi Nhan, 2026-07-29: "hiển thị 30 hóa đơn thôi trang 1 trang 2" --
+           phan trang 30 hoa don/trang (xem PAGE_SIZE o route GET), giu nguyen
+           cac bo loc dang chon (baseQs) khi bam sang trang khac. -->
+      <% if (totalPages > 1) { %>
+      <div class="hddv-pagination">
+        <% if (currentPage > 1) { %>
+        <a class="btn btn-secondary" href="/hoa-don-dau-vao?<%= baseQs ? baseQs + '&' : '' %>page=<%= currentPage - 1 %>">‹ Trang trước</a>
+        <% } %>
+        <% for (let p = 1; p <= totalPages; p++) { %>
+        <a class="hddv-page-link <%= p === currentPage ? 'active' : '' %>" href="/hoa-don-dau-vao?<%= baseQs ? baseQs + '&' : '' %>page=<%= p %>"><%= p %></a>
+        <% } %>
+        <% if (currentPage < totalPages) { %>
+        <a class="btn btn-secondary" href="/hoa-don-dau-vao?<%= baseQs ? baseQs + '&' : '' %>page=<%= currentPage + 1 %>">Trang sau ›</a>
+        <% } %>
+      </div>
+      <% } %>
     </section>
   </main>
   <script>

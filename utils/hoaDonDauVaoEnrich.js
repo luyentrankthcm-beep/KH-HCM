@@ -210,6 +210,43 @@ function matchGianViaUncContent(noiDungUnc, gianForCompany) {
   return list.length === 1 ? list[0] : null;
 }
 
+// Chi Nhan, 2026-07-29: "đi tìm từ 3 unc gg sheet á lấy ra gian cho tôi" --
+// 3 Google Sheet "UNC" (ĐI ỦY NHIỆM CHI KVC + MTĐ MN / Tạo lệnh UNC KVC MB /
+// TẠO LỆNH UNC MTĐ MB) DA duoc dong bo san vao store.chi_phi (trang "Chi
+// Phí", routes/chi-phi.js) voi cac cot gian/ncc/soHoaDon/soTien day du (1735/
+// 2119 dong kh_moi da co san "gian" luc kiem tra 2026-07-29) -- day moi la
+// nguon UNC that Chi Nhan dang nhac toi (KHAC voi chi_phi_unc_list, la file
+// UNC rieng Chi Nhan tu tai len o trang Doi soat Chi phi, thuong con trong).
+// Uu tien khop theo SO HOA DON (chinh xac nhat, vi cot soHoaDon co san tren
+// ca 2 ben), fallback theo Ten NCC + So tien (nhu matchUncForPayment). CHI
+// tra ve khi khop DUY NHAT 1 gian, tranh doan nham.
+function matchGianViaChiPhiLedger(row, chiPhiForCompany) {
+  if (!chiPhiForCompany || chiPhiForCompany.length === 0) return null;
+  const soHD = String(row.soHoaDon || "").trim();
+  if (soHD) {
+    const bySoHD = chiPhiForCompany.filter((c) => String(c.soHoaDon || "").trim() === soHD);
+    const distinctGian = new Set(bySoHD.map((c) => String(c.gian || "").trim()).filter(Boolean));
+    if (distinctGian.size === 1) return Array.from(distinctGian)[0];
+  }
+  const tenNorm = normVN(row.tenNCC);
+  const amount = row.soTien || 0;
+  if (tenNorm && amount) {
+    let candidates = chiPhiForCompany.filter(
+      (c) => Math.abs((c.soTien || 0) - amount) < 1000 && normVN(c.ncc) === tenNorm
+    );
+    if (candidates.length === 0) {
+      candidates = chiPhiForCompany.filter((c) => {
+        if (Math.abs((c.soTien || 0) - amount) >= 1000) return false;
+        const cn = normVN(c.ncc);
+        return cn && (cn.includes(tenNorm) || tenNorm.includes(cn));
+      });
+    }
+    const distinctGian = new Set(candidates.map((c) => String(c.gian || "").trim()).filter(Boolean));
+    if (distinctGian.size === 1) return Array.from(distinctGian)[0];
+  }
+  return null;
+}
+
 // ---------- Phan loai tu Dien giai + so tien ----------
 // Chi Nhan, 2026-07-28: "nếu nó số lượng đếm được mua vào bán ra thì phân
 // làm hàng hóa 156 cái nào cccd thì phân vào 153 cái nào là tài sản thì đưa
@@ -270,6 +307,7 @@ module.exports = {
   parseGianSheetWorkbook,
   matchByMstOrName,
   matchGianViaUncContent,
+  matchGianViaChiPhiLedger,
   classifyPhanLoai,
   matchTenHangHoa,
 };
