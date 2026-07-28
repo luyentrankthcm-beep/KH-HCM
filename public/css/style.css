@@ -521,6 +521,32 @@ a.report-tile.accent-gian { --report-accent: #1d8a4a; }
   vertical-align: bottom;
 }
 
+/* Chi Nhan, 2026-07-28: "táu cả nội dung chi tiết này lên hàng dài cho tôi
+   đi 1 hóa đơn 1 khung" -- panel "Chi tiết & Sửa" cua Hoa Don Dau Vao TRUOC
+   DAY nam trong 1 <td> hep (cot cuoi bang), lam noi dung bi don doc theo
+   chieu doc rat cao/hep khi mo ra. Gio panel nay nam trong 1 HANG RIENG
+   (colspan full chieu rong bang, xem hddv-detail-row trong view), va dung
+   flex-wrap de cac muc con (ten hang hoa/phan loai/cac nut sua) xep NGANG
+   canh nhau, tran xuong dong khi het cho -- xem het 1 hoa don trong 1 khung
+   ngang thay vi 1 cot doc dai, van xem duoc nhieu hoa don khac phia tren/
+   duoi cung luc. */
+.hddv-detail-panel {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px 28px;
+  padding: 12px 4px;
+  font-size: 13px;
+  background: rgba(2, 62, 138, 0.03);
+  border-radius: var(--radius-md);
+}
+.hddv-detail-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 160px;
+}
+.hddv-detail-field input[type="text"], .hddv-detail-field select { font-size: 13px; padding: 5px 8px; }
+
 /* Nút nổi "Lên đầu trang" / "Quay lại" -- luôn hiện ở góc dưới phải để dễ
    di chuyển trên các trang dài (nhiều bảng đối soát xếp chồng). */
 .float-nav {
