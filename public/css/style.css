@@ -506,6 +506,21 @@ a.report-tile.accent-gian { --report-accent: #1d8a4a; }
 .table-pivot td a { color: var(--color-primary); text-decoration: none; }
 .table-pivot td a:hover { text-decoration: underline; }
 
+/* Chi Nhan, 2026-07-28: "thêm ngắn quá cho tôi đi" -- trang Hóa Đơn Đầu Vào
+   co nhieu cot + ten NCC dai lam dong bang qua cao. .table-compact giam
+   padding/font cho gon hon; .truncate-1line cat ngan 1 dong (vd Ten NCC) voi
+   dau "..." va tooltip (title=) hien ten day du khi ruoc chuot vao, tranh
+   dong bi keo dai chi vi 1 cot wrap qua nhieu dong. */
+.table-compact th, .table-compact td { padding: 6px 10px; font-size: 13px; }
+.truncate-1line {
+  display: inline-block;
+  max-width: 240px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
+}
+
 /* Nút nổi "Lên đầu trang" / "Quay lại" -- luôn hiện ở góc dưới phải để dễ
    di chuyển trên các trang dài (nhiều bảng đối soát xếp chồng). */
 .float-nav {
