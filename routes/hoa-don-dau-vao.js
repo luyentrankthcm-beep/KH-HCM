@@ -49,6 +49,73 @@ function ensureDefaults(row) {
   );
 }
 
+// Chi Nhan, 2026-07-28: "mấy cái hóa đơn nhiều dòng á bạn gom lại chỗ diễn
+// giải để nhiều dòng thôi á xuất ra thì mỗi cái 1 dòng cho tôi chớ trên đây
+// coi gom lại cho tôi đi" -- tren TRANG WEB (khong dung cho export.xlsx, xem
+// route rieng ben duoi), gop cac dong CUNG 1 hoa don (cung So hoa don + Ky
+// hieu) lai thanh 1 dong hien thi: Dien giai noi cac dong con lai bang xuong
+// dong, cong don Tien truoc thue/Tien thue/Tong tien. Du lieu GOC trong
+// store van giu nguyen moi dong rieng (khong sua/gop that trong store.json)
+// -- chi gop luc RENDER, nen export/upload/dedup phia tren khong bi anh
+// huong gi ca.
+//
+// Dong nhap tay KHONG co So hoa don (rong) thi KHONG gop chung voi nhau (moi
+// dong 1 nhom rieng, dung id lam khoa) -- tranh gop nham hang loat dong
+// khong lien quan chi vi cung co soHoaDon="".
+function groupRowsByInvoice(rows) {
+  const map = new Map();
+  const order = [];
+  rows.forEach((r) => {
+    const key = r.soHoaDon ? `${r.soHoaDon}|${r.kyHieuHD || ""}` : `__single__${r.id}`;
+    if (!map.has(key)) {
+      map.set(key, {
+        ids: [],
+        ngayHD: r.ngayHD,
+        tenNCC: r.tenNCC,
+        mstNCC: r.mstNCC,
+        kyHieuHD: r.kyHieuHD,
+        soHoaDon: r.soHoaDon,
+        dienGiaiList: [],
+        soTienTruocThue: 0,
+        tienThue: 0,
+        soTien: 0,
+        linkHoaDon: "",
+        ghiChuList: [],
+        daHachToanCount: 0,
+      });
+      order.push(key);
+    }
+    const g = map.get(key);
+    g.ids.push(r.id);
+    if (r.dienGiai) g.dienGiaiList.push(r.dienGiai);
+    g.soTienTruocThue += r.soTienTruocThue || 0;
+    g.tienThue += r.tienThue || 0;
+    g.soTien += r.soTien || 0;
+    if (!g.linkHoaDon && r.linkHoaDon) g.linkHoaDon = r.linkHoaDon;
+    if (r.ghiChu) g.ghiChuList.push(r.ghiChu);
+    if (r.daHachToan) g.daHachToanCount++;
+  });
+  return order.map((key) => {
+    const g = map.get(key);
+    return {
+      idsCsv: g.ids.join(","),
+      soDong: g.ids.length,
+      ngayHD: g.ngayHD,
+      tenNCC: g.tenNCC,
+      mstNCC: g.mstNCC,
+      kyHieuHD: g.kyHieuHD,
+      soHoaDon: g.soHoaDon,
+      dienGiai: g.dienGiaiList.join("\n"),
+      soTienTruocThue: g.soTienTruocThue,
+      tienThue: g.tienThue,
+      soTien: g.soTien,
+      linkHoaDon: g.linkHoaDon,
+      ghiChu: g.ghiChuList.join("; "),
+      daHachToan: g.daHachToanCount === g.ids.length,
+    };
+  });
+}
+
 router.get("/hoa-don-dau-vao", (req, res) => {
   const store = load();
   ensureShape(store);
@@ -56,26 +123,28 @@ router.get("/hoa-don-dau-vao", (req, res) => {
   const hachToanFilter = req.query.hachToan || ""; // "" = tat ca, "1" = da hach toan, "0" = chua hach toan
   const thangFilter = req.query.thang || "";
 
-  let rows = store.hoa_don_dau_vao.map(ensureDefaults).filter((r) => r.congTy === activeCompany);
-  const totalForCompany = rows.length;
+  const allRows = store.hoa_don_dau_vao.map(ensureDefaults).filter((r) => r.congTy === activeCompany);
+  const totalForCompany = groupRowsByInvoice(allRows).length;
 
   const monthSet = new Set();
-  rows.forEach((r) => {
+  allRows.forEach((r) => {
     const m = (r.ngayHD || "").slice(0, 7);
     if (m) monthSet.add(m);
   });
   const availableMonths = [...monthSet].sort().reverse();
 
-  if (hachToanFilter === "1") rows = rows.filter((r) => r.daHachToan);
-  else if (hachToanFilter === "0") rows = rows.filter((r) => !r.daHachToan);
+  let rows = allRows;
   if (thangFilter) rows = rows.filter((r) => (r.ngayHD || "").slice(0, 7) === thangFilter);
 
-  rows.sort((a, b) => (a.ngayHD < b.ngayHD ? 1 : -1));
-  const tongTien = rows.reduce((s, r) => s + (r.soTien || 0), 0);
+  let groupedRows = groupRowsByInvoice(rows);
+  if (hachToanFilter === "1") groupedRows = groupedRows.filter((r) => r.daHachToan);
+  else if (hachToanFilter === "0") groupedRows = groupedRows.filter((r) => !r.daHachToan);
+  groupedRows.sort((a, b) => (a.ngayHD < b.ngayHD ? 1 : -1));
+  const tongTien = groupedRows.reduce((s, r) => s + (r.soTien || 0), 0);
 
   res.render("hoa-don-dau-vao", {
     userName: req.session.userName,
-    rows,
+    rows: groupedRows,
     totalForCompany,
     hachToanFilter,
     thangFilter,
@@ -238,14 +307,19 @@ router.post("/hoa-don-dau-vao/upload", requireDataEntry, upload.single("file"), 
   }
 });
 
-router.post("/hoa-don-dau-vao/:id/hach-toan", requireDataEntry, (req, res) => {
+// Chi Nhan, 2026-07-28: trang gio gop nhieu dong (cung 1 hoa don) lai thanh 1
+// dong hien thi (xem groupRowsByInvoice o tren) -- nut "hạch toán"/"Xóa" tren
+// 1 dong hien thi phai ap dung cho TOAN BO cac dong GOC trong nhom do (id cua
+// tung dong duoc gop lai truyen qua truong "ids", cach nhau boi dau phay).
+router.post("/hoa-don-dau-vao/hach-toan", requireDataEntry, (req, res) => {
   const store = load();
   ensureShape(store);
-  const r = store.hoa_don_dau_vao.find((x) => String(x.id) === req.params.id);
-  if (r) {
-    r.daHachToan = req.body.daHachToan === "1";
-    save(store);
-  }
+  const ids = (req.body.ids || "").split(",").filter(Boolean);
+  const daHachToan = req.body.daHachToan === "1";
+  store.hoa_don_dau_vao.forEach((r) => {
+    if (ids.includes(String(r.id))) r.daHachToan = daHachToan;
+  });
+  save(store);
   const qs = [];
   if (req.body.hachToan) qs.push("hachToan=" + encodeURIComponent(req.body.hachToan));
   if (req.body.thang) qs.push("thang=" + encodeURIComponent(req.body.thang));
@@ -253,10 +327,11 @@ router.post("/hoa-don-dau-vao/:id/hach-toan", requireDataEntry, (req, res) => {
   res.redirect("/hoa-don-dau-vao?" + qs.join("&"));
 });
 
-router.post("/hoa-don-dau-vao/:id/delete", requireAdmin, (req, res) => {
+router.post("/hoa-don-dau-vao/xoa", requireAdmin, (req, res) => {
   const store = load();
   ensureShape(store);
-  store.hoa_don_dau_vao = store.hoa_don_dau_vao.filter((r) => String(r.id) !== req.params.id);
+  const ids = (req.body.ids || "").split(",").filter(Boolean);
+  store.hoa_don_dau_vao = store.hoa_don_dau_vao.filter((r) => !ids.includes(String(r.id)));
   save(store);
   res.redirect("/hoa-don-dau-vao?success=" + encodeURIComponent("Đã xóa hóa đơn."));
 });

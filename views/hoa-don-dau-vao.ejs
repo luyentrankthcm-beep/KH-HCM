@@ -94,14 +94,15 @@
               <td><%= r.tenNCC %></td>
               <td><%= r.mstNCC || '—' %></td>
               <td><%= r.kyHieuHD || '—' %></td>
-              <td><%= r.soHoaDon || '—' %></td>
-              <td><%= r.dienGiai || '—' %></td>
+              <td><%= r.soHoaDon || '—' %><% if (r.soDong > 1) { %> <span class="muted">(<%= r.soDong %> dòng)</span><% } %></td>
+              <td style="white-space:pre-line;"><%= r.dienGiai || '—' %></td>
               <td><%= (r.soTienTruocThue||0).toLocaleString('vi-VN') %> đ</td>
               <td><%= (r.tienThue||0).toLocaleString('vi-VN') %> đ</td>
               <td><%= (r.soTien||0).toLocaleString('vi-VN') %> đ</td>
               <td><% if (r.linkHoaDon) { %><a href="<%= r.linkHoaDon %>" target="_blank" rel="noopener">Xem</a><% } else { %>—<% } %></td>
               <td>
-                <form method="POST" action="/hoa-don-dau-vao/<%= r.id %>/hach-toan" style="display:inline">
+                <form method="POST" action="/hoa-don-dau-vao/hach-toan" style="display:inline">
+                  <input type="hidden" name="ids" value="<%= r.idsCsv %>" />
                   <input type="hidden" name="thang" value="<%= thangFilter %>" />
                   <input type="hidden" name="hachToan" value="<%= hachToanFilter %>" />
                   <input type="hidden" name="daHachToan" value="<%= r.daHachToan ? '0' : '1' %>" />
@@ -111,7 +112,8 @@
               <td><%= r.ghiChu || '—' %></td>
               <td>
                 <% if (typeof isAdmin !== "undefined" && isAdmin) { %>
-                <form method="POST" action="/hoa-don-dau-vao/<%= r.id %>/delete" style="display:inline" onsubmit="return confirm('Xóa hóa đơn này?');">
+                <form method="POST" action="/hoa-don-dau-vao/xoa" style="display:inline" onsubmit="return confirm('Xóa hóa đơn này (<%= r.soDong %> dòng)?');">
+                  <input type="hidden" name="ids" value="<%= r.idsCsv %>" />
                   <button type="submit" class="link-btn">Xóa</button>
                 </form>
                 <% } %>
