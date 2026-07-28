@@ -531,9 +531,6 @@ a.report-tile.accent-gian { --report-accent: #1d8a4a; }
    ngang thay vi 1 cot doc dai, van xem duoc nhieu hoa don khac phia tren/
    duoi cung luc. */
 .hddv-detail-panel {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 18px 28px;
   padding: 12px 4px;
   font-size: 13px;
   background: rgba(2, 62, 138, 0.03);
@@ -546,6 +543,38 @@ a.report-tile.accent-gian { --report-accent: #1d8a4a; }
   min-width: 160px;
 }
 .hddv-detail-field input[type="text"], .hddv-detail-field select { font-size: 13px; padding: 5px 8px; }
+
+/* Chi Nhan, 2026-07-28: "ngắn cho tôi các dữ liệu như tài khoản có với tên
+   hàng hóa đối tượng ... phần nào sửa thì thêm vào mục ... chọn nào tích đó" --
+   1 dong TOM TAT gon (khong xuong hang doc nhu truoc) cho Gian Hang/TK Co/
+   TK No/Ma doi tuong NCC/Ten hang hoa/Phan loai/Link/Ghi chu, cong voi 1 nut
+   "✏️ Sửa" duy nhat de mo form sua gop (thay vi 6 form/6 nut Luu rieng le). */
+.hddv-summary-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 20px;
+  line-height: 1.5;
+}
+.hddv-summary-line strong { font-weight: 600; color: var(--color-muted, #555); margin-right: 3px; }
+.hddv-edit-form {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed rgba(2, 62, 138, 0.15);
+}
+.hddv-edit-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 22px;
+}
+.hddv-edit-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 170px;
+}
+.hddv-edit-item span { font-size: 12px; color: var(--color-muted, #555); display: flex; align-items: center; gap: 5px; }
+.hddv-edit-item input[type="text"], .hddv-edit-item select { font-size: 13px; padding: 5px 8px; }
 
 /* Nút nổi "Lên đầu trang" / "Quay lại" -- luôn hiện ở góc dưới phải để dễ
    di chuyển trên các trang dài (nhiều bảng đối soát xếp chồng). */

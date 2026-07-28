@@ -196,103 +196,73 @@
             <tr class="hddv-detail-row" style="display:none;">
               <td colspan="12">
                 <div class="hddv-detail-panel">
-                  <div class="hddv-detail-field">
-                    <span class="muted">Tên hàng hóa (Misa)</span>
-                    <div style="white-space:pre-line;"><%= r.tenHangHoa.replace(/\n+/g,'\n').trim() || '—' %></div>
-                  </div>
-                  <div class="hddv-detail-field">
-                    <span class="muted">Phân loại (tự động)</span>
-                    <div style="white-space:pre-line;"><%= r.phanLoai.replace(/\n+/g,'\n').trim() || '—' %></div>
-                  </div>
-                  <div class="hddv-detail-field">
-                    <span class="muted">Link hóa đơn</span>
-                    <div><% if (r.linkHoaDon) { %><a href="<%= r.linkHoaDon %>" target="_blank" rel="noopener">Xem</a><% } else { %>—<% } %></div>
-                  </div>
-                  <div class="hddv-detail-field">
-                    <span class="muted">Ghi chú</span>
-                    <div><%= r.ghiChu || '—' %></div>
+                  <!-- Chi Nhan, 2026-07-28: "ngắn cho tôi các dữ liệu như tài
+                       khoản có với tên hàng hóa đối tượng ... phần nào sửa
+                       thì thêm vào mục ... chọn nào tích đó" -- hien GON gia
+                       tri hien tai (chi 1 dong tom tat), chi khi bam "✏️ Sửa"
+                       moi hien ra CAC O NHAP (tich checkbox truoc o nao muon
+                       doi, khong tich thi gia tri GIU NGUYEN khong doi) --
+                       gop CA 6 truong vao 1 form/1 nut Luu duy nhat thay vi 6
+                       form/6 nut rieng le nhu truoc. -->
+                  <div class="hddv-summary-line">
+                    <span><strong>Gian Hàng:</strong> <%= r.gianHang || '—' %></span>
+                    <span><strong>TK Có:</strong> <%= r.taiKhoanCo || '—' %></span>
+                    <span><strong>TK Nợ:</strong> <span style="white-space:pre-line;"><%= r.taiKhoanNo.replace(/\n+/g,'\n').trim() || '—' %></span></span>
+                    <span><strong>Mã đối tượng NCC:</strong> <%= r.maDoiTuongNCC || '—' %></span>
+                    <span><strong>Tên hàng hóa:</strong> <span style="white-space:pre-line;"><%= r.tenHangHoa.replace(/\n+/g,'\n').trim() || '—' %></span></span>
+                    <span><strong>Phân loại:</strong> <span style="white-space:pre-line;"><%= r.phanLoai.replace(/\n+/g,'\n').trim() || '—' %></span></span>
+                    <span><strong>Link HĐ:</strong> <% if (r.linkHoaDon) { %><a href="<%= r.linkHoaDon %>" target="_blank" rel="noopener">Xem</a><% } else { %>—<% } %></span>
+                    <span><strong>Ghi chú:</strong> <%= r.ghiChu || '—' %></span>
+                    <button type="button" class="link-btn" onclick="toggleHddvEdit(this)">✏️ Sửa</button>
                   </div>
 
-                  <form method="POST" action="/hoa-don-dau-vao/sua" class="hddv-detail-field">
+                  <form method="POST" action="/hoa-don-dau-vao/sua" class="hddv-edit-form" style="display:none;">
                     <input type="hidden" name="ids" value="<%= r.idsCsv %>" />
                     <input type="hidden" name="thang" value="<%= thangFilter %>" />
                     <input type="hidden" name="hachToan" value="<%= hachToanFilter %>" />
-                    <input type="hidden" name="field" value="gianHang" />
-                    <label class="muted">Sửa Gian Hàng</label>
-                    <div style="display:flex; gap:6px;">
-                      <input type="text" name="value" value="<%= r.gianHang %>" />
-                      <button type="submit" class="btn btn-secondary">Lưu</button>
+                    <p class="muted" style="margin:0 0 6px;">Tích chọn ô nào muốn đổi, không tích thì giữ nguyên giá trị cũ.</p>
+                    <div class="hddv-edit-grid">
+                      <label class="hddv-edit-item">
+                        <span><input type="checkbox" name="apply_gianHang" value="1" /> Gian Hàng</span>
+                        <input type="text" name="value_gianHang" value="<%= r.gianHang %>" />
+                      </label>
+                      <label class="hddv-edit-item">
+                        <span><input type="checkbox" name="apply_taiKhoanCo" value="1" /> Tài khoản Có</span>
+                        <select name="value_taiKhoanCo">
+                          <option value="" <%= !r.taiKhoanCo ? 'selected' : '' %>>-- chọn --</option>
+                          <option value="1388" <%= r.taiKhoanCo === '1388' ? 'selected' : '' %>>1388 (Chia sẻ)</option>
+                          <option value="331" <%= r.taiKhoanCo === '331' ? 'selected' : '' %>>331 (Thường)</option>
+                        </select>
+                      </label>
+                      <label class="hddv-edit-item">
+                        <span><input type="checkbox" name="apply_taiKhoanNo" value="1" /> Tài khoản Nợ (cả HĐ)</span>
+                        <input type="text" name="value_taiKhoanNo" placeholder="vd 6421" />
+                      </label>
+                      <label class="hddv-edit-item">
+                        <span><input type="checkbox" name="apply_maDoiTuongNCC" value="1" /> Mã đối tượng NCC</span>
+                        <input type="text" name="value_maDoiTuongNCC" value="<%= r.maDoiTuongNCC %>" />
+                      </label>
+                      <label class="hddv-edit-item">
+                        <span><input type="checkbox" name="apply_tenHangHoaMisa" value="1" /> Tên hàng hóa (cả HĐ)</span>
+                        <input type="text" name="value_tenHangHoaMisa" />
+                      </label>
+                      <label class="hddv-edit-item">
+                        <span><input type="checkbox" name="apply_phanLoai" value="1" /> Phân loại (cả HĐ)</span>
+                        <select name="value_phanLoai">
+                          <option value="">-- chọn --</option>
+                          <option value="Hàng hóa">Hàng hóa</option>
+                          <option value="CCDC">CCDC</option>
+                          <option value="Tài sản">Tài sản</option>
+                          <option value="Dịch vụ">Dịch vụ</option>
+                          <option value="Chi phí QLDN">Chi phí QLDN</option>
+                        </select>
+                      </label>
                     </div>
-                  </form>
-                  <form method="POST" action="/hoa-don-dau-vao/sua" class="hddv-detail-field">
-                    <input type="hidden" name="ids" value="<%= r.idsCsv %>" />
-                    <input type="hidden" name="thang" value="<%= thangFilter %>" />
-                    <input type="hidden" name="hachToan" value="<%= hachToanFilter %>" />
-                    <input type="hidden" name="field" value="taiKhoanCo" />
-                    <label class="muted">Sửa Tài khoản Có</label>
-                    <div style="display:flex; gap:6px;">
-                      <select name="value">
-                        <option value="" <%= !r.taiKhoanCo ? 'selected' : '' %>>-- chọn --</option>
-                        <option value="1388" <%= r.taiKhoanCo === '1388' ? 'selected' : '' %>>1388 (Chia sẻ)</option>
-                        <option value="331" <%= r.taiKhoanCo === '331' ? 'selected' : '' %>>331 (Thường)</option>
-                      </select>
-                      <button type="submit" class="btn btn-secondary">Lưu</button>
-                    </div>
-                  </form>
-                  <form method="POST" action="/hoa-don-dau-vao/sua" class="hddv-detail-field">
-                    <input type="hidden" name="ids" value="<%= r.idsCsv %>" />
-                    <input type="hidden" name="thang" value="<%= thangFilter %>" />
-                    <input type="hidden" name="hachToan" value="<%= hachToanFilter %>" />
-                    <input type="hidden" name="field" value="maDoiTuongNCC" />
-                    <label class="muted">Sửa Mã đối tượng NCC</label>
-                    <div style="display:flex; gap:6px;">
-                      <input type="text" name="value" value="<%= r.maDoiTuongNCC %>" />
-                      <button type="submit" class="btn btn-secondary">Lưu</button>
-                    </div>
-                  </form>
-                  <form method="POST" action="/hoa-don-dau-vao/sua" class="hddv-detail-field">
-                    <input type="hidden" name="ids" value="<%= r.idsCsv %>" />
-                    <input type="hidden" name="thang" value="<%= thangFilter %>" />
-                    <input type="hidden" name="hachToan" value="<%= hachToanFilter %>" />
-                    <input type="hidden" name="field" value="tenHangHoaMisa" />
-                    <label class="muted">Sửa Tên hàng hóa (cả HĐ)</label>
-                    <div style="display:flex; gap:6px;">
-                      <input type="text" name="value" />
-                      <button type="submit" class="btn btn-secondary">Lưu</button>
-                    </div>
-                  </form>
-                  <form method="POST" action="/hoa-don-dau-vao/sua" class="hddv-detail-field">
-                    <input type="hidden" name="ids" value="<%= r.idsCsv %>" />
-                    <input type="hidden" name="thang" value="<%= thangFilter %>" />
-                    <input type="hidden" name="hachToan" value="<%= hachToanFilter %>" />
-                    <input type="hidden" name="field" value="phanLoai" />
-                    <label class="muted">Sửa Phân loại (cả HĐ)</label>
-                    <div style="display:flex; gap:6px;">
-                      <select name="value">
-                        <option value="">-- chọn --</option>
-                        <option value="Hàng hóa">Hàng hóa</option>
-                        <option value="CCDC">CCDC</option>
-                        <option value="Tài sản">Tài sản</option>
-                        <option value="Dịch vụ">Dịch vụ</option>
-                        <option value="Chi phí QLDN">Chi phí QLDN</option>
-                      </select>
-                      <button type="submit" class="btn btn-secondary">Lưu</button>
-                    </div>
-                  </form>
-                  <form method="POST" action="/hoa-don-dau-vao/sua" class="hddv-detail-field">
-                    <input type="hidden" name="ids" value="<%= r.idsCsv %>" />
-                    <input type="hidden" name="thang" value="<%= thangFilter %>" />
-                    <input type="hidden" name="hachToan" value="<%= hachToanFilter %>" />
-                    <input type="hidden" name="field" value="taiKhoanNo" />
-                    <label class="muted">Sửa Tài khoản Nợ (cả HĐ)</label>
-                    <div style="display:flex; gap:6px;">
-                      <input type="text" name="value" placeholder="vd 6421" />
-                      <button type="submit" class="btn btn-secondary">Lưu</button>
-                    </div>
+                    <button type="submit" class="btn btn-primary" style="margin-top:8px;">Lưu các ô đã tích</button>
                   </form>
 
                   <% if (typeof isAdmin !== "undefined" && isAdmin) { %>
-                  <form method="POST" action="/hoa-don-dau-vao/xoa" class="hddv-detail-field" onsubmit="return confirm('Xóa hóa đơn này (<%= r.soDong %> dòng)?');">
+                  <form method="POST" action="/hoa-don-dau-vao/xoa" style="margin-top:8px;" onsubmit="return confirm('Xóa hóa đơn này (<%= r.soDong %> dòng)?');">
                     <input type="hidden" name="ids" value="<%= r.idsCsv %>" />
                     <button type="submit" class="link-btn link-danger">🗑 Xóa hóa đơn này</button>
                   </form>
@@ -320,6 +290,18 @@
       var isHidden = detailRow.style.display === "none" || !detailRow.style.display;
       detailRow.style.display = isHidden ? "table-row" : "none";
       btn.textContent = isHidden ? "▲ Ẩn chi tiết" : "Chi tiết & Sửa";
+    }
+
+    // Chi Nhan, 2026-07-28: mo/dong form sua gop (hddv-edit-form) nam ngay
+    // duoi dong tom tat (hddv-summary-line) trong cung 1 panel chi tiet.
+    function toggleHddvEdit(btn) {
+      var panel = btn.closest(".hddv-detail-panel");
+      if (!panel) return;
+      var form = panel.querySelector(".hddv-edit-form");
+      if (!form) return;
+      var isHidden = form.style.display === "none" || !form.style.display;
+      form.style.display = isHidden ? "block" : "none";
+      btn.textContent = isHidden ? "✕ Đóng" : "✏️ Sửa";
     }
   </script>
 </body>

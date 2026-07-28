@@ -491,17 +491,40 @@ router.post("/hoa-don-dau-vao/xoa", requireAdmin, (req, res) => {
 // bi ghi de boi "Cập nhật Gian Hàng" lan sau NEU dang khac rong (xem cac route
 // cap-nhat-* ben duoi, chi dien vao o dang TRONG).
 const EDITABLE_FIELDS = new Set(["gianHang", "taiKhoanCo", "maDoiTuongNCC", "tenHangHoaMisa", "phanLoai", "taiKhoanNo"]);
+// Chi Nhan, 2026-07-28: "còn phần nào sửa thì thêm vào mục các hóa đơn có
+// chữ sửa chọn nào tích đó" -- gop 6 form/6 nut Luu rieng le (moi field 1
+// form) thanh 1 form/1 nut Luu duy nhat. Form gui len 1 cap checkbox+gia tri
+// cho MOI field (apply_<field> = "1" neu duoc tich, value_<field> = gia tri
+// nhap). CHI field nao co apply_<field>="1" moi duoc ghi de; field khong
+// tich thi GIU NGUYEN gia tri cu (khong dong nao bi mat du lieu ngoai y muon).
+// Van giu tuong thich nguoc voi cach cu (field/value don) neu co noi nao khac
+// con goi theo kieu cu.
 router.post("/hoa-don-dau-vao/sua", requireDataEntry, (req, res) => {
   const store = load();
   ensureShape(store);
   const ids = (req.body.ids || "").split(",").filter(Boolean);
-  const field = req.body.field;
-  const value = (req.body.value || "").trim();
-  if (!EDITABLE_FIELDS.has(field)) {
-    return res.redirect("/hoa-don-dau-vao?error=" + encodeURIComponent("Cột không hợp lệ."));
+
+  const fieldsToApply = {};
+  if (req.body.field && EDITABLE_FIELDS.has(req.body.field)) {
+    // Kieu cu: 1 field/1 value duy nhat.
+    fieldsToApply[req.body.field] = (req.body.value || "").trim();
+  }
+  let anyChecked = false;
+  EDITABLE_FIELDS.forEach((f) => {
+    if (req.body["apply_" + f] === "1") {
+      anyChecked = true;
+      fieldsToApply[f] = (req.body["value_" + f] || "").trim();
+    }
+  });
+  if (Object.keys(fieldsToApply).length === 0) {
+    const msg = anyChecked || req.body.field ? "Cột không hợp lệ." : "Vui lòng tích chọn ít nhất 1 ô muốn sửa.";
+    return res.redirect("/hoa-don-dau-vao?error=" + encodeURIComponent(msg));
   }
   store.hoa_don_dau_vao.forEach((r) => {
-    if (ids.includes(String(r.id))) r[field] = value;
+    if (!ids.includes(String(r.id))) return;
+    Object.keys(fieldsToApply).forEach((f) => {
+      r[f] = fieldsToApply[f];
+    });
   });
   save(store);
   const qs = [];
