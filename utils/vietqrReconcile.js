@@ -697,7 +697,19 @@ function resolveGianGross(rawRows, storeNameMap, gianCandidates, nocodeAssignmen
 // boi buildChannelReconciliation neu khong co override nay), nhung Luyen
 // tu xac dinh duoc dung tien do thuoc gian nao. Kiem tra TRUOC ca buoc tim
 // rawRow theo ref, nen boi qua hoan toan yeu cau phai co dong QR khop.
-function resolveGianGrossByBankRef(bankTxs, rawRows, storeNameMap, tenDiemToProjectMap, storeCodeOverride, refOverride) {
+// Chi Nhan (2026-07-28, Luyen yeu cau cho kenh BIDV77021): "lệch tiền á nếu
+// nó có diễn giải giống của viet qr nhưng nó không có tên điểm thì đưa vô
+// hải phòng nhá" -- giao dich ngan hang da qua duoc bo loc "thu, khong phai
+// lai/Momo" (extractVietQrThuTransactions) nen chac chan GIONG tien VietQR
+// that, nhung neu KHONG khop duoc So tham chieu nao (unmatchedBankTx) hoac
+// khop duoc dong QR nhung Ma cua hang lai chua co ten/diem nao (khong co
+// "ten diem", unmappedStoreCodesAgg) thi gan THANG vao defaultBlankCode
+// (truyen tu cfg.defaultBlankCode cua kenh, vd "AE HP PHN") thay vi de rieng
+// trong 2 bang canh bao roi bi tru khoi "Ngan hang" (xem buildChannelReconciliation).
+// KHONG ap dung cho unmappedTenDiemAgg (co ten diem that, chi la CHUA co
+// trong bang tra ma cong trinh) -- truong hop do van can bao rieng vi co the
+// la 1 diem MOI thuc su, khong nen am tham gap vao gian mac dinh.
+function resolveGianGrossByBankRef(bankTxs, rawRows, storeNameMap, tenDiemToProjectMap, storeCodeOverride, refOverride, defaultBlankCode) {
   const override = storeCodeOverride || {};
   const refOv = refOverride || {};
   const refIndex = new Map(); // Ma tham chieu -> [rawRow, ...]
@@ -732,6 +744,12 @@ function resolveGianGrossByBankRef(bankTxs, rawRows, storeNameMap, tenDiemToProj
       raw = candidates.slice().sort((a, b) => (a.date || "").localeCompare(b.date || ""))[0];
     }
     if (!raw) {
+      if (defaultBlankCode) {
+        codes.add(defaultBlankCode);
+        const key = `${tx.date}|${defaultBlankCode}`;
+        grossByCode[key] = (grossByCode[key] || 0) + tx.amount;
+        continue;
+      }
       unmatchedBankTx.push({
         date: tx.date,
         amount: tx.amount,
@@ -758,6 +776,12 @@ function resolveGianGrossByBankRef(bankTxs, rawRows, storeNameMap, tenDiemToProj
     }
     const storeInfo = storeNameMap[raw.maCuaHang];
     if (!storeInfo) {
+      if (defaultBlankCode) {
+        codes.add(defaultBlankCode);
+        const key = `${tx.date}|${defaultBlankCode}`;
+        grossByCode[key] = (grossByCode[key] || 0) + tx.amount;
+        continue;
+      }
       const agg = unmappedStoreCodesAgg.get(raw.maCuaHang) || {
         maCuaHang: raw.maCuaHang || "",
         count: 0,

@@ -94,6 +94,12 @@ const CHANNELS = {
     tagPattern: /VietQR\s*POSH\s*MB/i,
     company: "kh_moi",
     refMatchFrom: "2026-01-01",
+    // Luyen, 2026-07-28: "lệch tiền á nếu nó có diễn giải giống của viet qr
+    // nhưng nó không có tên điểm thì đưa vô hải phòng nhá" -- giao dich thu
+    // KHONG khop duoc So tham chieu nao, hoac khop duoc nhung Ma cua hang
+    // chua co ten diem, tu dong gan vao AE HP PHN thay vi nam rieng trong
+    // canh bao "khong khop" (xem defaultBlankCode trong resolveGianGrossByBankRef).
+    defaultBlankCode: "AE HP PHN",
   },
 };
 const CHANNEL_KEYS = Object.keys(CHANNELS);
@@ -622,7 +628,15 @@ function buildChannelReconciliation(store, channelKey) {
     const tenDiemMaster = store.viet_qr_ten_diem_master[channelKey] || {};
     const storeCodeOverride = store.viet_qr_store_code_override[channelKey] || {};
     const refOverride = store.viet_qr_ref_override[channelKey] || {};
-    const refResolved = resolveGianGrossByBankRef(bankThuTxs, rawRows, storeNames, tenDiemMaster, storeCodeOverride, refOverride);
+    const refResolved = resolveGianGrossByBankRef(
+      bankThuTxs,
+      rawRows,
+      storeNames,
+      tenDiemMaster,
+      storeCodeOverride,
+      refOverride,
+      cfg.defaultBlankCode
+    );
 
     const filteredGrossByCode = {};
     const filteredCodes = new Set();
