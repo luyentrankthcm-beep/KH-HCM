@@ -9,15 +9,80 @@
     <h1>Hóa Đơn Đầu Vào</h1>
     <p class="muted" style="margin-top:-10px;margin-bottom:20px;">
       Sổ ghi hóa đơn mua hàng hóa/dịch vụ từ nhà cung cấp (NCC) -- tách riêng KH Cũ/KH Mới qua nút ở góc trên.
-      Đây là khung ban đầu, chị bổ sung thêm cột/trường nào cần thì báo tôi thêm sau. Tổng: <%= totalForCompany %> hóa đơn,
-      <%= tongTien.toLocaleString('vi-VN') %> đ (theo bộ lọc đang chọn).
+      Các cột Gian Hàng/Tài khoản/Mã đối tượng NCC/Tên hàng hóa/Phân loại là gợi ý tự động, chị xem qua và bấm "Sửa" ở mỗi dòng nếu cần chỉnh lại.
     </p>
 
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
     <% if (success) { %><div class="alert alert-success"><%= success %></div><% } %>
 
+    <section class="cards">
+      <div class="card">
+        <div class="card-label">Tổng hóa đơn (theo bộ lọc)</div>
+        <div class="card-value"><%= rows.length %></div>
+      </div>
+      <div class="card card-chi">
+        <div class="card-label">Tổng tiền thanh toán</div>
+        <div class="card-value"><%= tongTien.toLocaleString('vi-VN') %> đ</div>
+      </div>
+      <div class="card card-thu">
+        <div class="card-label">Đã chi tiền</div>
+        <div class="card-value"><%= daChiCount %> / <%= rows.length %></div>
+      </div>
+    </section>
+
     <section class="panel">
-      <h2>Tải lên bảng kê hóa đơn mua vào</h2>
+      <div class="panel-head">
+        <h2>Cập nhật dữ liệu đối chiếu</h2>
+      </div>
+      <p class="muted" style="margin-top:-6px;">
+        4 nguồn dùng để tự điền Gian Hàng/Tài khoản/Mã đối tượng NCC/Tên hàng hóa/Đã chi tiền -- chỉ điền vào dòng đang trống, không ghi đè dòng chị đã tự sửa.
+      </p>
+      <div style="display:flex; flex-wrap:wrap; gap:20px; align-items:flex-start;">
+        <div>
+          <form method="POST" action="/hoa-don-dau-vao/cap-nhat-gian">
+            <button type="submit" class="btn btn-secondary">🏬 Cập nhật Gian Hàng &amp; Tài khoản Có</button>
+          </form>
+          <p class="muted" style="margin:4px 0 0; font-size:12px;">
+            <% if (gianMeta) { %>Đã đọc <%= gianMeta.count %> gian (<%= gianCountForCompany %> thuộc công ty này), lúc <%= new Date(gianMeta.fetched_at).toLocaleString('vi-VN') %>.<% } else { %>Chưa đọc lần nào.<% } %>
+          </p>
+        </div>
+        <div>
+          <form method="POST" action="/hoa-don-dau-vao/upload-ncc" enctype="multipart/form-data" style="display:flex; gap:8px;">
+            <input type="file" name="file" accept=".xlsx,.xls" required />
+            <button type="submit" class="btn btn-secondary">📇 Tải Danh sách NCC</button>
+          </form>
+          <p class="muted" style="margin:4px 0 0; font-size:12px;">
+            <% if (nccMeta) { %>"<%= nccMeta.file_name %>" (<%= nccCountForCompany %> NCC công ty này), lúc <%= new Date(nccMeta.uploaded_at).toLocaleString('vi-VN') %>.<% } else { %>Chưa tải lần nào.<% } %>
+          </p>
+        </div>
+        <div>
+          <form method="POST" action="/hoa-don-dau-vao/upload-hang-hoa" enctype="multipart/form-data" style="display:flex; gap:8px;">
+            <input type="file" name="file" accept=".xlsx,.xls" required />
+            <button type="submit" class="btn btn-secondary">📦 Tải Danh sách hàng hóa</button>
+          </form>
+          <p class="muted" style="margin:4px 0 0; font-size:12px;">
+            <% if (hangHoaMeta) { %>"<%= hangHoaMeta.file_name %>" (<%= hangHoaMeta.count %> mặt hàng), lúc <%= new Date(hangHoaMeta.uploaded_at).toLocaleString('vi-VN') %>.<% } else { %>Chưa tải lần nào.<% } %>
+          </p>
+        </div>
+        <div>
+          <form method="POST" action="/hoa-don-dau-vao/cap-nhat-da-chi">
+            <button type="submit" class="btn btn-secondary">💸 Cập nhật Đã chi tiền</button>
+          </form>
+          <p class="muted" style="margin:4px 0 0; font-size:12px;">Đối chiếu tên NCC + số tiền với trang Đối soát Chi Phí.</p>
+        </div>
+        <div>
+          <form method="POST" action="/hoa-don-dau-vao/cap-nhat-phan-loai">
+            <button type="submit" class="btn btn-secondary">🏷 Cập nhật Phân loại</button>
+          </form>
+          <p class="muted" style="margin:4px 0 0; font-size:12px;">Phân loại lại các dòng cũ chưa có Phân loại (156/153/242/154/642).</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Tải lên bảng kê hóa đơn mua vào</h2>
+      </div>
       <p class="muted" style="margin-top:-6px;">
         Tải file "Bảng kê hóa đơn hàng hóa, dịch vụ mua vào chi tiết" (xuất từ hệ thống hóa đơn điện tử) --
         mỗi dòng hàng hóa/dịch vụ trong 1 hóa đơn được giữ riêng (không gộp lại), tải lại file cùng kỳ sẽ tự cập nhật số tiền, không tạo trùng dòng.
@@ -28,26 +93,30 @@
       </form>
     </section>
 
-    <section class="panel">
-      <h2>Thêm hóa đơn mới (nhập tay)</h2>
-      <form method="POST" action="/hoa-don-dau-vao" class="form-grid">
-        <label>Ngày hóa đơn <input type="date" name="ngayHD" required /></label>
-        <label>Tên NCC <input type="text" name="tenNCC" required /></label>
-        <label>MST NCC <input type="text" name="mstNCC" /></label>
-        <label>Ký hiệu <input type="text" name="kyHieuHD" placeholder="vd C26TNT" /></label>
-        <label>Số hóa đơn <input type="text" name="soHoaDon" /></label>
-        <label>Tiền trước thuế <input type="text" name="soTienTruocThue" placeholder="vd 5000000" /></label>
-        <label>Tiền thuế <input type="text" name="tienThue" placeholder="vd 500000" /></label>
-        <label>Tổng tiền thanh toán <input type="text" name="soTien" placeholder="vd 5500000" /></label>
-        <label style="grid-column: 1 / -1;">Diễn giải / nội dung <input type="text" name="dienGiai" /></label>
-        <label style="grid-column: 1 / -1;">Link hóa đơn <input type="text" name="linkHoaDon" placeholder="link Google Drive..." /></label>
-        <label style="grid-column: 1 / -1;">Ghi chú <input type="text" name="ghiChu" /></label>
-        <button type="submit" class="btn btn-primary">Lưu</button>
-      </form>
-    </section>
+    <details style="margin-bottom:20px;">
+      <summary class="link-btn">+ Thêm hóa đơn mới (nhập tay)</summary>
+      <section class="panel" style="margin-top:10px;">
+        <form method="POST" action="/hoa-don-dau-vao" class="form-grid">
+          <label>Ngày hóa đơn <input type="date" name="ngayHD" required /></label>
+          <label>Tên NCC <input type="text" name="tenNCC" required /></label>
+          <label>MST NCC <input type="text" name="mstNCC" /></label>
+          <label>Ký hiệu <input type="text" name="kyHieuHD" placeholder="vd C26TNT" /></label>
+          <label>Số hóa đơn <input type="text" name="soHoaDon" /></label>
+          <label>Tiền trước thuế <input type="text" name="soTienTruocThue" placeholder="vd 5000000" /></label>
+          <label>Tiền thuế <input type="text" name="tienThue" placeholder="vd 500000" /></label>
+          <label>Tổng tiền thanh toán <input type="text" name="soTien" placeholder="vd 5500000" /></label>
+          <label style="grid-column: 1 / -1;">Diễn giải / nội dung <input type="text" name="dienGiai" /></label>
+          <label style="grid-column: 1 / -1;">Link hóa đơn <input type="text" name="linkHoaDon" placeholder="link Google Drive..." /></label>
+          <label style="grid-column: 1 / -1;">Ghi chú <input type="text" name="ghiChu" /></label>
+          <button type="submit" class="btn btn-primary">Lưu</button>
+        </form>
+      </section>
+    </details>
 
     <section class="panel">
-      <h2>Danh sách (<%= rows.length %> hóa đơn)</h2>
+      <div class="panel-head">
+        <h2>Danh sách (<%= rows.length %> hóa đơn)</h2>
+      </div>
       <form method="GET" action="/hoa-don-dau-vao" class="form-grid" style="margin-bottom:10px;">
         <label>Tháng
           <select name="thang" onchange="this.form.submit()">
@@ -66,24 +135,23 @@
         </label>
       </form>
       <div style="margin-bottom:10px;">
-        <a class="btn" href="/hoa-don-dau-vao/export.xlsx?thang=<%= encodeURIComponent(thangFilter) %>&hachToan=<%= encodeURIComponent(hachToanFilter) %>">⬇ Xuất Excel</a>
+        <a class="btn" href="/hoa-don-dau-vao/export.xlsx?thang=<%= encodeURIComponent(thangFilter) %>&hachToan=<%= encodeURIComponent(hachToanFilter) %>">⬇ Xuất Excel (mỗi mặt hàng 1 dòng)</a>
       </div>
       <div class="table-scroll">
         <table class="table">
           <thead>
             <tr>
               <th>Ngày HĐ</th>
-              <th>Tên NCC</th>
-              <th>MST NCC</th>
-              <th>Ký hiệu</th>
-              <th>Số hóa đơn</th>
+              <th>NCC</th>
+              <th>Số HĐ</th>
               <th>Diễn giải</th>
-              <th>Trước thuế</th>
-              <th>Thuế</th>
-              <th>Tổng tiền</th>
-              <th>Link</th>
+              <th>Gian Hàng</th>
+              <th class="num">Trước thuế</th>
+              <th class="num">Thuế</th>
+              <th class="num">Tổng tiền</th>
+              <th>TK Nợ/Có</th>
+              <th>Đã chi</th>
               <th>Hạch toán</th>
-              <th>Ghi chú</th>
               <th></th>
             </tr>
           </thead>
@@ -91,37 +159,123 @@
             <% rows.forEach(function(r) { %>
             <tr>
               <td><%= r.ngayHD || '—' %></td>
-              <td><%= r.tenNCC %></td>
-              <td><%= r.mstNCC || '—' %></td>
-              <td><%= r.kyHieuHD || '—' %></td>
-              <td><%= r.soHoaDon || '—' %><% if (r.soDong > 1) { %> <span class="muted">(<%= r.soDong %> dòng)</span><% } %></td>
+              <td><%= r.tenNCC %><br /><span class="muted"><%= r.mstNCC || '—' %></span></td>
+              <td><%= r.soHoaDon || '—' %><% if (r.soDong > 1) { %><br /><span class="muted">(<%= r.soDong %> dòng)</span><% } %></td>
               <td style="white-space:pre-line;"><%= r.dienGiai || '—' %></td>
-              <td><%= (r.soTienTruocThue||0).toLocaleString('vi-VN') %> đ</td>
-              <td><%= (r.tienThue||0).toLocaleString('vi-VN') %> đ</td>
-              <td><%= (r.soTien||0).toLocaleString('vi-VN') %> đ</td>
-              <td><% if (r.linkHoaDon) { %><a href="<%= r.linkHoaDon %>" target="_blank" rel="noopener">Xem</a><% } else { %>—<% } %></td>
+              <td><%= r.gianHang || '—' %></td>
+              <td class="num"><%= (r.soTienTruocThue||0).toLocaleString('vi-VN') %> đ</td>
+              <td class="num"><%= (r.tienThue||0).toLocaleString('vi-VN') %> đ</td>
+              <td class="num"><%= (r.soTien||0).toLocaleString('vi-VN') %> đ</td>
+              <td style="white-space:pre-line;"><%= r.taiKhoanNo || '—' %> / <%= r.taiKhoanCo || '—' %></td>
+              <td>
+                <form method="POST" action="/hoa-don-dau-vao/da-chi-tien" style="display:inline">
+                  <input type="hidden" name="ids" value="<%= r.idsCsv %>" />
+                  <input type="hidden" name="thang" value="<%= thangFilter %>" />
+                  <input type="hidden" name="hachToan" value="<%= hachToanFilter %>" />
+                  <input type="hidden" name="daChiTien" value="<%= r.daChiTien ? '0' : '1' %>" />
+                  <button type="submit" class="link-btn">
+                    <% if (r.daChiTien) { %><span class="badge badge-thu">Đã chi</span><% } else { %><span class="badge badge-warn">Chưa chi</span><% } %>
+                  </button>
+                </form>
+              </td>
               <td>
                 <form method="POST" action="/hoa-don-dau-vao/hach-toan" style="display:inline">
                   <input type="hidden" name="ids" value="<%= r.idsCsv %>" />
                   <input type="hidden" name="thang" value="<%= thangFilter %>" />
                   <input type="hidden" name="hachToan" value="<%= hachToanFilter %>" />
                   <input type="hidden" name="daHachToan" value="<%= r.daHachToan ? '0' : '1' %>" />
-                  <button type="submit" class="link-btn"><%= r.daHachToan ? '☑ Đã hạch toán' : '☐ Chưa hạch toán' %></button>
+                  <button type="submit" class="link-btn">
+                    <% if (r.daHachToan) { %><span class="badge badge-thu">Đã hạch toán</span><% } else { %><span class="badge">Chưa hạch toán</span><% } %>
+                  </button>
                 </form>
               </td>
-              <td><%= r.ghiChu || '—' %></td>
               <td>
-                <% if (typeof isAdmin !== "undefined" && isAdmin) { %>
-                <form method="POST" action="/hoa-don-dau-vao/xoa" style="display:inline" onsubmit="return confirm('Xóa hóa đơn này (<%= r.soDong %> dòng)?');">
-                  <input type="hidden" name="ids" value="<%= r.idsCsv %>" />
-                  <button type="submit" class="link-btn">Xóa</button>
-                </form>
-                <% } %>
+                <details>
+                  <summary class="link-btn">Chi tiết &amp; Sửa</summary>
+                  <div style="padding:10px 0 4px; font-size:13px; min-width:260px;">
+                    <p><strong>Tên hàng hóa (Misa):</strong><br /><span style="white-space:pre-line;"><%= r.tenHangHoa.replace(/\n+/g,'\n').trim() || '—' %></span></p>
+                    <p><strong>Phân loại:</strong><br /><span style="white-space:pre-line;"><%= r.phanLoai.replace(/\n+/g,'\n').trim() || '—' %></span></p>
+                    <p><strong>Mã đối tượng NCC:</strong> <%= r.maDoiTuongNCC || '—' %></p>
+                    <p><strong>Link hóa đơn:</strong> <% if (r.linkHoaDon) { %><a href="<%= r.linkHoaDon %>" target="_blank" rel="noopener">Xem</a><% } else { %>—<% } %></p>
+                    <p><strong>Ghi chú:</strong> <%= r.ghiChu || '—' %></p>
+
+                    <form method="POST" action="/hoa-don-dau-vao/sua" class="form-grid" style="margin-top:8px;">
+                      <input type="hidden" name="ids" value="<%= r.idsCsv %>" />
+                      <input type="hidden" name="thang" value="<%= thangFilter %>" />
+                      <input type="hidden" name="hachToan" value="<%= hachToanFilter %>" />
+                      <input type="hidden" name="field" value="gianHang" />
+                      <label>Sửa Gian Hàng <input type="text" name="value" value="<%= r.gianHang %>" /></label>
+                      <button type="submit" class="btn btn-secondary">Lưu</button>
+                    </form>
+                    <form method="POST" action="/hoa-don-dau-vao/sua" class="form-grid" style="margin-top:8px;">
+                      <input type="hidden" name="ids" value="<%= r.idsCsv %>" />
+                      <input type="hidden" name="thang" value="<%= thangFilter %>" />
+                      <input type="hidden" name="hachToan" value="<%= hachToanFilter %>" />
+                      <input type="hidden" name="field" value="taiKhoanCo" />
+                      <label>Sửa Tài khoản Có
+                        <select name="value">
+                          <option value="" <%= !r.taiKhoanCo ? 'selected' : '' %>>-- chọn --</option>
+                          <option value="1388" <%= r.taiKhoanCo === '1388' ? 'selected' : '' %>>1388 (Doanh thu chia sẻ)</option>
+                          <option value="331" <%= r.taiKhoanCo === '331' ? 'selected' : '' %>>331 (Thường)</option>
+                        </select>
+                      </label>
+                      <button type="submit" class="btn btn-secondary">Lưu</button>
+                    </form>
+                    <form method="POST" action="/hoa-don-dau-vao/sua" class="form-grid" style="margin-top:8px;">
+                      <input type="hidden" name="ids" value="<%= r.idsCsv %>" />
+                      <input type="hidden" name="thang" value="<%= thangFilter %>" />
+                      <input type="hidden" name="hachToan" value="<%= hachToanFilter %>" />
+                      <input type="hidden" name="field" value="maDoiTuongNCC" />
+                      <label>Sửa Mã đối tượng NCC <input type="text" name="value" value="<%= r.maDoiTuongNCC %>" /></label>
+                      <button type="submit" class="btn btn-secondary">Lưu</button>
+                    </form>
+                    <form method="POST" action="/hoa-don-dau-vao/sua" class="form-grid" style="margin-top:8px;">
+                      <input type="hidden" name="ids" value="<%= r.idsCsv %>" />
+                      <input type="hidden" name="thang" value="<%= thangFilter %>" />
+                      <input type="hidden" name="hachToan" value="<%= hachToanFilter %>" />
+                      <input type="hidden" name="field" value="tenHangHoaMisa" />
+                      <label style="grid-column: 1 / -1;">Sửa Tên hàng hóa (áp dụng cho cả hóa đơn) <input type="text" name="value" /></label>
+                      <button type="submit" class="btn btn-secondary">Lưu</button>
+                    </form>
+                    <form method="POST" action="/hoa-don-dau-vao/sua" class="form-grid" style="margin-top:8px;">
+                      <input type="hidden" name="ids" value="<%= r.idsCsv %>" />
+                      <input type="hidden" name="thang" value="<%= thangFilter %>" />
+                      <input type="hidden" name="hachToan" value="<%= hachToanFilter %>" />
+                      <input type="hidden" name="field" value="phanLoai" />
+                      <label>Sửa Phân loại (cả hóa đơn)
+                        <select name="value">
+                          <option value="">-- chọn --</option>
+                          <option value="Hàng hóa">Hàng hóa</option>
+                          <option value="CCDC">CCDC</option>
+                          <option value="Tài sản">Tài sản</option>
+                          <option value="Dịch vụ">Dịch vụ</option>
+                          <option value="Chi phí QLDN">Chi phí QLDN</option>
+                        </select>
+                      </label>
+                      <button type="submit" class="btn btn-secondary">Lưu</button>
+                    </form>
+                    <form method="POST" action="/hoa-don-dau-vao/sua" class="form-grid" style="margin-top:8px;">
+                      <input type="hidden" name="ids" value="<%= r.idsCsv %>" />
+                      <input type="hidden" name="thang" value="<%= thangFilter %>" />
+                      <input type="hidden" name="hachToan" value="<%= hachToanFilter %>" />
+                      <input type="hidden" name="field" value="taiKhoanNo" />
+                      <label>Sửa Tài khoản Nợ (cả hóa đơn) <input type="text" name="value" placeholder="vd 6421" /></label>
+                      <button type="submit" class="btn btn-secondary">Lưu</button>
+                    </form>
+
+                    <% if (typeof isAdmin !== "undefined" && isAdmin) { %>
+                    <form method="POST" action="/hoa-don-dau-vao/xoa" style="margin-top:12px;" onsubmit="return confirm('Xóa hóa đơn này (<%= r.soDong %> dòng)?');">
+                      <input type="hidden" name="ids" value="<%= r.idsCsv %>" />
+                      <button type="submit" class="link-btn link-danger">Xóa hóa đơn này</button>
+                    </form>
+                    <% } %>
+                  </div>
+                </details>
               </td>
             </tr>
             <% }) %>
             <% if (rows.length === 0) { %>
-            <tr><td colspan="13" class="muted">Chưa có hóa đơn nào.</td></tr>
+            <tr><td colspan="12" class="muted">Chưa có hóa đơn nào.</td></tr>
             <% } %>
           </tbody>
         </table>
