@@ -1,11 +1,14 @@
 const express = require("express");
 const XLSX = require("xlsx");
+const multer = require("multer");
 const { load, save, nextId } = require("../store");
 const { requireLogin, requireAdmin, requireDataEntry } = require("../middleware/auth");
 const { getCompany } = require("../utils/companies");
+const { parseHoaDonDauVaoWorkbook } = require("../utils/hoaDonDauVaoParser");
 
 const router = express.Router();
 router.use(requireLogin);
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 80 * 1024 * 1024 } });
 
 // Chi Nhan, 2026-07-28: "thêm cho tôi 1 trang hóa đơn đầu vào kh cũ và kh mới
 // nhá nội dung tôi sẽ nối sao" -- trang MOI, khac voi "Đối soát Chi phí"
@@ -29,7 +32,14 @@ function ensureDefaults(row) {
       tenNCC: "",
       mstNCC: "",
       soHoaDon: "",
+      kyHieuHD: "",
       dienGiai: "",
+      // Chi Nhan, 2026-07-28: them tach rieng tien truoc thue/tien thue (tu
+      // "Bảng kê hóa đơn hàng hóa dịch vụ mua vào chi tiết") -- soTien van la
+      // TONG TIEN THANH TOAN (giu nguyen y nghia cu, cac dong nhap tay truoc
+      // do khong bi anh huong).
+      soTienTruocThue: 0,
+      tienThue: 0,
       soTien: 0,
       linkHoaDon: "",
       daHachToan: false,
@@ -92,9 +102,12 @@ router.get("/hoa-don-dau-vao/export.xlsx", (req, res) => {
     "Ngày HĐ": r.ngayHD,
     "Tên NCC": r.tenNCC,
     "MST NCC": r.mstNCC,
+    "Ký hiệu": r.kyHieuHD,
     "Số hóa đơn": r.soHoaDon,
     "Diễn giải": r.dienGiai,
-    "Số tiền": r.soTien,
+    "Tiền trước thuế": r.soTienTruocThue,
+    "Tiền thuế": r.tienThue,
+    "Tổng tiền thanh toán": r.soTien,
     "Link hóa đơn": r.linkHoaDon,
     "Đã hạch toán": r.daHachToan ? "Có" : "Không",
     "Ghi chú": r.ghiChu,
@@ -110,15 +123,18 @@ router.get("/hoa-don-dau-vao/export.xlsx", (req, res) => {
   res.send(buf);
 });
 
+function parseAmt(v) {
+  return v ? Number(String(v).replace(/[^\d]/g, "")) : 0;
+}
+
 router.post("/hoa-don-dau-vao", requireDataEntry, (req, res) => {
   const store = load();
   ensureShape(store);
   const activeCompany = getCompany(req);
   try {
-    const { ngayHD, tenNCC, mstNCC, soHoaDon, dienGiai, soTien, linkHoaDon, ghiChu } = req.body;
+    const { ngayHD, tenNCC, mstNCC, soHoaDon, kyHieuHD, dienGiai, soTienTruocThue, tienThue, soTien, linkHoaDon, ghiChu } = req.body;
     if (!ngayHD) throw new Error("Thiếu ngày hóa đơn.");
     if (!tenNCC || !tenNCC.trim()) throw new Error("Thiếu tên NCC.");
-    const amt = soTien ? Number(String(soTien).replace(/[^\d]/g, "")) : 0;
     store.hoa_don_dau_vao.push({
       id: nextId(store, "hoa_don_dau_vao_seq") || Date.now(),
       congTy: activeCompany,
@@ -126,8 +142,11 @@ router.post("/hoa-don-dau-vao", requireDataEntry, (req, res) => {
       tenNCC: tenNCC.trim(),
       mstNCC: (mstNCC || "").trim(),
       soHoaDon: (soHoaDon || "").trim(),
+      kyHieuHD: (kyHieuHD || "").trim(),
       dienGiai: (dienGiai || "").trim(),
-      soTien: amt,
+      soTienTruocThue: parseAmt(soTienTruocThue),
+      tienThue: parseAmt(tienThue),
+      soTien: parseAmt(soTien),
       linkHoaDon: (linkHoaDon || "").trim(),
       daHachToan: false,
       ghiChu: (ghiChu || "").trim(),
@@ -136,6 +155,84 @@ router.post("/hoa-don-dau-vao", requireDataEntry, (req, res) => {
     });
     save(store);
     res.redirect("/hoa-don-dau-vao?success=" + encodeURIComponent("Đã lưu hóa đơn."));
+  } catch (e) {
+    res.redirect("/hoa-don-dau-vao?error=" + encodeURIComponent(e.message));
+  }
+});
+
+// Chi Nhan, 2026-07-28: "thêm cho tôi chỗ úp file này luôn nhá" -- tai len
+// thang file "Bảng kê hóa đơn hàng hóa, dịch vụ mua vào chi tiết" (xuat tu he
+// thong hoa don dien tu).
+//
+// BUG suyt gay MAT DU LIEU (phat hien va sua truoc khi bao Chi Nhan): ban dau
+// dung khoa upsert congTy+soHoaDon+kyHieuHD+dienGiai (KHONG co so tien) --
+// nhung file thuc te CO 1 hoa don cung Ky hieu/So hoa don voi 2 dong CUNG
+// dien giai (vd "NƯỚC UỐNG ĐÓNG CHAI LA VIE...") nhung so tien KHAC NHAU (2
+// lo hang khac nhau cung 1 ten hang). Dung khoa khong co so tien se GOP 2
+// dong nay lam 1 (dong sau ghi de dong truoc), MAT 1 dong tien that. Sua:
+// them soTien vao khoa upsert (congTy+soHoaDon+kyHieuHD+dienGiai+soTien) --
+// 2 dong noi dung giong het (ke ca so tien) moi duoc coi la "da co" (tai lai
+// dung file cu se khong tao trung); dong nao so tien khac (kha nang la dong
+// that khac, khong phai sua loi) se duoc THEM MOI thay vi ghi de, an toan
+// hon (Chi Nhan tu xoa tay neu that su la 1 ban ghi trung do tai file 2 lan).
+router.post("/hoa-don-dau-vao/upload", requireDataEntry, upload.single("file"), (req, res) => {
+  const store = load();
+  ensureShape(store);
+  const activeCompany = getCompany(req);
+  try {
+    if (!req.file) throw new Error("Vui lòng chọn 1 file để tải lên.");
+    const { rows, skippedNoInvoiceNo } = parseHoaDonDauVaoWorkbook(req.file.buffer);
+    if (rows.length === 0) {
+      throw new Error("File không đọc được dòng hóa đơn nào.");
+    }
+    const existingByKey = new Map();
+    store.hoa_don_dau_vao.forEach((r) => {
+      if (r.congTy !== activeCompany) return;
+      const key = [r.congTy, r.soHoaDon, r.kyHieuHD || "", r.dienGiai || "", r.soTien].join("|");
+      existingByKey.set(key, r);
+    });
+    let added = 0;
+    let updated = 0;
+    rows.forEach((r) => {
+      const key = [activeCompany, r.soHoaDon, r.kyHieuHD || "", r.dienGiai || "", r.soTien].join("|");
+      const existing = existingByKey.get(key);
+      if (existing) {
+        // Da co dong y het (cung hoa don + dien giai + so tien) -- khong tao
+        // trung, chi dam bao ngay/NCC dong bo (thuong khong doi).
+        existing.ngayHD = r.ngayHD || existing.ngayHD;
+        existing.tenNCC = r.tenNCC || existing.tenNCC;
+        existing.mstNCC = r.mstNCC || existing.mstNCC;
+        updated++;
+        return;
+      }
+      const newRow = {
+        id: nextId(store, "hoa_don_dau_vao_seq") || Date.now(),
+        congTy: activeCompany,
+        ngayHD: r.ngayHD,
+        tenNCC: r.tenNCC,
+        mstNCC: r.mstNCC,
+        soHoaDon: r.soHoaDon,
+        kyHieuHD: r.kyHieuHD,
+        dienGiai: r.dienGiai,
+        soTienTruocThue: r.soTienTruocThue,
+        tienThue: r.tienThue,
+        soTien: r.soTien,
+        linkHoaDon: "",
+        daHachToan: false,
+        ghiChu: "",
+        createdAt: new Date().toISOString(),
+        source: `upload "${req.file.originalname}" ${new Date().toISOString().slice(0, 10)}`,
+      };
+      store.hoa_don_dau_vao.push(newRow);
+      existingByKey.set(key, newRow);
+      added++;
+    });
+    save(store);
+    let msg = `Đã đọc "${req.file.originalname}": thêm ${added} dòng mới, cập nhật ${updated} dòng đã có.`;
+    if (skippedNoInvoiceNo > 0) {
+      msg += ` (Bỏ qua ${skippedNoInvoiceNo} dòng không có số hóa đơn -- dòng tổng cộng cuối file.)`;
+    }
+    res.redirect("/hoa-don-dau-vao?success=" + encodeURIComponent(msg));
   } catch (e) {
     res.redirect("/hoa-don-dau-vao?error=" + encodeURIComponent(e.message));
   }

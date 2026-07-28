@@ -17,13 +17,28 @@
     <% if (success) { %><div class="alert alert-success"><%= success %></div><% } %>
 
     <section class="panel">
-      <h2>Thêm hóa đơn mới</h2>
+      <h2>Tải lên bảng kê hóa đơn mua vào</h2>
+      <p class="muted" style="margin-top:-6px;">
+        Tải file "Bảng kê hóa đơn hàng hóa, dịch vụ mua vào chi tiết" (xuất từ hệ thống hóa đơn điện tử) --
+        mỗi dòng hàng hóa/dịch vụ trong 1 hóa đơn được giữ riêng (không gộp lại), tải lại file cùng kỳ sẽ tự cập nhật số tiền, không tạo trùng dòng.
+      </p>
+      <form method="POST" action="/hoa-don-dau-vao/upload" enctype="multipart/form-data" style="display:flex; gap:10px; align-items:center;">
+        <input type="file" name="file" accept=".xlsx,.xls" required />
+        <button type="submit" class="btn btn-primary">Tải lên</button>
+      </form>
+    </section>
+
+    <section class="panel">
+      <h2>Thêm hóa đơn mới (nhập tay)</h2>
       <form method="POST" action="/hoa-don-dau-vao" class="form-grid">
         <label>Ngày hóa đơn <input type="date" name="ngayHD" required /></label>
         <label>Tên NCC <input type="text" name="tenNCC" required /></label>
         <label>MST NCC <input type="text" name="mstNCC" /></label>
+        <label>Ký hiệu <input type="text" name="kyHieuHD" placeholder="vd C26TNT" /></label>
         <label>Số hóa đơn <input type="text" name="soHoaDon" /></label>
-        <label>Số tiền <input type="text" name="soTien" placeholder="vd 5000000" /></label>
+        <label>Tiền trước thuế <input type="text" name="soTienTruocThue" placeholder="vd 5000000" /></label>
+        <label>Tiền thuế <input type="text" name="tienThue" placeholder="vd 500000" /></label>
+        <label>Tổng tiền thanh toán <input type="text" name="soTien" placeholder="vd 5500000" /></label>
         <label style="grid-column: 1 / -1;">Diễn giải / nội dung <input type="text" name="dienGiai" /></label>
         <label style="grid-column: 1 / -1;">Link hóa đơn <input type="text" name="linkHoaDon" placeholder="link Google Drive..." /></label>
         <label style="grid-column: 1 / -1;">Ghi chú <input type="text" name="ghiChu" /></label>
@@ -60,9 +75,12 @@
               <th>Ngày HĐ</th>
               <th>Tên NCC</th>
               <th>MST NCC</th>
+              <th>Ký hiệu</th>
               <th>Số hóa đơn</th>
               <th>Diễn giải</th>
-              <th>Số tiền</th>
+              <th>Trước thuế</th>
+              <th>Thuế</th>
+              <th>Tổng tiền</th>
               <th>Link</th>
               <th>Hạch toán</th>
               <th>Ghi chú</th>
@@ -75,8 +93,11 @@
               <td><%= r.ngayHD || '—' %></td>
               <td><%= r.tenNCC %></td>
               <td><%= r.mstNCC || '—' %></td>
+              <td><%= r.kyHieuHD || '—' %></td>
               <td><%= r.soHoaDon || '—' %></td>
               <td><%= r.dienGiai || '—' %></td>
+              <td><%= (r.soTienTruocThue||0).toLocaleString('vi-VN') %> đ</td>
+              <td><%= (r.tienThue||0).toLocaleString('vi-VN') %> đ</td>
               <td><%= (r.soTien||0).toLocaleString('vi-VN') %> đ</td>
               <td><% if (r.linkHoaDon) { %><a href="<%= r.linkHoaDon %>" target="_blank" rel="noopener">Xem</a><% } else { %>—<% } %></td>
               <td>
@@ -98,7 +119,7 @@
             </tr>
             <% }) %>
             <% if (rows.length === 0) { %>
-            <tr><td colspan="10" class="muted">Chưa có hóa đơn nào.</td></tr>
+            <tr><td colspan="13" class="muted">Chưa có hóa đơn nào.</td></tr>
             <% } %>
           </tbody>
         </table>
