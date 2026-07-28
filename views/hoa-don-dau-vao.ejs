@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <%- include('partials/head') %>
+</head>
+<body>
+  <%- include('partials/nav') %>
+  <main class="container">
+    <h1>Hóa Đơn Đầu Vào</h1>
+    <p class="muted" style="margin-top:-10px;margin-bottom:20px;">
+      Sổ ghi hóa đơn mua hàng hóa/dịch vụ từ nhà cung cấp (NCC) -- tách riêng KH Cũ/KH Mới qua nút ở góc trên.
+      Đây là khung ban đầu, chị bổ sung thêm cột/trường nào cần thì báo tôi thêm sau. Tổng: <%= totalForCompany %> hóa đơn,
+      <%= tongTien.toLocaleString('vi-VN') %> đ (theo bộ lọc đang chọn).
+    </p>
+
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+    <% if (success) { %><div class="alert alert-success"><%= success %></div><% } %>
+
+    <section class="panel">
+      <h2>Thêm hóa đơn mới</h2>
+      <form method="POST" action="/hoa-don-dau-vao" class="form-grid">
+        <label>Ngày hóa đơn <input type="date" name="ngayHD" required /></label>
+        <label>Tên NCC <input type="text" name="tenNCC" required /></label>
+        <label>MST NCC <input type="text" name="mstNCC" /></label>
+        <label>Số hóa đơn <input type="text" name="soHoaDon" /></label>
+        <label>Số tiền <input type="text" name="soTien" placeholder="vd 5000000" /></label>
+        <label style="grid-column: 1 / -1;">Diễn giải / nội dung <input type="text" name="dienGiai" /></label>
+        <label style="grid-column: 1 / -1;">Link hóa đơn <input type="text" name="linkHoaDon" placeholder="link Google Drive..." /></label>
+        <label style="grid-column: 1 / -1;">Ghi chú <input type="text" name="ghiChu" /></label>
+        <button type="submit" class="btn btn-primary">Lưu</button>
+      </form>
+    </section>
+
+    <section class="panel">
+      <h2>Danh sách (<%= rows.length %> hóa đơn)</h2>
+      <form method="GET" action="/hoa-don-dau-vao" class="form-grid" style="margin-bottom:10px;">
+        <label>Tháng
+          <select name="thang" onchange="this.form.submit()">
+            <option value="">Tất cả</option>
+            <% availableMonths.forEach(function(m) { %>
+            <option value="<%= m %>" <%= thangFilter === m ? 'selected' : '' %>><%= m %></option>
+            <% }) %>
+          </select>
+        </label>
+        <label>Hạch toán
+          <select name="hachToan" onchange="this.form.submit()">
+            <option value="">Tất cả</option>
+            <option value="1" <%= hachToanFilter === '1' ? 'selected' : '' %>>Đã hạch toán</option>
+            <option value="0" <%= hachToanFilter === '0' ? 'selected' : '' %>>Chưa hạch toán</option>
+          </select>
+        </label>
+      </form>
+      <div style="margin-bottom:10px;">
+        <a class="btn" href="/hoa-don-dau-vao/export.xlsx?thang=<%= encodeURIComponent(thangFilter) %>&hachToan=<%= encodeURIComponent(hachToanFilter) %>">⬇ Xuất Excel</a>
+      </div>
+      <div class="table-scroll">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Ngày HĐ</th>
+              <th>Tên NCC</th>
+              <th>MST NCC</th>
+              <th>Số hóa đơn</th>
+              <th>Diễn giải</th>
+              <th>Số tiền</th>
+              <th>Link</th>
+              <th>Hạch toán</th>
+              <th>Ghi chú</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <% rows.forEach(function(r) { %>
+            <tr>
+              <td><%= r.ngayHD || '—' %></td>
+              <td><%= r.tenNCC %></td>
+              <td><%= r.mstNCC || '—' %></td>
+              <td><%= r.soHoaDon || '—' %></td>
+              <td><%= r.dienGiai || '—' %></td>
+              <td><%= (r.soTien||0).toLocaleString('vi-VN') %> đ</td>
+              <td><% if (r.linkHoaDon) { %><a href="<%= r.linkHoaDon %>" target="_blank" rel="noopener">Xem</a><% } else { %>—<% } %></td>
+              <td>
+                <form method="POST" action="/hoa-don-dau-vao/<%= r.id %>/hach-toan" style="display:inline">
+                  <input type="hidden" name="thang" value="<%= thangFilter %>" />
+                  <input type="hidden" name="hachToan" value="<%= hachToanFilter %>" />
+                  <input type="hidden" name="daHachToan" value="<%= r.daHachToan ? '0' : '1' %>" />
+                  <button type="submit" class="link-btn"><%= r.daHachToan ? '☑ Đã hạch toán' : '☐ Chưa hạch toán' %></button>
+                </form>
+              </td>
+              <td><%= r.ghiChu || '—' %></td>
+              <td>
+                <% if (typeof isAdmin !== "undefined" && isAdmin) { %>
+                <form method="POST" action="/hoa-don-dau-vao/<%= r.id %>/delete" style="display:inline" onsubmit="return confirm('Xóa hóa đơn này?');">
+                  <button type="submit" class="link-btn">Xóa</button>
+                </form>
+                <% } %>
+              </td>
+            </tr>
+            <% }) %>
+            <% if (rows.length === 0) { %>
+            <tr><td colspan="10" class="muted">Chưa có hóa đơn nào.</td></tr>
+            <% } %>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+</body>
+</html>
