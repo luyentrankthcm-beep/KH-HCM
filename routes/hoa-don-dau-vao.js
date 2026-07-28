@@ -24,6 +24,17 @@ const chiPhi = require("./doisoat-chiphi");
 // khoan Co (1388/331) tu ten gian tim duoc, dung LAI logic da co san o
 // chi-phi.js (computeTaiKhoanChiPhi) thay vi doan lai tu dau.
 const { findContractForGianText, buildGianAliasIndex, isDoanhThuChiaSeRecord } = require("../utils/rentPaymentMatcher");
+// Chi Nhan, 2026-07-29: "3 cái đi unc lấy ra chỗ gian ... dựa vào hóa đơn hay
+// ncc hay số tiền" -- dung LAI (khong doan lai) 3 URL Google Sheet UNC + ham
+// gop du lieu da co san o routes/chi-phi.js (trang "Chi Phí"), de nut "Cập
+// nhật Gian Hàng" ben nay TU LAM MOI store.chi_phi truoc khi do Gian, khong
+// bat chi phai qua trang Chi Phi bam "Cập nhật chi phí" truoc nua.
+const chiPhiSheetRoutes = require("./chi-phi");
+const {
+  parseChiPhiSheetWorkbook,
+  parseKvcMienBacWorkbook,
+  parseKvcMienBacAutoWorkbook,
+} = require("../utils/chiPhiSheetParser");
 // Chi Nhan, 2026-07-28: "check trên UNC ra tên gian" -- khi khong khop duoc
 // Gian Hang qua Google Sheet (theo Ten NCC/MST), thu tim tiep qua bang lenh
 // chi UNC (chi_phi_unc_list, cung du lieu voi trang Doi Soat Chi Phi): khop
@@ -671,24 +682,37 @@ router.post("/hoa-don-dau-vao/upload-hang-hoa", requireDataEntry, upload.single(
 // sách các gian" (3 tab, dung chung ca KH Cu/Moi qua cot "Pháp nhân" ngay
 // trong sheet), khop "Tên khách hàng" (ben cho thue = NCC cua minh) + dung
 // cong ty. CHI dien vao dong dang TRONG gianHang (giong upload-ncc/hang-hoa).
+// Chi Nhan, 2026-07-29: "mình thanh toán cho nó gần hết rồi với gian bạn tìm
+// trên gg sheet cho tôi chưa á 3 cái đi unc lấy ra chỗ gian dựa vào hóa đơn
+// hay ncc hay số tiền" -- goi 1 lan bam nut la LAM MOI ca 4 nguon (khong con
+// bat chi phai qua trang Chi Phi bam truoc): (1) sheet "Danh sách các gian"
+// (khop Ten NCC/MST), (2+3+4) 3 sheet UNC that (Mien Nam + 2 sheet Mien Bac,
+// dung LAI ham gop cua routes/chi-phi.js) roi do Gian qua so Chi Phi vua lam
+// moi. MOI nguon fetch rieng, 1 nguon loi KHONG chan cac nguon con lai (vd
+// sheet "Danh sách các gian" bi loi van khong ngan viec lam moi + do Gian qua
+// so Chi Phi, va nguoc lai) -- gom tat ca ghi chu ket qua/loi vao 1 thong bao
+// duy nhat cuoi cung.
 router.post("/hoa-don-dau-vao/cap-nhat-gian", requireDataEntry, async (req, res) => {
   const store = load();
   ensureShape(store);
+  chiPhiSheetRoutes.ensureShape(store);
   const activeCompany = getCompany(req);
+  const notes = [];
+  let filled = 0;
+  let gianForCompany = (store.hoa_don_dau_vao_gian_list || []).filter((g) => g.congTy === activeCompany);
+
+  // (1) Sheet "Danh sách các gian" -- khop Ten NCC/MST (nguon co san tu truoc).
   try {
     const resp = await fetch(GIAN_SHEET_XLSX_URL);
     if (!resp.ok) {
-      throw new Error(
-        `Không đọc được Google Sheet (mã lỗi ${resp.status}). Kiểm tra lại sheet đã chia sẻ "Bất kỳ ai có link đều xem được" chưa.`
-      );
+      throw new Error(`mã lỗi ${resp.status}`);
     }
     const buf = Buffer.from(await resp.arrayBuffer());
     const { rows, sheetsRead } = parseGianSheetWorkbook(buf);
     store.hoa_don_dau_vao_gian_list = rows;
     store.hoa_don_dau_vao_gian_meta = { fetched_at: new Date().toISOString(), count: rows.length, sheetsRead };
+    gianForCompany = rows.filter((g) => g.congTy === activeCompany);
 
-    const gianForCompany = rows.filter((g) => g.congTy === activeCompany);
-    let filled = 0;
     store.hoa_don_dau_vao.forEach((r) => {
       if (r.congTy !== activeCompany || r.gianHang) return;
       const m = matchByMstOrName(r.mstNCC, r.tenNCC, gianForCompany, "mstKhachHang", "tenKhachHang");
@@ -699,75 +723,117 @@ router.post("/hoa-don-dau-vao/cap-nhat-gian", requireDataEntry, async (req, res)
         filled++;
       }
     });
-
-    // Chi Nhan, 2026-07-28: "check trên unc ra tên gian" -- con dong nao van
-    // trong gianHang (khong khop duoc qua Ten NCC/MST o tren) thi thu do them
-    // qua bang lenh chi UNC: khop UNC theo Ten NCC + So tien hoa don truoc,
-    // roi do noi dung UNC do xem co chua ma diem cua gian nao khong.
-    let filledViaUnc = 0;
-    const uncList = store.chi_phi_unc_list || [];
-    if (uncList.length > 0) {
-      const uncIndex = buildUncIndex(uncList);
-      store.hoa_don_dau_vao.forEach((r) => {
-        if (r.congTy !== activeCompany || r.gianHang) return;
-        const uncMatch = matchUncForPayment(r.tenNCC, r.soTien, uncIndex);
-        if (!uncMatch || !uncMatch.noiDungUnc) return;
-        const g = matchGianViaUncContent(uncMatch.noiDungUnc, gianForCompany);
-        if (g) {
-          r.gianHang = g.gianHang;
-          r.hinhThucHopTac = g.hinhThucHopTac;
-          r.taiKhoanCo = /cse/i.test(g.hinhThucHopTac) ? "1388" : "331";
-          filledViaUnc++;
-        }
-      });
-    }
-
-    // Chi Nhan, 2026-07-29: "đi tìm từ 3 unc gg sheet á lấy ra gian cho tôi" --
-    // dong nao van chua co Gian Hang thi do tiep qua store.chi_phi (trang
-    // "Chi Phí", đã tự động đồng bộ sẵn từ 3 Google Sheet UNC thật: "ĐI ỦY
-    // NHIỆM CHI KVC + MTĐ MN"/"Tạo lệnh UNC KVC MB"/"TẠO LỆNH UNC MTĐ MB") --
-    // khop theo Số hóa đơn truoc (chac chan nhat), khong co thi khop Tên NCC +
-    // Số tiền. Neu tim duoc gian, tra cuu tiep Hợp Đồng Thuê Gian Hàng (Pháp
-    // Danh) de xac dinh Tài khoản Có (1388 neu la doanh thu chia se, con lai
-    // 331) -- dung LAI logic co san o chi-phi.js (computeTaiKhoanChiPhi) thay
-    // vi doan lai tu dau.
-    let filledViaChiPhi = 0;
-    const chiPhiForCompany = (store.chi_phi || []).filter((c) => c.congTy === activeCompany && (c.gian || "").trim());
-    if (chiPhiForCompany.length > 0) {
-      const gianListForTaiKhoan = store.phap_danh_hop_dong_thue || [];
-      const aliasIndex = buildGianAliasIndex(gianListForTaiKhoan);
-      store.hoa_don_dau_vao.forEach((r) => {
-        if (r.congTy !== activeCompany || r.gianHang) return;
-        const g = matchGianViaChiPhiLedger(r, chiPhiForCompany);
-        if (!g) return;
-        r.gianHang = g;
-        filledViaChiPhi++;
-        if (!r.taiKhoanCo) {
-          const rec = findContractForGianText(g, gianListForTaiKhoan, aliasIndex);
-          if (rec) {
-            const chiaSe = isDoanhThuChiaSeRecord(rec);
-            r.taiKhoanCo = chiaSe ? "1388" : "331";
-            if (!r.hinhThucHopTac) r.hinhThucHopTac = chiaSe ? "CSE" : "Thuê";
-          }
-        }
-      });
-    }
-
-    save(store);
-    const uncNote = filledViaUnc > 0 ? `, dò thêm qua UNC (file tải lên) được ${filledViaUnc} dòng` : "";
-    const chiPhiNote =
-      filledViaChiPhi > 0
-        ? `, dò thêm qua sổ Chi Phí (3 sheet UNC) được ${filledViaChiPhi} dòng`
-        : chiPhiForCompany.length === 0
-        ? " (sổ Chi Phí chưa có dòng nào có Gian cho công ty này để dò thêm)"
-        : "";
-    res.redirect(
-      "/hoa-don-dau-vao?success=" +
-        encodeURIComponent(`Đã đọc Google Sheet (${sheetsRead.join(", ")}): điền Gian Hàng/Tài khoản Có cho ${filled} dòng đang trống${uncNote}${chiPhiNote}.`)
-    );
+    notes.push(`Đã đọc Google Sheet Danh sách các gian (${sheetsRead.join(", ")}): điền ${filled} dòng đang trống.`);
   } catch (e) {
-    res.redirect("/hoa-don-dau-vao?error=" + encodeURIComponent(e.message));
+    notes.push(`Lỗi đọc sheet Danh sách các gian (${e.message}).`);
   }
+
+  // Chi Nhan, 2026-07-28: "check trên unc ra tên gian" -- con dong nao van
+  // trong gianHang (khong khop duoc qua Ten NCC/MST o tren) thi thu do them
+  // qua bang lenh chi UNC (file tai len rieng o trang Doi soat Chi phi): khop
+  // UNC theo Ten NCC + So tien hoa don truoc, roi do noi dung UNC do xem co
+  // chua ma diem cua gian nao khong.
+  let filledViaUnc = 0;
+  const uncList = store.chi_phi_unc_list || [];
+  if (uncList.length > 0) {
+    const uncIndex = buildUncIndex(uncList);
+    store.hoa_don_dau_vao.forEach((r) => {
+      if (r.congTy !== activeCompany || r.gianHang) return;
+      const uncMatch = matchUncForPayment(r.tenNCC, r.soTien, uncIndex);
+      if (!uncMatch || !uncMatch.noiDungUnc) return;
+      const g = matchGianViaUncContent(uncMatch.noiDungUnc, gianForCompany);
+      if (g) {
+        r.gianHang = g.gianHang;
+        r.hinhThucHopTac = g.hinhThucHopTac;
+        r.taiKhoanCo = /cse/i.test(g.hinhThucHopTac) ? "1388" : "331";
+        filledViaUnc++;
+      }
+    });
+    if (filledViaUnc > 0) notes.push(`Dò thêm qua UNC (file tải lên): +${filledViaUnc} dòng.`);
+  }
+
+  // (2+3+4) Chi Nhan, 2026-07-29: "3 cái đi unc lấy ra chỗ gian dựa vào hóa
+  // đơn hay ncc hay số tiền" -- lam moi CHINH store.chi_phi tu 3 Google Sheet
+  // UNC that (Mien Nam + 2 sheet Mien Bac), dung LAI ham applyChiPhiMonthRowsToStore
+  // cua routes/chi-phi.js (giong het nut "Cập nhật chi phí" o trang Chi Phi) --
+  // chi THEM dong moi, khong dong tay dong da co (an toan, khong sua nham
+  // du lieu Chi Nhan da tu dieu chinh).
+  try {
+    const respNam = await fetch(chiPhiSheetRoutes.CHI_PHI_SHEET_XLSX_URL);
+    if (respNam.ok) {
+      const buf = Buffer.from(await respNam.arrayBuffer());
+      const { monthRows, skippedSheets } = parseChiPhiSheetWorkbook(buf);
+      if (monthRows.length > 0) {
+        const result = chiPhiSheetRoutes.applyChiPhiMonthRowsToStore(store, monthRows, "GG Sheet " + new Date().toISOString().slice(0, 10), "nam");
+        if (result.added > 0) notes.push(`Sổ Chi Phí Miền Nam: +${result.added} khoản chi mới.`);
+      }
+    } else {
+      notes.push(`Lỗi đọc sheet Chi Phí Miền Nam (mã lỗi ${respNam.status}).`);
+    }
+  } catch (e) {
+    notes.push(`Lỗi đọc sheet Chi Phí Miền Nam (${e.message}).`);
+  }
+  try {
+    const [respManual, respAuto] = await Promise.all([
+      fetch(chiPhiSheetRoutes.KVC_MB_SHEET_XLSX_URL),
+      fetch(chiPhiSheetRoutes.MTD_MB_AUTO_SHEET_XLSX_URL),
+    ]);
+    const monthRowsBac = [];
+    if (respManual.ok) {
+      const buf = Buffer.from(await respManual.arrayBuffer());
+      const { sheetName, rows } = parseKvcMienBacWorkbook(buf);
+      if (sheetName) monthRowsBac.push({ sheetName: `UNC KVC MB (${sheetName})`, rows });
+    }
+    if (respAuto.ok) {
+      const buf = Buffer.from(await respAuto.arrayBuffer());
+      const { sheetName, rows } = parseKvcMienBacAutoWorkbook(buf);
+      if (sheetName) monthRowsBac.push({ sheetName: `MTĐ MB tự động (${sheetName})`, rows });
+    }
+    if (monthRowsBac.length > 0) {
+      const result = chiPhiSheetRoutes.applyChiPhiMonthRowsToStore(store, monthRowsBac, "GG Sheet Mien Bac " + new Date().toISOString().slice(0, 10), "bac");
+      if (result.added > 0) notes.push(`Sổ Chi Phí Miền Bắc: +${result.added} khoản chi mới.`);
+    }
+    if (!respManual.ok && !respAuto.ok) {
+      notes.push(`Lỗi đọc cả 2 sheet Chi Phí Miền Bắc (mã lỗi ${respManual.status}/${respAuto.status}).`);
+    }
+  } catch (e) {
+    notes.push(`Lỗi đọc sheet Chi Phí Miền Bắc (${e.message}).`);
+  }
+
+  // Chi Nhan, 2026-07-29: "đi tìm từ 3 unc gg sheet á lấy ra gian cho tôi" --
+  // dong nao van chua co Gian Hang thi do tiep qua store.chi_phi (vua duoc
+  // lam moi o tren) -- khop theo Số hóa đơn truoc (chac chan nhat), khong co
+  // thi khop Tên NCC + Số tiền. Neu tim duoc gian, tra cuu tiep Hợp Đồng Thuê
+  // Gian Hàng (Pháp Danh) de xac dinh Tài khoản Có (1388 neu la doanh thu
+  // chia se, con lai 331) -- dung LAI logic co san o chi-phi.js
+  // (computeTaiKhoanChiPhi) thay vi doan lai tu dau.
+  let filledViaChiPhi = 0;
+  const chiPhiForCompany = (store.chi_phi || []).filter((c) => c.congTy === activeCompany && (c.gian || "").trim());
+  if (chiPhiForCompany.length > 0) {
+    const gianListForTaiKhoan = store.phap_danh_hop_dong_thue || [];
+    const aliasIndex = buildGianAliasIndex(gianListForTaiKhoan);
+    store.hoa_don_dau_vao.forEach((r) => {
+      if (r.congTy !== activeCompany || r.gianHang) return;
+      const g = matchGianViaChiPhiLedger(r, chiPhiForCompany);
+      if (!g) return;
+      r.gianHang = g;
+      filledViaChiPhi++;
+      if (!r.taiKhoanCo) {
+        const rec = findContractForGianText(g, gianListForTaiKhoan, aliasIndex);
+        if (rec) {
+          const chiaSe = isDoanhThuChiaSeRecord(rec);
+          r.taiKhoanCo = chiaSe ? "1388" : "331";
+          if (!r.hinhThucHopTac) r.hinhThucHopTac = chiaSe ? "CSE" : "Thuê";
+        }
+      }
+    });
+    if (filledViaChiPhi > 0) notes.push(`Dò Gian qua sổ Chi Phí (3 sheet UNC): +${filledViaChiPhi} dòng.`);
+  } else {
+    notes.push("Sổ Chi Phí chưa có dòng nào có Gian cho công ty này để dò thêm.");
+  }
+
+  save(store);
+  res.redirect("/hoa-don-dau-vao?success=" + encodeURIComponent(notes.join(" ")));
 });
 
 // Chi Nhan, 2026-07-28: "thêm cột Đã chi tiền chưa ... theo tên NCC với số

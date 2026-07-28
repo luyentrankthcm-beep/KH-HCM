@@ -16,9 +16,13 @@
     <% if (success) { %><div class="alert alert-success"><%= success %></div><% } %>
 
     <section class="cards">
+      <!-- Chi Nhan, 2026-07-29: sua loi -- sau khi them phan trang (30
+           dong/trang), "rows" chi con la 30 dong CUA TRANG DANG XEM, khong
+           phai toan bo dong khop bo loc nua. Cac the tong quan phai dung
+           totalMatching (tong so khop bo loc, TRUOC khi cat trang) moi dung. -->
       <div class="card">
         <div class="card-label">Tổng hóa đơn (theo bộ lọc)</div>
-        <div class="card-value"><%= rows.length %></div>
+        <div class="card-value"><%= totalMatching %></div>
       </div>
       <div class="card card-chi">
         <div class="card-label">Tổng tiền thanh toán</div>
@@ -26,7 +30,7 @@
       </div>
       <div class="card card-thu">
         <div class="card-label">Đã chi tiền</div>
-        <div class="card-value"><%= daChiCount %> / <%= rows.length %></div>
+        <div class="card-value"><%= daChiCount %> / <%= totalMatching %></div>
       </div>
     </section>
 

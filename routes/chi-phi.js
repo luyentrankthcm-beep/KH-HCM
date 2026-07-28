@@ -935,3 +935,13 @@ router.post("/chi-phi/:mien(mien-nam|mien-bac)/tim-hoa-don-gmail", requireDataEn
 });
 
 module.exports = router;
+// Chi Nhan, 2026-07-29: cho routes/hoa-don-dau-vao.js dung LAI (khong doan
+// lai) logic doc+gop 3 Google Sheet UNC vao store.chi_phi -- "Cập nhật Gian
+// Hàng" ben Hoa Don Dau Vao se tu lam moi store.chi_phi (giong het nut "Cập
+// nhật chi phí" o day) TRUOC KHI do Gian tu do, khong can chi tu qua trang
+// Chi Phi bam truoc nua.
+module.exports.ensureShape = ensureShape;
+module.exports.applyChiPhiMonthRowsToStore = applyChiPhiMonthRowsToStore;
+module.exports.CHI_PHI_SHEET_XLSX_URL = CHI_PHI_SHEET_XLSX_URL;
+module.exports.KVC_MB_SHEET_XLSX_URL = KVC_MB_SHEET_XLSX_URL;
+module.exports.MTD_MB_AUTO_SHEET_XLSX_URL = MTD_MB_AUTO_SHEET_XLSX_URL;
