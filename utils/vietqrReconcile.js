@@ -63,11 +63,25 @@ function extractVqrCode(text) {
 // token se loai NHAM ca doanh thu QR that. Dung dung dac diem MOMO (ma
 // KH###KVCMN#### hoac REM tu M-Service) de loai TRU, giu lai tat ca con lai.
 const MOMO_TX_PATTERN = /KH\d+KVCMN\d+|DICH\s+VU\s+DI\s+DONG\s+TRUC\s+TUYEN/i;
+// Chi Nhan (2026-07-28): "cac dien giai ngoai viet qr a bo ra khoi doi soat
+// nha 11521268 a" -- vai giao dich KHONG phai tien khach tra qua VietQR van
+// lot vao so du "thu" cua tai khoan (vd lai tien gui ngan hang tra hang
+// thang) va bi tinh nham vao "Ngan hang" cua ngay do. Dung them 1 danh sach
+// LOAI TRU theo dien giai (giong huong MOMO_TX_PATTERN o tren, KHONG dung
+// "phai co token X" vi mot so giao dich QR THAT lai khong co token dac
+// trung -- xem ghi chu ngay tren). Sau khi normText (bo dau, thuong hoa) de
+// khop du dien giai co dau hay khong.
+const NON_VQR_TX_PATTERN = /tra lai tien gui|thanh toan lai|lai nhap von|lai tien gui/i;
 // Tach rieng buoc loc (dung chung cho ca extractVietQrSettlements o duoi VA
 // resolveGianGrossByBankRef, xem ghi chu tai do) khoi buoc gop theo ngay.
 function extractVietQrThuTransactions(transactions) {
   return transactions.filter(
-    (t) => t.type === "thu" && !t.excludeFromVietQrRecon && t.date && !MOMO_TX_PATTERN.test(t.description || "")
+    (t) =>
+      t.type === "thu" &&
+      !t.excludeFromVietQrRecon &&
+      t.date &&
+      !MOMO_TX_PATTERN.test(t.description || "") &&
+      !NON_VQR_TX_PATTERN.test(normText(t.description || ""))
   );
 }
 function extractVietQrSettlements(transactions) {
