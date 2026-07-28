@@ -10,11 +10,19 @@ const {
   parseHangHoaWorkbook,
   parseGianSheetWorkbook,
   matchByMstOrName,
+  matchGianViaUncContent,
   classifyPhanLoai,
   matchTenHangHoa,
   normVN,
 } = require("../utils/hoaDonDauVaoEnrich");
 const chiPhi = require("./doisoat-chiphi");
+// Chi Nhan, 2026-07-28: "check trên UNC ra tên gian" -- khi khong khop duoc
+// Gian Hang qua Google Sheet (theo Ten NCC/MST), thu tim tiep qua bang lenh
+// chi UNC (chi_phi_unc_list, cung du lieu voi trang Doi Soat Chi Phi): khop
+// UNC theo Ten NCC + So tien hoa don, roi do noi dung UNC xem co chua ma
+// diem noi bo/ma diem thue nao trong danh sach gian (cua dung cong ty) khong
+// -- CHI dien khi khop DUY NHAT 1 gian, tranh doan nham.
+const { buildUncIndex, matchUncForPayment } = require("../utils/chiphiReconcile");
 
 const router = express.Router();
 router.use(requireLogin);
@@ -638,10 +646,34 @@ router.post("/hoa-don-dau-vao/cap-nhat-gian", requireDataEntry, async (req, res)
         filled++;
       }
     });
+
+    // Chi Nhan, 2026-07-28: "check trên unc ra tên gian" -- con dong nao van
+    // trong gianHang (khong khop duoc qua Ten NCC/MST o tren) thi thu do them
+    // qua bang lenh chi UNC: khop UNC theo Ten NCC + So tien hoa don truoc,
+    // roi do noi dung UNC do xem co chua ma diem cua gian nao khong.
+    let filledViaUnc = 0;
+    const uncList = store.chi_phi_unc_list || [];
+    if (uncList.length > 0) {
+      const uncIndex = buildUncIndex(uncList);
+      store.hoa_don_dau_vao.forEach((r) => {
+        if (r.congTy !== activeCompany || r.gianHang) return;
+        const uncMatch = matchUncForPayment(r.tenNCC, r.soTien, uncIndex);
+        if (!uncMatch || !uncMatch.noiDungUnc) return;
+        const g = matchGianViaUncContent(uncMatch.noiDungUnc, gianForCompany);
+        if (g) {
+          r.gianHang = g.gianHang;
+          r.hinhThucHopTac = g.hinhThucHopTac;
+          r.taiKhoanCo = /cse/i.test(g.hinhThucHopTac) ? "1388" : "331";
+          filledViaUnc++;
+        }
+      });
+    }
+
     save(store);
+    const uncNote = filledViaUnc > 0 ? `, dò thêm qua UNC được ${filledViaUnc} dòng` : uncList.length === 0 ? " (chưa có dữ liệu UNC để dò thêm, tải lên ở trang Đối soát Chi Phí)" : "";
     res.redirect(
       "/hoa-don-dau-vao?success=" +
-        encodeURIComponent(`Đã đọc Google Sheet (${sheetsRead.join(", ")}): điền Gian Hàng/Tài khoản Có cho ${filled} dòng đang trống.`)
+        encodeURIComponent(`Đã đọc Google Sheet (${sheetsRead.join(", ")}): điền Gian Hàng/Tài khoản Có cho ${filled} dòng đang trống${uncNote}.`)
     );
   } catch (e) {
     res.redirect("/hoa-don-dau-vao?error=" + encodeURIComponent(e.message));

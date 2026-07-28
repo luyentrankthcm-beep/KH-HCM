@@ -191,6 +191,25 @@ function matchByMstOrName(mst, ten, list, mstField, nameField) {
   return null;
 }
 
+// Chi Nhan, 2026-07-28: "check trên unc ra tên gian" -- khi khong khop duoc
+// Gian Hang qua Google Sheet (theo Ten NCC/MST), thu do NOI DUNG cua 1 dong
+// UNC (da khop truoc do theo Ten NCC + So tien, xem matchUncForPayment ben
+// chiphiReconcile.js) xem co chua Ma Diem Noi Bo hoac Ma Diem Thue cua gian
+// nao trong danh sach gian (cung cong ty) khong -- CHI dien khi khop DUY
+// NHAT 1 gian (theo ca 2 ma), tranh doan nham nhu cac ham match khac o day.
+function matchGianViaUncContent(noiDungUnc, gianForCompany) {
+  const noiDungNorm = normVN(noiDungUnc);
+  if (!noiDungNorm || noiDungNorm.length < 3) return null;
+  const matched = new Set();
+  for (const g of gianForCompany || []) {
+    const codes = [g.gianHang, g.maDiemThue].map((c) => String(c || "").trim()).filter((c) => c.length >= 3);
+    const hit = codes.some((c) => noiDungNorm.includes(normVN(c)));
+    if (hit) matched.add(g);
+  }
+  const list = Array.from(matched);
+  return list.length === 1 ? list[0] : null;
+}
+
 // ---------- Phan loai tu Dien giai + so tien ----------
 // Chi Nhan, 2026-07-28: "nếu nó số lượng đếm được mua vào bán ra thì phân
 // làm hàng hóa 156 cái nào cccd thì phân vào 153 cái nào là tài sản thì đưa
@@ -250,6 +269,7 @@ module.exports = {
   parseHangHoaWorkbook,
   parseGianSheetWorkbook,
   matchByMstOrName,
+  matchGianViaUncContent,
   classifyPhanLoai,
   matchTenHangHoa,
 };
