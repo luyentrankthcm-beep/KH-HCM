@@ -81,6 +81,20 @@ const CHANNELS = {
     // ngay nay van dung y nguyen cach cu (resolveGianGross ben tren).
     refMatchFrom: "2026-07-22",
   },
+  // Chi Nhan, 2026-07-28: "giống như KH mới 7702 á làm cho tôi 77021 á" --
+  // tai khoan BIDV moi (8690077021, cung phap nhan CONG TY TNHH GIAI TRI
+  // K&H/kh_moi nhu 7702), Luyen xac nhan hoa don kenh nay duoc dan tag rieng
+  // "VietQR POSH MB" (KHAC voi "MTD MN" cua 7702) tren cot "Dich vu thu ho"
+  // cua file MTT dung chung. La kenh hoan toan MOI (khong co giai doan du
+  // lieu cu truoc do) nen dung ngay tinh nang khop theo "So tham chieu" ngan
+  // hang (refMatchFrom) ngay tu dau, khong can giai doan fuzzy-match nhu 7702.
+  bidv77021: {
+    bankName: "BIDV77021",
+    label: "BIDV 77021",
+    tagPattern: /VietQR\s*POSH\s*MB/i,
+    company: "kh_moi",
+    refMatchFrom: "2026-01-01",
+  },
 };
 const CHANNEL_KEYS = Object.keys(CHANNELS);
 

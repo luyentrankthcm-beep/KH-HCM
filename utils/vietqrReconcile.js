@@ -263,9 +263,14 @@ function parseVietQrRawWorkbook(buffer) {
 // "Ten diem xuat hoa don" wording).
 function parseCuaHangSheet(buffer) {
   const wbLite = XLSX.read(buffer, { type: "buffer", bookSheets: true });
+  // Chi Nhan (2026-07-28, kenh BIDV77021 moi): mot so file dat ten sheet la
+  // "Diem ban" thay vi "Cua hang" nhung cot ben trong giong het (Ten cua
+  // hang/Ma cua hang/Ten diem ban) -- chap nhan ca 2 kieu ten sheet, viec
+  // khop cot header van dam bao khong nham voi sheet "Ten diem - Ma cong
+  // trinh" (sheet do khong co cot "ma cua hang").
   const sheetName = wbLite.SheetNames.find((n) => {
     const t = normText(n);
-    return t.includes("cua hang");
+    return t.includes("cua hang") || t.includes("diem ban");
   });
   if (sheetName) {
     const wb = XLSX.read(buffer, { type: "buffer", sheets: [sheetName] });
