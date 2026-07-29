@@ -240,6 +240,10 @@
                   <option value="thu" <%= t.type === 'thu' ? 'selected' : '' %>>Thu</option>
                   <option value="chi" <%= t.type === 'chi' ? 'selected' : '' %>>Chi</option>
                 </select>
+                <label style="font-size:12px; display:inline-flex; align-items:center; gap:4px;" title="Dòng tiền THẬT vẫn giữ nguyên ở đây, chỉ không tính vào doanh thu QR bên trang Đối soát VietQR nữa -- dùng cho các khoản không phải khách trả qua QR (vd đối tác chuyển gộp doanh thu chia sẻ theo kỳ) bị gom nhầm vào 1 gian.">
+                  <input type="checkbox" name="excludeFromVietQrRecon" value="1" <%= t.excludeFromVietQrRecon ? 'checked' : '' %> />
+                  Loại khỏi đối soát VietQR
+                </label>
                 <button type="submit" class="btn btn-secondary" style="font-size:12px; padding:3px 10px;">Lưu</button>
                 <button type="button" class="link-btn" style="font-size:12px;" onclick="txToggleEdit(event, '<%= t.id %>')">Hủy</button>
               </form>

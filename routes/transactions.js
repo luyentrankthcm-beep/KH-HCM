@@ -241,7 +241,7 @@ router.post("/transactions/:id/sua", requireDataEntry, (req, res) => {
     return res.redirect("/transactions?error=" + encodeURIComponent("Không tìm thấy giao dịch này."));
   }
   try {
-    const { date, description, amount, type, tenDoiUng } = req.body;
+    const { date, description, amount, type, tenDoiUng, excludeFromVietQrRecon } = req.body;
     const parsedDate = parseDate(date) || date;
     const parsedAmount = Math.abs(parseAmount(amount));
     if (!parsedDate || isNaN(parsedAmount) || !["thu", "chi"].includes(type)) {
@@ -253,6 +253,19 @@ router.post("/transactions/:id/sua", requireDataEntry, (req, res) => {
     // truoc khi co tinh nang nay nen dang trong, hoac file sao ke khong co
     // san cot nay).
     tx.tenDoiUng = (tenDoiUng || "").trim();
+    // Chi Nhan, 2026-07-29: "hải phòng làm gì cộng dữ liệu nhiều vậy check
+    // lại xem có bị trùng hk 77021" -- dieu tra ra: KHONG phai trung du lieu,
+    // ma 1 giao dich "thu" khong phai tien khach tra qua VietQR (vd tien doi
+    // tac chuyen trang toan doanh thu chia se theo ky/thang, khong co Ma tham
+    // chieu khop voi file xuat QR) bi Doi soat VietQR gom NHAM vao gian mac
+    // dinh (AE HP PHN, xem CHANNELS.bidv77021.defaultBlankCode trong
+    // routes/doisoat-vietqr.js) lam sai lech ca ngay. utils/vietqrReconcile.js
+    // da co san co che loai tru (t.excludeFromVietQrRecon, dung cho dung
+    // truong hop nay -- xem extractVietQrThuTransactions) nhung CHUA co cho
+    // nao tren giao dien de tu bat/tat -- them checkbox nay tai day de Chi
+    // Nhan tu xu ly duoc cac truong hop tuong tu sau nay (giao dich VAN o lai
+    // Giao dich/Sao ke binh thuong, chi khong tinh vao doanh thu QR nua).
+    tx.excludeFromVietQrRecon = excludeFromVietQrRecon === "1" || excludeFromVietQrRecon === "on";
     tx.amount = parsedAmount;
     tx.type = type;
     tx.edited_at = new Date().toISOString();
