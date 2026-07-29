@@ -237,6 +237,120 @@ function buildChannelChiPhi(store, channelKey, revenueStatusMap) {
   return { lines, error: null, lockDate };
 }
 
+// Chi Nhan, 2026-07-29: "check theo đối tượng NCC ... đối tượng đó nó xuất
+// cho mình các hóa đơn nào mình thanh toán chưa ngày nào từ tài khoản nào số
+// tiền bao nhiêu để cấn trừ công nợ ... thêm cái công nợ ncc theo tên cho
+// tôi" -- gop hoa don Hóa Đơn Đầu Vào (store.hoa_don_dau_vao, DUNG cong ty
+// dang xem) theo Ten NCC: Tong hoa don / Da chi / Con no, kem drill-down
+// TUNG HOA DON (KHONG phai tung dong hang hoa -- xem ghi chu ben trong ham).
+// Tach thanh ham rieng (khong inline trong route) de dung LAI duoc cho ca
+// trang GET (hien thi) va route export.xlsx (xuat file, Chi Nhan yeu cau
+// 2026-07-29 "xuất ra chi tiết chỗ này á cho tôi").
+function computeNccDebtRows(store, activeCompany) {
+  const activeKeys = CHANNEL_KEYS.filter((ch) => CHANNELS[ch].company === activeCompany);
+  const revenueStatusMap = buildRevenueStatusMap(store);
+  const allLines = activeKeys.flatMap((ch) => buildChannelChiPhi(store, ch, revenueStatusMap).lines || []);
+
+  const bankIdsForCompany = new Set(
+    (store.banks || []).filter((b) => (b.company || "kh_cu") === activeCompany).map((b) => b.id)
+  );
+  const generalChiTx = (store.transactions || []).filter(
+    (t) => t.type === "chi" && bankIdsForCompany.has(t.bank_id) && (t.tenDoiUng || "").trim()
+  );
+  const bankNameById = new Map((store.banks || []).map((b) => [b.id, b.name]));
+
+  // Chi Nhan, 2026-07-29: "sao dò dc chi rồi chưa mà chưa dò được nguồn chi
+  // vậy" -- BUG: 1 hóa đơn co the co NHIEU DONG hang hoa (vd hoa don
+  // 00008443 co 23 dong Kem Celano/Merino rieng le), moi dong chi la 1 PHAN
+  // nho cua tong tien hoa don -- daChiTien duoc gan THEO CA NHOM (so sanh
+  // TONG TIEN CA HOA DON voi 1 giao dich/dong chi phi, xem cap-nhat-da-chi
+  // ben Hoa Don Dau Vao) roi to CA nhom la Da chi, chu KHONG PHAI tung dong
+  // rieng le co giao dich rieng. Truoc do code nay do tim giao dich khop
+  // DUNG SO TIEN TUNG DONG (vd 309.000d) nen khong bao gio khop dc, luon ra
+  // "chua do duoc nguon chi". Sua: GOP cac dong CUNG 1 So hoa don (+Ky hieu)
+  // lai THANH 1 HOA DON (cong don Tien) truoc khi do nguon chi, dung LAI
+  // dung 1 cach key voi groupRowsByInvoice ben Hoa Don Dau Vao de ra cung
+  // ket qua. LUU Y (Chi Nhan, 2026-07-29 "có thể chi theo đợt hay công nợ
+  // cuối tháng mới xuất"): neu 1 giao dich tra GOP nhieu hoa don lai lam 1
+  // lan (hoac tra tung dot/1 phan hoa don), so tien giao dich do se KHONG
+  // khop dung tong 1 hoa don rieng le -- nhung truong hop nay se KHONG do ra
+  // duoc nguon chi (van hien "Đã chi" dung theo du lieu da danh dau, chi la
+  // khong biet chinh xac giao dich nao), Chi Nhan tu doi chieu them neu can.
+  function findPaymentForGroup(soTien, tenNCC, mstNCC) {
+    const nccNormShort = normText(tenNCC).slice(0, 12);
+    const viaChiPhi = allLines.find((l) => {
+      if (Math.abs(l.debit - soTien) > 1000) return false;
+      const mstMatch = mstNCC && l.mstNCC && l.mstNCC === mstNCC;
+      const tenMatch = (l.tenNCC || l.vendor) && normText(l.tenNCC || l.vendor).includes(nccNormShort);
+      return mstMatch || tenMatch;
+    });
+    if (viaChiPhi) return { date: viaChiPhi.date, source: CHANNELS[viaChiPhi.channelKey].label };
+    const viaTx = generalChiTx.find(
+      (t) => Math.abs(t.amount - soTien) <= 1000 && normText(t.tenDoiUng).includes(nccNormShort)
+    );
+    if (viaTx) return { date: viaTx.date, source: bankNameById.get(viaTx.bank_id) || "" };
+    return null;
+  }
+
+  const hddvRows = (store.hoa_don_dau_vao || []).filter((r) => r.congTy === activeCompany);
+  const nccDebtMap = new Map();
+  hddvRows.forEach((r) => {
+    const nccKey = (r.tenNCC || "(chưa rõ NCC)").trim();
+    if (!nccDebtMap.has(nccKey)) {
+      nccDebtMap.set(nccKey, { tenNCC: nccKey, mstNCC: r.mstNCC || "", invoiceGroups: new Map(), invoiceOrder: [] });
+    }
+    const g = nccDebtMap.get(nccKey);
+    // Gop dung 1 kieu voi groupRowsByInvoice (Hoa Don Dau Vao): cung So hoa
+    // don + Ky hieu la 1 hoa don, khong co So hoa don thi coi moi dong 1 hoa don rieng.
+    const invKey = r.soHoaDon ? `${r.soHoaDon}|${r.kyHieuHD || ""}` : `__single__${r.id}`;
+    if (!g.invoiceGroups.has(invKey)) {
+      g.invoiceGroups.set(invKey, {
+        ngayHD: r.ngayHD,
+        soHoaDon: r.soHoaDon,
+        dienGiaiList: [],
+        soTien: 0,
+        daChiTienCount: 0,
+        soDong: 0,
+      });
+      g.invoiceOrder.push(invKey);
+    }
+    const inv = g.invoiceGroups.get(invKey);
+    inv.soTien += r.soTien || 0;
+    inv.soDong++;
+    if (r.dienGiai) inv.dienGiaiList.push(r.dienGiai);
+    if (r.daChiTien) inv.daChiTienCount++;
+  });
+  const nccDebtRows = Array.from(nccDebtMap.values())
+    .map((g) => {
+      const invoices = g.invoiceOrder.map((k) => {
+        const inv = g.invoiceGroups.get(k);
+        const daChiTien = inv.daChiTienCount > 0; // dong nao trong nhom cung da danh dau Da chi thi ca hoa don la Da chi
+        const payment = daChiTien ? findPaymentForGroup(inv.soTien, g.tenNCC, g.mstNCC) : null;
+        return {
+          ngayHD: inv.ngayHD,
+          soHoaDon: inv.soHoaDon,
+          dienGiai: inv.soDong > 1 ? `${inv.dienGiaiList[0] || ""} (+${inv.soDong - 1} dòng khác)` : inv.dienGiaiList[0] || "",
+          soTien: inv.soTien,
+          daChiTien,
+          paymentDate: payment ? payment.date : "",
+          paymentSource: payment ? payment.source : "",
+        };
+      });
+      const tongHoaDon = invoices.reduce((s, i) => s + i.soTien, 0);
+      const daChi = invoices.reduce((s, i) => s + (i.daChiTien ? i.soTien : 0), 0);
+      return { tenNCC: g.tenNCC, mstNCC: g.mstNCC, tongHoaDon, daChi, invoices };
+    })
+    .map((g) => ({ ...g, conNo: g.tongHoaDon - g.daChi, soHoaDonCount: g.invoices.length }))
+    .filter((g) => g.tongHoaDon !== 0)
+    .sort((a, b) => Math.abs(b.conNo) - Math.abs(a.conNo));
+  const nccDebtGrandTotal = {
+    tongHoaDon: nccDebtRows.reduce((s, g) => s + g.tongHoaDon, 0),
+    daChi: nccDebtRows.reduce((s, g) => s + g.daChi, 0),
+    conNo: nccDebtRows.reduce((s, g) => s + g.conNo, 0),
+  };
+  return { nccDebtRows, nccDebtGrandTotal };
+}
+
 router.get("/doi-soat/chi-phi", (req, res) => {
   const store = load();
   ensureShape(store);
@@ -285,68 +399,7 @@ router.get("/doi-soat/chi-phi", (req, res) => {
 
   const totalAmount = lines.reduce((s, l) => s + l.debit, 0);
 
-  // Chi Nhan, 2026-07-29: "check theo đối tượng NCC ... đối tượng đó nó xuất
-  // cho mình các hóa đơn nào mình thanh toán chưa ngày nào từ tài khoản nào
-  // số tiền bao nhiêu để cấn trừ công nợ ... thêm cái công nợ ncc theo tên
-  // cho tôi" -- gop hoa don Hóa Đơn Đầu Vào (store.hoa_don_dau_vao, DUNG
-  // cong ty dang xem) theo Ten NCC: Tong hoa don / Da chi / Con no, kem
-  // drill-down tung hoa don (ngay, so HD, so tien, da chi hay chua). Voi hoa
-  // don da danh dau Da chi, do THEM 1 lan (chi de HIEN THI, khong luu) xem
-  // khop duoc voi dong Chi Phi (allLines, dung cong ty) hay giao dich ngan
-  // hang thuong (Ten doi ung) nao de biet ngay/tai khoan da thanh toan --
-  // dung LAI 2 nguon nay (khong doan lai) giong het cach cap-nhat-da-chi ben
-  // Hoa Don Dau Vao dang lam.
-  const bankIdsForCompany = new Set(
-    (store.banks || []).filter((b) => (b.company || "kh_cu") === activeCompany).map((b) => b.id)
-  );
-  const generalChiTx = (store.transactions || []).filter(
-    (t) => t.type === "chi" && bankIdsForCompany.has(t.bank_id) && (t.tenDoiUng || "").trim()
-  );
-  const bankNameById = new Map((store.banks || []).map((b) => [b.id, b.name]));
-
-  function findPaymentForInvoice(inv, tenNCC) {
-    const nccNormShort = normText(tenNCC).slice(0, 12);
-    const viaChiPhi = allLines.find(
-      (l) => Math.abs(l.debit - inv.soTien) <= 1000 && (l.tenNCC || l.vendor) && normText(l.tenNCC || l.vendor).includes(nccNormShort)
-    );
-    if (viaChiPhi) return { date: viaChiPhi.date, source: CHANNELS[viaChiPhi.channelKey].label };
-    const viaTx = generalChiTx.find(
-      (t) => Math.abs(t.amount - inv.soTien) <= 1000 && normText(t.tenDoiUng).includes(nccNormShort)
-    );
-    if (viaTx) return { date: viaTx.date, source: bankNameById.get(viaTx.bank_id) || "" };
-    return null;
-  }
-
-  const hddvRows = (store.hoa_don_dau_vao || []).filter((r) => r.congTy === activeCompany);
-  const nccDebtMap = new Map();
-  hddvRows.forEach((r) => {
-    const key = (r.tenNCC || "(chưa rõ NCC)").trim();
-    if (!nccDebtMap.has(key)) {
-      nccDebtMap.set(key, { tenNCC: key, mstNCC: r.mstNCC || "", tongHoaDon: 0, daChi: 0, invoices: [] });
-    }
-    const g = nccDebtMap.get(key);
-    g.tongHoaDon += r.soTien || 0;
-    if (r.daChiTien) g.daChi += r.soTien || 0;
-    const payment = r.daChiTien ? findPaymentForInvoice(r, key) : null;
-    g.invoices.push({
-      ngayHD: r.ngayHD,
-      soHoaDon: r.soHoaDon,
-      dienGiai: r.dienGiai,
-      soTien: r.soTien,
-      daChiTien: r.daChiTien,
-      paymentDate: payment ? payment.date : "",
-      paymentSource: payment ? payment.source : "",
-    });
-  });
-  const nccDebtRows = Array.from(nccDebtMap.values())
-    .map((g) => ({ ...g, conNo: g.tongHoaDon - g.daChi, soHoaDonCount: g.invoices.length }))
-    .filter((g) => g.tongHoaDon !== 0)
-    .sort((a, b) => Math.abs(b.conNo) - Math.abs(a.conNo));
-  const nccDebtGrandTotal = {
-    tongHoaDon: nccDebtRows.reduce((s, g) => s + g.tongHoaDon, 0),
-    daChi: nccDebtRows.reduce((s, g) => s + g.daChi, 0),
-    conNo: nccDebtRows.reduce((s, g) => s + g.conNo, 0),
-  };
+  const { nccDebtRows, nccDebtGrandTotal } = computeNccDebtRows(store, activeCompany);
 
   res.render("doisoat-chiphi", {
     userName: req.session.userName,
@@ -380,6 +433,58 @@ router.get("/doi-soat/chi-phi", (req, res) => {
     error: req.query.error || null,
     success: req.query.success || null,
   });
+});
+
+// Chi Nhan, 2026-07-29: "xuất ra chi tiết chỗ này á cho tôi cái cộng từng cái
+// đi" -- xuat Excel muc "Cong no NCC theo ten": 1 dong / 1 hoa don (da GOP
+// theo So hoa don, cong don so tien -- xem computeNccDebtRows), kem 1 dong
+// tong ket dau moi NCC de de cong doi chieu ngoai Excel.
+router.get("/doi-soat/chi-phi/cong-no-ncc/export.xlsx", (req, res) => {
+  const store = load();
+  ensureShape(store);
+  const activeCompany = getCompany(req);
+  const { nccDebtRows } = computeNccDebtRows(store, activeCompany);
+
+  const exportRows = [];
+  nccDebtRows.forEach((g) => {
+    exportRows.push({
+      "Tên NCC": g.tenNCC,
+      "MST": g.mstNCC,
+      "Số HĐ": "",
+      "Ngày HĐ": "",
+      "Diễn giải": `--- TỔNG ${g.soHoaDonCount} hóa đơn ---`,
+      "Số tiền": g.tongHoaDon,
+      "Đã chi": g.daChi,
+      "Còn nợ": g.conNo,
+      "Đã chi?": "",
+      "Ngày thanh toán (dò được)": "",
+      "Nguồn thanh toán (dò được)": "",
+    });
+    g.invoices.forEach((inv) => {
+      exportRows.push({
+        "Tên NCC": g.tenNCC,
+        "MST": g.mstNCC,
+        "Số HĐ": inv.soHoaDon,
+        "Ngày HĐ": inv.ngayHD,
+        "Diễn giải": inv.dienGiai,
+        "Số tiền": inv.soTien,
+        "Đã chi": inv.daChiTien ? inv.soTien : 0,
+        "Còn nợ": inv.daChiTien ? 0 : inv.soTien,
+        "Đã chi?": inv.daChiTien ? "Có" : "Không",
+        "Ngày thanh toán (dò được)": inv.paymentDate,
+        "Nguồn thanh toán (dò được)": inv.paymentSource,
+      });
+    });
+  });
+
+  const ws = XLSX.utils.json_to_sheet(exportRows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Cong no NCC");
+  const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
+
+  res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+  res.setHeader("Content-Disposition", `attachment; filename=cong-no-ncc-${activeCompany}.xlsx`);
+  res.send(buf);
 });
 
 // ---------- Khoa so (giong Momo/ZVP/VietQR, nhung an canh bao TUNG DONG theo

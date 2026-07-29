@@ -13,7 +13,8 @@ const {
   matchGianViaUncContent,
   matchGianViaChiPhiLedger,
   classifyPhanLoai,
-  matchTenHangHoa,
+  matchHangHoaRecord,
+  classifyFromHangHoaMatch,
   normVN,
 } = require("../utils/hoaDonDauVaoEnrich");
 const chiPhi = require("./doisoat-chiphi");
@@ -95,6 +96,12 @@ function ensureDefaults(row) {
       linkHoaDon: "",
       daHachToan: false,
       ghiChu: "",
+      // Chi Nhan, 2026-07-29: "hóa đơn lấy thêm thông tin đơn vị tính ... số
+      // lượng và đơn giá cho tôi nhá xuất ra file excel mới có thôi chứ
+      // không cần hiển thị thêm trên đây" -- CHI dung cho export.xlsx.
+      donViTinh: "",
+      soLuong: 0,
+      donGia: 0,
       // Chi Nhan, 2026-07-28: 8 cot "lam giau" moi -- tat ca deu la GOI Y tu
       // dong (tu doi chieu voi Danh sach NCC/hang hoa/cac gian, hoac tu Dien
       // giai), Chi Nhan tu sua lai tung dong qua nut sua tren bang neu sai.
@@ -116,12 +123,24 @@ function ensureDefaults(row) {
 // moi duoc tao (nhap tay hoac upload bang ke) -- tranh phai bam "Cap nhat" tay
 // ngay sau khi vua tai/nhap xong.
 function enrichNewRow(store, row) {
-  const classified = classifyPhanLoai(row.dienGiai, row.soTienTruocThue);
-  row.phanLoai = classified.phanLoai;
-  row.taiKhoanNo = classified.taiKhoanNo;
-
-  if ((store.hoa_don_dau_vao_hang_hoa_list || []).length > 0) {
-    row.tenHangHoaMisa = matchTenHangHoa(row.dienGiai, store.hoa_don_dau_vao_hang_hoa_list);
+  // Chi Nhan, 2026-07-29: "tên hàng hóa á thì thêm cho tôi tài khoản là 156
+  // đi" -- khop duoc voi danh muc Hang hoa/dich vu (file MISA Chi Nhan da tai
+  // len) la nguon DANG TIN CAY NHAT (do CHINH XAC tung mat hang, khong phai
+  // doan tu keyword) nen uu tien truoc: dung TK Kho cua chinh mat hang do neu
+  // file co ghi, khong co thi mac dinh 156 (hang hoa ban ra). CHI khi KHONG
+  // khop duoc voi danh muc nao moi roi ve doan qua tu khoa trong Dien giai
+  // (classifyPhanLoai, xem ghi chu tai do).
+  const hangHoaList = store.hoa_don_dau_vao_hang_hoa_list || [];
+  const matchedHH = hangHoaList.length > 0 ? matchHangHoaRecord(row.dienGiai, hangHoaList) : null;
+  if (matchedHH) {
+    const r = classifyFromHangHoaMatch(matchedHH, row.dienGiai, row.soTienTruocThue);
+    row.tenHangHoaMisa = r.tenHangHoaMisa;
+    row.phanLoai = r.phanLoai;
+    row.taiKhoanNo = r.taiKhoanNo;
+  } else {
+    const classified = classifyPhanLoai(row.dienGiai, row.soTienTruocThue);
+    row.phanLoai = classified.phanLoai;
+    row.taiKhoanNo = classified.taiKhoanNo;
   }
   const nccList = (store.hoa_don_dau_vao_ncc_list || []).filter((n) => n.congTy === row.congTy);
   if (nccList.length > 0) {
@@ -353,6 +372,9 @@ router.get("/hoa-don-dau-vao/export.xlsx", (req, res) => {
     "Số hóa đơn": r.soHoaDon,
     "Diễn giải": r.dienGiai,
     "Tên hàng hóa (Misa)": r.tenHangHoaMisa,
+    "Đơn vị tính": r.donViTinh,
+    "Số lượng": r.soLuong,
+    "Đơn giá": r.donGia,
     "Phân loại": r.phanLoai,
     "Tài khoản Nợ": r.taiKhoanNo,
     "Tài khoản Có": r.taiKhoanCo,
@@ -480,6 +502,9 @@ router.post("/hoa-don-dau-vao/upload", requireDataEntry, upload.single("file"), 
         soTienTruocThue: r.soTienTruocThue,
         tienThue: r.tienThue,
         soTien: r.soTien,
+        donViTinh: r.donViTinh || "",
+        soLuong: r.soLuong || 0,
+        donGia: r.donGia || 0,
         linkHoaDon: "",
         daHachToan: false,
         ghiChu: "",
@@ -666,19 +691,34 @@ router.post("/hoa-don-dau-vao/upload-hang-hoa", requireDataEntry, upload.single(
     store.hoa_don_dau_vao_hang_hoa_list = rows;
     store.hoa_don_dau_vao_hang_hoa_meta = { uploaded_at: new Date().toISOString(), file_name: req.file.originalname, count: rows.length };
 
+    // Chi Nhan, 2026-07-29: "tài khoản là 156 đi ... check lại tên nha có thể
+    // tên khác" -- dung matchHangHoaRecord (khop them ca theo Ma, khong chi
+    // Ten) va, khi khop duoc, DIEN LUON Tai khoan No/Phan loai theo TK Kho cua
+    // mat hang do (mac dinh 156 neu file khong ghi TK Kho) -- CHI dien vao
+    // dong dang TRONG (khong ghi de Chi Nhan da tu sua qua nut Sua).
     let filled = 0;
+    let filledTk = 0;
     store.hoa_don_dau_vao.forEach((r) => {
-      if (r.congTy !== activeCompany || r.tenHangHoaMisa) return;
-      const ten = matchTenHangHoa(r.dienGiai, rows);
-      if (ten) {
-        r.tenHangHoaMisa = ten;
+      if (r.congTy !== activeCompany) return;
+      const matched = matchHangHoaRecord(r.dienGiai, rows);
+      if (!matched) return;
+      const classified = classifyFromHangHoaMatch(matched, r.dienGiai, r.soTienTruocThue);
+      if (!r.tenHangHoaMisa) {
+        r.tenHangHoaMisa = classified.tenHangHoaMisa;
         filled++;
+      }
+      if (!r.taiKhoanNo) {
+        r.phanLoai = classified.phanLoai;
+        r.taiKhoanNo = classified.taiKhoanNo;
+        filledTk++;
       }
     });
     save(store);
     res.redirect(
       "/hoa-don-dau-vao?success=" +
-        encodeURIComponent(`Đã đọc "${req.file.originalname}" (${rows.length} hàng hóa/dịch vụ): điền Tên hàng hóa cho ${filled} dòng đang trống.`)
+        encodeURIComponent(
+          `Đã đọc "${req.file.originalname}" (${rows.length} hàng hóa/dịch vụ): điền Tên hàng hóa cho ${filled} dòng, Tài khoản Nợ cho ${filledTk} dòng đang trống.`
+        )
     );
   } catch (e) {
     res.redirect("/hoa-don-dau-vao?error=" + encodeURIComponent(e.message));
@@ -932,9 +972,21 @@ router.post("/hoa-don-dau-vao/cap-nhat-phan-loai", requireDataEntry, (req, res) 
   const store = load();
   ensureShape(store);
   const activeCompany = getCompany(req);
+  const hangHoaList = store.hoa_don_dau_vao_hang_hoa_list || [];
   let filled = 0;
   store.hoa_don_dau_vao.forEach((r) => {
     if (r.congTy !== activeCompany || r.phanLoai) return;
+    // Chi Nhan, 2026-07-29: uu tien khop danh muc Hang hoa/dich vu (chinh
+    // xac tung mat hang, xem enrichNewRow) truoc khi roi ve doan tu khoa.
+    const matchedHH = hangHoaList.length > 0 ? matchHangHoaRecord(r.dienGiai, hangHoaList) : null;
+    if (matchedHH) {
+      const classified = classifyFromHangHoaMatch(matchedHH, r.dienGiai, r.soTienTruocThue);
+      r.tenHangHoaMisa = r.tenHangHoaMisa || classified.tenHangHoaMisa;
+      r.phanLoai = classified.phanLoai;
+      r.taiKhoanNo = classified.taiKhoanNo;
+      filled++;
+      return;
+    }
     const { phanLoai, taiKhoanNo } = classifyPhanLoai(r.dienGiai, r.soTienTruocThue);
     if (phanLoai) {
       r.phanLoai = phanLoai;

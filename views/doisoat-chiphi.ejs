@@ -319,12 +319,17 @@
     <section class="panel">
       <div class="panel-head">
         <h2>5. Công nợ NCC theo tên</h2>
+        <a href="/doi-soat/chi-phi/cong-no-ncc/export.xlsx" class="btn btn-secondary">Xuất Excel</a>
       </div>
       <p class="muted" style="margin-top:6px;">
-        Mỗi NCC: <strong>Tổng hóa đơn</strong> (cộng dồn Số tiền các hóa đơn bên "Hóa Đơn Đầu Vào" của NCC này),
-        <strong>Đã chi</strong> (cộng các hóa đơn đã đánh dấu Đã chi tiền), <strong>Còn nợ</strong> = Tổng hóa đơn − Đã chi.
+        Mỗi NCC: <strong>Tổng hóa đơn</strong> (cộng dồn từng hóa đơn — nhiều dòng hàng hóa cùng 1 Số hóa đơn đã được
+        gộp lại, cộng tổng tiền — bên "Hóa Đơn Đầu Vào" của NCC này), <strong>Đã chi</strong> (cộng các hóa đơn đã
+        đánh dấu Đã chi tiền), <strong>Còn nợ</strong> = Tổng hóa đơn − Đã chi.
         Bấm vào tên NCC để xem từng hóa đơn — hóa đơn nào Đã chi sẽ cố gắng dò thêm ngày/tài khoản đã thanh toán
-        (khớp Tên NCC + Số tiền với dòng Chi phí hoặc giao dịch ngân hàng, chỉ để tham khảo).
+        (khớp Tên NCC/MST + Tổng số tiền hóa đơn với dòng Chi phí hoặc giao dịch ngân hàng, chỉ để tham khảo).
+        <strong>Lưu ý</strong>: nếu chị trả gộp nhiều hóa đơn cùng lúc (trả theo đợt/cấn trừ công nợ cuối tháng),
+        số tiền giao dịch sẽ không khớp đúng 1 hóa đơn riêng lẻ nên cột "Ngày/Nơi thanh toán" có thể không dò ra được
+        dù hóa đơn đó đã được đánh dấu Đã chi — chị tự đối chiếu thêm cho những trường hợp này.
       </p>
       <div style="margin:10px 0;">
         <input type="text" id="nccDebtSearch" placeholder="Tìm theo tên NCC..." style="width:280px;max-width:100%;" onkeyup="filterNccDebtRows()" />

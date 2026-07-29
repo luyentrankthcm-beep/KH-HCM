@@ -82,6 +82,16 @@ function parseHangHoaWorkbook(buffer) {
     ten: header.findIndex((c) => c === "ten"),
     tinhChat: header.findIndex((c) => c.includes("tinh chat")),
     donViTinh: header.findIndex((c) => c.includes("don vi tinh")),
+    // Chi Nhan, 2026-07-29: "tài khoản là 156 đi ... tôi có tải bảng hệ thống
+    // tài khoản chia theo gian cho tôi rồi ấy" -- file "Danh sách hàng hóa,
+    // dịch vụ" (MISA) THUONG co san 2 cot nay (da ghi chu tu 2026-07-28 nhung
+    // chua doc): "TK Kho" (tai khoan No khi nhap kho -- 156/152/153 tuy loai
+    // hang) va "TK Doanh thu". Doc THEM 2 cot nay, khong bat buoc phai co
+    // (khong throw neu thieu) -- dung lam TAI KHOAN NO DUNG NHAT cho tung mat
+    // hang cu the (uu tien HON keyword doan trong classifyPhanLoai) khi khop
+    // duoc dong hang hoa nao qua matchTenHangHoa/matchHangHoaRecord.
+    tkKho: header.findIndex((c) => c.includes("tk kho")),
+    tkDoanhThu: header.findIndex((c) => c.includes("tk doanh thu")),
   };
   const rows = [];
   for (let r = headerIdx + 1; r < grid.length; r++) {
@@ -93,6 +103,8 @@ function parseHangHoaWorkbook(buffer) {
       ten: String(ten).trim(),
       tinhChat: col.tinhChat !== -1 ? String(row[col.tinhChat] || "").trim() : "",
       donViTinh: col.donViTinh !== -1 ? String(row[col.donViTinh] || "").trim() : "",
+      tkKho: col.tkKho !== -1 ? String(row[col.tkKho] || "").trim() : "",
+      tkDoanhThu: col.tkDoanhThu !== -1 ? String(row[col.tkDoanhThu] || "").trim() : "",
     });
   }
   // Uu tien khop TEN DAI truoc (cu the hon) khi nhieu ten cung la substring cua Dien giai.
@@ -264,13 +276,50 @@ const CCDC_KEYWORDS = ["ccdc", "cong cu dung cu", "dung cu", "ban ghe", "airpods
 const CHI_PHI_642_KEYWORDS = [
   "xang dau", "xang", "dau nhot", "van phong pham", "vpp", "phi ngan hang",
   "phi chuyen khoan", "phi quan ly tai khoan", "phi thuong nien the", "in an",
-  "photo", "cuoc phi", "lai vay",
+  "photo", "cuoc phi", "lai vay", "sim", "cuoc dien thoai", "thue bao",
+  "vien thong", "internet", "phi thuong nien", "phi duy tri",
+  // Chi Nhan, 2026-07-29: them tu du lieu that (kiem tra 2026-07-29) -- phi
+  // giao dich phan mem/vi dien tu, phi marketing: KHONG tao doanh thu truc
+  // tiep tu vui choi giai tri, dung 1 y voi "Khác"/642 Chi Nhan yeu cau.
+  "phi giao dich", "phan mem", "phi marketing", "quang cao",
 ];
+// Chi Nhan, 2026-07-29: "tiền điện tiền nước đưa vào phí lưu trú nhá" -- tach
+// rieng tien dien/nuoc ra khoi nhom Dich vu chung (truoc do gom chung voi
+// thue mat bang/phi quan ly...), van cung TK No 154 (chi phi truc tiep de
+// duy tri gian dang thue) nhung PHAN LOAI ten rieng cho de doi soat/xem xet.
+const PHI_LUU_TRU_KEYWORDS = ["tien dien", "tien nuoc"];
 const DICH_VU_KEYWORDS = [
-  "tien dien", "tien nuoc", "phi thue", "thue gian", "thue mat bang",
-  "phi quan ly", "bao hiem", "internet", "cuoc vien thong", "tu van",
-  "bao tri", "bao duong", "van chuyen", "dao tao", "kiem toan", "quang cao",
-  "hoa hong", "ve ", "dich vu", "phi dich vu",
+  "phi thue", "thue gian", "thue mat bang", "phi quan ly",
+  "bao hiem", "tu van", "bao tri", "bao duong", "van chuyen",
+  "dao tao", "kiem toan", "hoa hong", "ve ", "dich vu", "phi dich vu",
+];
+// Chi Nhan, 2026-07-29: "các nvl phải qua chế biến mới bỏ vào 154 nhá còn kem
+// hay cái nào đếm được bán liền không qua chế biến thì đưa vô 156 nhá" --
+// GOI Y tu khoa cho truong hop KHONG khop duoc voi danh muc hang hoa (uploaded
+// hang-hoa list, xem matchHangHoaRecord) -- vd hang dong lanh/nguyen lieu tuoi
+// song can nau/chien/hap truoc khi ban (154, "dang che" -- chua thanh pham),
+// khac voi hang dong goi/che bien san co the ban thang cho khach (156).
+const NVL_CHE_BIEN_KEYWORDS = [
+  "vien hai san", "tom vien", "ca vien", "muc vien", "muc xoan", "cha ca",
+  "cha hai san", "dau hu ca", "tam bot", "hai san dong lanh", "thit song",
+  "thit dong lanh", "ca dong lanh", "rau hon hop", "rau cu dong lanh",
+  "nguyen lieu", "gia vi", "bot chien gion", "khoai tay dong lanh",
+  // Chi Nhan, 2026-07-29: them tu du lieu that -- xot/sot dung de che bien
+  // mon an (khong ban rieng cho khach), tinh la NVL nhu gia vi.
+  "xot ", "sot ",
+];
+// Chi Nhan, 2026-07-29: mo rong tu du lieu that (kiem tra 2026-07-29, cac
+// mat hang nay KHONG khop duoc voi danh muc hang hoa Chi Nhan da tai truoc
+// do nen truoc day roi ve "Khác"/642 sai -- nuoc uong/banh keo/snack DA co
+// ban tai cac gian FARM PT-... la hang hoa BAN THANG cho khach, khong lien
+// quan che bien) -- day CHI la GOI Y bo sung, chinh xac nhat van la khop
+// dung danh muc hang hoa Chi Nhan tai len (xem matchHangHoaRecord).
+const HANG_HOA_BAN_LIEN_KEYWORDS = [
+  "kem", "banh keo", "banh ", "keo ", "do uong", "nuoc ngot", "nuoc suoi",
+  "nuoc uong", "nuoc ep", "sinh to", "sting", "coca", "pepsi", "tra xanh",
+  "nuoc tang luc", "sua ", "la vie", "aquafina", "dasani", "lay's", "lays",
+  "oishi", "poca", "oreo", "chocopie", "xuc xich", "snack", "do choi",
+  "luu niem", "ao thun", "quan short", "non", "tui xach", "moc khoa", "sticker",
 ];
 const TAI_SAN_THRESHOLD = 30000000; // quy dinh TSCD: gia tri >= 30 trieu VA thoi gian su dung > 1 nam
 
@@ -287,17 +336,79 @@ function classifyPhanLoai(dienGiai, soTienTruocThue) {
   if (CHI_PHI_642_KEYWORDS.some((k) => t.includes(k))) {
     return { phanLoai: "Chi phí QLDN", taiKhoanNo: "642" };
   }
+  if (PHI_LUU_TRU_KEYWORDS.some((k) => t.includes(k))) {
+    return { phanLoai: "Phí lưu trú", taiKhoanNo: "154" };
+  }
   if (DICH_VU_KEYWORDS.some((k) => t.includes(k))) {
     return { phanLoai: "Dịch vụ", taiKhoanNo: "154" };
   }
+  if (NVL_CHE_BIEN_KEYWORDS.some((k) => t.includes(k))) {
+    return { phanLoai: "NVL chế biến", taiKhoanNo: "154" };
+  }
+  if (HANG_HOA_BAN_LIEN_KEYWORDS.some((k) => t.includes(k))) {
+    return { phanLoai: "Hàng hóa", taiKhoanNo: "156" };
+  }
+  // Chi Nhan, 2026-07-29: "có nhiều cái không liên quan tới dịch vụ vui chơi
+  // giải trí không tạo ra doanh thu thì đưa vào tên Khác nhá đưa vào 642 theo
+  // lý lẽ của bạn" -- LUC DAU thu mac dinh MOI dong con lai (khong khop nhom
+  // nao) thanh "Khác"/642, nhung kiem tra tren du lieu that (2026-07-29) cho
+  // thay nhieu mat hang THAT SU la hang hoa ban tai cac gian (nuoc uong,
+  // snack, sua...) chi vi CHUA co trong danh muc hang hoa Chi Nhan tai len
+  // nen bi roi xuong day va bi gan SAI thanh 642 -- rui ro hon la de trong.
+  // Vi vay: CHI gan "Khác"/642 khi Dien giai chua 1 tu khoa trong
+  // CHI_PHI_642_KEYWORDS o tren (da mo rong them phi giao dich/phan mem/
+  // marketing tu du lieu that) -- con lai KHONG khop duoc nhom nao thi de
+  // TRONG (nhu truoc), Chi Nhan tu xem/gan tay hoac tai them danh muc hang
+  // hoa day du hon (mat hang/mã trong file se tu khop chinh xac, xem
+  // matchHangHoaRecord) thay vi doan sai qua tu khoa.
   return { phanLoai: "", taiKhoanNo: "" };
 }
 
-function matchTenHangHoa(dienGiai, hangHoaList) {
+// Chi Nhan, 2026-07-29: "tên hàng hóa là mã hàng hóa á bim bim cũng vậy á nên
+// bạn check lại tên nha có thể tên khác" -- truoc day CHI khop theo "Tên" dai
+// (substring), nhieu mat hang trong danh muc (dac biet snack/bimbim) ghi theo
+// "Mã" (vd "TEXAS53G10X10") thay vi ten day du, hoac ten trong Dien giai viet
+// tat/khac thu tu voi ten trong danh muc nen khong khop duoc -- THEM buoc 2:
+// thu khop theo Ma (bo het khoang trang ca 2 ben) truoc khi bo cuoc. Tra ve CA
+// BAN GHI (khong chi ten) de lay them tkKho dung lam Tai khoan No.
+function matchHangHoaRecord(dienGiai, hangHoaList) {
   const t = normVN(dienGiai);
-  if (!t) return "";
-  const found = hangHoaList.find((h) => h.ten && t.includes(normVN(h.ten)));
+  if (!t) return null;
+  const byTen = hangHoaList.find((h) => h.ten && t.includes(normVN(h.ten)));
+  if (byTen) return byTen;
+  const tNoSpace = t.replace(/\s+/g, "");
+  const byMa = hangHoaList.find((h) => h.ma && h.ma.length >= 4 && tNoSpace.includes(normVN(h.ma).replace(/\s+/g, "")));
+  return byMa || null;
+}
+
+function matchTenHangHoa(dienGiai, hangHoaList) {
+  const found = matchHangHoaRecord(dienGiai, hangHoaList);
   return found ? found.ten : "";
+}
+
+// Chi Nhan, 2026-07-29: dung CHUNG 1 cho 3 cho goi (enrichNewRow, upload-
+// hang-hoa, cap-nhat-phan-loai ben routes/hoa-don-dau-vao.js) -- danh muc
+// hang hoa CHINH CHI Chi Nhan da tai len co san cot "Tính chất" (Hàng
+// hóa/Dịch vụ, kiem tra du lieu that 2026-07-29 thay co san, KHONG phai doan)
+// -- mat hang tinh chat "Dịch vụ" (vd "THU PHI SMS...") thi KHONG duoc gan
+// thang 156 (do la hang hoa ban ra), phai roi ve doan qua tu khoa
+// (classifyPhanLoai) nhu binh thuong de ra dung 154/642/... CHI mat hang
+// tinh chat "Hàng hóa" (hoac khong ghi ro tinh chat) moi mac dinh 156.
+function classifyFromHangHoaMatch(matched, dienGiai, soTienTruocThue) {
+  const isDichVu = normVN(matched.tinhChat).includes("dich vu");
+  if (isDichVu) {
+    const classified = classifyPhanLoai(dienGiai, soTienTruocThue);
+    return {
+      tenHangHoaMisa: matched.ten,
+      phanLoai: classified.phanLoai || "Dịch vụ (theo danh mục)",
+      taiKhoanNo: matched.tkKho || classified.taiKhoanNo || "154",
+    };
+  }
+  return {
+    tenHangHoaMisa: matched.ten,
+    phanLoai: "Hàng hóa (theo danh mục)",
+    taiKhoanNo: matched.tkKho || "156",
+  };
 }
 
 module.exports = {
@@ -310,4 +421,6 @@ module.exports = {
   matchGianViaChiPhiLedger,
   classifyPhanLoai,
   matchTenHangHoa,
+  matchHangHoaRecord,
+  classifyFromHangHoaMatch,
 };

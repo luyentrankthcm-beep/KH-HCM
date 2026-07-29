@@ -90,9 +90,18 @@ function parseHoaDonDauVaoWorkbook(buffer) {
     truocThue: findCol(headerRow, ["doanh số bán chưa thuế", "chưa thuế"]),
     thueGtgt: findCol(headerRow, ["thuế gtgt", "tiền thuế"]),
     tongThanhToan: findCol(headerRow, ["tổng tiền thanh toán"]),
+    // Chi Nhan, 2026-07-29: "hóa đơn lấy thêm thông tin đơn vị tính cho tôi
+    // luôn nhá số lượng và đơn giá cho tôi nhá xuất ra file excel mới có thôi
+    // chứ không cần hiển thị thêm trên đây" -- 3 cot THEM, tuy chon (khong bat
+    // buoc phai co, khong co thi de trong/0, KHONG throw loi) vi file nguon co
+    // the khong co du ca 3 cot nay. Chi dung cho export.xlsx, KHONG hien tren
+    // bang web (xem GET /hoa-don-dau-vao va views/hoa-don-dau-vao.ejs).
+    donViTinh: findCol(headerRow, ["đơn vị tính", "đvt"]),
+    soLuong: findCol(headerRow, ["số lượng", "sl"]),
+    donGia: findCol(headerRow, ["đơn giá"]),
   };
   const missing = Object.entries(col)
-    .filter(([k, v]) => v === -1 && k !== "stt" && k !== "kyHieu")
+    .filter(([k, v]) => v === -1 && k !== "stt" && k !== "kyHieu" && k !== "donViTinh" && k !== "soLuong" && k !== "donGia")
     .map(([k]) => k);
   if (missing.length > 0) {
     throw new Error(`Không tìm thấy cột: ${missing.join(", ")} trong file.`);
@@ -118,6 +127,9 @@ function parseHoaDonDauVaoWorkbook(buffer) {
       soTienTruocThue: parseNumberCell(row[col.truocThue]),
       tienThue: parseNumberCell(row[col.thueGtgt]),
       soTien: parseNumberCell(row[col.tongThanhToan]),
+      donViTinh: col.donViTinh !== -1 ? String(row[col.donViTinh] || "").trim() : "",
+      soLuong: col.soLuong !== -1 ? parseNumberCell(row[col.soLuong]) : 0,
+      donGia: col.donGia !== -1 ? parseNumberCell(row[col.donGia]) : 0,
     });
   }
 
