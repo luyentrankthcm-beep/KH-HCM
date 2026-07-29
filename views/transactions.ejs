@@ -48,6 +48,9 @@
         <% if (uploadResult.healedRemoved > 0) { %>
         Đã tự động dọn <strong><%= uploadResult.healedRemoved %></strong> dòng cũ bị gộp nhầm (do lỗi trùng lặp trước đây) trong đúng khoảng ngày của file này trước khi nạp lại đầy đủ.
         <% } %>
+        <% if (uploadResult.backfilledVendor > 0) { %>
+        Đã điền thêm Tên đối ứng cho <strong><%= uploadResult.backfilledVendor %></strong> dòng cũ đang trống (đã có sẵn từ trước khi có cột này).
+        <% } %>
       </div>
       <% } %>
     </section>

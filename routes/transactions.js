@@ -428,20 +428,35 @@ router.post("/transactions/upload-statement", requireDataEntry, upload.single("f
   }
 
   const bankTx = store.transactions.filter((t) => t.bank_id === bankIdNum);
-  const existingRefs = new Set(bankTx.filter((t) => t.reference).map((t) => t.reference));
+  // Chi Nhan, 2026-07-29: doi tu Set sang Map (reference -> chinh dong da
+  // luu) de co the SUA (backfill) truc tiep dong da co san, khong chi biet
+  // "co roi" nhu Set truoc day.
+  const existingByRef = new Map(bankTx.filter((t) => t.reference).map((t) => [t.reference, t]));
   const existingKeys = new Set(
     bankTx.filter((t) => !t.reference).map((t) => `${t.date}|${t.amount}|${t.type}`)
   );
 
   let added = 0;
   let skipped = 0;
+  // Chi Nhan, 2026-07-29: "tôi đã tải sao kê bên ngân hàng rồi ... sao lại
+  // không có [Tên đối ứng]" -- tai khoan da co san du lieu TU TRUOC (luc
+  // chua doc duoc cot Ten doi ung) se bi tinh la "trung" theo reference va bo
+  // qua nhu cu (khong tao dong moi), nen KHONG BAO GIO duoc dien Ten doi ung
+  // moi neu chi dung logic upsert cu. Backfill THEM o day: dong da co san nao
+  // dang TRONG tenDoiUng ma lan doc file nay ra duoc gia tri thi dien vao
+  // (khong ghi de neu dong do da co san Ten doi ung, tranh mat du lieu da co).
+  let backfilledVendor = 0;
   for (const c of candidates) {
     if (c.reference) {
-      if (existingRefs.has(c.reference)) {
+      const existingRow = existingByRef.get(c.reference);
+      if (existingRow) {
         skipped++;
+        if (!existingRow.tenDoiUng && c.tenDoiUng) {
+          existingRow.tenDoiUng = c.tenDoiUng;
+          backfilledVendor++;
+        }
         continue;
       }
-      existingRefs.add(c.reference);
     } else {
       const key = `${c.date}|${c.amount}|${c.type}`;
       if (existingKeys.has(key)) {
@@ -450,7 +465,7 @@ router.post("/transactions/upload-statement", requireDataEntry, upload.single("f
       }
       existingKeys.add(key);
     }
-    store.transactions.push({
+    const newRow = {
       id: nextId(store, "transactions"),
       bank_id: bankIdNum,
       date: c.date,
@@ -465,10 +480,12 @@ router.post("/transactions/upload-statement", requireDataEntry, upload.single("f
       tenDoiUng: c.tenDoiUng || "",
       created_at: new Date().toISOString(),
       created_by: req.session.userName || "",
-    });
+    };
+    store.transactions.push(newRow);
+    if (c.reference) existingByRef.set(c.reference, newRow);
     added++;
   }
-  if (added > 0 || healedRemoved > 0) save(store);
+  if (added > 0 || healedRemoved > 0 || backfilledVendor > 0) save(store);
 
   const allFilteredAfterUpload = filterTransactionsWithBalance(store, {
     bank_id,
@@ -488,6 +505,7 @@ router.post("/transactions/upload-statement", requireDataEntry, upload.single("f
       added,
       skipped,
       healedRemoved,
+      backfilledVendor,
     },
     maCongTrinhMaster: maCongTrinhMasterFor(store, activeCompany),
     maCongTrinhResult: null,
