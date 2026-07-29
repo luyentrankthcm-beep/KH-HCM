@@ -121,6 +121,62 @@ const GIAN_MERGE_DEFAULTS = {
   "FARM LOTTE PHAN THIET": { maCongTrinh: "LOTTE PHAN THIET", isCse: false },
 };
 
+// Chi Nhan, 2026-07-29: "chia hóa đơn bị nhầm vô như 4 gian tôi nói á bị xuất
+// chung hóa đơn á cấn trừ qua giúp tôi ... lưu luôn loại này để mốt lệch t2 á"
+// -- 2 cap gian nay (kenh BIDV77021) LUON duoc nhan vien xuat hoa don GOP
+// CHUNG 1 hoa don/ngay duoi TEN CHI 1 TRONG 2 gian (khong tach rieng hoa don
+// cho tung diem that), nen 1 ben luon hien "Chua co HD" con ben kia luon
+// "Lech" (hoa don du dung phan cua ben con lai). Truoc day phai tu tao tung
+// "Doi tru thu cong" (store.viet_qr_manual_matches) rieng cho MOI ngay (~25
+// lan cho ngay 1-27/7) -- Chi Nhan xac nhan 2026-07-29 day la CACH XUAT HOA
+// DON CO DINH (khong phai loi 1 lan), nen chuyen thanh QUY TAC TU DONG ap
+// dung cho MOI ngay (ca truoc 28/7 chua co manual match, lan tuong lai) qua
+// applyInvoiceSharePairs ben duoi -- khong con phai tao tay moi ngay nua.
+// Chay SAU reconcileVietQr (dung invoiceTotal DA duoc chia theo ngay cho hoa
+// don gop nhieu ngay/T7+CN, xem ghi chu Math.round trong utils/vietqrReconcile.js)
+// nen tu dong ket hop dung ca 2 truong hop (hoa don gop 2 gian VA hoa don gop
+// 2 ngay) ma khong can code rieng cho truong hop gop ngay.
+const INVOICE_SHARE_PAIRS = {
+  bidv77021: [
+    ["VC TUYEN QUANG PNH", "NSTV TUYEN QUANG PHN"],
+    ["VC T.PHU N.TRANG PHN", "VC MAXI TN NT PHN"],
+  ],
+};
+
+function applyInvoiceSharePairs(reconciled, pairs) {
+  if (!pairs || pairs.length === 0) return;
+  reconciled.forEach((r) => {
+    pairs.forEach(([codeA, codeB]) => {
+      const lineA = r.lines.find((l) => l.code === codeA);
+      const lineB = r.lines.find((l) => l.code === codeB);
+      if (!lineA || !lineB) return; // ngay nay 1 trong 2 khong co doanh thu -- khong co gi de chia
+      const combinedGross = lineA.gross + lineB.gross;
+      const combinedInvoiceTotal = lineA.invoiceTotal + lineB.invoiceTotal;
+      const combinedInvoiceNumbers = Array.from(new Set([...lineA.invoiceNumbers, ...lineB.invoiceNumbers]));
+      if (combinedGross <= 0 || combinedInvoiceNumbers.length === 0) return;
+      const newTotalA = Math.round((combinedInvoiceTotal * lineA.gross) / combinedGross);
+      const newTotalB = combinedInvoiceTotal - newTotalA;
+      const note = `Tu dong chia theo ty le doanh thu: hoa don cua "${codeA}"/"${codeB}" do nhan vien xuat chung 1 hoa don/ngay duoi 1 ten, he thong tu chia lai theo dung doanh thu ngan hang tung gian.`;
+      Object.assign(lineA, {
+        invoiceNumbers: combinedInvoiceNumbers,
+        invoiceTotal: newTotalA,
+        diff: newTotalA - lineA.gross,
+        matched: Math.abs(newTotalA - lineA.gross) < 1,
+        manualOverride: true,
+        manualNote: note,
+      });
+      Object.assign(lineB, {
+        invoiceNumbers: combinedInvoiceNumbers,
+        invoiceTotal: newTotalB,
+        diff: newTotalB - lineB.gross,
+        matched: Math.abs(newTotalB - lineB.gross) < 1,
+        manualOverride: true,
+        manualNote: note,
+      });
+    });
+  });
+}
+
 // Luyen, 2026-07-20: mot so ten "Mã công trình" hien tren bang doi soat Viet
 // QR (lay tu Ma diem tren hoa don/QR) khac qua xa so voi ten trong danh sach
 // "Mã công trình chuẩn" (vd co them chu thich "(EB Tân Phú)", "ghế"...) nen
@@ -702,6 +758,11 @@ function buildChannelReconciliation(store, channelKey) {
     manualMatches,
     store.invoice_diem_alias
   );
+
+  // Xem ghi chu tai INVOICE_SHARE_PAIRS o tren -- chay SAU reconcileVietQr
+  // (da bao gom ca chia theo ngay cho hoa don gop T7+CN) de tu dong chia lai
+  // theo dung ty le doanh thu cho cac cap gian bi xuat chung 1 hoa don.
+  applyInvoiceSharePairs(reconciled, INVOICE_SHARE_PAIRS[channelKey]);
 
   // Luyen, 2026-07-27: "các giao dịch không phải của vietqr thì trừ ra nhá
   // cái nào có mã tham chiếu á" -- tu ngay cutover (refMatchFrom), 1 giao
