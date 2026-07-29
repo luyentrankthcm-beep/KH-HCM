@@ -57,6 +57,13 @@
     window.__khbtPanelToggleInit = true;
 
     var STORAGE_PREFIX = "khbt_panel_collapsed:" + location.pathname + ":";
+    // Nhan, 2026-07-29: "cái này lúc nào cx ở trang thái hiện cho tôi" -- khung
+    // "Danh sách giao dịch" (trang Ngân hàng) LUON mo san moi lan vao trang,
+    // KHONG phu thuoc localStorage lan truoc (khac cac khung khac -- van mac
+    // dinh AN lan dau roi nho trang thai lan sau nhu Nhan/Luyen tung yeu cau
+    // truoc do). Nut Ẩn/Hiện van hoat dong binh thuong de xem tam trong luc
+    // dang o trang, chi la lan TAI TRANG SAU khong bi ket o trang thai an nua.
+    var ALWAYS_EXPANDED_TITLES = ["Danh sách giao dịch"];
     var panels = document.querySelectorAll("section.panel");
     panels.forEach(function (panel, idx) {
       var h2 = panel.querySelector("h2");
@@ -94,8 +101,11 @@
       try {
         saved = localStorage.getItem(key);
       } catch (e) {}
+      var alwaysExpanded = ALWAYS_EXPANDED_TITLES.indexOf(h2.textContent.trim()) !== -1;
       // Chua co gia tri luu (lan dau vao trang) -> mac dinh AN (collapsed).
-      setState(saved === null ? true : saved === "1");
+      // Rieng cac khung trong ALWAYS_EXPANDED_TITLES -- bo qua gia tri da luu,
+      // MOI LAN vao trang deu mo san.
+      setState(alwaysExpanded ? false : saved === null ? true : saved === "1");
 
       btn.addEventListener("click", function () {
         setState(wrapper.style.display !== "none");
