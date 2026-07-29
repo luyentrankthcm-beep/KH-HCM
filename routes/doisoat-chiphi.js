@@ -47,6 +47,13 @@ const CHANNELS = {
   // khac trong ten sheet) de tu nhan dien khi upload file co sheet ten
   // "VP58888" giong file sao ke thuc te Luyen da dung.
   vp58888: { bankName: "VP58888", label: "VP 58888 (KH Mới)", sheetMatch: /58888/, company: "kh_moi" },
+  // Chi Nhan, 2026-07-29: "thêm 1 tk chi bên kh mới cho tôi đi ... với gắn vô
+  // mục tk chi cho tôi nhá" -- them tai khoan chi phi moi BIDV8681 (KH Moi).
+  // bankName PHAI khop CHINH XAC "Tên hiển thị" cua tai khoan trong Quan ly
+  // ngan hang (xem buildChannelChiPhi: tim theo store.banks.find(b => b.name
+  // === cfg.bankName)) -- Chi Nhan can tao tai khoan nay voi Ten hien thi
+  // dung la "BIDV8681" thi kenh moi nay moi nhan dien duoc.
+  bidv8681: { bankName: "BIDV8681", label: "BIDV 8681 (KH Mới)", sheetMatch: /8681/, company: "kh_moi" },
 };
 const CHANNEL_KEYS = Object.keys(CHANNELS);
 const UPDATED_NOTE = " Ket qua ben duoi da tu cap nhat theo du lieu moi.";
