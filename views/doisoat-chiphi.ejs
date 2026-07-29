@@ -315,6 +315,115 @@
         <button type="submit" class="btn btn-primary">Lưu TK Nợ</button>
       </form>
     </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <h2>5. Công nợ NCC theo tên</h2>
+      </div>
+      <p class="muted" style="margin-top:6px;">
+        Mỗi NCC: <strong>Tổng hóa đơn</strong> (cộng dồn Số tiền các hóa đơn bên "Hóa Đơn Đầu Vào" của NCC này),
+        <strong>Đã chi</strong> (cộng các hóa đơn đã đánh dấu Đã chi tiền), <strong>Còn nợ</strong> = Tổng hóa đơn − Đã chi.
+        Bấm vào tên NCC để xem từng hóa đơn — hóa đơn nào Đã chi sẽ cố gắng dò thêm ngày/tài khoản đã thanh toán
+        (khớp Tên NCC + Số tiền với dòng Chi phí hoặc giao dịch ngân hàng, chỉ để tham khảo).
+      </p>
+      <div style="margin:10px 0;">
+        <input type="text" id="nccDebtSearch" placeholder="Tìm theo tên NCC..." style="width:280px;max-width:100%;" onkeyup="filterNccDebtRows()" />
+      </div>
+      <div class="cards" style="margin-bottom:14px;">
+        <div class="card">
+          <div class="card-label">Tổng hóa đơn (tất cả NCC)</div>
+          <div class="card-value"><%= nccDebtGrandTotal.tongHoaDon.toLocaleString('vi-VN') %> đ</div>
+        </div>
+        <div class="card card-thu">
+          <div class="card-label">Đã chi</div>
+          <div class="card-value"><%= nccDebtGrandTotal.daChi.toLocaleString('vi-VN') %> đ</div>
+        </div>
+        <div class="card <%= nccDebtGrandTotal.conNo > 0 ? 'card-chi' : 'card-thu' %>">
+          <div class="card-label">Còn nợ</div>
+          <div class="card-value"><%= nccDebtGrandTotal.conNo.toLocaleString('vi-VN') %> đ</div>
+        </div>
+      </div>
+      <div class="table-scroll">
+        <table class="table" id="nccDebtTable">
+          <thead>
+            <tr>
+              <th>NCC</th><th>Số hóa đơn</th><th>Tổng hóa đơn</th><th>Đã chi</th><th>Còn nợ</th><th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <% nccDebtRows.forEach(function(g, gi) { %>
+            <tr class="ncc-debt-row" data-name="<%= g.tenNCC.toLowerCase() %>">
+              <td><strong><%= g.tenNCC %></strong><% if (g.mstNCC) { %><div class="muted" style="font-size:12px;">MST: <%= g.mstNCC %></div><% } %></td>
+              <td class="num"><%= g.soHoaDonCount %></td>
+              <td class="num"><%= g.tongHoaDon.toLocaleString('vi-VN') %> đ</td>
+              <td class="num" style="color:#1a7f37;"><%= g.daChi.toLocaleString('vi-VN') %> đ</td>
+              <td class="num" style="font-weight:700;color:<%= g.conNo > 0 ? '#c0392b' : '#1a7f37' %>;">
+                <%= g.conNo.toLocaleString('vi-VN') %> đ
+                <% if (g.conNo <= 0 && g.daChi > 0) { %><span class="badge badge-thu" title="Đã chi đủ hoặc vượt tổng hóa đơn">Hết nợ</span><% } %>
+              </td>
+              <td><button type="button" class="link-btn" onclick="toggleNccDebtDetail(<%= gi %>)">Xem chi tiết ▾</button></td>
+            </tr>
+            <tr class="ncc-debt-detail-row" id="nccDebtDetail<%= gi %>" style="display:none;">
+              <td colspan="6" style="background:#fafafa;">
+                <table class="table" style="margin:6px 0;">
+                  <thead>
+                    <tr><th>Ngày HĐ</th><th>Số HĐ</th><th>Diễn giải</th><th>Số tiền</th><th>Đã chi?</th><th>Ngày/Nơi thanh toán (dò được)</th></tr>
+                  </thead>
+                  <tbody>
+                    <% g.invoices.forEach(function(inv) { %>
+                    <tr>
+                      <td><%= inv.ngayHD || '-' %></td>
+                      <td><%= inv.soHoaDon || '-' %></td>
+                      <td class="desc-cell" title="<%= inv.dienGiai %>"><%= inv.dienGiai || '-' %></td>
+                      <td class="num"><%= (inv.soTien || 0).toLocaleString('vi-VN') %> đ</td>
+                      <td>
+                        <% if (inv.daChiTien) { %>
+                        <span class="badge badge-thu">Đã chi</span>
+                        <% } else { %>
+                        <span class="badge badge-warn">Chưa chi</span>
+                        <% } %>
+                      </td>
+                      <td class="muted">
+                        <% if (inv.paymentDate) { %>
+                        <%= inv.paymentDate %> — <%= inv.paymentSource %>
+                        <% } else if (inv.daChiTien) { %>
+                        (chưa dò được nguồn chi)
+                        <% } else { %>
+                        -
+                        <% } %>
+                      </td>
+                    </tr>
+                    <% }) %>
+                  </tbody>
+                </table>
+              </td>
+            </tr>
+            <% }) %>
+            <% if (nccDebtRows.length === 0) { %>
+            <tr><td colspan="6" class="muted">Chưa có dữ liệu — cần có hóa đơn ở trang "Hóa Đơn Đầu Vào" cho công ty này.</td></tr>
+            <% } %>
+          </tbody>
+        </table>
+      </div>
+    </section>
+    <script>
+      function toggleNccDebtDetail(i) {
+        var row = document.getElementById('nccDebtDetail' + i);
+        if (!row) return;
+        row.style.display = row.style.display === 'none' ? '' : 'none';
+      }
+      function filterNccDebtRows() {
+        var q = document.getElementById('nccDebtSearch').value.trim().toLowerCase();
+        document.querySelectorAll('#nccDebtTable tr.ncc-debt-row').forEach(function (tr) {
+          var match = !q || (tr.getAttribute('data-name') || '').indexOf(q) !== -1;
+          tr.style.display = match ? '' : 'none';
+          var detailRow = tr.nextElementSibling;
+          if (!match && detailRow && detailRow.classList.contains('ncc-debt-detail-row')) {
+            detailRow.style.display = 'none';
+          }
+        });
+      }
+    </script>
   </main>
 </body>
 </html>
