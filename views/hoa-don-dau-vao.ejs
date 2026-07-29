@@ -184,12 +184,12 @@
               <td><%= r.ngayHD || '—' %></td>
               <td><span class="truncate-1line" title="<%= r.tenNCC %>"><%= r.tenNCC %></span><br /><span class="muted"><%= r.mstNCC || '—' %></span></td>
               <td><%= r.soHoaDon || '—' %><% if (r.soDong > 1) { %><br /><span class="muted">(<%= r.soDong %> dòng)</span><% } %></td>
-              <td style="white-space:pre-line;"><%= r.dienGiai || '—' %></td>
+              <td><div class="hddv-scroll-cell"><%= r.dienGiai || '—' %></div></td>
               <td><%= r.gianHang || '—' %></td>
               <td class="num"><%= (r.soTienTruocThue||0).toLocaleString('vi-VN') %> đ</td>
               <td class="num"><%= (r.tienThue||0).toLocaleString('vi-VN') %> đ</td>
               <td class="num"><%= (r.soTien||0).toLocaleString('vi-VN') %> đ</td>
-              <td style="white-space:pre-line;"><%= r.taiKhoanNo || '—' %> / <%= r.taiKhoanCo || '—' %></td>
+              <td><div class="hddv-scroll-cell"><%= r.taiKhoanNo || '—' %> / <%= r.taiKhoanCo || '—' %></div></td>
               <td>
                 <form method="POST" action="/hoa-don-dau-vao/da-chi-tien" style="display:inline">
                   <input type="hidden" name="ids" value="<%= r.idsCsv %>" />
