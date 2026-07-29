@@ -374,8 +374,16 @@ router.post("/doi-soat/chi-phi/upload", requireDataEntry, upload.single("file"),
       summaryParts.push(`${CHANNELS[chKey].label}: ${assigned[chKey].length} dong`);
     }
     if (summaryParts.length === 0) {
+      // Chi Nhan, 2026-07-29: "tôi nạp sao kê chi tk này không dc" -- thong
+      // bao loi CU hardcode chi nhac "8651"/"9997" (2 kenh dau tien), da CU
+      // tu khi them VP58888/BIDV8681 -- gio liet ke DUNG toan bo kenh + tu
+      // khoa can co trong ten sheet, lay THANG tu CHANNELS de khong bao gio
+      // lech nua khi them kenh moi ve sau.
+      const channelHints = CHANNEL_KEYS.map(
+        (k) => `${CHANNELS[k].label} (tên sheet cần chứa "${String(CHANNELS[k].sheetMatch).replace(/^\/|\/[a-z]*$/g, "")}")`
+      ).join(", ");
       throw new Error(
-        `File co ${sheets.length} sheet du lieu (${sheets.map((s) => s.sheetName).join(", ")}) nhung khong sheet nao khop ten voi 2 tai khoan chi phi (can chua "8651" hoac "9997" trong ten sheet).`
+        `File co ${sheets.length} sheet du lieu (${sheets.map((s) => s.sheetName).join(", ")}) nhung khong sheet nao khop ten voi cac tai khoan chi phi dang co: ${channelHints}. Doi ten sheet trong file Excel cho khop roi tai lai.`
       );
     }
     save(store);
