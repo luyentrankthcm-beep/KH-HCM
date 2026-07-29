@@ -164,23 +164,21 @@ function extractDayList(text) {
     .filter((x) => !isNaN(x));
 }
 
-function parseInvoiceWorkbookByTag(buffer, tag) {
-  const wbLite = XLSX.read(buffer, { type: "buffer", bookSheets: true });
-  const kdsCandidates = wbLite.SheetNames.filter((n) => /k.\s*ds\s*xu.t/i.test(n));
-  const sheetName =
-    kdsCandidates.find((n) => /989/.test(n)) ||
-    kdsCandidates[0] ||
-    wbLite.SheetNames.find((n) => {
-      const t = normText(n);
-      return t.includes("hoa don") || (t.includes("danh sach") && t.includes("don"));
-    });
-  if (!sheetName) {
-    throw new Error("Khong tim thay sheet danh sach hoa don trong file.");
-  }
-  const wb = XLSX.read(buffer, { type: "buffer", sheets: [sheetName] });
-  const ws = wb.Sheets[sheetName];
-  const grid = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: null });
-
+// Chi Nhan, 2026-07-29: "ngày 28 file MTT tôi đổi về mã công trình rồi á bạn
+// map cho tôi nhá" -- upload "MTT 29.07.xlsx" (kenh BIDV77021, tag "VietQR
+// POSH MB") tra ve 0 hoa don du sheet "kê ds xuất HĐ MTT - 705" (KH Moi) co
+// tang 2293 dong khop tag nay. NGUYEN NHAN: file MTT gop chung ca 2 cong ty
+// trong 1 file co CA 2 sheet "kê ds xuất HĐ MTT - 705" (KH Moi) VA "kê ds
+// xuất HĐ MTT - 989" (KH Cu) -- code CU chi chon 1 sheet DUY NHAT de doc,
+// uu tien CUNG "989" bat ke tag dang tim la gi, nen MOI lan doc tag cua KH
+// Moi (vd "MTD MN" cua BIDV7702, "VietQR POSH MB" cua BIDV77021) deu vo tinh
+// doc NHAM sheet "989" (toan tag cua KH Cu, khong bao gio khop) thay vi sheet
+// "705" that su chua no. Fix: DOC CA 2 (hoac nhieu hon, neu co) sheet "kê ds
+// xuat"/"danh sach ... don" VA GOP KET QUA lai -- an toan tuyet doi vi 1 tag
+// (vd "VietQR POSH MB") CHI xuat hien trong dung 1 sheet cua dung cong ty do
+// (KH Cu va KH Moi dung tag hoan toan khac nhau), khong co rui ro doc trung/
+// nham du lieu giua 2 cong ty khi gop.
+function parseInvoiceRowsFromSheet(grid, tag) {
   let headerRowIdx = -1;
   let cols = {};
   for (let r = 0; r < Math.min(grid.length, 10); r++) {
@@ -204,9 +202,7 @@ function parseInvoiceWorkbookByTag(buffer, tag) {
       break;
     }
   }
-  if (headerRowIdx < 0) {
-    throw new Error('Khong doc duoc dong tieu de (can cot "So HD" va "Ma diem") trong sheet hoa don.');
-  }
+  if (headerRowIdx < 0) return null; // sheet nay khong co dong tieu de hop le -- bo qua, khong throw (co the la sheet cua cong ty khac)
 
   const invoices = [];
   for (let r = headerRowIdx + 1; r < grid.length; r++) {
@@ -246,8 +242,38 @@ function parseInvoiceWorkbookByTag(buffer, tag) {
       raw: String(dvth).trim(),
     });
   }
+  return invoices;
+}
 
-  return { sheetName, invoices };
+function parseInvoiceWorkbookByTag(buffer, tag) {
+  const wbLite = XLSX.read(buffer, { type: "buffer", bookSheets: true });
+  let sheetCandidates = wbLite.SheetNames.filter((n) => /k.\s*ds\s*xu.t/i.test(n));
+  if (sheetCandidates.length === 0) {
+    sheetCandidates = wbLite.SheetNames.filter((n) => {
+      const t = normText(n);
+      return t.includes("hoa don") || (t.includes("danh sach") && t.includes("don"));
+    });
+  }
+  if (sheetCandidates.length === 0) {
+    throw new Error("Khong tim thay sheet danh sach hoa don trong file.");
+  }
+
+  const invoices = [];
+  const sheetNamesUsed = [];
+  for (const sheetName of sheetCandidates) {
+    const wb = XLSX.read(buffer, { type: "buffer", sheets: [sheetName] });
+    const ws = wb.Sheets[sheetName];
+    const grid = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: null });
+    const rows = parseInvoiceRowsFromSheet(grid, tag);
+    if (rows === null) continue; // sheet khong doc duoc dong tieu de -- bo qua sheet nay, thu sheet khac
+    sheetNamesUsed.push(sheetName);
+    invoices.push(...rows);
+  }
+  if (sheetNamesUsed.length === 0) {
+    throw new Error('Khong doc duoc dong tieu de (can cot "So HD" va "Ma diem") trong sheet hoa don.');
+  }
+
+  return { sheetName: sheetNamesUsed.join(", "), invoices };
 }
 
 function parseOfflineVnpayWorkbook(buffer) {

@@ -71,7 +71,17 @@ const MOMO_TX_PATTERN = /KH\d+KVCMN\d+|DICH\s+VU\s+DI\s+DONG\s+TRUC\s+TUYEN/i;
 // "phai co token X" vi mot so giao dich QR THAT lai khong co token dac
 // trung -- xem ghi chu ngay tren). Sau khi normText (bo dau, thuong hoa) de
 // khop du dien giai co dau hay khong.
-const NON_VQR_TX_PATTERN = /tra lai tien gui|thanh toan lai|lai nhap von|lai tien gui/i;
+// Chi Nhan, 2026-07-29: "hải phòng làm gì cộng dữ liệu nhiều vậy check lại
+// xem có bị trùng hk 77021" -- dieu tra ra KHONG phai trung du lieu, ma la
+// giao dich "CTNB" (Chuyen Tien Noi Bo -- giua CHINH cac tai khoan cua cong
+// ty, vd "CTNB BIDV701-681") lap lai NHIEU LAN (kiem tra 2026-07-29: >15 lan
+// tren rieng tai khoan BIDV77021, ngay 23/7 va 27-28/7 la 3 vi du da phat
+// hien/sua tay qua excludeFromVietQrRecon truoc khi tim ra day la 1 PATTERN
+// LAP LAI chu khong phai 1-2 truong hop don le) -- tien NAY khong phai khach
+// tra qua VietQR nen KHONG duoc tinh vao doanh thu QR, loai TU DONG qua day
+// (giong huong "tra lai tien gui") thay vi phai tu tay tick "Loai khoi doi
+// soat VietQR" cho tung dong 1 moi lan phat sinh ve sau.
+const NON_VQR_TX_PATTERN = /tra lai tien gui|thanh toan lai|lai nhap von|lai tien gui|ctnb/i;
 // Tach rieng buoc loc (dung chung cho ca extractVietQrSettlements o duoi VA
 // resolveGianGrossByBankRef, xem ghi chu tai do) khoi buoc gop theo ngay.
 function extractVietQrThuTransactions(transactions) {
