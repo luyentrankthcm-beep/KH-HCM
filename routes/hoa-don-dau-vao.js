@@ -250,6 +250,10 @@ router.get("/hoa-don-dau-vao", (req, res) => {
   const thangFilter = req.query.thang || "";
   const tkNoFilter = req.query.tkNo || ""; // "" = tat ca, hoac 1 ma TK No cu the (vd "154")
   const gianFilter = req.query.gian || ""; // "" = tat ca, "1" = da co Gian Hang, "0" = chua co
+  // Chi Nhan, 2026-07-29: "lên cho tôi cái hóa đơn nào chi chưa" -- them bo
+  // loc Da chi (Tat ca / Da chi / Chua chi), giup tim nhanh hoa don con chua
+  // thanh toan thay vi phai doc het danh sach.
+  const daChiFilter = req.query.daChi || ""; // "" = tat ca, "1" = da chi, "0" = chua chi
   const page = Math.max(1, parseInt(req.query.page, 10) || 1);
   const PAGE_SIZE = 30;
 
@@ -275,6 +279,8 @@ router.get("/hoa-don-dau-vao", (req, res) => {
   else if (hachToanFilter === "0") groupedRows = groupedRows.filter((r) => !r.daHachToan);
   if (gianFilter === "1") groupedRows = groupedRows.filter((r) => (r.gianHang || "").trim());
   else if (gianFilter === "0") groupedRows = groupedRows.filter((r) => !(r.gianHang || "").trim());
+  if (daChiFilter === "1") groupedRows = groupedRows.filter((r) => r.daChiTien);
+  else if (daChiFilter === "0") groupedRows = groupedRows.filter((r) => !r.daChiTien);
   groupedRows.sort((a, b) => (a.ngayHD < b.ngayHD ? 1 : -1));
   const tongTien = groupedRows.reduce((s, r) => s + (r.soTien || 0), 0);
   const daChiCount = groupedRows.filter((r) => r.daChiTien).length;
@@ -290,6 +296,7 @@ router.get("/hoa-don-dau-vao", (req, res) => {
   if (hachToanFilter) qs.push("hachToan=" + encodeURIComponent(hachToanFilter));
   if (tkNoFilter) qs.push("tkNo=" + encodeURIComponent(tkNoFilter));
   if (gianFilter) qs.push("gian=" + encodeURIComponent(gianFilter));
+  if (daChiFilter) qs.push("daChi=" + encodeURIComponent(daChiFilter));
   const baseQs = qs.join("&");
 
   const nccMeta = store.hoa_don_dau_vao_ncc_meta;
@@ -307,6 +314,7 @@ router.get("/hoa-don-dau-vao", (req, res) => {
     thangFilter,
     tkNoFilter,
     gianFilter,
+    daChiFilter,
     availableMonths,
     availableTkNo,
     tongTien,
@@ -515,6 +523,7 @@ function buildRedirectQs(body) {
   if (body.thang) qs.push("thang=" + encodeURIComponent(body.thang));
   if (body.tkNo) qs.push("tkNo=" + encodeURIComponent(body.tkNo));
   if (body.gian) qs.push("gian=" + encodeURIComponent(body.gian));
+  if (body.daChi) qs.push("daChi=" + encodeURIComponent(body.daChi));
   if (body.page) qs.push("page=" + encodeURIComponent(body.page));
   return qs;
 }

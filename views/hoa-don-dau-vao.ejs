@@ -156,6 +156,16 @@
             <option value="0" <%= gianFilter === '0' ? 'selected' : '' %>>Chưa có Gian</option>
           </select>
         </label>
+        <!-- Chi Nhan, 2026-07-29: "lên cho tôi cái hóa đơn nào chi chưa" --
+             loc nhanh hoa don Chua chi de xem con thieu hoa don nao chua
+             thanh toan. -->
+        <label class="form-inline-tight" style="gap:6px;">Đã chi
+          <select name="daChi" onchange="this.form.submit()">
+            <option value="">Tất cả</option>
+            <option value="1" <%= daChiFilter === '1' ? 'selected' : '' %>>Đã chi</option>
+            <option value="0" <%= daChiFilter === '0' ? 'selected' : '' %>>Chưa chi</option>
+          </select>
+        </label>
       </form>
       <div style="margin-bottom:10px;">
         <a class="btn" href="/hoa-don-dau-vao/export.xlsx?thang=<%= encodeURIComponent(thangFilter) %>&hachToan=<%= encodeURIComponent(hachToanFilter) %>">⬇ Xuất Excel (mỗi mặt hàng 1 dòng)</a>
@@ -197,6 +207,7 @@
                   <input type="hidden" name="hachToan" value="<%= hachToanFilter %>" />
                   <input type="hidden" name="tkNo" value="<%= tkNoFilter %>" />
                   <input type="hidden" name="gian" value="<%= gianFilter %>" />
+                  <input type="hidden" name="daChi" value="<%= daChiFilter %>" />
                   <input type="hidden" name="page" value="<%= currentPage %>" />
                   <input type="hidden" name="daChiTien" value="<%= r.daChiTien ? '0' : '1' %>" />
                   <button type="submit" class="link-btn">
@@ -211,6 +222,7 @@
                   <input type="hidden" name="hachToan" value="<%= hachToanFilter %>" />
                   <input type="hidden" name="tkNo" value="<%= tkNoFilter %>" />
                   <input type="hidden" name="gian" value="<%= gianFilter %>" />
+                  <input type="hidden" name="daChi" value="<%= daChiFilter %>" />
                   <input type="hidden" name="page" value="<%= currentPage %>" />
                   <input type="hidden" name="daHachToan" value="<%= r.daHachToan ? '0' : '1' %>" />
                   <button type="submit" class="link-btn">
@@ -252,6 +264,7 @@
                     <input type="hidden" name="hachToan" value="<%= hachToanFilter %>" />
                     <input type="hidden" name="tkNo" value="<%= tkNoFilter %>" />
                     <input type="hidden" name="gian" value="<%= gianFilter %>" />
+                    <input type="hidden" name="daChi" value="<%= daChiFilter %>" />
                     <input type="hidden" name="page" value="<%= currentPage %>" />
                     <p class="muted" style="margin:0 0 6px;">Tích chọn ô nào muốn đổi, không tích thì giữ nguyên giá trị cũ.</p>
                     <div class="hddv-edit-grid">
