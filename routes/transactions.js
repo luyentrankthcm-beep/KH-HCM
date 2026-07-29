@@ -241,7 +241,7 @@ router.post("/transactions/:id/sua", requireDataEntry, (req, res) => {
     return res.redirect("/transactions?error=" + encodeURIComponent("Không tìm thấy giao dịch này."));
   }
   try {
-    const { date, description, amount, type } = req.body;
+    const { date, description, amount, type, tenDoiUng } = req.body;
     const parsedDate = parseDate(date) || date;
     const parsedAmount = Math.abs(parseAmount(amount));
     if (!parsedDate || isNaN(parsedAmount) || !["thu", "chi"].includes(type)) {
@@ -249,6 +249,10 @@ router.post("/transactions/:id/sua", requireDataEntry, (req, res) => {
     }
     tx.date = parsedDate;
     tx.description = (description || "").trim();
+    // Chi Nhan, 2026-07-29: cho sua tay Ten doi ung tu day (vd dong cu tai
+    // truoc khi co tinh nang nay nen dang trong, hoac file sao ke khong co
+    // san cot nay).
+    tx.tenDoiUng = (tenDoiUng || "").trim();
     tx.amount = parsedAmount;
     tx.type = type;
     tx.edited_at = new Date().toISOString();
@@ -454,6 +458,11 @@ router.post("/transactions/upload-statement", requireDataEntry, upload.single("f
       amount: c.amount,
       type: c.type,
       reference: c.reference || "",
+      // Chi Nhan, 2026-07-29: "thêm cho tôi trên cái ngân hàng có hiển thị
+      // cái tên đối ứng trên sao kê" -- luu them Ten doi ung (neu file sao ke
+      // co cot nay, xem utils/bankStatementParser.js) de hien tren bang Giao
+      // dich va dung doi soat Da chi tien ben Hoa Don Dau Vao.
+      tenDoiUng: c.tenDoiUng || "",
       created_at: new Date().toISOString(),
       created_by: req.session.userName || "",
     });
@@ -637,6 +646,7 @@ router.get("/export.xlsx", (req, res) => {
       "Ngan hang": t.bank_label,
       Ngay: t.date,
       "Dien giai": t.description,
+      "Ten doi ung": t.tenDoiUng || "",
       "So tien": t.amount,
       Loai: t.type,
       "So du": t.balance,

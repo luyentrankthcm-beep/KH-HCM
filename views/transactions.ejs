@@ -201,7 +201,12 @@
 
       <table class="table">
         <thead>
-          <tr><th>Ngày</th><th>Ngân hàng</th><th>Diễn giải</th><th>Thu</th><th>Chi</th><th>Số dư</th><% if (isAdmin) { %><th></th><% } %></tr>
+          <!-- Chi Nhan, 2026-07-29: "thêm cho tôi trên cái ngân hàng có hiển
+               thị cái tên đối ứng trên sao kê luôn nha" -- them cot Ten doi
+               ung (ben kia giao dich, doc tu file sao ke neu co, xem
+               utils/bankStatementParser.js), giup do ai/NCC nao thanh toan/
+               nhan tien ma khong can doc het Dien giai dai. -->
+          <tr><th>Ngày</th><th>Ngân hàng</th><th>Diễn giải</th><th>Tên đối ứng</th><th>Thu</th><th>Chi</th><th>Số dư</th><% if (isAdmin) { %><th></th><% } %></tr>
         </thead>
         <tbody>
           <% rows.forEach(function(t) { %>
@@ -209,6 +214,7 @@
             <td><%= t.date %></td>
             <td><%= t.bank_label %></td>
             <td class="desc-cell" title="<%= t.description %>"><%= t.description %></td>
+            <td class="desc-cell" title="<%= t.tenDoiUng || '' %>"><%= t.tenDoiUng || '—' %></td>
             <td class="text-pos"><%= t.type === 'thu' ? t.amount.toLocaleString('vi-VN') + ' đ' : '' %></td>
             <td class="text-neg"><%= t.type === 'chi' ? t.amount.toLocaleString('vi-VN') + ' đ' : '' %></td>
             <td><%= t.balance != null ? t.balance.toLocaleString('vi-VN') + ' đ' : '-' %></td>
@@ -221,10 +227,11 @@
                vậy" -- truoc gio khong co cach sua 1 giao dich da nhap sai (chi
                them moi), them form sua an san ngay duoi dong, mo ra khi bam "Sửa". -->
           <tr class="tx-edit-row" id="txEdit-<%= t.id %>" style="display:none; background:#fffbe6;">
-            <td colspan="7">
+            <td colspan="8">
               <form method="POST" action="/transactions/<%= t.id %>/sua" class="form-inline tx-edit-form" data-id="<%= t.id %>" style="gap:6px; padding:6px 0;">
                 <input type="date" name="date" value="<%= t.date %>" required style="font-size:12px;" />
                 <input type="text" name="description" value="<%= t.description %>" style="width:260px; font-size:12px;" placeholder="Diễn giải" />
+                <input type="text" name="tenDoiUng" value="<%= t.tenDoiUng || '' %>" style="width:180px; font-size:12px;" placeholder="Tên đối ứng" />
                 <input type="text" name="amount" value="<%= t.amount %>" style="width:140px; font-size:12px;" placeholder="Số tiền" required />
                 <select name="type" style="font-size:12px;">
                   <option value="thu" <%= t.type === 'thu' ? 'selected' : '' %>>Thu</option>
@@ -238,7 +245,7 @@
           <% } %>
           <% }) %>
           <% if (rows.length === 0) { %>
-          <tr><td colspan="7" class="muted">Không có giao dịch nào.</td></tr>
+          <tr><td colspan="8" class="muted">Không có giao dịch nào.</td></tr>
           <% } %>
         </tbody>
       </table>

@@ -110,6 +110,12 @@ const DESC_HEADER_PATTERNS = [
 // nao khop nhom chinh trong ca dong tieu de.
 const REF_HEADER_PATTERNS_PRIMARY = ["so tham chieu", "reference"];
 const REF_HEADER_PATTERNS_FALLBACK = ["so chung tu", "so ct"];
+// Chi Nhan, 2026-07-29: "thêm cho tôi trên cái ngân hàng có hiển thị cái tên
+// đối ứng trên sao kê luôn nha các tài khoản khác cũng vậy á" -- doc them cot
+// "Tên đối ứng" (ten cua ben kia giao dich, vd NCC/khach hang), CUNG 1 pattern
+// da dung o utils/chiphiReconcile.js (VENDOR_PATTERNS) cho sao ke Chi Phi,
+// gio ap dung chung cho MOI ngan hang o trang Giao dich/Sao ke thuong.
+const VENDOR_HEADER_PATTERNS = ["ten doi ung"];
 
 function findHeaderRow(grid) {
   for (let r = 0; r < Math.min(grid.length, 20); r++) {
@@ -119,6 +125,7 @@ function findHeaderRow(grid) {
     let descCol = -1;
     let refColPrimary = -1;
     let refColFallback = -1;
+    let vendorCol = -1;
     row.forEach((cell, c) => {
       if (cell === null || cell === undefined || typeof cell !== "string") return;
       const h = normHeader(cell);
@@ -127,10 +134,11 @@ function findHeaderRow(grid) {
       if (descCol === -1 && DESC_HEADER_PATTERNS.some((p) => h.includes(p))) descCol = c;
       if (refColPrimary === -1 && REF_HEADER_PATTERNS_PRIMARY.some((p) => h.includes(p))) refColPrimary = c;
       if (refColFallback === -1 && REF_HEADER_PATTERNS_FALLBACK.some((p) => h.includes(p))) refColFallback = c;
+      if (vendorCol === -1 && VENDOR_HEADER_PATTERNS.some((p) => h.includes(p))) vendorCol = c;
     });
     const refCol = refColPrimary !== -1 ? refColPrimary : refColFallback;
     if (dateCol !== -1 && balCol !== -1) {
-      return { headerRowIdx: r, dateCol, balCol, descCol, refCol, refIsPrimary: refColPrimary !== -1 };
+      return { headerRowIdx: r, dateCol, balCol, descCol, refCol, refIsPrimary: refColPrimary !== -1, vendorCol };
     }
   }
   return null;
@@ -175,7 +183,7 @@ function parseBankStatement(buffer, sheetNameHint) {
       'Khong nhan dien duoc file sao ke: can co cot "Ngay giao dich" (hoac "Ngay hieu luc") va cot "So du".'
     );
   }
-  let { headerRowIdx, dateCol, balCol, descCol, refCol, refIsPrimary } = found;
+  let { headerRowIdx, dateCol, balCol, descCol, refCol, refIsPrimary, vendorCol } = found;
   const maxCol = (grid[headerRowIdx] || []).length;
   if (descCol === -1) {
     descCol = guessDescCol(grid, headerRowIdx, dateCol, balCol, maxCol);
@@ -198,7 +206,10 @@ function parseBankStatement(buffer, sheetNameHint) {
     const reference = refCol >= 0 && row[refCol] !== null && row[refCol] !== undefined
       ? String(row[refCol]).trim()
       : "";
-    rows.push({ date, balance: bal, description: String(desc || "").trim(), reference });
+    const tenDoiUng = vendorCol >= 0 && row[vendorCol] !== null && row[vendorCol] !== undefined
+      ? String(row[vendorCol]).trim()
+      : "";
+    rows.push({ date, balance: bal, description: String(desc || "").trim(), reference, tenDoiUng });
   }
 
   if (rows.length === 0) {
@@ -253,6 +264,7 @@ function computeThuChi(rows, priorBalance) {
       amount: Math.round(amount * 100) / 100,
       type,
       reference: r.reference || "",
+      tenDoiUng: r.tenDoiUng || "",
     });
     running = r.balance;
   }
