@@ -1305,7 +1305,15 @@ function reconcileVietQr(settlements, grossData, invoiceData, gianMapping, manua
         // vd chua tai du lieu ngay do) -- giu nguyen hanh vi cu (cong nguyen)
         // de khong lam mat canh bao "Lech" that su.
         if (totalGrossAcrossDays <= 0) return sum + inv.tongTt;
-        return sum + inv.tongTt * (thisDayGross / totalGrossAcrossDays);
+        // Chi Nhan, 2026-07-29: "hóa đơn tuyên quang nào mà ngày 26 là 300 mấy
+        // chục triệu đâu" -- SO KHONG PHAI 300 trieu, chi la 395.675,676 d (395
+        // NGAN, phan thap phan la ",676") -- phep chia ty le nay ra so thap
+        // phan dai (vd 395675.6756756757), hien thi qua toLocaleString('vi-VN')
+        // MAC DINH giu ca phan thap phan (dau phay) nen nhin nham thanh 1 nhom
+        // nghin nua ("395.675,676" bi doc nham la "395.675.676"). Lam tron ve
+        // dong nguyen (VND khong co don vi nho hon) truoc khi cong don, tranh
+        // hien thi gay hieu lam nhu vay ve sau.
+        return sum + Math.round(inv.tongTt * (thisDayGross / totalGrossAcrossDays));
       }, 0);
       const line = {
         code: g.code,
