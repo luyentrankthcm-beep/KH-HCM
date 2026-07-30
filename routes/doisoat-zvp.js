@@ -183,6 +183,35 @@ function seedZvpInvoiceDiemAliasDefaults(store) {
   return changed;
 }
 
+// Chi Nhan, 2026-07-30: "sao ngân hàng trả ngày 16/07 á trả của ngày 15 á nó
+// có 19tr mấy sao bạn cộng lên mấy trăm triệu dữ vậy" -- khoan ve ngay 16/7
+// (doanh thu 15/7) kenh Offline (VNPay QR OFFLINE) hien Ngan hang 125.766.363d
+// trong khi Tinh tu du lieu tai len (khop dung hoa don) chi 19.957.812d. Dieu
+// tra: TK ACB31268 co 2 dong giao dich CUNG mo ta y het "...VNPAY TT
+// 829168...DV QR OFFLINE NGAY 15.07.26" nhung khac so tien -- 1 dong nhap
+// 17/7 (nguoi nhap "Ga Cute") ghi 105.808.551d (KHONG khop bat ky doanh thu/
+// hoa don nao), va 1 dong nhap lai sau do ngay 20/7 (Quan tri vien K&H) ghi
+// dung 19.957.812d (khop tuyet doi voi tong hoa don ngay do) -- rat co the
+// nhap tay 17/7 bi sai/nhamg so, sau do co nguoi nhap lai dung nhung quen xoa
+// dong cu, khien 2 dong cong don lai. Chi Nhan xac nhan xoa dong sai (dua
+// theo sao ke: so dung la 19.957.812d).
+function removeDuplicateOfflineTx20260716(store) {
+  const bank = store.banks.find((b) => b.name === ZVP_BANK_NAME);
+  if (!bank) return false;
+  const before = store.transactions.length;
+  store.transactions = store.transactions.filter(
+    (t) =>
+      !(
+        t.bank_id === bank.id &&
+        t.date === "2026-07-16" &&
+        t.type === "thu" &&
+        t.amount === 105808551 &&
+        (t.description || "").includes("DV QR OFFLINE NGAY 15.07.26")
+      )
+  );
+  return store.transactions.length !== before;
+}
+
 function stripZvpGianListBadRedirects(store) {
   if (!store.zvp_gian_list || !Array.isArray(store.zvp_gian_list)) return false;
   let changed = false;
@@ -200,6 +229,7 @@ function buildReconciliation(store) {
   if (ensureNo1388(store)) save(store);
   if (stripZvpGianListBadRedirects(store)) save(store);
   if (seedZvpInvoiceDiemAliasDefaults(store)) save(store);
+  if (removeDuplicateOfflineTx20260716(store)) save(store);
   // Chi Nhan, 2026-07-29: xem ghi chu day du tai VNPAY_KHMOI_INVOICE_MADIEM_MAP
   // trong utils/vietqrReconcile.js -- hoa don KVC AE HUE/KVC TIMES/KVC ROYAL/
   // SAVICO PHN thuc ra la doanh thu VNPay KH Moi (02865168), khong phai KH
