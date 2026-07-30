@@ -1,4 +1,5 @@
 const express = require("express");
+const fs = require("fs");
 const multer = require("multer");
 const { load, save, nextId, DATA_FILE } = require("../store");
 const { requireLogin, requireAdmin } = require("../middleware/auth");
@@ -59,11 +60,26 @@ router.post("/he-thong/sao-luu/phuc-hoi", requireAdmin, upload.single("file"), (
         `File nay khong dung cau truc file sao luu K&H Bank Tracker (thieu: ${missing.join(", ")}).`
       );
     }
+    // Chi Nhan, 2026-07-30: "tôi lỡ xuất file offline lên rồi ... mất rồi" --
+    // Nhan vo tinh Phuc hoi 1 file sao luu CU (offline) DE LEN ban dang chay
+    // (online), xoa mat cong viec moi hon (map cong no NCC hom truoc) ma
+    // KHONG CO CACH NAO lay lai duoc vi thao tac nay GHI DE HOAN TOAN, khong
+    // giu lai ban truoc do o dau ca. Tu nay, TRUOC KHI ghi de, tu dong luu lai
+    // 1 ban sao cua du lieu HIEN TAI (ngay truoc luc bi ghi de) vao file rieng
+    // trong thu muc data/ -- neu Phuc hoi nham lan nua, van con 1 diem de quay
+    // lai (chi can doi ten file backup nay thanh ten file chinh va khoi dong
+    // lai server, hoac phuc hoi lai bang chinh file backup nay).
+    try {
+      const preRestoreBackupPath = DATA_FILE + ".before-phuc-hoi-" + Date.now() + ".bak";
+      fs.copyFileSync(DATA_FILE, preRestoreBackupPath);
+    } catch (backupErr) {
+      console.error("[backup] Khong the tao ban sao truoc khi phuc hoi (tiep tuc phuc hoi):", backupErr.message);
+    }
     save(parsed);
     res.render("backup", {
       userName: req.session.userName,
       error: null,
-      success: `Da phuc hoi du lieu thanh cong: ${parsed.banks.length} ngan hang, ${parsed.transactions.length} giao dich, ${parsed.users.length} tai khoan dang nhap. Ban co the can dang nhap lai.`,
+      success: `Da phuc hoi du lieu thanh cong: ${parsed.banks.length} ngan hang, ${parsed.transactions.length} giao dich, ${parsed.users.length} tai khoan dang nhap. Ban co the can dang nhap lai. (He thong da tu dong luu 1 ban sao du lieu TRUOC luc phuc hoi trong thu muc data/ -- phong khi phuc hoi nham file.)`,
     });
   } catch (e) {
     res.render("backup", { userName: req.session.userName, error: e.message, success: null });
