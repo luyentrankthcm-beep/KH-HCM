@@ -40,13 +40,16 @@ router.get("/he-thong/sao-luu/tai-xuong", (req, res) => {
 router.post("/he-thong/sao-luu/phuc-hoi", requireAdmin, upload.single("file"), (req, res) => {
   try {
     if (!req.file) throw new Error("Vui long chon 1 file sao luu (.json) de phuc hoi.");
-    const text = req.file.buffer.toString("utf8");
+    let text = req.file.buffer.toString("utf8");
+    req.file.buffer = null; // file da lon (~90MB+) -- giai phong buffer goc ngay khi da co chuoi text, tranh giu 2 ban sao cung luc gay OOM tren Railway
     let parsed;
     try {
       parsed = JSON.parse(text);
     } catch (e) {
       throw new Error("File nay khong phai file JSON hop le -- kiem tra lai file da tai xuong o muc tren.");
     }
+    text = null; // da parse xong, giai phong chuoi text (~90MB+) truoc khi goi save() (con phai stringify lai toan bo store)
+    if (global.gc) global.gc(); // ep don rac ngay (server.js chay voi --expose-gc) truoc buoc save() ton bo nho nhat, giam dinh RAM tranh OOM/502 tren Railway
     // Kiem tra so bo day co dung la file sao luu cua he thong nay khong,
     // tranh phuc hoi nham 1 file JSON khac roi mat het du lieu that.
     const requiredKeys = ["users", "banks", "transactions"];

@@ -241,21 +241,35 @@ function save(store) {
   // to a temp file (via writeFileDurable, which loops until fully written
   // and fsyncs), (2) rename it into place (atomic at the filesystem level --
   // the old file is fully replaced, not overwritten byte-by-byte), then
-  // (3) read the result back and verify it actually parses before declaring
-  // success, retrying a few times if not.
+  // (3) verify the write landed fully before declaring success, retrying a
+  // few times if not.
   // Chi Nhan, 2026-07-22: bo indent (null, 2) -- file da lon (30-40MB+), indent
   // lam file to hon dang ke va JSON.stringify cham hon (van la JSON hop le,
   // doc/phuc hoi lai binh thuong), gop voi cache o load() de giam toi da thoi
   // gian chan luong Node.js gay 502.
+  // Chi Nhan, 2026-07-30: file da qua lon (~90MB+, se con lon them) -- buoc (3)
+  // truoc day doc lai TOAN BO file roi JSON.parse lai de "kiem tra", tao ra 1
+  // BAN SAO du lieu THU HAI trong bo nho cung luc voi `store` dang giu +
+  // chuoi `data` vua stringify -- do la nguyen nhan chinh gay HET BO NHO khi
+  // phuc hoi file sao luu tren Railway (do luong: ~930MB dinh RAM cho 1 file
+  // 92MB, trong khi goi Railway chi co vai tram MB) -- day chinh la nguyen
+  // nhan loi "502 Application failed to respond" khi bam Phuc hoi sao luu.
+  // writeFileDurable() da fsync + dung writeFileSync (tu lap toi khi ghi HET
+  // buffer, khong con rui ro "ghi thieu byte") nen chi can kiem tra NHE: so
+  // sanh dung so byte da ghi thuc te tren dia voi so byte du kien, khong can
+  // doc lai + parse lai toan bo noi dung.
   const data = JSON.stringify(store);
+  const expectedBytes = Buffer.byteLength(data, "utf8");
   let lastErr = null;
   for (let attempt = 1; attempt <= 3; attempt++) {
     const tmpFile = DATA_FILE + ".tmp-" + process.pid + "-" + Date.now() + "-" + Math.random().toString(36).slice(2);
     try {
       writeFileDurable(tmpFile, data);
       fs.renameSync(tmpFile, DATA_FILE);
-      const check = fs.readFileSync(DATA_FILE, "utf8");
-      JSON.parse(check); // throws if the file on disk is corrupted
+      const actualBytes = fs.statSync(DATA_FILE).size;
+      if (actualBytes !== expectedBytes) {
+        throw new Error(`Ghi file khong du so byte (mong doi ${expectedBytes}, thuc te ${actualBytes})`);
+      }
       cachedStore = store; // cache updated only after a verified-successful write
       return; // success
     } catch (e) {

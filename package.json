@@ -4,7 +4,7 @@
   "description": "Theo doi ngan hang online cho CONG TY TNHH DICH VU VA GIAI TRI K&H",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node --expose-gc server.js"
   },
   "dependencies": {
     "adm-zip": "^0.6.0",
