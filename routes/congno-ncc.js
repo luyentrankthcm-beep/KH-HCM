@@ -1,6 +1,7 @@
 const express = require("express");
 const { load } = require("../store");
 const { requireLogin } = require("../middleware/auth");
+const { getCompany } = require("../utils/companies");
 const hoaDonDauVao = require("./hoa-don-dau-vao");
 const { normVN } = require("../utils/hoaDonDauVaoEnrich");
 
@@ -142,25 +143,31 @@ function summarizeByNcc(invoices) {
 
 router.get("/cong-no/ncc", (req, res) => {
   const store = load();
+  const activeCompany = getCompany(req);
   let error = null;
+  let invoicesAllCompanies = [];
   let invoices = [];
   let nccSummary = [];
   try {
-    invoices = buildInvoiceDebt(store);
+    invoicesAllCompanies = buildInvoiceDebt(store);
+    // Chi Nhan, 2026-07-30: "khi tôi chọn Kh mới hiện của kh mới tk kh mới hóa
+    // đơn kh mới thôi còn khi tôi chọn kh cũ thì hiện ra kh cũ á" -- loc theo
+    // DUNG cong ty dang xem o topbar (giong Hoa Don Dau Vao/Chi Phi/Phap
+    // danh), khong con gop chung 2 cong ty + dropdown loc thu cong nhu ban
+    // dau nua.
+    invoices = invoicesAllCompanies.filter((i) => i.company === activeCompany);
     nccSummary = summarizeByNcc(invoices);
   } catch (e) {
     error = e.message;
     console.error("Loi tinh cong no NCC:", e);
   }
 
-  const companyFilter = req.query.company || ""; // "", "kh_cu", "kh_moi"
   const daChiFilter = req.query.daChi || ""; // "", "1" = da chi, "0" = chua chi
   const nccFilter = (req.query.ncc || "").trim();
   const page = Math.max(1, parseInt(req.query.page, 10) || 1);
   const PAGE_SIZE = 30;
 
   let filtered = invoices;
-  if (companyFilter) filtered = filtered.filter((i) => i.company === companyFilter);
   if (daChiFilter === "1") filtered = filtered.filter((i) => i.daChi);
   else if (daChiFilter === "0") filtered = filtered.filter((i) => !i.daChi);
   if (nccFilter) {
@@ -178,7 +185,6 @@ router.get("/cong-no/ncc", (req, res) => {
   const pageRows = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
   const qs = [];
-  if (companyFilter) qs.push("company=" + encodeURIComponent(companyFilter));
   if (daChiFilter) qs.push("daChi=" + encodeURIComponent(daChiFilter));
   if (nccFilter) qs.push("ncc=" + encodeURIComponent(nccFilter));
   const baseQs = qs.join("&");
@@ -198,7 +204,6 @@ router.get("/cong-no/ncc", (req, res) => {
     currentPage,
     totalPages,
     baseQs,
-    companyFilter,
     daChiFilter,
     nccFilter,
     grandTotalHoaDon,

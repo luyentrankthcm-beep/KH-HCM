@@ -6,12 +6,13 @@
 <body>
   <%- include('partials/nav') %>
   <main class="container">
-    <h1>Công Nợ NCC</h1>
+    <h1>Công Nợ NCC — <%= COMPANIES[activeCompany].label %></h1>
     <p class="muted" style="margin-top:-10px;margin-bottom:20px;">
       Công nợ phải trả cho nhà cung cấp (NCC) — đối chiếu từng hóa đơn ở trang "Hóa Đơn Đầu Vào" với giao dịch
-      chi trên đúng 4 Tài khoản Chi: KH Cũ (VPBANK9997, BIDV8651), KH Mới (VP58888, BIDV8681), khớp theo
-      Tên đối ứng trên sao kê + đúng số tiền hóa đơn. Hóa đơn nào không tìm được giao dịch chi khớp thì tính là
-      còn nợ.
+      chi trên đúng 2 Tài khoản Chi của <%= COMPANIES[activeCompany].label %>
+      (<%= activeCompany === 'kh_cu' ? 'VPBANK9997, BIDV8651' : 'VP58888, BIDV8681' %>), khớp theo Tên đối ứng
+      trên sao kê + đúng số tiền hóa đơn. Hóa đơn nào không tìm được giao dịch chi khớp thì tính là còn nợ.
+      Đổi nút "<%= activeCompany === 'kh_cu' ? 'Mới' : 'Cũ' %>" ở góc trên bên trái để xem công ty kia.
     </p>
 
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
@@ -39,11 +40,11 @@
       <div class="panel-head">
         <h2>Tổng hợp theo NCC (<%= nccSummary.length %> nhà cung cấp)</h2>
       </div>
+      <p class="muted">Bấm vào tên NCC để xem chi tiết từng hóa đơn của NCC đó (đã chi hay chưa, chi ngày nào, tài khoản nào) ở bảng bên dưới.</p>
       <div class="table-scroll">
         <table class="table">
           <thead>
             <tr>
-              <th>Công ty</th>
               <th>Tên NCC</th>
               <th>Số hóa đơn</th>
               <th>Tổng hóa đơn</th>
@@ -54,8 +55,7 @@
           <tbody>
             <% nccSummary.forEach(function (r) { %>
             <tr>
-              <td><%= r.companyLabel %></td>
-              <td><%= r.tenNCC %></td>
+              <td><a href="/cong-no/ncc?ncc=<%= encodeURIComponent(r.tenNCC) %>#chi-tiet-hoa-don"><%= r.tenNCC %></a></td>
               <td><%= r.soHoaDon %> <span class="muted">(<%= r.soChuaChi %> chưa chi)</span></td>
               <td><%= r.tongHoaDon.toLocaleString('vi-VN') %> đ</td>
               <td><%= r.daChi.toLocaleString('vi-VN') %> đ</td>
@@ -63,26 +63,19 @@
             </tr>
             <% }) %>
             <% if (nccSummary.length === 0) { %>
-            <tr><td colspan="6" class="muted">Chưa có dữ liệu — cần có hóa đơn ở trang "Hóa Đơn Đầu Vào" trước.</td></tr>
+            <tr><td colspan="5" class="muted">Chưa có dữ liệu — cần có hóa đơn ở trang "Hóa Đơn Đầu Vào" trước.</td></tr>
             <% } %>
           </tbody>
         </table>
       </div>
     </section>
 
-    <section class="panel">
+    <section class="panel" id="chi-tiet-hoa-don">
       <div class="panel-head">
         <h2>Chi tiết theo từng hóa đơn (<%= totalMatching %>)</h2>
       </div>
 
       <form method="GET" action="/cong-no/ncc" class="form-inline-tight" style="margin-bottom:10px;">
-        <label>Công ty
-          <select name="company" onchange="this.form.submit()">
-            <option value="">-- Tất cả --</option>
-            <option value="kh_cu" <%= companyFilter === 'kh_cu' ? 'selected' : '' %>>KH Cũ</option>
-            <option value="kh_moi" <%= companyFilter === 'kh_moi' ? 'selected' : '' %>>KH Mới</option>
-          </select>
-        </label>
         <label>Trạng thái
           <select name="daChi" onchange="this.form.submit()">
             <option value="">-- Tất cả --</option>
@@ -94,7 +87,7 @@
           <input type="text" name="ncc" value="<%= nccFilter %>" placeholder="Tìm theo tên NCC..." />
         </label>
         <button type="submit" class="btn btn-secondary">Lọc</button>
-        <% if (companyFilter || daChiFilter || nccFilter) { %>
+        <% if (daChiFilter || nccFilter) { %>
         <a class="btn btn-secondary" href="/cong-no/ncc">Xóa lọc</a>
         <% } %>
       </form>
@@ -103,7 +96,6 @@
         <table class="table">
           <thead>
             <tr>
-              <th>Công ty</th>
               <th>Ngày HĐ</th>
               <th>Số HĐ</th>
               <th>Tên NCC</th>
@@ -117,7 +109,6 @@
           <tbody>
             <% rows.forEach(function (r) { %>
             <tr>
-              <td><%= r.companyLabel %></td>
               <td><%= r.ngayHD %></td>
               <td><%= r.soHoaDon %><% if (r.kyHieuHD) { %> <span class="muted">(<%= r.kyHieuHD %>)</span><% } %></td>
               <td><%= r.tenNCC %></td>
@@ -135,7 +126,7 @@
             </tr>
             <% }) %>
             <% if (rows.length === 0) { %>
-            <tr><td colspan="9" class="muted">Không có hóa đơn nào khớp bộ lọc.</td></tr>
+            <tr><td colspan="8" class="muted">Không có hóa đơn nào khớp bộ lọc.</td></tr>
             <% } %>
           </tbody>
         </table>
