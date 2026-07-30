@@ -129,6 +129,20 @@ const DATE_HEADER_PATTERNS = [
   "ngay hach toan",
 ];
 const BALANCE_HEADER_PATTERNS = ["so du"];
+// Chi Nhan, 2026-07-30: "sao ngân hàng trả... vẫn thiếu 20k" -- dong DAU TIEN
+// cua 1 lan tai file phu thuoc so du luy ke he thong dang co san TRUOC ngay
+// do; neu so du luy ke nay bi lech (vi du do 1 sai sot lich su nao khac chua
+// phat hien) thi rieng dong dau tien se bi tinh SAI ca loai (thu/chi) lan so
+// tien theo dung phan chenh lech do -- moi dong SAU van dung vi tu chuoi theo
+// dung so du cua tung dong ghi san trong file (khong phu thuoc gia tri
+// "running" ben ngoai nua). Them phat hien cot "Phat sinh No/Co" (khi file co
+// san) de dung lam LUOI AN TOAN CHI CHO DONG DAU TIEN: neu gia tri No/Co that
+// cua file mau thuan ro voi ket qua tinh tu delta so du, uu tien gia trị No/
+// Co (dang tin hon vi khong phu thuoc so du luy ke ben ngoai) -- KHONG ap
+// dung cho cac dong con lai (van giu nguyen triet ly cu, tranh lap lai bug
+// "DW" text da tung gap voi cot No/Co).
+const DEBIT_HEADER_PATTERNS = ["phat sinh no", "debit amount", "debit"];
+const CREDIT_HEADER_PATTERNS = ["phat sinh co", "credit amount", "credit"];
 const DESC_HEADER_PATTERNS = [
   "dien giai",
   "noi dung giao dich",
@@ -194,6 +208,8 @@ function findHeaderRow(grid) {
     let refColPrimary = -1;
     let refColFallback = -1;
     let vendorCol = -1;
+    let debitCol = -1;
+    let creditCol = -1;
     row.forEach((cell, c) => {
       if (cell === null || cell === undefined || typeof cell !== "string") return;
       const h = normHeader(cell);
@@ -203,10 +219,22 @@ function findHeaderRow(grid) {
       if (refColPrimary === -1 && REF_HEADER_PATTERNS_PRIMARY.some((p) => h.includes(p))) refColPrimary = c;
       if (refColFallback === -1 && REF_HEADER_PATTERNS_FALLBACK.some((p) => h.includes(p))) refColFallback = c;
       if (vendorCol === -1 && VENDOR_HEADER_PATTERNS.some((p) => h.includes(p))) vendorCol = c;
+      if (debitCol === -1 && DEBIT_HEADER_PATTERNS.some((p) => h.includes(p))) debitCol = c;
+      if (creditCol === -1 && CREDIT_HEADER_PATTERNS.some((p) => h.includes(p))) creditCol = c;
     });
     const refCol = refColPrimary !== -1 ? refColPrimary : refColFallback;
     if (dateCol !== -1 && balCol !== -1) {
-      return { headerRowIdx: r, dateCol, balCol, descCol, refCol, refIsPrimary: refColPrimary !== -1, vendorCol };
+      return {
+        headerRowIdx: r,
+        dateCol,
+        balCol,
+        descCol,
+        refCol,
+        refIsPrimary: refColPrimary !== -1,
+        vendorCol,
+        debitCol,
+        creditCol,
+      };
     }
   }
   return null;
@@ -251,7 +279,7 @@ function parseBankStatement(buffer, sheetNameHint) {
       'Khong nhan dien duoc file sao ke: can co cot "Ngay giao dich" (hoac "Ngay hieu luc") va cot "So du".'
     );
   }
-  let { headerRowIdx, dateCol, balCol, descCol, refCol, refIsPrimary, vendorCol } = found;
+  let { headerRowIdx, dateCol, balCol, descCol, refCol, refIsPrimary, vendorCol, debitCol, creditCol } = found;
   const maxCol = (grid[headerRowIdx] || []).length;
   if (descCol === -1) {
     descCol = guessDescCol(grid, headerRowIdx, dateCol, balCol, maxCol);
@@ -278,7 +306,18 @@ function parseBankStatement(buffer, sheetNameHint) {
       ? String(row[vendorCol]).trim()
       : "";
     const sortKey = parseDateTimeSortKey(row[dateCol]);
-    rows.push({ date, balance: bal, description: String(desc || "").trim(), reference, tenDoiUng, _sortKey: sortKey });
+    const debitVal = debitCol >= 0 ? parseNumberCell(row[debitCol]) : null;
+    const creditVal = creditCol >= 0 ? parseNumberCell(row[creditCol]) : null;
+    rows.push({
+      date,
+      balance: bal,
+      description: String(desc || "").trim(),
+      reference,
+      tenDoiUng,
+      debit: debitVal,
+      credit: creditVal,
+      _sortKey: sortKey,
+    });
   }
 
   if (rows.length === 0) {
@@ -357,7 +396,7 @@ function parseBankStatement(buffer, sheetNameHint) {
 function computeThuChi(rows, priorBalance) {
   const out = [];
   let running = priorBalance;
-  for (const r of rows) {
+  rows.forEach((r, idx) => {
     const delta = r.balance - running;
     let type, amount;
     if (delta > 0) {
@@ -368,7 +407,31 @@ function computeThuChi(rows, priorBalance) {
       amount = -delta;
     } else {
       running = r.balance;
-      continue; // no actual movement (delta ~ 0) -> skip
+      return; // no actual movement (delta ~ 0) -> skip
+    }
+    // Chi Nhan, 2026-07-30: chi ap dung luoi an toan nay cho DONG DAU TIEN cua
+    // lan tai nay (idx===0) -- day la dong DUY NHAT phu thuoc "running"
+    // (=priorBalance, tinh tu du lieu DA LUU truoc do, co the bi lech neu co
+    // sai sot lich su chua phat hien) thay vi so du CHINH cua dong truoc DO
+    // trong CUNG file nay; cac dong sau deu tu chuoi dung theo file, khong can
+    // (va khong nen) can thiep. Neu file co san cot No/Co hop le va gia tri do
+    // mau thuan ro voi (type, amount) tinh tu delta, uu tien No/Co.
+    if (idx === 0 && (r.debit !== null || r.credit !== null)) {
+      const explicitCredit = r.credit || 0;
+      const explicitDebit = r.debit || 0;
+      let explicitType = null;
+      let explicitAmount = null;
+      if (explicitCredit > 0 && explicitDebit === 0) {
+        explicitType = "thu";
+        explicitAmount = explicitCredit;
+      } else if (explicitDebit > 0 && explicitCredit === 0) {
+        explicitType = "chi";
+        explicitAmount = explicitDebit;
+      }
+      if (explicitType && (explicitType !== type || Math.abs(explicitAmount - amount) > 1)) {
+        type = explicitType;
+        amount = explicitAmount;
+      }
     }
     out.push({
       date: r.date,
@@ -379,7 +442,7 @@ function computeThuChi(rows, priorBalance) {
       tenDoiUng: r.tenDoiUng || "",
     });
     running = r.balance;
-  }
+  });
   return out;
 }
 

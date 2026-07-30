@@ -485,6 +485,29 @@ function fixDuplicateBidv8681BankId(store) {
   }
   if (fixVib20260729ThuMisreadAsChi(store)) changed = true;
 
+  // Chi Nhan, 2026-07-30: doi chieu voi 2 file sao ke DAY DU CA THANG 7 (72.430
+  // dong that) Nhan gui de tim goc re chenh lech ~2,37 ty noi tren. Ket qua: KHONG
+  // phai loi cong don gi -- BIDV77021 tu truoc gio chi tung nhap duoc cac giao
+  // dich "thu" (QR khach tra), con 846 dong that khac (chu yeu la cac dot
+  // "CTNB BIDV021-681"/"BIDV021-VP888" -- ngan hang tu dong chuyen bot tien ve
+  // BIDV8681/VP58888 dinh ky, tong ~2,35 ty) CHUA TUNG duoc tai len/nhap vao he
+  // thong, vi truoc gio chi upload/dan 1 phan sao ke (thuong la loc rieng phan
+  // "Co"). Rieng 1 dong DUY NHAT bi SAI ngay tu lan nhap dau tien (01/7, tham
+  // chieu "0832DldY-8AFrfsJVU"): ghi nham "chi" 26.145.000d thay vi "thu"
+  // 20.000d that (dung 1 kieu loi voi dong VIB o tren, nhung tu 8 ngay truoc khi
+  // phat hien) -- sua thang dong nay; con 846 dong con thieu se duoc tu dong bo
+  // sung khi Nhan tai lai 2 file sao ke day du thang 7 qua "Tai file sao ke truc
+  // tiep tu ngan hang" (an toan, khong trung vi khop theo So tham chieu).
+  function fixBidv77021Day1ThuMisreadAsChi(store) {
+    const t = store.transactions.find((x) => x.reference === "0832DldY-8AFrfsJVU");
+    if (!t) return false;
+    if (t.type === "thu" && t.amount === 20000) return false; // da dung, khong can sua
+    t.type = "thu";
+    t.amount = 20000;
+    return true;
+  }
+  if (fixBidv77021Day1ThuMisreadAsChi(store)) changed = true;
+
   if (changed) save(store);
 })();
 
