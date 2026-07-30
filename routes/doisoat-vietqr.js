@@ -457,6 +457,20 @@ const INVOICE_DIEM_ALIAS_DEFAULTS = {
   // chung ca kenh) -- can alias de 2 ben khop nhau, khong thi hoa don luon
   // hien "Chua co HD" du da co hoa don that.
   "SÂN BAY PHÚ QUỐC": "CHKQT PHU QUOC",
+  // Chi Nhan, 2026-07-30: "bạn đã map đúng từ mã điểm qua tên điểm qua tên mã
+  // công trình giống với 77021 chưa á" -- ra soat kenh bidv77020 phat hien hoa
+  // don thang 7 dung LAN LON 2 cach ghi maDiem cho CUNG 1 diem San bay Noi Bai:
+  // 25 hoa don ghi tat "JPSBNB" (27.850.000d, khop dung ma noi bo dang dung --
+  // xem TEN_DIEM_MASTER_DEFAULTS.bidv77020/JPSBNB o tren), nhung so con lai ghi
+  // day du "JP SB NOI BAI" (28.350.000d) -- KHONG co alias nao noi 2 ten nay
+  // lai voi nhau, nen toan bo 28.350.000d hoa don loai "JP SB NOI BAI" tu truoc
+  // gio KHONG BAO GIO khop duoc voi gross/QR (da resolve thanh ma "JPSBNB"),
+  // hien "Chua co HD" o CA 29/29 ngay thang 7 cho gian nay du tien da ve du.
+  // Day la loi doc lap voi "bankExcessDefaultCode" (phan du ngan hang don vao
+  // SB CAM RANH PHN, Chi Nhan tu xac nhan 2026-07-29) -- SB CAM RANH PHN thuc
+  // ra da khop hoa don rat tot (85.430.000/88.760.000d, chi 6.400.000d la phan
+  // du that su chua co du lieu QR), gian THUC SU chua map dung la Noi Bai.
+  "JP SB NOI BAI": "JPSBNB",
 };
 
 // Chi Nhan, 2026-07-30: "Số hóa đơn á có 20k xem nó đưa vô gian nào á bạn đưa
