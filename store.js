@@ -289,8 +289,62 @@ function save(store) {
 }
 
 function nextId(store, collection) {
+  // Chi Nhan, 2026-07-30: phat hien BIDV77021 va BIDV8681 (2 ngan hang khac
+  // nhau) bi trung id=16 -- rat co the do ban offline (may Nhan) va ban online
+  // (Railway) moi ben tu tao ngan hang moi doc lap, moi ben giu 1 ban
+  // "cachedStore.seq.banks" RIENG trong bo nho (xem ghi chu cachedStore o
+  // tren), nen ca 2 tinh ra CUNG 1 "so tiep theo" roi luu de len nhau qua
+  // buoc dong bo/sao luu -- khien trang Danh sach giao dich loc theo 1 tai
+  // khoan bi cong nham ca giao dich cua tai khoan kia vao (xem
+  // fixDuplicateBidv8681BankId ben duoi cho lan nay cu the). De tranh trung
+  // id THEM LAN NUA sau nay (khong chi rieng banks, ca users/transactions),
+  // doi chieu voi ID LON NHAT dang thuc su co trong mang tuong ung truoc khi
+  // tang, thay vi chi tin tuong con dem luu rieng (co the bi lech giua 2 tien
+  // trinh) -- an toan vi ten mang y het ten collection ("banks" ->
+  // store.banks, "transactions" -> store.transactions, "users" -> store.users).
+  const arr = store[collection];
+  if (Array.isArray(arr) && arr.length > 0) {
+    const maxExisting = arr.reduce((m, x) => (x && typeof x.id === "number" && x.id > m ? x.id : m), 0);
+    if (maxExisting > (store.seq[collection] || 0)) {
+      store.seq[collection] = maxExisting;
+    }
+  }
   store.seq[collection] = (store.seq[collection] || 0) + 1;
   return store.seq[collection];
+}
+
+// Chi Nhan, 2026-07-30: "sao tôi chọn 77021 nó nhẩy ra tài khoản khác vậy ...
+// cộng gì tới 90 mấy triệu vậy" -- BIDV77021 (tao 28/7) va BIDV8681 (tao 29/7,
+// "Tài khoản chi") vo tinh bi trung id=16. Vi store.transactions chi luu
+// "bank_id" (so), ca 2 tai khoan bi GOP CHUNG lam 1 tren moi trang loc/tong
+// theo ngan hang -- vd ngay 29/7, sao ke that cua 77021 chi co 50.170.000d
+// nhung he thong cong ra 94.657.521d vi bi cong them 1 giao dich that su cua
+// BIDV8681 (44.507.521d, "FSS TT HTKD ...", KHONG lien quan VietQR). Da doi
+// chieu THU CONG toan bo 361 giao dich dang nam duoi id=16 (tu 1/7 den 29/7):
+// giao dich nao co nhac so tai khoan "8690077021" trong mo ta la CUA
+// BIDV77021 that (71.583 dong, hau het la thu QR + 1 phi quan ly TK); con lai
+// (30 thu + 331 chi, toan chi phi/tam ung/thanh toan nha cung cap -- dung
+// dang giao dich cua 1 tai khoan CHI, khop voi vai tro "Tài khoản chi" cua
+// BIDV8681) la cua BIDV8681 that. Tach BIDV8681 sang ID MOI + chuyen dung
+// 361 giao dich do theo, giu nguyen id=16 cho BIDV77021.
+function fixDuplicateBidv8681BankId(store) {
+  const b77021 = store.banks.find((b) => b.name === "BIDV77021");
+  const b8681 = store.banks.find((b) => b.name === "BIDV8681");
+  if (!b77021 || !b8681 || b77021.id !== b8681.id) return false; // da tach roi hoac khong (con) trung id
+  const oldId = b8681.id;
+  const newId = store.banks.reduce((m, b) => (b.id > m ? b.id : m), 0) + 1;
+  b8681.id = newId;
+  let moved = 0;
+  store.transactions.forEach((t) => {
+    if (t.bank_id === oldId && !(t.description || "").includes("8690077021")) {
+      t.bank_id = newId;
+      moved += 1;
+    }
+  });
+  console.log(
+    `[fix] Da tach BIDV8681 khoi bi trung ID voi BIDV77021 (id cu=${oldId}) -> id moi=${newId}, da chuyen ${moved} giao dich ve dung BIDV8681.`
+  );
+  return true;
 }
 
 // ---- Seed default admin user + example bank on first run ----
@@ -363,6 +417,8 @@ function nextId(store, collection) {
         "NHO XOA 2 BIEN NAY NGAY SAU KHI DANG NHAP LAI DUOC."
     );
   }
+
+  if (fixDuplicateBidv8681BankId(store)) changed = true;
 
   if (store.banks.length === 0) {
     store.banks.push({
