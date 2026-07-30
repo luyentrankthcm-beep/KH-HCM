@@ -999,3 +999,9 @@ router.post("/hoa-don-dau-vao/cap-nhat-phan-loai", requireDataEntry, (req, res) 
 });
 
 module.exports = router;
+// Chi Nhan, 2026-07-30: export de trang "Cong No NCC" (routes/congno-ncc.js)
+// tai su dung DUNG logic gom dong theo hoa don + gia tri mac dinh cot, khong
+// doan lai / khong bi lech so voi trang "Hoa Don Dau Vao" goc.
+module.exports.ensureShape = ensureShape;
+module.exports.ensureDefaults = ensureDefaults;
+module.exports.groupRowsByInvoice = groupRowsByInvoice;

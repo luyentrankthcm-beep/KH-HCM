@@ -8,70 +8,148 @@
   <main class="container">
     <h1>Công Nợ NCC</h1>
     <p class="muted" style="margin-top:-10px;margin-bottom:20px;">
-      Công nợ phải trả cho nhà cung cấp (NCC) — Tổng hóa đơn (từ danh sách hóa đơn NCC đã tải ở Tài khoản Chi)
-      trừ Tổng đã chi (các giao dịch chi đã gán đúng mã NCC, cả 3 ngân hàng chi phí). Còn nợ dương = còn thiếu NCC,
-      âm = đã chi vượt hóa đơn/tạm ứng.
+      Công nợ phải trả cho nhà cung cấp (NCC) — đối chiếu từng hóa đơn ở trang "Hóa Đơn Đầu Vào" với giao dịch
+      chi trên đúng 4 Tài khoản Chi: KH Cũ (VPBANK9997, BIDV8651), KH Mới (VP58888, BIDV8681), khớp theo
+      Tên đối ứng trên sao kê + đúng số tiền hóa đơn. Hóa đơn nào không tìm được giao dịch chi khớp thì tính là
+      còn nợ.
     </p>
 
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
-    <% if (result.errors && result.errors.length > 0) { %>
-    <div class="alert alert-error">
-      <% result.errors.forEach(function(e) { %><div><%= e %></div><% }) %>
-    </div>
-    <% } %>
 
     <section class="cards">
       <div class="card">
-        <div class="card-label">Tổng hóa đơn NCC</div>
-        <div class="card-value"><%= result.grandTotalHoaDon.toLocaleString('vi-VN') %> đ</div>
+        <div class="card-label">Tổng hóa đơn (<%= tongSoHoaDon %>)</div>
+        <div class="card-value"><%= grandTotalHoaDon.toLocaleString('vi-VN') %> đ</div>
       </div>
       <div class="card">
-        <div class="card-label">Tổng đã chi (khớp mã NCC)</div>
-        <div class="card-value"><%= result.grandTotalDaChi.toLocaleString('vi-VN') %> đ</div>
+        <div class="card-label">Đã chi (khớp sao kê)</div>
+        <div class="card-value"><%= grandTotalDaChi.toLocaleString('vi-VN') %> đ</div>
       </div>
       <div class="card">
         <div class="card-label">Còn nợ NCC</div>
-        <div class="card-value"><%= result.grandTotalConNo.toLocaleString('vi-VN') %> đ</div>
+        <div class="card-value"><%= grandTotalConNo.toLocaleString('vi-VN') %> đ</div>
+      </div>
+      <div class="card">
+        <div class="card-label">Số hóa đơn chưa chi</div>
+        <div class="card-value"><%= soHoaDonChuaChi %></div>
       </div>
     </section>
 
     <section class="panel">
       <div class="panel-head">
-        <h2>Chi tiết theo NCC (<%= result.rows.length %> nhà cung cấp)</h2>
+        <h2>Tổng hợp theo NCC (<%= nccSummary.length %> nhà cung cấp)</h2>
       </div>
-      <p class="muted">
-        Chỉ hiện NCC có ít nhất 1 hóa đơn hoặc 1 giao dịch chi đã khớp. NCC chưa có hóa đơn trong hệ thống sẽ
-        không tính được "Tổng hóa đơn" (hiện 0đ) dù đã có chi — phần này cần tải thêm hóa đơn NCC ở Tài khoản Chi.
-      </p>
       <div class="table-scroll">
         <table class="table">
           <thead>
             <tr>
-              <th>Mã NCC</th>
+              <th>Công ty</th>
               <th>Tên NCC</th>
-              <th>MST</th>
+              <th>Số hóa đơn</th>
               <th>Tổng hóa đơn</th>
-              <th>Đã chi (số GD)</th>
+              <th>Đã chi</th>
               <th>Còn nợ</th>
             </tr>
           </thead>
           <tbody>
-            <% result.rows.forEach(function(r) { %>
+            <% nccSummary.forEach(function (r) { %>
             <tr>
-              <td><%= r.maNCC %></td>
+              <td><%= r.companyLabel %></td>
               <td><%= r.tenNCC %></td>
-              <td><%= r.mst %></td>
+              <td><%= r.soHoaDon %> <span class="muted">(<%= r.soChuaChi %> chưa chi)</span></td>
               <td><%= r.tongHoaDon.toLocaleString('vi-VN') %> đ</td>
-              <td><%= r.daChi.toLocaleString('vi-VN') %> đ <span class="muted">(<%= r.soGiaoDich %>)</span></td>
+              <td><%= r.daChi.toLocaleString('vi-VN') %> đ</td>
               <td class="<%= Math.abs(r.conNo) < 1000 ? 'text-pos' : 'text-neg' %>"><%= r.conNo.toLocaleString('vi-VN') %> đ</td>
             </tr>
             <% }) %>
-            <% if (result.rows.length === 0) { %>
-            <tr><td colspan="6" class="muted">Chưa có dữ liệu — cần tải hóa đơn NCC và/hoặc gán mã NCC cho giao dịch chi ở trang Tài khoản Chi trước.</td></tr>
+            <% if (nccSummary.length === 0) { %>
+            <tr><td colspan="6" class="muted">Chưa có dữ liệu — cần có hóa đơn ở trang "Hóa Đơn Đầu Vào" trước.</td></tr>
             <% } %>
           </tbody>
         </table>
       </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Chi tiết theo từng hóa đơn (<%= totalMatching %>)</h2>
+      </div>
+
+      <form method="GET" action="/cong-no/ncc" class="form-inline-tight" style="margin-bottom:10px;">
+        <label>Công ty
+          <select name="company" onchange="this.form.submit()">
+            <option value="">-- Tất cả --</option>
+            <option value="kh_cu" <%= companyFilter === 'kh_cu' ? 'selected' : '' %>>KH Cũ</option>
+            <option value="kh_moi" <%= companyFilter === 'kh_moi' ? 'selected' : '' %>>KH Mới</option>
+          </select>
+        </label>
+        <label>Trạng thái
+          <select name="daChi" onchange="this.form.submit()">
+            <option value="">-- Tất cả --</option>
+            <option value="0" <%= daChiFilter === '0' ? 'selected' : '' %>>Chưa chi</option>
+            <option value="1" <%= daChiFilter === '1' ? 'selected' : '' %>>Đã chi</option>
+          </select>
+        </label>
+        <label>Tên NCC
+          <input type="text" name="ncc" value="<%= nccFilter %>" placeholder="Tìm theo tên NCC..." />
+        </label>
+        <button type="submit" class="btn btn-secondary">Lọc</button>
+        <% if (companyFilter || daChiFilter || nccFilter) { %>
+        <a class="btn btn-secondary" href="/cong-no/ncc">Xóa lọc</a>
+        <% } %>
+      </form>
+
+      <div class="table-scroll">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Công ty</th>
+              <th>Ngày HĐ</th>
+              <th>Số HĐ</th>
+              <th>Tên NCC</th>
+              <th>Số tiền</th>
+              <th>Trạng thái</th>
+              <th>Ngày chi</th>
+              <th>TK chi</th>
+              <th>Còn nợ</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% rows.forEach(function (r) { %>
+            <tr>
+              <td><%= r.companyLabel %></td>
+              <td><%= r.ngayHD %></td>
+              <td><%= r.soHoaDon %><% if (r.kyHieuHD) { %> <span class="muted">(<%= r.kyHieuHD %>)</span><% } %></td>
+              <td><%= r.tenNCC %></td>
+              <td><%= r.soTien.toLocaleString('vi-VN') %> đ</td>
+              <td>
+                <% if (r.daChi) { %>
+                <span class="badge badge-thu">✓ Đã chi</span>
+                <% } else { %>
+                <span class="badge badge-warn">Chưa chi</span>
+                <% } %>
+              </td>
+              <td><%= r.ngayChi %></td>
+              <td><%= r.nganHangChi %></td>
+              <td class="<%= r.conNo < 1000 ? 'text-pos' : 'text-neg' %>"><%= r.conNo.toLocaleString('vi-VN') %> đ</td>
+            </tr>
+            <% }) %>
+            <% if (rows.length === 0) { %>
+            <tr><td colspan="9" class="muted">Không có hóa đơn nào khớp bộ lọc.</td></tr>
+            <% } %>
+          </tbody>
+        </table>
+      </div>
+
+      <% if (totalPages > 1) { %>
+      <div class="pagination" style="margin-top:14px; display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
+        <a class="btn btn-secondary" href="/cong-no/ncc?<%= baseQs ? baseQs + '&' : '' %>page=<%= currentPage - 1 %>" <%= currentPage <= 1 ? 'style="pointer-events:none;opacity:.5;"' : '' %>>‹ Trang trước</a>
+        <% for (let p = 1; p <= totalPages; p++) { %>
+        <a class="hddv-page-link <%= p === currentPage ? 'active' : '' %>" href="/cong-no/ncc?<%= baseQs ? baseQs + '&' : '' %>page=<%= p %>"><%= p %></a>
+        <% } %>
+        <a class="btn btn-secondary" href="/cong-no/ncc?<%= baseQs ? baseQs + '&' : '' %>page=<%= currentPage + 1 %>" <%= currentPage >= totalPages ? 'style="pointer-events:none;opacity:.5;"' : '' %>>Trang sau ›</a>
+      </div>
+      <% } %>
     </section>
   </main>
 </body>
