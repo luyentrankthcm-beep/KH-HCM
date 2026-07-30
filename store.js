@@ -458,6 +458,33 @@ function fixDuplicateBidv8681BankId(store) {
     }
   });
 
+  // Chi Nhan, 2026-07-30: "sao ngân hàng trả... vẫn thiếu 20k vậy là sao" --
+  // sao ke BIDV77021 ngay 29/7 tai len lai bi thieu dung 1 giao dich that
+  // (20.000d, "thu", tham chieu "083z36w-8Awg5iyRR"). Nguyen nhan SAU KHI tai
+  // lai: bankStatementParser.js co chu dinh suy Thu/Chi tu DELTA cot "So du"
+  // (khong doc truc tiep cot "Phat sinh No/Co") vi coi so du la "chan ly ngan
+  // hang" dang tin cay hon -- nhung dong DAU TIEN cua 1 lan tai file phu
+  // thuoc vao so du LUY KE ma he thong dang co san TRUOC ngay do (opening_balance
+  // + tong Thu/Chi da luu); neu so du luy ke nay bi lech so voi ngan hang that
+  // (o day lech ~2,37 ty, rat co the do sai sot lich su tu 21/7-28/7, can doi
+  // chieu rieng voi sao ke day du giai doan do de tim dung nguyen nhan) thi
+  // dong dau tien cua lan tai moi se bi tinh SAI ca loai (thu/chi) lan so tien
+  // theo phan chenh lech do -- day chinh la ly do dong 20.000d nay bi ghi
+  // nham thanh "chi" 2.374.997.880d thay vi "thu" 20.000d. Da doi chieu truc
+  // tiep voi cot "Phat sinh Co" cua file goc (=20.000, "Phat sinh No"=0) nen
+  // biet chac day la "thu" 20.000d that. Sua thang dong da bi ghi sai nay;
+  // KHONG dong den goc re (chenh lech so du luy ke ~2,37 ty van con do, can
+  // sao ke day du 21/7-28/7 tu Nhan de doi chieu rieng).
+  function fixVib20260729ThuMisreadAsChi(store) {
+    const t = store.transactions.find((x) => x.reference === "083z36w-8Awg5iyRR");
+    if (!t) return false;
+    if (t.type === "thu" && t.amount === 20000) return false; // da dung, khong can sua
+    t.type = "thu";
+    t.amount = 20000;
+    return true;
+  }
+  if (fixVib20260729ThuMisreadAsChi(store)) changed = true;
+
   if (changed) save(store);
 })();
 
