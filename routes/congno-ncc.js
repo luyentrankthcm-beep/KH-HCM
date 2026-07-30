@@ -112,7 +112,12 @@ function buildInvoiceDebt(store) {
 }
 
 // Gop cac hoa don cung 1 NCC (trong cung 1 cong ty) thanh 1 dong tong hop --
-// de xem nhanh NCC nao dang no nhieu nhat, khong can doc tung hoa don.
+// de xem nhanh NCC nao dang no nhieu nhat, khong can doc tung hoa don. Chi
+// Nhan, 2026-07-30: "cho xem chi tiết dưới cái đó luôn đi đừng có nhấn gì cx
+// nhẩy lên đầu trang" -- moi dong tong hop giu LUON danh sach hoa don cua
+// dung NCC do (r.invoices), de trang render san 1 bang chi tiet AN SAN ngay
+// duoi dong tong hop, bam vao la hien/an tai cho bang JS (khong tai lai
+// trang, khong nhay vi tri cuon) thay vi phai dieu huong sang URL loc rieng.
 function summarizeByNcc(invoices) {
   const map = new Map();
   invoices.forEach((inv) => {
@@ -127,6 +132,7 @@ function summarizeByNcc(invoices) {
         conNo: 0,
         soHoaDon: 0,
         soChuaChi: 0,
+        invoices: [],
       });
     }
     const s = map.get(key);
@@ -135,10 +141,18 @@ function summarizeByNcc(invoices) {
     else s.soChuaChi++;
     s.conNo += inv.conNo;
     s.soHoaDon++;
+    s.invoices.push(inv);
   });
   return Array.from(map.values())
     .filter((r) => r.tongHoaDon !== 0)
-    .sort((a, b) => b.conNo - a.conNo);
+    .sort((a, b) => b.conNo - a.conNo)
+    .map((r) => {
+      r.invoices.sort((a, b) => {
+        if (a.daChi !== b.daChi) return a.daChi ? 1 : -1;
+        return (b.ngayHD || "").localeCompare(a.ngayHD || "");
+      });
+      return r;
+    });
 }
 
 router.get("/cong-no/ncc", (req, res) => {

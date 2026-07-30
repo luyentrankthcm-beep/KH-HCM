@@ -40,11 +40,12 @@
       <div class="panel-head">
         <h2>Tổng hợp theo NCC (<%= nccSummary.length %> nhà cung cấp)</h2>
       </div>
-      <p class="muted">Bấm vào tên NCC để xem chi tiết từng hóa đơn của NCC đó (đã chi hay chưa, chi ngày nào, tài khoản nào) ở bảng bên dưới.</p>
+      <p class="muted">Bấm vào 1 dòng NCC để xem/ẩn ngay tại chỗ chi tiết từng hóa đơn của NCC đó (đã chi hay chưa, chi ngày nào, tài khoản nào) — không tải lại trang.</p>
       <div class="table-scroll">
         <table class="table">
           <thead>
             <tr>
+              <th></th>
               <th>Tên NCC</th>
               <th>Số hóa đơn</th>
               <th>Tổng hóa đơn</th>
@@ -53,22 +54,75 @@
             </tr>
           </thead>
           <tbody>
-            <% nccSummary.forEach(function (r) { %>
-            <tr>
-              <td><a href="/cong-no/ncc?ncc=<%= encodeURIComponent(r.tenNCC) %>#chi-tiet-hoa-don"><%= r.tenNCC %></a></td>
+            <% nccSummary.forEach(function (r, idx) { %>
+            <tr class="ncc-summary-row" style="cursor:pointer" onclick="toggleNccDetail('ncc-detail-<%= idx %>')">
+              <td><span class="ncc-toggle-caret" id="ncc-caret-<%= idx %>">▶</span></td>
+              <td><%= r.tenNCC %></td>
               <td><%= r.soHoaDon %> <span class="muted">(<%= r.soChuaChi %> chưa chi)</span></td>
               <td><%= r.tongHoaDon.toLocaleString('vi-VN') %> đ</td>
               <td><%= r.daChi.toLocaleString('vi-VN') %> đ</td>
               <td class="<%= Math.abs(r.conNo) < 1000 ? 'text-pos' : 'text-neg' %>"><%= r.conNo.toLocaleString('vi-VN') %> đ</td>
             </tr>
+            <tr class="ncc-detail-row" id="ncc-detail-<%= idx %>" style="display:none;">
+              <td colspan="6" style="padding:0 0 14px 0; background:rgba(0,0,0,0.02);">
+                <table class="table" style="margin:0;">
+                  <thead>
+                    <tr>
+                      <th>Ngày HĐ</th>
+                      <th>Số HĐ</th>
+                      <th>Số tiền</th>
+                      <th>Trạng thái</th>
+                      <th>Ngày chi</th>
+                      <th>TK chi</th>
+                      <th>Còn nợ</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <% r.invoices.forEach(function (inv) { %>
+                    <tr>
+                      <td><%= inv.ngayHD %></td>
+                      <td><%= inv.soHoaDon %><% if (inv.kyHieuHD) { %> <span class="muted">(<%= inv.kyHieuHD %>)</span><% } %></td>
+                      <td><%= inv.soTien.toLocaleString('vi-VN') %> đ</td>
+                      <td>
+                        <% if (inv.daChi) { %>
+                        <span class="badge badge-thu">✓ Đã chi</span>
+                        <% } else { %>
+                        <span class="badge badge-warn">Chưa chi</span>
+                        <% } %>
+                      </td>
+                      <td><%= inv.ngayChi %></td>
+                      <td><%= inv.nganHangChi %></td>
+                      <td class="<%= inv.conNo < 1000 ? 'text-pos' : 'text-neg' %>"><%= inv.conNo.toLocaleString('vi-VN') %> đ</td>
+                    </tr>
+                    <% }) %>
+                  </tbody>
+                </table>
+              </td>
+            </tr>
             <% }) %>
             <% if (nccSummary.length === 0) { %>
-            <tr><td colspan="5" class="muted">Chưa có dữ liệu — cần có hóa đơn ở trang "Hóa Đơn Đầu Vào" trước.</td></tr>
+            <tr><td colspan="6" class="muted">Chưa có dữ liệu — cần có hóa đơn ở trang "Hóa Đơn Đầu Vào" trước.</td></tr>
             <% } %>
           </tbody>
         </table>
       </div>
     </section>
+
+    <script>
+      // Chi Nhan, 2026-07-30: bam 1 dong NCC o bang tong hop -- hien/an ngay
+      // bang chi tiet hoa don cua dung NCC do NGAY DUOI dong vua bam, hoan
+      // toan bang JS phia trinh duyet (khong goi lai server, khong doi URL,
+      // khong lam mat vi tri dang cuon) thay vi dieu huong sang trang loc
+      // rieng nhu truoc (gay cam giac "nhay len dau trang" moi lan bam).
+      function toggleNccDetail(id) {
+        var row = document.getElementById(id);
+        var caret = document.getElementById(id.replace('ncc-detail-', 'ncc-caret-'));
+        if (!row) return;
+        var isHidden = row.style.display === 'none' || !row.style.display;
+        row.style.display = isHidden ? 'table-row' : 'none';
+        if (caret) caret.textContent = isHidden ? '▼' : '▶';
+      }
+    </script>
 
     <section class="panel" id="chi-tiet-hoa-don">
       <div class="panel-head">
