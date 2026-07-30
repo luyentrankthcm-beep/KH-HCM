@@ -1,0 +1,129 @@
+<!-- Chi Nhan, 2026-07-30: "thêm đối soát ảnh chọn nhanh giống này nhá có thể di
+     chuyển đi được á với lại gắn sau hòa nhập với ảnh động qua lại đi cho nó
+     sinh động" -- widget "Đối soát" nhay nhanh (dung chung boi doisoat-vietqr
+     va doisoat-zvp): (1) keo tha duoc bang tay cam "⠿ Đối soát" o dau khung,
+     nho vi tri rieng cho tung trang qua localStorage (khong bi reset ve goc
+     cu moi lan tai lai trang); (2) gan 1 anh meo hong (cat-mascot.png, chinh
+     Chi Nhan gui) sat ben canh khung, lung lay qua lai lien tuc bang CSS
+     animation cho sinh dong -- KHONG chan click vao cac nut ben trong khung
+     (pointer-events:none tren anh).
+     Truyen vao: `quickNavId` (string, duy nhat neu 1 trang co nhieu widget -
+     hien tai luon dung 1 gia tri co dinh la du), `quickNavItems` (mang
+     {href, label}). -->
+<div
+  class="quick-bank-nav-wrap"
+  id="<%= quickNavId %>Wrap"
+  style="position:fixed; right:16px; top:50%; transform:translateY(-50%); z-index:40; display:flex; align-items:center;"
+>
+  <div
+    class="quick-bank-nav"
+    id="<%= quickNavId %>"
+    style="display:flex; flex-direction:column; gap:6px; background:#fff; border-radius:12px; box-shadow:0 6px 20px rgba(0,0,0,0.15); padding:10px 8px; user-select:none;"
+  >
+    <span
+      class="muted quick-nav-handle"
+      title="Kéo để di chuyển"
+      style="font-size:11px; text-align:center; padding-bottom:2px; cursor:grab;"
+      >⠿ Đối soát</span
+    >
+    <% quickNavItems.forEach(function (item) { %>
+    <a href="<%= item.href %>" class="btn btn-secondary" style="font-size:11px; padding:6px 10px; white-space:nowrap;"><%= item.label %></a>
+    <% }) %>
+  </div>
+  <img src="/img/cat-mascot.png" class="quick-nav-cat" alt="" style="width:190px; height:auto; margin-left:-22px; pointer-events:none;" />
+</div>
+<style>
+  @keyframes quickNavCatSway {
+    0%, 100% { transform: translateX(0) rotate(0deg); }
+    25% { transform: translateX(5px) rotate(4deg); }
+    75% { transform: translateX(-5px) rotate(-4deg); }
+  }
+  .quick-nav-cat {
+    animation: quickNavCatSway 2.8s ease-in-out infinite;
+  }
+</style>
+<script>
+  (function () {
+    var wrap = document.getElementById('<%= quickNavId %>Wrap');
+    var handle = wrap.querySelector('.quick-nav-handle');
+    var storageKey = 'quickNavPos:' + location.pathname;
+
+    function applySaved() {
+      var saved = null;
+      try {
+        saved = JSON.parse(localStorage.getItem(storageKey) || 'null');
+      } catch (e) {
+        saved = null;
+      }
+      if (saved && typeof saved.left === 'number' && typeof saved.top === 'number') {
+        wrap.style.left = saved.left + 'px';
+        wrap.style.top = saved.top + 'px';
+        wrap.style.right = 'auto';
+        wrap.style.transform = 'none';
+      }
+    }
+    applySaved();
+
+    var dragging = false;
+    var offsetX = 0;
+    var offsetY = 0;
+
+    function clamp(val, min, max) {
+      return Math.max(min, Math.min(max, val));
+    }
+
+    function startDrag(clientX, clientY) {
+      dragging = true;
+      var rect = wrap.getBoundingClientRect();
+      offsetX = clientX - rect.left;
+      offsetY = clientY - rect.top;
+      wrap.style.left = rect.left + 'px';
+      wrap.style.top = rect.top + 'px';
+      wrap.style.right = 'auto';
+      wrap.style.transform = 'none';
+      handle.style.cursor = 'grabbing';
+    }
+    function moveDrag(clientX, clientY) {
+      if (!dragging) return;
+      var left = clamp(clientX - offsetX, 4, window.innerWidth - wrap.offsetWidth - 4);
+      var top = clamp(clientY - offsetY, 4, window.innerHeight - wrap.offsetHeight - 4);
+      wrap.style.left = left + 'px';
+      wrap.style.top = top + 'px';
+    }
+    function endDrag() {
+      if (!dragging) return;
+      dragging = false;
+      handle.style.cursor = 'grab';
+      var rect = wrap.getBoundingClientRect();
+      localStorage.setItem(storageKey, JSON.stringify({ left: rect.left, top: rect.top }));
+    }
+
+    handle.addEventListener('mousedown', function (e) {
+      startDrag(e.clientX, e.clientY);
+      e.preventDefault();
+    });
+    document.addEventListener('mousemove', function (e) {
+      moveDrag(e.clientX, e.clientY);
+    });
+    document.addEventListener('mouseup', endDrag);
+
+    handle.addEventListener(
+      'touchstart',
+      function (e) {
+        var t = e.touches[0];
+        startDrag(t.clientX, t.clientY);
+      },
+      { passive: true }
+    );
+    document.addEventListener(
+      'touchmove',
+      function (e) {
+        if (!dragging) return;
+        var t = e.touches[0];
+        moveDrag(t.clientX, t.clientY);
+      },
+      { passive: true }
+    );
+    document.addEventListener('touchend', endDrag);
+  })();
+</script>

@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <%- include('partials/head') %>
+</head>
+<body>
+  <%- include('partials/nav') %>
+  <main class="container">
+    <h1>Xuất Hóa Đơn Bán Ra — <%= COMPANIES[activeCompany].label %></h1>
+    <p class="muted" style="margin-top:-10px;margin-bottom:20px;">
+      Gộp TẤT CẢ các đối soát của <%= COMPANIES[activeCompany].label %> (Viet QR, VN Pay, Payoo, Zalo App, Momo...) trong
+      1 khoảng Từ ngày - Đến ngày (tính theo NGÀY DOANH THU, không phải ngày tiền về ngân hàng), cộng dồn lại thành đúng
+      1 dòng cho mỗi cặp (Mã công trình, Thuộc đối soát), có thêm 2 cột "Thuộc đối soát" và "Mã công trình". Cột "Ngày
+      hóa đơn" lấy đúng ngày xuất file (hôm nay), số tiền là số chẵn đã bao gồm thuế (đã tự tách 8% thuế GTGT). Đổi nút
+      "<%= activeCompany === 'kh_cu' ? 'Mới' : 'Cũ' %>" ở góc trên bên trái để xuất cho công ty kia.
+      <% if (activeCompany === 'kh_cu') { %>Dùng mẫu <strong>EasyInvoice</strong> (theo file mẫu chị Nhẫn gửi).<% } else { %>Dùng mẫu <strong>VietInvoice</strong> giống bên BIDV 7702.<% } %>
+    </p>
+
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+
+    <section class="panel">
+      <h2>Xuất file</h2>
+      <p class="muted" style="margin-bottom:14px;">
+        <% if (activeCompany === 'kh_cu') { %>
+        Sẽ gộp: Viet QR (BIDV 7704, BIDV 77020, MB 11521268) + Zalo app ACB31268 + VN Pay ACB31268 + Payoo ACB31268 + Momo BIDV123456.
+        <% } else { %>
+        Sẽ gộp: Viet QR (BIDV 7702, BIDV 77021, MB 02865168, BIDV 8613600999) + VN Pay VTB982 + Payoo VTB982 + Momo BIDV7701.
+        <% } %>
+      </p>
+      <div class="form-inline" style="margin-bottom:14px;">
+        <label style="margin:0;">Từ ngày:</label>
+        <input type="date" id="hdbrFrom" style="width:150px;" />
+        <label style="margin:0;">Đến ngày:</label>
+        <input type="date" id="hdbrTo" style="width:150px;" />
+        <label style="margin:0;">Số hóa đơn bắt đầu:</label>
+        <input type="number" id="hdbrStart" value="1" min="1" style="width:100px;" />
+        <a class="btn btn-secondary" id="hdbrExportBtn" href="#">Xuất Hóa Đơn Bán Ra</a>
+      </div>
+      <script>
+        (function() {
+          var fromInput = document.getElementById('hdbrFrom');
+          var toInput = document.getElementById('hdbrTo');
+          var startInput = document.getElementById('hdbrStart');
+          var btn = document.getElementById('hdbrExportBtn');
+          function updateHref() {
+            if (!fromInput.value || !toInput.value) { btn.setAttribute('href', '#'); return; }
+            btn.setAttribute(
+              'href',
+              '/bao-cao/xuat-hoa-don-ban-ra/xuat.xlsx?company=<%= activeCompany %>&from=' + fromInput.value + '&to=' + toInput.value + '&start=' + (startInput.value || 1)
+            );
+          }
+          fromInput.addEventListener('input', updateHref);
+          toInput.addEventListener('input', updateHref);
+          startInput.addEventListener('input', updateHref);
+          btn.addEventListener('click', function(e) {
+            if (!fromInput.value || !toInput.value) {
+              e.preventDefault();
+              alert('Chọn đủ Từ ngày và Đến ngày trước.');
+            }
+          });
+          updateHref();
+        })();
+      </script>
+    </section>
+  </main>
+</body>
+</html>

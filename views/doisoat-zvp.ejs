@@ -21,12 +21,14 @@
          thang id="zvp-channel-<key>" cua tung kenh. Khac VietQR: trang nay
          KHONG co bo loc rieng tung kenh (luon hien ca 3), nen luon hien nav
          nay, khong can dieu kien selectedChannel. -->
-    <div class="quick-bank-nav" style="position:fixed; right:16px; top:50%; transform:translateY(-50%); z-index:40; display:flex; flex-direction:column; gap:6px; background:#fff; border-radius:12px; box-shadow:0 6px 20px rgba(0,0,0,0.15); padding:10px 8px;">
-      <span class="muted" style="font-size:11px; text-align:center; padding-bottom:2px;">Đối soát</span>
-      <a href="#zvp-channel-online" class="btn btn-secondary" style="font-size:11px; padding:6px 10px; white-space:nowrap;">Online</a>
-      <a href="#zvp-channel-offline" class="btn btn-secondary" style="font-size:11px; padding:6px 10px; white-space:nowrap;">Offline</a>
-      <a href="#zvp-channel-payoo" class="btn btn-secondary" style="font-size:11px; padding:6px 10px; white-space:nowrap;">Payoo</a>
-    </div>
+    <%- include('partials/quick-bank-nav', {
+      quickNavId: 'quickBankNav',
+      quickNavItems: [
+        { href: '#zvp-channel-online', label: 'Online' },
+        { href: '#zvp-channel-offline', label: 'Offline' },
+        { href: '#zvp-channel-payoo', label: 'Payoo' },
+      ],
+    }) %>
 
     <% if (error) { %><div class="alert alert-error" id="autohide-error"><%= error %></div><% } %>
     <% if (success) { %><div class="alert alert-success" id="autohide-success"><%= success %></div><% } %>

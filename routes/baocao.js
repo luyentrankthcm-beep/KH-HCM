@@ -409,4 +409,416 @@ router.get("/bao-cao/trang-thai-doi-soat", (req, res) => {
   res.render("baocao-trangthai", { userName: req.session.userName, stats, COMPANIES, error });
 });
 
+// ---------- 5) Xuat "Hoa don ban ra" (mau VietInvoice) gop nhieu doi soat ----------
+// Chi Nhan, 2026-07-30: "trong báo cáo này bạn thêm cho tôi thêm 1 cái khung
+// nữa là xuất ra mẫu Hóa Đơn Bán Ra nhá cái mẫu lúc trc tôi thêm trong 7702"
+// -- kenh BIDV7702 (routes/doisoat-vietqr.js, route /xuat-hoa-don-dau-ra) da
+// co san xuat file mau VietInvoice CHO 1 NGAN HANG, 1 dong/gian/ngay. Bao cao
+// nay MOI, gop CA NHIEU kenh doi soat cua 1 cong ty lai lam 1 file: chon 1
+// khoang Tu ngay-Den ngay, CONG DON tat ca ngay trong khoang do lai, xuat
+// DUNG 1 dong cho moi cap (Ma cong trinh, Thuoc doi soat) -- khac voi ban
+// BIDV7702 la 1 dong/gian/MOI ngay rieng. Them 2 cot cuoi "Thuộc đối soát"
+// (Viet QR <NH> / VN Pay <NH> / Payoo <NH> / Zalo app <NH>) va "Mã công
+// trình" de Chi Nhan tu loc/doi chieu lai sau khi xuat.
+//
+// Chi Nhan xac nhan qua AskUserQuestion (2026-07-30): cot "Ngày hóa đơn" lay
+// NGAY XUAT FILE (hom nay, luc bam nut) cho MOI dong, KHONG phai tu/den ngay
+// cua khoang loc doanh thu -- khac voi ban BIDV7702 (lay dung ngay giao dich
+// vi do la 1 dong/ngay rieng, con ban nay la 1 dong GOP NHIEU NGAY nen khong
+// co "1 ngay" duy nhat de dien).
+//
+// KH Moi lam TRUOC (Chi Nhan xac nhan): gom VietQR (bidv7702/bidv77021/
+// mb02865168/bidv8613600999, moi kenh 1 nhan "Viet QR <ten TK ngan hang>")
+// va VNPay/Payoo KH Moi (routes/doisoat-vnpay-khmoi.js, ca 2 kenh cung ve TK
+// VTB982 -- "VN Pay VTB982" va "Payoo VTB982"). KH Cu (Momo/ZVP) Chi Nhan se
+// gui them thong tin sau ("KH cũ tôi gửi sau"), tam thoi bao loi ro rang neu
+// chon KH Cu thay vi doan bua nhan/kenh nao dung.
+const HOA_DON_BAN_RA_HEADER_INFO = [
+  ["FILE MẪU DANH SÁCH HÓA ĐƠN ĐỂ NHẬP VÀO PHẦN MỀM VIETINVOICE"],
+  ["Hướng dẫn:"],
+  ["- Điền dữ liệu hóa đơn cần lập trên phần mềm vào các cột tương ứng trên file này"],
+  ["- Các cột có dấu (*) là những cột bắt buộc"],
+  [
+    "- Nếu hóa đơn chiết khấu theo tổng tiền hàng thì điền thông tin về tỷ lệ CK và tiền CK ở cột màu tím. Nếu chiết khấu theo từng mặt hàng thì điền thông tin ở cột màu vàng",
+  ],
+  ['- Loại tiền tệ lấy theo cột "Mã loại tiền" trong chức năng "Danh mục => Loại tiền"'],
+  ['- Mã khách hàng (cột D) chỉ hợp lệ nếu đã tồn tại trong chức năng "Danh mục => Khách hàng"'],
+  ['- Mã hàng chỉ hợp lệ nếu đã tồn tại trong chức năng "Danh mục => Hàng hóa, dịch vụ"'],
+  ["- Các dòng dữ liệu phía dưới chỉ là ví dụ minh họa"],
+  ["- Hệ thống sử dụng dấu '.' để phân tách các chữ số hàng nghìn và dấu ',' để phân tách các chữ số phần thập phân"],
+  [],
+];
+const HOA_DON_BAN_RA_HEADER_ROW = [
+  "Số thứ tự hóa đơn (*)",
+  "Ngày hóa đơn",
+  "Tên đơn vị mua hàng",
+  "Mã khách hàng",
+  "Địa chỉ",
+  "Mã số thuế",
+  "Người mua hàng",
+  "Email",
+  "CMND/CCCD",
+  "Số hộ chiếu",
+  "Mã DVQHNS",
+  "Hình thức thanh toán",
+  "Loại tiền",
+  "Tỷ giá",
+  "Tỷ lệ CK(%)",
+  "Tiền CK",
+  "% thuế GTGT",
+  "Tiền thuế GTGT",
+  "Tên hàng hóa/dịch vụ (*)",
+  "Mã hàng",
+  "ĐVT",
+  "Số lượng",
+  "Đơn giá",
+  "Tỷ lệ CK (%)",
+  "Tiền CK",
+  "Thành tiền(*)",
+  "Thuộc đối soát",
+  "Mã công trình",
+];
+const HOA_DON_BAN_RA_VAT_RATE = 0.08;
+
+// Chi Nhan, 2026-07-30: gui file mau "Copy of EasyInvoice.xlsx" ("y chan vậy
+// với thêm 2 cột y như kh mới để cho kh cũ nha") -- KH Cu dung phan mem xuat
+// hoa don TEN "EasyInvoice", mau HOAN TOAN KHAC voi "VietInvoice" cua KH Moi
+// (48 cot: 46 cot chuan EasyInvoice + 2 cot them "Thuộc đối soát"/"Mã công
+// trình" giong KH Moi). Header lay Y CHANG dong 1 sheet "Hóa đơn" trong file
+// mau (khong co cac dong huong dan phia tren nhu VietInvoice). Doi chieu voi
+// vi du co san trong file de suy ra dung cong thuc: dong 2 mau co DonGia =
+// ThanhTien = 7162037, TienThue = 572963. Neu 7162037 la SO GOC (gross, da
+// gom thue) thi tach thue 8% ra phai duoc 7162037/1.08 = 6631515 (KHONG khop
+// TienThue mau). Nguoc lai neu 7162037 CHINH LA phan da tru thue (net) thi
+// gross that = 7162037*1.08 = 7735000, TienThue = gross - 7162037 = 572963 --
+// KHOP CHINH XAC. Vay cot "ThanhTien"/"DonGia" trong mau EasyInvoice DA LA SO
+// SAU KHI TACH THUE (net), giong y nghia cot "Thành tiền(*)" cua VietInvoice
+// -- CUNG 1 cong thuc da dung cho KH Moi: goi gross la so tien thu duoc thuc
+// te (Chi Nhan xac nhan "số tiền bạn lấy phải là số chẵn số chưa trừ phí" +
+// "đã bao gồm thuế nên bạn trừ cho thuế nha"), thanhTien = round(gross/1.08),
+// tienThue = gross - thanhTien.
+const HOA_DON_BAN_RA_EASYINVOICE_HEADER_ROW = [
+  "MaHD(*)",
+  "NgayHoaDon(*)",
+  "MaKhachHang",
+  "TenNguoiMua",
+  "TenDonVi",
+  "MaSoThue",
+  "DiaChiKhachHang",
+  "SoDienThoai",
+  "SoBangKe",
+  "NgayBangKe",
+  "SOTKKHACH",
+  "TENNHKHACH",
+  "HinhThucThanhToan(*)",
+  "ThueSuat(*)",
+  "ThueSuatKhac",
+  "MaHang",
+  "TenHangHoa(*)",
+  "DVT",
+  "SoLuong",
+  "DonGia",
+  "ThanhTien",
+  "TienTe",
+  "SoTT",
+  "TinhChat(*)",
+  "Email",
+  "Ghichu",
+  "TyGia",
+  "GiamTruHoaDon",
+  "GiamTruTungDongHangHoa",
+  "TienGiamTru",
+  "TyLe%ChietKhau",
+  "TienChietKhau",
+  "TienThue",
+  "MaDonViQuanHeNganSach",
+  "CanCuocCongDan",
+  "SoHoChieu",
+  "SoKhung",
+  "SoMay",
+  "BienKiemSoatPhuongTienVanchuyen",
+  "TenNguoiGuiHang",
+  "DiaChiNguoiGuiHang",
+  "MaSoThueNguoiGuiHang",
+  "SoDinhDanhNguoiGuiHang",
+  "Madiadiemkinhdoanh",
+  "Tendiadiemkinhdoanh",
+  "Diachidiadiemkinhdoanh",
+  "Thuộc đối soát",
+  "Mã công trình",
+];
+
+// { key: { bankName, label } } -- moi kenh VietQR cua 1 cong ty, dung LAI
+// dung cau hinh CHANNELS trong routes/doisoat-vietqr.js (khong doan lai ten
+// ngan hang) qua vietqrRouter.VIETQR_CHANNELS.
+const HOA_DON_BAN_RA_VIETQR_KEYS = {
+  kh_moi: ["bidv7702", "bidv77021", "mb02865168", "bidv8613600999"],
+  kh_cu: ["bidv7704", "bidv77020", "mb11521268"],
+};
+
+// Gop tat ca kenh doi soat cua 1 cong ty trong 1 khoang ngay thanh danh sach
+// { thuocDoiSoat, maCongTrinh, gross } DA CONG DON (khong con tach theo
+// ngay/thang nua) -- moi dong DUY NHAT 1 cap (thuocDoiSoat, maCongTrinh).
+function buildHoaDonBanRaGroups(store, company, fromDate, toDate) {
+  const groups = new Map();
+  function addLine(thuocDoiSoat, maCongTrinh, gross) {
+    const roundedGross = Math.round(gross || 0);
+    if (!roundedGross) return;
+    const key = thuocDoiSoat + "||" + maCongTrinh;
+    if (!groups.has(key)) groups.set(key, { thuocDoiSoat, maCongTrinh, gross: 0 });
+    groups.get(key).gross += roundedGross;
+  }
+  // `skipMeansBelongsToKhMoi`: rieng kenh Momo cua KH Moi (BIDV7701) dung TK
+  // Co = "SKIP" theo 1 nghia HOAN TOAN KHAC voi moi kenh con lai -- do la di
+  // san tu thoi KH Moi chua co tai khoan Momo rieng, phai doi soat chung
+  // nguon voi KH Cu, nen SKIP duoc dung lam CO HIEU PHAN BIET "gian nay la
+  // cua KH Moi" (xem ensureGianHidden/route /doi-soat/momo, dong loc
+  // `l.tkCo === "SKIP"` cho activeCompany === "kh_moi"), KHONG phai "chua
+  // xuat MISA" nhu moi noi khac. Chi Nhan xac nhan (2026-07-30): "4 gian đó
+  // của kh mới á" (FARM LOTTE PHAN THIET/NHA TRANG, AE TAN AN KVC, KVC
+  // ESTELLA) -- nen kenh nay phai LAY CA cac dong SKIP thay vi loai bo,
+  // nguoc lai voi VietQR/VNPay (noi SKIP dung dung nghia "chua xuat MISA",
+  // van phai loai nhu cu).
+  // Chi Nhan, 2026-07-30: "momo có 3 tr mấy mà với payoo có 2 tr mấy lận mà
+  // bạn lấy số đối soát chê vậy" -- loc theo `day.settlementDate` (ngay TIEN
+  // VE NGAN HANG) la SAI cho Momo/ZVP/VNPay-KhMoi: nhung kenh nay dung
+  // reconcileMomo/reconcileZvpChannel, TIEN VE NGAN HANG bi LECH ngay (thuong
+  // T+1) so voi NGAY BAN HANG THUC TE -- xem label "Khoản về ngày <settlementDate>
+  // (doanh thu <from> → <to>)" tren chinh trang doi soat. Vi du hom Chi Nhan
+  // xuat 29/7-29/7: doanh thu THAT su cua ngay 29/7 lai settle vao ngan hang
+  // NGAY 30/7, nen loc theo settlementDate=='2026-07-29' vo tinh lay nham
+  // doanh thu cua ngay 28/7 (settle vao 29/7) thay vi dung ngay 29/7 Chi Nhan
+  // muon. Rieng VietQR KHONG bi loi nay (tien ve tung giao dich mot, cung
+  // ngay, khong co do tre) nen khong co truong `from`/`to` -- fallback ve
+  // settlementDate cho kenh do. Dung phep GIAO KHOANG NGAY (thay vi so sanh 1
+  // ngay duy nhat) vi 1 "ngay" doi soat co the gom nhieu ngay doanh thu lai
+  // (vd tien cuoi tuan gop lai settle chung 1 hom, from != to).
+  function collectDays(reconciledDays, thuocDoiSoat, skipMeansBelongsToKhMoi) {
+    (reconciledDays || []).forEach((day) => {
+      const rangeStart = day.from || day.settlementDate;
+      const rangeEnd = day.to || day.settlementDate;
+      if (!rangeStart || !rangeEnd) return;
+      if (rangeEnd < fromDate || rangeStart > toDate) return; // khong giao voi khoang loc
+      (day.lines || []).forEach((l) => {
+        if (l.tkCo === "SKIP" && !skipMeansBelongsToKhMoi) return; // chua xuat MISA -- khong xuat hoa don
+        addLine(thuocDoiSoat, l.maCongTrinh, l.gross);
+      });
+    });
+  }
+
+  if (company === "kh_moi") {
+    const vietqrRouter = require("./doisoat-vietqr");
+    HOA_DON_BAN_RA_VIETQR_KEYS.kh_moi.forEach((chKey) => {
+      const built = vietqrRouter.buildChannelReconciliation(store, chKey);
+      if (built && !built.error && built.reconciled) {
+        const bankName = vietqrRouter.VIETQR_CHANNELS[chKey].bankName;
+        collectDays(built.reconciled, `Viet QR ${bankName}`);
+      }
+    });
+    const vnpayKhMoiRouter = require("./doisoat-vnpay-khmoi");
+    const vnpayBuilt = vnpayKhMoiRouter.buildReconciliation(store);
+    if (vnpayBuilt && !vnpayBuilt.error && vnpayBuilt.reconciled) {
+      collectDays(vnpayBuilt.reconciled.offline, "VN Pay VTB982");
+      collectDays(vnpayBuilt.reconciled.payoo, "Payoo VTB982");
+    }
+    // Chi Nhan, 2026-07-30: "sao xuất ra thử ngày 29 á không có đối soát momo
+    // kh mới" -- thieu sot: Momo CUNG co rieng 1 TK cho KH Moi (BIDV7701, xem
+    // MOMO_CHANNELS.kh_moi trong routes/doisoat.js), khong chi KH Cu, nen phai
+    // gop them kenh nay vao bao cao (nhan "Momo BIDV7701" giong cach dat ten
+    // "Viet QR <NH>"/"VN Pay <NH>" o tren).
+    const momoRouter = require("./doisoat");
+    const momoBuilt = momoRouter.buildMomoReconciliation(store, "kh_moi");
+    if (momoBuilt && !momoBuilt.error && momoBuilt.reconciledAll) {
+      collectDays(momoBuilt.reconciledAll, "Momo BIDV7701", true);
+    }
+  } else {
+    // Chi Nhan, 2026-07-30: gui file mau "EasyInvoice" rieng cho KH Cu, xac
+    // nhan lam theo cung kien truc voi KH Moi -- gom VietQR (bidv7704/
+    // bidv77020/mb11521268) + Momo (BIDV123456, TK Co SKIP dung DUNG nghia
+    // "chua xuat MISA" o day, khong phai co hieu phan cong ty nhu ben KH Moi,
+    // nen KHONG bat skipMeansBelongsToKhMoi) + Zalo App/VNPay/Payoo (routes/
+    // doisoat-zvp.js, ca 3 kenh cung ve TK ACB31268 -- "online"=Zalo App,
+    // "offline"=VNPay tai co so, "payoo"=Payoo, dat nhan giong quy uoc KH Moi:
+    // "Zalo app <NH>"/"VN Pay <NH>"/"Payoo <NH>").
+    const vietqrRouter = require("./doisoat-vietqr");
+    HOA_DON_BAN_RA_VIETQR_KEYS.kh_cu.forEach((chKey) => {
+      const built = vietqrRouter.buildChannelReconciliation(store, chKey);
+      if (built && !built.error && built.reconciled) {
+        const bankName = vietqrRouter.VIETQR_CHANNELS[chKey].bankName;
+        collectDays(built.reconciled, `Viet QR ${bankName}`);
+      }
+    });
+    const momoRouter = require("./doisoat");
+    const momoBuilt = momoRouter.buildMomoReconciliation(store, "kh_cu");
+    if (momoBuilt && !momoBuilt.error && momoBuilt.reconciledAll) {
+      collectDays(momoBuilt.reconciledAll, `Momo ${MOMO_BANK_NAME}`);
+    }
+    const zvpRouter = require("./doisoat-zvp");
+    const zvpBuilt = zvpRouter.buildZvpReconciliation(store);
+    if (zvpBuilt && !zvpBuilt.error && zvpBuilt.reconciled) {
+      const zvpBankName = zvpRouter.ZVP_BANK_NAME || ZVP_BANK_NAME;
+      collectDays(zvpBuilt.reconciled.online, `Zalo app ${zvpBankName}`);
+      collectDays(zvpBuilt.reconciled.offline, `VN Pay ${zvpBankName}`);
+      collectDays(zvpBuilt.reconciled.payoo, `Payoo ${zvpBankName}`);
+    }
+  }
+
+  return Array.from(groups.values())
+    .filter((r) => r.gross !== 0)
+    .sort((a, b) => a.thuocDoiSoat.localeCompare(b.thuocDoiSoat) || a.maCongTrinh.localeCompare(b.maCongTrinh));
+}
+
+router.get("/bao-cao/xuat-hoa-don-ban-ra", (req, res) => {
+  const activeCompany = getCompany(req);
+  res.render("baocao-hoadonbanra", { userName: req.session.userName, activeCompany, COMPANIES, error: req.query.error || null });
+});
+
+router.get("/bao-cao/xuat-hoa-don-ban-ra/xuat.xlsx", (req, res) => {
+  const store = load();
+  const company = req.query.company === "kh_cu" ? "kh_cu" : "kh_moi";
+  const fromDate = (req.query.from || "").trim();
+  const toDate = (req.query.to || "").trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(fromDate) || !/^\d{4}-\d{2}-\d{2}$/.test(toDate)) {
+    return res.status(400).send("Thiếu hoặc sai định dạng ngày (YYYY-MM-DD) -- chọn đủ Từ ngày và Đến ngày trước.");
+  }
+  if (fromDate > toDate) {
+    return res.status(400).send("Từ ngày phải nhỏ hơn hoặc bằng Đến ngày.");
+  }
+  let startNo = parseInt(req.query.start || "1", 10);
+  if (isNaN(startNo) || startNo < 1) startNo = 1;
+
+  let groups;
+  try {
+    groups = buildHoaDonBanRaGroups(store, company, fromDate, toDate);
+  } catch (e) {
+    return res.status(400).send(e.message);
+  }
+  if (groups.length === 0) {
+    return res.status(400).send(`Từ ${fromDate} đến ${toDate} không có mã công trình nào có doanh thu (khác 0) để xuất hóa đơn.`);
+  }
+
+  const today = new Date();
+  const ngayHoaDon = [today.getDate(), today.getMonth() + 1, today.getFullYear()]
+    .map((n) => String(n).padStart(2, "0"))
+    .join("/");
+
+  const dataRows = [];
+  let seq = startNo;
+  let aoa;
+  let sheetName;
+
+  if (company === "kh_moi") {
+    // KH Moi -- mau "VietInvoice" (giu nguyen nhu Chi Nhan da xac nhan truoc).
+    groups.forEach((g) => {
+      const grossTotal = g.gross;
+      const thanhTien = Math.round(grossTotal / (1 + HOA_DON_BAN_RA_VAT_RATE));
+      const tienThueGtgt = grossTotal - thanhTien;
+      dataRows.push([
+        seq,
+        ngayHoaDon,
+        "Bán cho người tiêu dùng ",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "TM/CK",
+        "VND",
+        "",
+        "",
+        "",
+        "8",
+        tienThueGtgt,
+        "Dịch vụ vui chơi giải trí",
+        "",
+        "Kỳ ",
+        "1",
+        thanhTien,
+        "",
+        "",
+        thanhTien,
+        g.thuocDoiSoat,
+        g.maCongTrinh,
+      ]);
+      seq++;
+    });
+    aoa = [...HOA_DON_BAN_RA_HEADER_INFO, HOA_DON_BAN_RA_HEADER_ROW, ...dataRows];
+    sheetName = "Hóa đơn";
+  } else {
+    // KH Cu -- mau "EasyInvoice" (file Chi Nhan gui 2026-07-30), 48 cot (46
+    // cot chuan + 2 cot "Thuộc đối soát"/"Mã công trình" giong KH Moi). Xem
+    // ghi chu day du o dinh nghia HOA_DON_BAN_RA_EASYINVOICE_HEADER_ROW ve
+    // cong thuc ThanhTien/TienThue (giong VietInvoice: tach 8% thue tu gross).
+    groups.forEach((g) => {
+      const grossTotal = g.gross;
+      const thanhTien = Math.round(grossTotal / (1 + HOA_DON_BAN_RA_VAT_RATE));
+      const tienThue = grossTotal - thanhTien;
+      dataRows.push([
+        `HD${seq}`, // MaHD(*)
+        ngayHoaDon, // NgayHoaDon(*)
+        "", // MaKhachHang
+        "Bán cho người tiêu dùng ", // TenNguoiMua
+        "", // TenDonVi
+        "", // MaSoThue
+        "", // DiaChiKhachHang
+        "", // SoDienThoai
+        "", // SoBangKe
+        "", // NgayBangKe
+        "", // SOTKKHACH
+        "", // TENNHKHACH
+        "Tiền mặt/Chuyển khoản", // HinhThucThanhToan(*)
+        8, // ThueSuat(*)
+        "", // ThueSuatKhac
+        "", // MaHang
+        "Dịch vụ vui chơi giải trí", // TenHangHoa(*)
+        "Kỳ ", // DVT
+        1, // SoLuong
+        thanhTien, // DonGia
+        thanhTien, // ThanhTien
+        "VND", // TienTe
+        "", // SoTT
+        1, // TinhChat(*)
+        "", // Email
+        "", // Ghichu
+        "", // TyGia
+        "", // GiamTruHoaDon
+        "", // GiamTruTungDongHangHoa
+        "", // TienGiamTru
+        "", // TyLe%ChietKhau
+        "", // TienChietKhau
+        tienThue, // TienThue
+        "", // MaDonViQuanHeNganSach
+        "", // CanCuocCongDan
+        "", // SoHoChieu
+        "", // SoKhung
+        "", // SoMay
+        "", // BienKiemSoatPhuongTienVanchuyen
+        "", // TenNguoiGuiHang
+        "", // DiaChiNguoiGuiHang
+        "", // MaSoThueNguoiGuiHang
+        "", // SoDinhDanhNguoiGuiHang
+        "", // Madiadiemkinhdoanh
+        "", // Tendiadiemkinhdoanh
+        "", // Diachidiadiemkinhdoanh
+        g.thuocDoiSoat, // Thuộc đối soát
+        g.maCongTrinh, // Mã công trình
+      ]);
+      seq++;
+    });
+    aoa = [HOA_DON_BAN_RA_EASYINVOICE_HEADER_ROW, ...dataRows];
+    sheetName = "Hóa đơn";
+  }
+
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  const wb2 = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb2, ws, sheetName);
+  const buf = XLSX.write(wb2, { type: "buffer", bookType: "xlsx" });
+  res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+  res.setHeader("Content-Disposition", `attachment; filename=HoaDonBanRa-${company}-${fromDate}_${toDate}.xlsx`);
+  res.send(buf);
+});
+
 module.exports = router;

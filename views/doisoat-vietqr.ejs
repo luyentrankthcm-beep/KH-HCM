@@ -29,12 +29,10 @@
          cuon tay qua cac panel tai file. CHI hien khi dang xem "Tat ca ngan
          hang" (selectedChannel rong) -- neu da loc rieng 1 ngan hang thi cac
          section khac khong ton tai tren trang, link se khong nhay duoc. -->
-    <div class="quick-bank-nav" style="position:fixed; right:16px; top:50%; transform:translateY(-50%); z-index:40; display:flex; flex-direction:column; gap:6px; background:#fff; border-radius:12px; box-shadow:0 6px 20px rgba(0,0,0,0.15); padding:10px 8px;">
-      <span class="muted" style="font-size:11px; text-align:center; padding-bottom:2px;">Đối soát</span>
-      <% channels.forEach(function (chInfo) { %>
-      <a href="#vqr-channel-<%= chInfo.key %>" class="btn btn-secondary" style="font-size:11px; padding:6px 10px; white-space:nowrap;"><%= chInfo.label %></a>
-      <% }) %>
-    </div>
+    <%- include('partials/quick-bank-nav', {
+      quickNavId: 'quickBankNav',
+      quickNavItems: channels.map(function (chInfo) { return { href: '#vqr-channel-' + chInfo.key, label: chInfo.label }; }),
+    }) %>
     <% } %>
 
     <% if (error) { %><div class="alert alert-error" id="autohide-error"><%= error %></div><% } %>
