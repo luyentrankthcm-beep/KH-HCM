@@ -13,6 +13,21 @@
       "CSE" trên sheet "gian hang xuất HĐ" được tự tách sang TK Có 1388 (doanh thu chia sẻ), giống Fun/Fest SC VIVO bên Momo.
     </p>
 
+    <!-- Chi Nhan, 2026-07-30: "các trang có trên 2 ngân hàng á thêm chỗ đối
+         soát bên phải đi để đẩy xuống đối soát phía dưới cho nhanh" -- trang
+         nay LUON co 3 kenh (Online/Offline/Payoo) lien tiep, cac panel tai
+         file (1-4) o phia tren rat dai truoc khi toi "7. Ket qua doi soat" --
+         them thanh nhay nhanh co dinh ben phai (giong doisoat-vietqr.ejs) toi
+         thang id="zvp-channel-<key>" cua tung kenh. Khac VietQR: trang nay
+         KHONG co bo loc rieng tung kenh (luon hien ca 3), nen luon hien nav
+         nay, khong can dieu kien selectedChannel. -->
+    <div class="quick-bank-nav" style="position:fixed; right:16px; top:50%; transform:translateY(-50%); z-index:40; display:flex; flex-direction:column; gap:6px; background:#fff; border-radius:12px; box-shadow:0 6px 20px rgba(0,0,0,0.15); padding:10px 8px;">
+      <span class="muted" style="font-size:11px; text-align:center; padding-bottom:2px;">Đối soát</span>
+      <a href="#zvp-channel-online" class="btn btn-secondary" style="font-size:11px; padding:6px 10px; white-space:nowrap;">Online</a>
+      <a href="#zvp-channel-offline" class="btn btn-secondary" style="font-size:11px; padding:6px 10px; white-space:nowrap;">Offline</a>
+      <a href="#zvp-channel-payoo" class="btn btn-secondary" style="font-size:11px; padding:6px 10px; white-space:nowrap;">Payoo</a>
+    </div>
+
     <% if (error) { %><div class="alert alert-error" id="autohide-error"><%= error %></div><% } %>
     <% if (success) { %><div class="alert alert-success" id="autohide-success"><%= success %></div><% } %>
     <script>
@@ -551,7 +566,7 @@
     </section>
 
     <% ['online', 'offline', 'payoo'].forEach(function(ch) { %>
-    <section class="panel">
+    <section class="panel" id="zvp-channel-<%= ch %>">
       <h2>
         <%= ch === 'online' ? 'Kết quả đối soát Online (VNPay CTT qua Zalo App)' :
             ch === 'offline' ? 'Kết quả đối soát Offline (VNPay QR)' : 'Kết quả đối soát Payoo' %>

@@ -16,6 +16,27 @@
       <% } %>
     </p>
 
+    <% if (channels.length > 2 && !selectedChannel) { %>
+    <!-- Chi Nhan, 2026-07-30: "các trang có trên 2 ngân hàng á thêm chỗ đối
+         soát bên phải đi để đẩy xuống đối soát phía dưới cho nhanh á chớ chờ
+         lướt xuống kiếm ngày lâu lắm" -- trang nay liet ke nhieu ngan hang
+         lien tiep (panel tai file + panel ket qua doi soat cho TUNG ngan
+         hang), cuon qua het cac panel tai file phia tren rat lau moi toi
+         dung ngan hang can xem. Them 1 thanh nhay nhanh CO DINH ben phai
+         (giua man hinh, duoi nut float-nav goc duoi phai de khong de) --
+         bam thang toi dung section "Ket qua doi soat" cua ngan hang do (xem
+         id="vqr-channel-<key>" gan o section tuong ung ben duoi), khong can
+         cuon tay qua cac panel tai file. CHI hien khi dang xem "Tat ca ngan
+         hang" (selectedChannel rong) -- neu da loc rieng 1 ngan hang thi cac
+         section khac khong ton tai tren trang, link se khong nhay duoc. -->
+    <div class="quick-bank-nav" style="position:fixed; right:16px; top:50%; transform:translateY(-50%); z-index:40; display:flex; flex-direction:column; gap:6px; background:#fff; border-radius:12px; box-shadow:0 6px 20px rgba(0,0,0,0.15); padding:10px 8px;">
+      <span class="muted" style="font-size:11px; text-align:center; padding-bottom:2px;">Đối soát</span>
+      <% channels.forEach(function (chInfo) { %>
+      <a href="#vqr-channel-<%= chInfo.key %>" class="btn btn-secondary" style="font-size:11px; padding:6px 10px; white-space:nowrap;"><%= chInfo.label %></a>
+      <% }) %>
+    </div>
+    <% } %>
+
     <% if (error) { %><div class="alert alert-error" id="autohide-error"><%= error %></div><% } %>
     <% if (success) { %><div class="alert alert-success" id="autohide-success"><%= success %></div><% } %>
 
@@ -793,7 +814,7 @@
 
     <% var displayChannels = selectedChannel ? channels.filter(function(c) { return c.key === selectedChannel; }) : channels; %>
     <% displayChannels.forEach(function(chInfo) { var ch = chInfo.key; var pivot = pivotByChannel[ch] || { dates: [], rows: [] }; %>
-    <section class="panel">
+    <section class="panel" id="vqr-channel-<%= ch %>">
       <h2>Kết quả đối soát — <%= chInfo.label %></h2>
 
       <script>
