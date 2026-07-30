@@ -216,6 +216,27 @@ function applyConsecutiveRunNetting(results) {
   });
 }
 
+// Chi Nhan, 2026-07-30: "ngày 8 có cái 12.120 trên dữ liệu payoo này là text
+// thôi bạn xóa ra ln đi cho tôi nhá" -- file "PY-GiaoDichBanHangPayoo-
+// 01072026-29072026.xlsx" co 1 dong bi doc nham thanh "2026-07-08|KVC ROYAL"
+// = 12.120d (thuc ra la text, khong phai giao dich that -- ngay 08/7 KVC
+// ROYAL khong co doanh thu Payoo nao ca, xac nhan: bo dong nay di thi ca
+// "Ngan hang" (3.757.098d) lan hoa don (8987,8988 = 3.780.000d) deu khop
+// TUYET DOI voi rieng ngay 09/7, giai thich dung 2 cho lech "Chenh lech
+// 11.892d" (= net cua dong rac) VA "Lech -12.120d" (= gross cua dong rac)
+// cung luc). Loc bo SAU KHI merge (khong sua truc tiep tung file upload) de
+// ap dung du la ban ghi nam trong file nao, KHONG BI MAT khi server dang
+// chay cua Chi Nhan tu ghi de store.json.
+const PAYOO_BAD_GROSS_KEYS = new Set(["2026-07-08|KVC ROYAL"]);
+
+function stripPayooBadGrossKeys(merged) {
+  PAYOO_BAD_GROSS_KEYS.forEach((key) => {
+    delete merged.grossByCode[key];
+    delete merged.netByCode[key];
+  });
+  return merged;
+}
+
 function buildReconciliation(store) {
   if (ensureVnpayKhMoiShape(store)) save(store);
   const bank = store.banks.find((b) => b.name === VTB_BANK_NAME);
@@ -226,7 +247,7 @@ function buildReconciliation(store) {
   const settlements = extractZvpSettlements(txs);
 
   const grossMerged = mergeResolvedGross(store.vnpay_khmoi_uploads);
-  const payooGrossMerged = mergeResolvedGross(store.vnpay_khmoi_payoo_uploads);
+  const payooGrossMerged = stripPayooBadGrossKeys(mergeResolvedGross(store.vnpay_khmoi_payoo_uploads));
   // Chi Nhan, 2026-07-29: "KVC ROYAL có lệch đâu đây nó chỉ có 1 hóa đơn mà
   // cộng chi mà nhiều vậy" -- store.viet_qr_invoices.vnpayKhMoi la 1 pool
   // hoa don DUNG CHUNG cho ca 2 kenh (gop tu ca 2 pool zvp_invoices.vnpay VA
