@@ -336,6 +336,15 @@ function buildMomoReconciliation(store, companyKey) {
     const invoiceData = { invoices };
     if (grossData.codes.length > 0) {
       reconciledAll = reconcileMomo(settlements, grossData, invoiceData, store.gian_mapping, store.invoice_diem_alias);
+      // Chi Nhan, 2026-07-30: "các đối soát tất cả các trang điều xếp theo
+      // ngày cho tôi nhá" -- reconcileMomo tra ve ket qua theo THU TU giao
+      // dich ngan hang trong store.transactions (thu tu tai/nhap lieu, KHONG
+      // phai thu tu ngay thang), nen trang co the hien VD ngay 30 roi toi
+      // 23 roi 24 (dung nhu Chi Nhan gap). Sap lai TANG DAN theo settlementDate
+      // NGAY SAU KHI TINH XONG (giong cach doisoat-vnpay-khmoi.js da lam) de
+      // moi cho dung ben duoi (monthSet/months, reconciledMonth, reconciled)
+      // deu tu dong ke thua dung thu tu, khong phai sua rai rac nhieu cho.
+      reconciledAll.sort((a, b) => (a.settlementDate < b.settlementDate ? -1 : a.settlementDate > b.settlementDate ? 1 : 0));
       // An gian theo YEU CAU RIENG cua tung cong ty (vd 1 gian duoc gop nham
       // vao file tai len cua cong ty nay, nhung se duoc xuat HD ben cong ty
       // KIA -- Luyen, 2026-07-16: "KVC ESTELLA", "FARM LOTTE NHA TRANG",

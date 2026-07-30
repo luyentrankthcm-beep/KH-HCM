@@ -1151,6 +1151,17 @@ function buildChannelReconciliation(store, channelKey) {
     store.invoice_diem_alias
   );
 
+  // Chi Nhan, 2026-07-30: "các đối soát tất cả các trang điều xếp theo ngày
+  // cho tôi nhá" -- reconcileVietQr tra ve ket qua theo thu tu giao dich
+  // ngan hang trong store.transactions (thu tu tai/nhap lieu), khong phai
+  // thu tu ngay thang, nen trang co the hien lon xon (vd ngay 30 roi 23 roi
+  // 24). Sap lai TANG DAN theo settlementDate NGAY SAU KHI TINH XONG (giong
+  // cach doisoat-vnpay-khmoi.js da lam) -- an toan de sap truoc
+  // applyInvoiceSharePairs/applySharePairChainNetting vi ca 2 ham do xu ly
+  // TUNG DONG doc lap (khong dua vao thu tu mang de tinh), applySharePairChainNetting
+  // con tu sap 1 ban sao rieng truoc khi xet chuoi ngay lien tiep.
+  reconciled.sort((a, b) => (a.settlementDate < b.settlementDate ? -1 : a.settlementDate > b.settlementDate ? 1 : 0));
+
   // Xem ghi chu tai INVOICE_SHARE_PAIRS o tren -- chay SAU reconcileVietQr
   // (da bao gom ca chia theo ngay cho hoa don gop T7+CN) de tu dong chia lai
   // theo dung ty le doanh thu cho cac cap gian bi xuat chung 1 hoa don.

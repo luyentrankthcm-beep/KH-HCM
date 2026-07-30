@@ -301,6 +301,17 @@ function buildReconciliation(store) {
     cseOverrideCodes
   );
 
+  // Chi Nhan, 2026-07-30: "các đối soát tất cả các trang điều xếp theo ngày
+  // cho tôi nhá" -- reconcileZvp tra ve ket qua theo thu tu giao dich ngan
+  // hang trong store.transactions (thu tu tai/nhap lieu), khong phai thu tu
+  // ngay thang, nen trang co the hien lon xon (vd ngay 30 roi 23 roi 24).
+  // Sap lai TANG DAN theo settlementDate cho CA 3 kenh NGAY SAU KHI TINH
+  // XONG (giong cach doisoat-vnpay-khmoi.js da lam) de moi cho dung ben duoi
+  // deu tu dong ke thua dung thu tu.
+  ["online", "offline", "payoo"].forEach((ch) => {
+    (reconciled[ch] || []).sort((a, b) => (a.settlementDate < b.settlementDate ? -1 : a.settlementDate > b.settlementDate ? 1 : 0));
+  });
+
   const allCodes = new Set();
   ["online", "offline", "payoo"].forEach((ch) => {
     reconciled[ch].forEach((r) => r.lines.forEach((l) => allCodes.add(l.code)));
