@@ -209,7 +209,7 @@
                ung (ben kia giao dich, doc tu file sao ke neu co, xem
                utils/bankStatementParser.js), giup do ai/NCC nao thanh toan/
                nhan tien ma khong can doc het Dien giai dai. -->
-          <tr><th>Ngày</th><th>Ngân hàng</th><th>Diễn giải</th><th>Tên đối ứng</th><th>Thu</th><th>Chi</th><th>Số dư</th><% if (isAdmin) { %><th></th><% } %></tr>
+          <tr><th>Ngày</th><th>Ngân hàng</th><th>Diễn giải</th><th>Tên đối ứng</th><th class="num">Thu</th><th class="num">Chi</th><th class="num">Số dư</th><% if (isAdmin) { %><th></th><% } %></tr>
         </thead>
         <tbody>
           <% rows.forEach(function(t) { %>
@@ -218,11 +218,11 @@
             <td><%= t.bank_label %></td>
             <td class="desc-cell" title="<%= t.description %>"><%= t.description %></td>
             <td class="desc-cell" title="<%= t.tenDoiUng || '' %>"><%= t.tenDoiUng || '—' %></td>
-            <td class="text-pos"><%= t.type === 'thu' ? t.amount.toLocaleString('vi-VN') + ' đ' : '' %></td>
-            <td class="text-neg"><%= t.type === 'chi' ? t.amount.toLocaleString('vi-VN') + ' đ' : '' %></td>
-            <td><%= t.balance != null ? t.balance.toLocaleString('vi-VN') + ' đ' : '-' %></td>
+            <td class="num text-pos"><%= t.type === 'thu' ? t.amount.toLocaleString('vi-VN') + ' đ' : '' %></td>
+            <td class="num text-neg"><%= t.type === 'chi' ? t.amount.toLocaleString('vi-VN') + ' đ' : '' %></td>
+            <td class="num"><%= t.balance != null ? t.balance.toLocaleString('vi-VN') + ' đ' : '-' %></td>
             <% if (isAdmin) { %>
-            <td><button type="button" class="link-btn" style="font-size:11px;" onclick="txToggleEdit(event, '<%= t.id %>')">Sửa</button></td>
+            <td class="num"><button type="button" class="link-btn" style="font-size:11px;" onclick="txToggleEdit(event, '<%= t.id %>')">Sửa</button></td>
             <% } %>
           </tr>
           <% if (isAdmin) { %>

@@ -503,6 +503,16 @@ a.report-tile.accent-gian { --report-accent: #1d8a4a; }
   z-index: 2;
   box-shadow: 0 1px 0 var(--color-hairline);
 }
+/* Chi Nhan, 2026-07-30: "giao diện dễ nhìn xíu đi xuống vòng vậy xấu quá" --
+   bang giao dich dai (Danh sach giao dich...) truoc gio khong co van soc xen
+   ke/hover, cac dong cung mau tuyet doi lam mat rat kho "do" ngang 1 dong khi
+   bang dai + nhieu cot so. Them van soc nhe (zebra) + hover ro rang cho MOI
+   bang .table trong site (khong rieng trang nao), dung dung mau co san
+   (--color-cloud/--color-fog) de hop voi theme xanh dang dung, khong can them
+   bien mau moi. */
+.table tbody tr:nth-child(even) { background: rgba(234, 247, 251, 0.5); }
+.table tbody tr:hover { background: var(--color-fog); }
+.table tbody tr.tx-row-selected:hover { background: #fff6d8; }
 .table-pivot td a { color: var(--color-primary); text-decoration: none; }
 .table-pivot td a:hover { text-decoration: underline; }
 

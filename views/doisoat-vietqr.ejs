@@ -6,12 +6,14 @@
 <body>
   <%- include('partials/nav') %>
   <main class="container">
-    <h1>Đối soát Viet QR — <%= COMPANIES[activeCompany].label %> (<%= channels.map(function(c){ return c.label; }).join(' / ') %>)</h1>
+    <h1><%= typeof pageTitle !== 'undefined' ? pageTitle : 'Đối soát Viet QR' %> — <%= COMPANIES[activeCompany].label %> (<%= channels.map(function(c){ return c.label; }).join(' / ') %>)</h1>
     <p class="muted">
+      <% if (typeof pageSubtitle !== 'undefined') { %><%= pageSubtitle %><% } else { %>
       Viet QR về ngân hàng từng giao dịch một (không gộp theo đợt như Momo/Zalo/VNPay), nên web đối soát theo TỪNG
       NGÀY: cộng hết tiền QR về ngày đó, tách theo gian dựa vào file "Dữ liệu"/"Cửa hàng" bạn tải lên, rồi dò khớp
       với danh sách hóa đơn dùng chung (gắn thẻ theo từng ngân hàng). Diễn giải khi xuất MISA luôn dùng đúng mẫu
       "Thu tiền dịch vụ vui chơi giải trí theo HĐ ...".
+      <% } %>
     </p>
 
     <% if (error) { %><div class="alert alert-error" id="autohide-error"><%= error %></div><% } %>
@@ -415,10 +417,11 @@
       <h2>⚠️ Tên điểm bán chưa có Mã công trình tương ứng (<%= allRefUnmappedTenDiem.length %>)</h2>
       <p class="muted">
         Đã tra được tên điểm bán qua Mã cửa hàng, nhưng tên điểm này chưa có trong sheet "Tên điểm- Mã công trình" —
-        bổ sung dòng tương ứng vào file rồi tải lại (qua nút tải "Dữ liệu Viet QR" như bình thường).
+        gán mã công trình trực tiếp bên dưới, hoặc bổ sung dòng tương ứng vào file rồi tải lại (qua nút tải "Dữ liệu
+        Viet QR" như bình thường).
       </p>
       <table class="table">
-        <thead><tr><th>Tên điểm bán</th><th>Mã cửa hàng</th><th>Số GD</th><th>Tổng tiền</th></tr></thead>
+        <thead><tr><th>Tên điểm bán</th><th>Mã cửa hàng</th><th>Số GD</th><th>Tổng tiền</th><th>Gán mã công trình</th></tr></thead>
         <tbody>
           <% allRefUnmappedTenDiem.forEach(function(r) { %>
           <tr>
@@ -426,6 +429,22 @@
             <td><%= r.maCuaHang %></td>
             <td><%= r.count %></td>
             <td><%= r.total.toLocaleString('vi-VN') %> đ</td>
+            <td>
+              <% if (r.tenDiemBan) { %>
+              <form method="POST" action="/doi-soat/vietqr/gan-ten-diem/<%= r.channel %>" class="form-inline" style="gap:4px;">
+                <input type="hidden" name="tenDiemBan" value="<%= r.tenDiemBan %>" />
+                <select name="maCongTrinh" required style="max-width:220px;">
+                  <option value="">-- Chọn mã công trình --</option>
+                  <% (typeof maCongTrinhOptions !== 'undefined' ? maCongTrinhOptions : []).forEach(function(m) { %>
+                  <option value="<%= m.maCongTrinh %>"><%= m.maCongTrinh %><%= m.tenCongTrinh ? ' - ' + m.tenCongTrinh : '' %></option>
+                  <% }) %>
+                </select>
+                <button type="submit" class="btn btn-secondary" style="font-size:12px; padding:4px 8px;">Gán</button>
+              </form>
+              <% } else { %>
+              <span class="muted" style="font-size:12px;">Không có tên điểm, không gán được -- xem cột Mã cửa hàng</span>
+              <% } %>
+            </td>
           </tr>
           <% }) %>
         </tbody>
@@ -892,7 +911,7 @@
           </summary>
           <% if (r.tanPhuSuggestion) { %>
           <p class="badge badge-warn" style="display:block; margin-top:8px; font-size:12px; padding:6px 10px;">
-            ⚠️ Sau khi trừ giao dịch không phải VietQR, Ngân hàng ngày này vẫn còn dư <strong><%= r.tanPhuSuggestion.amount.toLocaleString('vi-VN') %> đ</strong> so với dữ liệu đối soát — có nên gộp khoản này vào gian <strong><%= r.tanPhuSuggestion.targetCode %></strong> (Tân Phú) không?
+            ✅ Sau khi trừ giao dịch không phải VietQR, Ngân hàng ngày này còn dư <strong><%= r.tanPhuSuggestion.amount.toLocaleString('vi-VN') %> đ</strong> so với dữ liệu đối soát — đã tự động gộp vào gian <strong><%= r.tanPhuSuggestion.targetCode %></strong>.
           </p>
           <% } %>
           <table class="table" style="margin-top:8px;">

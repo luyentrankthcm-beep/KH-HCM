@@ -36,6 +36,7 @@ const {
   normCode,
   FF_SUFFIX,
 } = require("../utils/zvpReconcile");
+const { migrateVnpayKhMoiInvoices } = require("../utils/vietqrReconcile");
 
 const { getCompany } = require("../utils/companies");
 
@@ -140,8 +141,73 @@ function isDuplicateRecentUpload(uploadsList, fileName, grossByCode) {
   return JSON.stringify(recent.grossByCode) === JSON.stringify(grossByCode);
 }
 
+// Chi Nhan, 2026-07-29: "hóa đơn có 2 cái này thôi ... sao lại cộng hóa đơn
+// 11143 vậy lấy ra đi kh phải của VNPAY offline á" -- zvp_gian_list (bang
+// "gian" chi Nhan tu tai len) co dong "KVC AE HUE" -> "AE HUE KVCN" khien MOI
+// hoa don cua 1 chuoi hoa don HOAN TOAN KHAC (dat ten "KVC AE HUE"/"Tàu AE
+// Huế", so hoa don rieng 7700-11000+, vd 10413/11143) bi gop nham vao gian
+// "AE HUE KVCN" that -- vi khong co doanh thu ngan hang nao khop voi ten "KVC
+// AE HUE" ca, gop hoa don vao lam MOI ngay co phat sinh loai hoa don nay deu
+// bi "Lệch" dung bang so tien hoa don do (xac nhan qua nhieu ngay: 07-23
+// (2.114.000), 07-24 (1.620.000), 07-28/29 (11143 = 1.428.000)). Da xoa dong
+// nay 1 lan truc tiep nhung bi MAT lai (server cua chi Nhan tu ghi de
+// store.json bang ban cu dang giu trong bo nho no, xem ghi chu day du tai
+// INVOICE_DIEM_ALIAS_DEFAULTS trong routes/doisoat-vietqr.js) -- sua han qua
+// code o day (chay lai + tu xoa MOI LAN load(), giong co che GIAN_MERGE_DEFAULTS/
+// TEN_DIEM_MASTER_DEFAULTS ben VietQR) de KHONG BI MAT nua, chi can chi Nhan
+// restart server 1 lan de nap code moi la vinh vien khong con bug nay.
+const ZVP_GIAN_LIST_BAD_REDIRECTS = [{ tenDiem: "KVC AE HUE", maCongTrinh: "AE HUE KVCN" }];
+
+// Chi Nhan, 2026-07-30: "là hóa đơn này nè đổi tên á bạn coi lại nha lần sao
+// nó note z á" -- hoa don 2458 (450.000d, ngay 29/7, gian KVC TIMES that)
+// dan Ma diem "VC TC DIY KVCN" (doi ten tu "GHOST BRIDE" cu, gach bo ngay
+// tren file goc) thay vi "KVC TIMES" nen bao "Chua co HD" gia. Ghi thang 1
+// lan qua script bi MAT ngay lap tuc (server dang chay cua Chi Nhan tu ghi
+// de store.json bang ban cu dang giu trong bo nho, giong het co che da giai
+// thich tai INVOICE_DIEM_ALIAS_DEFAULTS trong routes/doisoat-vietqr.js) --
+// chuyen thanh seed tu dong CHAY LAI + GHI DE MOI LAN load() (giong het
+// stripZvpGianListBadRedirects ngay ben duoi) de khong bao gio mat lai.
+const ZVP_INVOICE_DIEM_ALIAS_DEFAULTS = {
+  "VC TC DIY KVCN": "KVC TIMES",
+};
+
+function seedZvpInvoiceDiemAliasDefaults(store) {
+  if (!store.invoice_diem_alias) store.invoice_diem_alias = {};
+  let changed = false;
+  Object.keys(ZVP_INVOICE_DIEM_ALIAS_DEFAULTS).forEach((k) => {
+    if (store.invoice_diem_alias[k] !== ZVP_INVOICE_DIEM_ALIAS_DEFAULTS[k]) {
+      store.invoice_diem_alias[k] = ZVP_INVOICE_DIEM_ALIAS_DEFAULTS[k];
+      changed = true;
+    }
+  });
+  return changed;
+}
+
+function stripZvpGianListBadRedirects(store) {
+  if (!store.zvp_gian_list || !Array.isArray(store.zvp_gian_list)) return false;
+  let changed = false;
+  store.zvp_gian_list = store.zvp_gian_list.filter((g) => {
+    const isBad = ZVP_GIAN_LIST_BAD_REDIRECTS.some(
+      (bad) => normText(g.tenDiem) === normText(bad.tenDiem) && g.maCongTrinh === bad.maCongTrinh
+    );
+    if (isBad) changed = true;
+    return !isBad;
+  });
+  return changed;
+}
+
 function buildReconciliation(store) {
   if (ensureNo1388(store)) save(store);
+  if (stripZvpGianListBadRedirects(store)) save(store);
+  if (seedZvpInvoiceDiemAliasDefaults(store)) save(store);
+  // Chi Nhan, 2026-07-29: xem ghi chu day du tai VNPAY_KHMOI_INVOICE_MADIEM_MAP
+  // trong utils/vietqrReconcile.js -- hoa don KVC AE HUE/KVC TIMES/KVC ROYAL/
+  // SAVICO PHN thuc ra la doanh thu VNPay KH Moi (02865168), khong phai KH
+  // Cu, nen tu dong chuyen ra khoi day moi lan trang nay duoc mo (kem ca
+  // trang VietQR, xem doisoat-vietqr.js) -- tu "don" ca hoa don MOI van tiep
+  // tuc duoc tai len qua nut "Tai len combo" o trang nay (van gan tag "Vnpay
+  // CS MB"/... nhu cu).
+  if (migrateVnpayKhMoiInvoices(store)) save(store);
   const bank = store.banks.find((b) => b.name === ZVP_BANK_NAME);
   if (!bank) {
     return { error: `Chua co ngan hang "${ZVP_BANK_NAME}" (TK ${ZVP_BANK_ACCOUNT}) trong he thong.` };

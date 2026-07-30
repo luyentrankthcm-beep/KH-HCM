@@ -231,6 +231,16 @@
               <input type="text" name="aliasGian" value="<%= r.aliasGian %>" placeholder="Mã viết tắt (Chi Phí)" />
               <button type="submit" class="link-btn" title="Lưu mã viết tắt">Lưu</button>
             </form>
+            <!-- Chi Nhan, 2026-07-29: "cái nào mà thuê gian hàng thì cho vô
+                 hợp đồng thuê gian còn lại của hcm cho qua bên ncc" -- chuyen
+                 nguyen ven 1 dong (khong mat du lieu) sang trang Hop dong NCC
+                 cho cac dong thuc ra la NCC (van tai, xay dung, thanh toan...),
+                 khong phai hop dong thue mat bang/gian hang that. -->
+            <form method="POST" action="/phap-danh/hop-dong-thue-gian-hang/<%= r.id %>/chuyen-sang-ncc" onsubmit="return confirm('Chuyển hợp đồng này sang Hợp đồng NCC?');">
+              <input type="hidden" name="loai" value="<%= loaiFilter %>" />
+              <input type="hidden" name="thang" value="<%= thangFilter %>" />
+              <button type="submit" class="link-btn" title="Đây không phải hợp đồng thuê gian hàng -- chuyển sang danh sách NCC">Chuyển sang NCC</button>
+            </form>
             <form method="POST" action="/phap-danh/hop-dong-thue-gian-hang/<%= r.id %>/delete" onsubmit="return confirm('Xóa gian này?');">
               <button type="submit" class="link-btn link-danger">Xóa</button>
             </form>

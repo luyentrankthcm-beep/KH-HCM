@@ -41,7 +41,18 @@ function pad2(s) {
 }
 
 function parseVnpayNgayExpr(expr) {
-  let mm = expr.match(/^(\d{1,2})\.(\d{1,2})-(\d{1,2})\.(\d{1,2})\.(\d{2,4})$/);
+  // Chi Nhan, 2026-07-29: tai khoan VTB982 (VNPay KH Moi) co doan dau thang
+  // (01-09/07) dung dinh dang cu "ngay 20260630" (yyyymmdd lien, khong dau
+  // cham) thay vi "ngay 28.07.26" nhu cac dong sau -- them nhan dang rieng,
+  // khong thi cac giao dich nay bi RONG (null) va bien mat khoi "Ngan hang"
+  // cua doi soat ma khong co canh bao gi.
+  let mm = expr.match(/^(\d{4})(\d{2})(\d{2})$/);
+  if (mm) {
+    const [, yyyy, mo, d] = mm;
+    const iso = `${yyyy}-${mo}-${d}`;
+    return { fromIso: iso, toIso: iso };
+  }
+  mm = expr.match(/^(\d{1,2})\.(\d{1,2})-(\d{1,2})\.(\d{1,2})\.(\d{2,4})$/);
   if (mm) {
     const [, d1, mo1, d2, mo2, yy] = mm;
     const yyyy = yy.length === 2 ? "20" + yy : yy;
@@ -1442,6 +1453,54 @@ function resolveOnlineGross(parsed, gianList) {
 // invoice data confirms it really is monolithic. Otherwise each invoice's
 // own "Hinh thuc hop tac" tag (already read correctly by the parser) is
 // left to decide plain vs __FF per invoice, same as any other gian.
+// Chi Nhan, 2026-07-30: "chỗ này là ngân hàng nó trả về gộm lại ngày 6 70tr
+// rồi bỏ cái ch có ngân hàng đi" -- VNPay/Zalo thinh thoang GOM tra tien cua
+// NHIEU ngay doanh thu lien tiep vao 1 giao dich duy nhat (vd giao dich ve
+// ngay 06/07 mo ta "DV QR Offline ngay 20260705" -- chi 1 ngay -- nhung so
+// tien 70.519.915d lon hon han binh thuong vi thuc ra gom ca doanh thu
+// 03-05/07, do 04-05/07 khong co giao dich rieng nao tren sao ke). Truoc day
+// extractZvpSettlements chi gan settlement THAT cho DUNG 1 ngay theo mo ta,
+// nen cac ngay doanh thu bi gom (03,04/07) van bao "Chua co ngan hang" du
+// tien da ve roi. Fix: TRUOC KHI tinh pending days (buildPendingDaySettlements),
+// mo rong LUI fromIso cua tung settlement THAT qua cac ngay LIEN TIEP ngay
+// truoc do co doanh thu (grossData) nhung KHONG duoc settlement THAT nao
+// khac (ke ca sau khi da mo rong) bao phu -- dung lai ngay khi gap ngay da
+// thuoc 1 settlement khac, hoac ngay do khong co doanh thu gi de gom, hoac
+// da di lui qua MAX_GAP_EXTEND_DAYS (phong ngua truong hop du lieu bat
+// thuong/vong lap).
+const MAX_GAP_EXTEND_DAYS = 10;
+function addIsoDays(iso, n) {
+  const d = new Date(iso + "T00:00:00Z");
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+function extendSettlementsOverPrecedingGaps(settlements, grossData) {
+  const real = (settlements || []).filter((s) => !s.pendingBank);
+  if (real.length === 0) return settlements;
+  const covered = new Set();
+  real.forEach((s) => dateRange(s.fromIso, s.toIso).forEach((d) => covered.add(d)));
+  const grossByCode = (grossData && grossData.grossByCode) || {};
+  const daysWithGross = new Set();
+  Object.keys(grossByCode).forEach((k) => {
+    if (grossByCode[k] > 0) daysWithGross.add(k.split("|")[0]);
+  });
+  const sorted = real.slice().sort((a, b) => (a.fromIso < b.fromIso ? -1 : 1));
+  sorted.forEach((s) => {
+    let steps = 0;
+    let cur = s.fromIso;
+    while (steps < MAX_GAP_EXTEND_DAYS) {
+      const prevDay = addIsoDays(cur, -1);
+      if (covered.has(prevDay)) break;
+      if (!daysWithGross.has(prevDay)) break;
+      s.fromIso = prevDay;
+      covered.add(prevDay);
+      cur = prevDay;
+      steps++;
+    }
+  });
+  return settlements;
+}
+
 function reconcileZvpChannel(settlements, grossData, invoiceData, gianMapping, manualMatches, diemAlias, cseOverrideCodes) {
   const alias = diemAlias || {};
   const basesWithNativePlainInvoice = new Set();
@@ -1499,7 +1558,8 @@ function reconcileZvpChannel(settlements, grossData, invoiceData, gianMapping, m
     }
     return 0;
   }
-  const allSettlements = settlements.concat(buildPendingDaySettlements(settlements, grossData, 1));
+  const adjustedSettlements = extendSettlementsOverPrecedingGaps(settlements, grossData);
+  const allSettlements = adjustedSettlements.concat(buildPendingDaySettlements(adjustedSettlements, grossData, 1));
   const results = [];
   for (const s of allSettlements) {
     const days = dateRange(s.fromIso, s.toIso);
@@ -1601,7 +1661,18 @@ function reconcileZvpChannel(settlements, grossData, invoiceData, gianMapping, m
           // "Chenh lech" dau ky khong bao gio het du dong da danh dau "Khop".
           if (mm.grossAdjustment) {
             line.gross += mm.grossAdjustment;
-            line.net = Math.round(line.gross);
+            // Chi Nhan, 2026-07-30: "lệch 40k của tàu á cộng vô doanh thu hôm
+            // đó luôn nhá tiền có về rồi á là khớp" -- truoc gio grossAdjustment
+            // luon RESET net = gross (bo qua % phi), dung cho truong hop tru
+            // NGUYEN 1 khoan trung lap (net khong quan trong vi ca dong se bi
+            // loai/lech het). Nhung khi CONG THEM doanh thu that thieu (nhu
+            // "Tau Time" 40.000d o day), can giu dung ty le phi cua phan them
+            // vao de dong khop CHINH XAC ca "Ngan hang" (net) lan "Du lieu-Hoa
+            // don" (gross/invoiceTotal) cung luc -- them netAdjustment rieng,
+            // CONG THANG vao net cu (khong dong lai het nhu Math.round(gross)),
+            // chi fallback ve hanh vi cu neu khong truyen netAdjustment (giu
+            // tuong thich nguoc cho cac ban ghi da luu tu truoc).
+            line.net = mm.netAdjustment != null ? line.net + mm.netAdjustment : Math.round(line.gross);
           }
           line.invoiceTotal = mm.amount != null ? mm.amount : line.gross;
           line.diff = line.invoiceTotal - line.gross;
@@ -1985,6 +2056,7 @@ module.exports = {
   mergeOnlineProductMap,
   resolveOnlineGrossByProductMap,
   reconcileZvp,
+  reconcileZvpChannel,
   parseOrderDetailsWorkbook,
   parseFeeReportWorkbook,
   parseVnpayOfflineFeeReport,

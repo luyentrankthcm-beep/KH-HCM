@@ -310,6 +310,63 @@ router.post("/phap-danh/hop-dong-thue-gian-hang/:id/delete", requireAdmin, (req,
   res.redirect("/phap-danh/hop-dong-thue-gian-hang?success=" + encodeURIComponent("Đã xóa hợp đồng."));
 });
 
+// Chi Nhan, 2026-07-29: "cái nào mà thuê gian hàng thì cho vô hợp đồng thuê
+// gian còn lại của hcm cho qua bên ncc" -- nhieu dong duoc import tu dong tu
+// Google Sheet ("Thuộc BP" trong sheet khong dung "Khác"/"Mua bán vocher" nen
+// lot qua bo loc NCC cu, xem utils/hopDongHcmParser.js) thuc ra la hop dong
+// NCC that (van tai, xay dung, thanh toan, thuc pham...), khong phai thue mat
+// bang/gian hang. Truoc day KHONG CO route nao chuyen 1 dong giua 2 danh sach
+// -- chi co xoa (mat het du lieu) hoac them tay lai tu dau ben NCC. Route nay
+// chuyen NGUYEN VEN 1 dong sang phap_danh_hop_dong_ncc (anh xa truong tuong
+// duong), roi xoa khoi phap_danh_hop_dong_thue, giu lai toan bo thong tin da
+// co (ten, MST, so hop dong, ngay, tien, link...) thay vi phai nhap lai tay.
+router.post("/phap-danh/hop-dong-thue-gian-hang/:id/chuyen-sang-ncc", requireAdmin, (req, res) => {
+  const store = load();
+  ensureShape(store);
+  const idx = store.phap_danh_hop_dong_thue.findIndex((r) => String(r.id) === req.params.id);
+  if (idx === -1) {
+    return res.redirect("/phap-danh/hop-dong-thue-gian-hang?error=" + encodeURIComponent("Không tìm thấy hợp đồng này."));
+  }
+  const r = ensureThueDefaults(store.phap_danh_hop_dong_thue[idx]);
+  const nccRec = ensureNccDefaults({
+    id: nextId(store, "phap_danh_hop_dong_ncc_seq") || Date.now(),
+    tenNCC: r.gian || r.tenDiemNoiBo || "",
+    tenDayDuNCC: r.benChoThue || "",
+    mstNCC: r.mstBenChoThue || "",
+    diaChiNCC: "",
+    congTy: r.congTy || "",
+    hangHoaMua: "",
+    noiDung: "",
+    phanLoaiHD: r.hinhThucHopTac || "",
+    soHopDong: r.soHopDongHCM || "",
+    ngayKy: r.ngayKyHD || "",
+    ngayBatDauHD: r.ngayBatDauHD || "",
+    ngayHetHan: r.ngayHetHanHD || "",
+    baoHanHD: r.baoHanHD || "",
+    giaTriHopDong: r.tienThueThang || 0,
+    giaTriHopDongRaw: r.tongTienThueThangHCM || "",
+    linkHopDong: r.linkHopDongChuaDuDau || r.linkHopDongDuDau || "",
+    soTKNH: "",
+    khachMoTaiNH: "",
+    khuVuc: r.khuVuc || "",
+    chiTiet: [],
+    ghiChu: [
+      r.ghiChu || "",
+      `Chuyển từ "Hợp đồng thuê gian hàng" sang NCC ngày ${new Date().toISOString().slice(0, 10)} (không phải hợp đồng thuê mặt bằng/gian hàng).`,
+    ]
+      .filter(Boolean)
+      .join(" -- "),
+  });
+  if (!store.phap_danh_hop_dong_ncc) store.phap_danh_hop_dong_ncc = [];
+  store.phap_danh_hop_dong_ncc.push(nccRec);
+  store.phap_danh_hop_dong_thue.splice(idx, 1);
+  save(store);
+  res.redirect(
+    "/phap-danh/hop-dong-thue-gian-hang?success=" +
+      encodeURIComponent(`Đã chuyển "${nccRec.tenNCC}" sang Hợp đồng NCC.`)
+  );
+});
+
 // Luyen, 2026-07-23: "có tàu bình tân với nhà ma bình dương hay ghost bình
 // dương cũng là doanh thu chia sẻ ... cho thêm thủ công cũng được" -- tich
 // chon tay 1 gian la "doanh thu chia se" (dung cho cot Tai Khoan 131/1388 ben

@@ -8,6 +8,13 @@ const {
   extractVietQrSettlements,
   extractVietQrThuTransactions,
   parseVietQrRawWorkbook,
+  parseVnpayPortalWorkbook,
+  migrateVnpayKhMoiInvoices,
+  seedMb02865168FromBidv77021,
+  migrateTk168Invoices,
+  fixBidv7702Day3TaggedAsDay4,
+  fixBidv8613600999Day3TaggedAsDay4,
+  fixBidv77021Day3TaggedAsDay4,
   parseCuaHangSheet,
   parseStoreExportSheet,
   parseTenDiemMaCongTrinhSheet,
@@ -16,6 +23,7 @@ const {
   resolveGianGross,
   resolveGianGrossByBankRef,
   reconcileVietQr,
+  applyMultiDayGroupConsolidation,
   parseVietQrMnRawWorkbook,
   parseMaCuaHangAppSheet,
   resolveGianGrossPrefix,
@@ -48,7 +56,26 @@ const upload = multer({
 // bank's invoices apart from the others' -- see utils/vietqrReconcile.js.
 const CHANNELS = {
   bidv7704: { bankName: "BIDV7704", label: "BIDV 7704", tagPattern: /POSH\+JP\s*MB\s*\(7704\)/i, company: "kh_cu" },
-  bidv77020: { bankName: "BIDV77020", label: "BIDV 77020", tagPattern: /POSH\+JP\s*MB\s*\(7020\)/i, company: "kh_cu" },
+  bidv77020: {
+    bankName: "BIDV77020",
+    label: "BIDV 77020",
+    tagPattern: /POSH\+JP\s*MB\s*\(7020\)/i,
+    company: "kh_cu",
+    // Chi Nhan, 2026-07-29: "bỏ qua các giao dịch khác ngoài viet qr nhá nhưng
+    // nếu nó có tiền viet qr về mà dữ liệu hk có thì cho vô gian SB CAM RANH
+    // PHN cho tôi nhá phần dư của ngân hàng mẫu diễn giải viêt qr á" -- kenh
+    // nay KHONG dung refMatchFrom (khong khop tung giao dich ngan hang theo So
+    // tham chieu nhu 7702/77021), nen khong the tai su dung
+    // resolveGianGrossByBankRef/tanPhuSuggestion. "Ngan hang" cua kenh nay da
+    // CHI tinh tu extractVietQrSettlements (loai san cac GD khong phai VietQR
+    // qua NON_VQR_TX_PATTERN/excludeFromVietQrRecon) nen phan "bo qua GD khac
+    // ngoai viet qr" da dung san, khong can sua them. Phan con lai (so du
+    // "Ngan hang" > "Tinh tu du lieu tai len" sau khi da loai GD khong phai
+    // VietQR) duoc TU DONG cong thang vao gian nay (khong chi goi y nhu
+    // tanPhuSuggestion) -- xem block "bankExcessDefaultCode" trong
+    // buildChannelReconciliation ben duoi.
+    bankExcessDefaultCode: "SB CAM RANH PHN",
+  },
   mb11521268: { bankName: "MB11521268", label: "MB 11521268", tagPattern: /POSH\+JP\s*MB\s*\(268\)/i, company: "kh_cu" },
   // Cong ty "KH Moi" (TNHH GIAI TRI K&H) -- tai khoan Viet QR BIDV7702. Tag
   // hoa don la "MTD MN" (xac nhan tu Luyen 2026-07-16, nam tren sheet "ke ds
@@ -91,7 +118,20 @@ const CHANNELS = {
   bidv77021: {
     bankName: "BIDV77021",
     label: "BIDV 77021",
-    tagPattern: /VietQR\s*POSH\s*MB/i,
+    // Chi Nhan, 2026-07-30: "thêm 1 ngân hàng 02865168 á các điểm bán với mã
+    // công trình map với 77021" -- phat hien tag "Dich vu thu ho" tren file
+    // MTT dung chung THUC RA co 2 bien the: "VietQR POSH MB [ngay]" (dung cho
+    // CHINH BIDV77021) va "VietQR POSH MB tk 168 [ngay]" (dung cho tai khoan
+    // MOI MB02865168, xem CHANNELS.mb02865168 ben duoi) -- pattern cu
+    // (/VietQR\s*POSH\s*MB/i) khop CA 2 bien the vi khong loai truong hop co
+    // hau to "tk 168", khien hoa don cua MB02865168 bi gom NHAM vao pool
+    // BIDV77021 tu truoc gio (2293 hoa don bidv77021, trong do co ca cap
+    // "VietQR POSH MB X" + "VietQR POSH MB tk 168 X" cho MOI ngay). Them
+    // negative lookahead loai bien the co "tk" ngay sau, giu nguyen bien the
+    // khong "tk" cho kenh nay. migrateTk168Invoices() (utils/vietqrReconcile.js)
+    // tu dong don cac hoa don "tk 168" DA LO nam trong pool nay tu truoc sang
+    // dung pool mb02865168 moi lan load().
+    tagPattern: /VietQR\s*POSH\s*MB(?!\s*tk)/i,
     company: "kh_moi",
     refMatchFrom: "2026-01-01",
     // Luyen, 2026-07-28: "lệch tiền á nếu nó có diễn giải giống của viet qr
@@ -101,6 +141,75 @@ const CHANNELS = {
     // canh bao "khong khop" (xem defaultBlankCode trong resolveGianGrossByBankRef).
     defaultBlankCode: "AE HP PHN",
   },
+  // Chi Nhan, 2026-07-30: "đây là viet qr kh mới thêm cho tôi vô trong đối
+  // soát viet qr nhá thêm 1 ngân hàng 02865168 á các điểm bán với mã công
+  // trình map với 77021 á check cho tôi nhá" -- tai khoan MB02865168 (da tao
+  // TRUOC do trong 1 phien lam viec truoc, luc do gia dinh SAI la doanh thu
+  // VNPay/Payoo -- da xac nhan LAI day chinh la 1 kenh VietQR THAT (giao dich
+  // tung cai 1, dinh dang "Transactions" chuan, xem sao ke da co san 7354
+  // giao dich voi truong "reference" dung dinh dang FT... giong bidv7702/77021),
+  // dung CHUNG may quet QR/Ma cua hang voi BIDV77021 (96/97 ma trung khop
+  // 100% qua kiem tra) nen tai su dung TRUC TIEP storeNames/tenDiemMaster cua
+  // bidv77021 qua seedMb02865168FromBidv77021() (utils/vietqrReconcile.js,
+  // goi trong ensureChannelShape) thay vi phai cho chi Nhan tai rieng 1 file
+  // "Danh sach diem ban" moi cho tai khoan nay.
+  mb02865168: {
+    bankName: "MB02865168",
+    label: "MB 02865168",
+    // Chi Nhan, 2026-07-30 (lan 2): "đây của JP VINPEARL NT đây nhá lí hiệu
+    // với cách note vậy nè" -- hoa don 8021 (3.050.000d, dung cho JP VINPEARL
+    // NT, ngay 1) dung tag "QR JP tk 168 1" (KHONG PHAI "VietQR POSH MB tk 168"
+    // nhu da biet truoc do) -- xac nhan qua sheet goc "kê ds xuất HĐ MTT - 705"
+    // cot "Dịch vụ thu hộ": biến thể "QR JP tk 168" xuat hien ~34 lan trong
+    // file MTT 29.07 (cung tai khoan 168, chi khac quy uoc dan tag theo khu
+    // vuc/nguoi nhap), truoc gio KHONG khop pattern cu nen hoa don loai nay
+    // hoan toan khong nam trong bat ky kenh nao (khong phai chi bidv77021 nhu
+    // truong hop tk168 truoc). Mo rong pattern de bat ca 2 bien the.
+    tagPattern: /(?:VietQR\s*POSH\s*MB|QR\s*JP)\s*tk\s*168/i,
+    company: "kh_moi",
+    refMatchFrom: "2026-01-01",
+    defaultBlankCode: "AE HP PHN",
+  },
+  // Chi Nhan, 2026-07-30 (lan 3): "thêm 1 ngân hàng 8613600999 ... thêm bên
+  // đối soát viet qr cho tôi nhá kh mới" -- tai khoan BIDV 8613600999
+  // (Cong Ty Tnhh Giai Tri K&H), xac nhan CUNG he thong may POS/QR voi
+  // BIDV77021/MB02865168 (45/46 "Ma cua hang" tren sao ke thang 07/2026 trung
+  // khop tuyet doi voi danh sach da co cua bidv77021) nen tai su dung
+  // storeNames/tenDiemMaster cua bidv77021 qua seedFromBidv77021()
+  // (utils/vietqrReconcile.js). "Số tham chiếu" tren sao ke + "Mã tham chiếu"
+  // tren file QR cung dinh dang chuoi (vd "868rcpe-8AGY9N21t") giong het
+  // bidv77021/mb02865168 nen dung duoc refMatchFrom tu dau.
+  // Chi Nhan, 2026-07-30 (lan 4): "đây là các hóa đơn của 8613600999 Viet qr
+  // nhá" -- gui anh chup sheet "kê ds xuất HĐ MTT - 705" xac nhan tag that la
+  // "QR JP <ngay>" (vd "QR JP 30", "QR JP 1", "QR JP 4,5" cho hoa don gop 2
+  // ngay) -- KHONG co hau to "tk <so>" nao ca (khac voi doan ban dau). Day
+  // chinh la phan "QR JP" THUAN (khong "tk 168") ma truoc do van con ~102 dong
+  // chua ro thuoc kenh nao trong file MTT 29.07 (phan biet voi "QR JP tk 168"
+  // cua MB02865168 qua negative lookahead). Cac ma gian tren hoa don (JP
+  // VINPEARL HOI AN, JP VC BA TRIEU, JP VC ROY, JP AE LONG BIEN, JP POSH VW
+  // VU YEN, JP GO DA NANG, IPH PHN...) khop dung voi cac ma da resolve duoc
+  // tu du lieu QR/store names seed tu bidv77021 (xac nhan seedFromBidv77021
+  // dung kenh).
+  bidv8613600999: {
+    bankName: "BIDV8613600999",
+    label: "BIDV 8613600999",
+    tagPattern: /QR\s*JP(?!\s*tk)/i,
+    company: "kh_moi",
+    refMatchFrom: "2026-01-01",
+    defaultBlankCode: "AE HP PHN",
+  },
+  // Chi Nhan, 2026-07-29: kenh "vnpayKhMoi" (MB02865168, kien truc VietQR
+  // theo ngay) tung o day da bi GO BO -- chi xac nhan lai sau: "tôi nhầm rồi
+  // cái vn pay này trả vè ngân hàng VTB982 á đây á với payoo cx về đây á",
+  // nghia la doanh thu TUTU TRAIN/SAVICO thuc ra ve TAI KHOAN VTB982
+  // (Vietinbank), tra tien THEO DOT (nhieu ngay gop 1 lan giong VNPay
+  // Offline/Payoo cua KH Cu), KHONG PHAI tung giao dich 1 nhu VietQR -- nen
+  // KHONG dung duoc kien truc file nay nua. Da xay lai dung kien truc ZVP
+  // (extractZvpSettlements/reconcileZvpChannel) tai route rieng
+  // routes/doisoat-vnpay-khmoi.js (trang /doi-soat/vnpay-khmoi), khong con
+  // phu thuoc CHANNELS/pageGroup cua file nay. store.viet_qr_invoices.vnpayKhMoi
+  // (hoa don da di sang qua migrateVnpayKhMoiInvoices) van con dung, chi doi
+  // NOI TIEU THU sang file moi do.
 };
 const CHANNEL_KEYS = Object.keys(CHANNELS);
 
@@ -141,11 +250,45 @@ const INVOICE_SHARE_PAIRS = {
     ["VC TUYEN QUANG PNH", "NSTV TUYEN QUANG PHN"],
     ["VC T.PHU N.TRANG PHN", "VC MAXI TN NT PHN"],
   ],
+  // Chi Nhan, 2026-07-30: "2 cái này này gom lại xuất chung á bạn cấn trừ 2
+  // ngày này cho tôi nhá" (ngay 18-19/7, AM TP PHCM du +177.399d, LM NHA TRANG
+  // KVC thieu dung -177.399d) -- da ra soat CA THANG: da so cac ngay (01,02,
+  // 03,06,07,08,10,13-17,20-24/7) nhan vien xuat 2 dong hoa don RIENG cung 1
+  // "Số HĐ" (1 cho AM TP PHCM, 1 cho LM NHA TRANG KVC) nen tu khop dung san,
+  // nhung MOT SO ngay (04,05,09,11,12,18,19/7) chi xuat 1 dong GOP CHUNG ca 2
+  // gian duoi ten "AM TP PHCM", khong co dong rieng cho LM NHA TRANG KVC --
+  // giong het co che INVOICE_SHARE_PAIRS.bidv77021 o tren (1 hoa don/ngay xuat
+  // chung 2 gian). Ap dung applyInvoiceSharePairs se tu dong chia lai theo ty
+  // le doanh thu MOI NGAY -- vo hai voi cac ngay da khop san (chia lai ra dung
+  // y nguyen ket qua cu, da kiem chung qua toan bo thang 7).
+  bidv7702: [["AM TP PHCM", "LM NHA TRANG KVC"]],
 };
 
-function applyInvoiceSharePairs(reconciled, pairs) {
+// Chi Nhan, 2026-07-30: "từ 29 tôi đã tách ra theo đúng tên rồi á khỏi cấn
+// trừ mấy ngày trước các ngày trc vẫn giữ nguyên còn các ngày sao này từ 29
+// trở đi đúng tên gian đó ln á khỏi cấn trừ tk 77021 thôi nhá" -- ke tu hoa
+// don ngay doanh thu 29/7, nhan vien da tach hoa don RIENG dung ten cho tung
+// cap gian (vd "VC T.PHU N.TRANG PHN" / "VC MAXI TN NT PHN" 29/7 tro di co 2
+// So HD RIENG, khong con xuat chung 1 hoa don duoi 1 ten nhu truoc) -- ap
+// dung applyInvoiceSharePairs/applySharePairChainNetting cho cac ngay nay se
+// sai (chia lai 1 cach khong can thiet 2 hoa don da dung san, tron lan
+// invoiceNumbers cua 2 dong lam 1). Gioi han CHI ap dung cho bidv77021 voi
+// ngay doanh thu (r.from) TRUOC ngay nay -- CHI bidv77021 (Chi Nhan xac nhan
+// "tk 77021 thoi nha"), bidv7702 khong doi.
+const INVOICE_SHARE_PAIRS_STOP_FROM = {
+  bidv77021: "2026-07-29",
+};
+
+// Chi Nhan, 2026-07-30: xem ghi chu day du o cho goi -- CHI 2 kenh nay duoc
+// tu dong cong phan du "Ngan hang > Du lieu" (khong co so tham chieu khop)
+// vao gian mac dinh cua kenh. Cac kenh khac (mb02865168, bidv8613600999...)
+// de nguyen thanh "Lech Ngan hang-Du lieu" cho Chi Nhan tu can doi tay.
+const TAN_PHU_AUTO_APPLY_CHANNELS = new Set(["bidv7702", "bidv77021"]);
+
+function applyInvoiceSharePairs(reconciled, pairs, stopFrom) {
   if (!pairs || pairs.length === 0) return;
   reconciled.forEach((r) => {
+    if (stopFrom && r.from >= stopFrom) return;
     pairs.forEach(([codeA, codeB]) => {
       const lineA = r.lines.find((l) => l.code === codeA);
       const lineB = r.lines.find((l) => l.code === codeB);
@@ -177,6 +320,72 @@ function applyInvoiceSharePairs(reconciled, pairs) {
   });
 }
 
+// Chi Nhan, 2026-07-30: "2 cái này này gom lại xuất chung á bạn cấn trừ 2
+// ngày này cho tôi nhá" -- sau khi applyInvoiceSharePairs chia lai gross theo
+// TUNG NGAY, mot cap gian (vd AM TP PHCM / LM NHA TRANG KVC) van co the con
+// lech CA CAP tren tung ngay rieng (vi hoa don thuc su gop ca 2 ngay lam 1,
+// nhung applyInvoiceSharePairs khong biet dieu do, chi chia trong PHAM VI 1
+// ngay) -- vd ngay 18 lech -177.399d, ngay 19 lech +177.399d, cong lai vua
+// dung bang 0. Khac voi "chuoi ngay lien tiep" cua reconcileVietQr (chi xet
+// TUNG MA rieng le, chay TRUOC applyInvoiceSharePairs nen chua thay duoc lech
+// cap nay), ham nay xet TONG LECH CUA CA CAP (2 ma cong) tren tung ngay, tim
+// chuoi ngay lien tiep (chi trong so cac ngay CHUA khop ca 2 ma) cong lai
+// bang 0 thi coi ca chuoi da khop.
+function applySharePairChainNetting(reconciled, pairs, stopFrom) {
+  if (!pairs || pairs.length === 0) return;
+  const sorted = reconciled.slice().sort((a, b) => (a.settlementDate < b.settlementDate ? -1 : 1));
+  pairs.forEach(([codeA, codeB]) => {
+    // Danh sach TOAN BO ngay co ca 2 ma (khong loc truoc theo matched) de giu
+    // dung tinh KE NHAU ve ngay -- 1 ngay da khop san (ca 2 ma) dong vai tro
+    // "ranh gioi" chan chuoi, giong het co che byCode trong reconcileVietQr.
+    // Xem ghi chu INVOICE_SHARE_PAIRS_STOP_FROM o tren -- ngay >= stopFrom
+    // (hoa don da tach rieng dung ten) bi loai KHOI danh sach hoan toan
+    // (khong phai chi "khong xet") de khong lam sai tinh KE NHAU cua cac ngay
+    // TRUOC do van con dung co che cu.
+    const entries = [];
+    sorted.forEach((day) => {
+      if (stopFrom && day.from >= stopFrom) return;
+      const lineA = day.lines.find((l) => l.code === codeA);
+      const lineB = day.lines.find((l) => l.code === codeB);
+      if (!lineA || !lineB) return;
+      entries.push({
+        lineA,
+        lineB,
+        date: day.settlementDate,
+        isFree: !(lineA.matched && lineB.matched),
+        combinedDiff: lineA.diff + lineB.diff,
+      });
+    });
+    let i = 0;
+    while (i < entries.length) {
+      if (!entries[i].isFree) {
+        i++;
+        continue;
+      }
+      let j = i;
+      while (j + 1 < entries.length && entries[j + 1].isFree) j++;
+      if (j > i) {
+        const run = entries.slice(i, j + 1);
+        const sum = run.reduce((s, e) => s + e.combinedDiff, 0);
+        if (Math.abs(sum) < 1) {
+          const note = `Tu dong can tru theo cap gian "${codeA}"/"${codeB}" giua cac ngay ${run[0].date}..${run[run.length - 1].date} (hoa don xuat chung nhieu ngay, tong lech ca cap ve dung 0).`;
+          run.forEach((e) => {
+            e.lineA.matched = true;
+            e.lineA.diff = 0;
+            e.lineA.manualOverride = true;
+            e.lineA.manualNote = note;
+            e.lineB.matched = true;
+            e.lineB.diff = 0;
+            e.lineB.manualOverride = true;
+            e.lineB.manualNote = note;
+          });
+        }
+      }
+      i = j + 1;
+    }
+  });
+}
+
 // Luyen, 2026-07-20: mot so ten "Mã công trình" hien tren bang doi soat Viet
 // QR (lay tu Ma diem tren hoa don/QR) khac qua xa so voi ten trong danh sach
 // "Mã công trình chuẩn" (vd co them chu thich "(EB Tân Phú)", "ghế"...) nen
@@ -202,6 +411,14 @@ const MA_CONG_TRINH_DISPLAY_ALIAS_DEFAULTS = {
   "LM NHA TRANG KVC": "FARM LOTTE NHA TRANG",
   "JP vicom 3.2 BIDV": "VC 3/2 JP-Posh",
   "VINCOM GAND PARK": "JP-POSH GRAND PARK",
+  // Chi Nhan, 2026-07-29: "mã công trình JPSBNB đổi thành JP SB NOI BAI đúng
+  // mẫu chuẩn mã công trình cho tôi nhá" -- "JPSBNB" (dung lam ma NOI BO de
+  // khop gross/QR va hoa don, xem TEN_DIEM_MASTER_DEFAULTS.bidv77020 o duoi)
+  // khong fuzzy-khop duoc voi ten chuan trong ma_cong_trinh_master (danh sach
+  // goc co san "JP SB NOI BAI", stt 75) vi 2 chuoi qua khac nhau (viet tat vs
+  // day du), nen hien thi van con "JPSBNB". Alias hien thi thang ve dung ten
+  // chuan; KHONG doi ma noi bo dung de doi soat (van la "JPSBNB").
+  JPSBNB: "JP SB NOI BAI",
 };
 
 // Chi Nhan, 2026-07-24: giong het KNOWN_INVOICE_DIEM_ALIASES ben routes/
@@ -233,6 +450,78 @@ const INVOICE_DIEM_ALIAS_DEFAULTS = {
   "POSH MN GALAXY QUANG TRUNG": "GALAXY QUANG TRUNG PHCM",
   "KNG BÀ RỊA": "KNG BA RIA PHCM",
   "SNOWFUN AEON HẢI PHÒNG": "AM HP KVCN",
+  // Chi Nhan, 2026-07-29: hoa don cua mb11521268 cho san bay Phu Quoc ghi
+  // maDiem "SÂN BAY PHÚ QUỐC" (ten tho), trong khi ben gross/QR (sau khi map
+  // theo bidv77021, xem cross-copy viet_qr_store_names trong ensureChannelShape)
+  // lai tu dong quy ve ma chuan "CHKQT PHU QUOC" (qua master gian sheet dung
+  // chung ca kenh) -- can alias de 2 ben khop nhau, khong thi hoa don luon
+  // hien "Chua co HD" du da co hoa don that.
+  "SÂN BAY PHÚ QUỐC": "CHKQT PHU QUOC",
+};
+
+// Chi Nhan, 2026-07-30: "Số hóa đơn á có 20k xem nó đưa vô gian nào á bạn đưa
+// vô gian đó cho tôi đi để khớp á" -- ngay 2026-07-10, kenh bidv7702, hoa don
+// 9124 (140.000d) cho "GALAXY KINH DUONG VUONG PHCM" nhung du lieu QR tai len
+// chi bat duoc 60.000d giao dich cho gian nay (thieu dung 20.000d, khop chinh
+// xac voi "Lệch Ngân hàng-Dữ liệu: -20.000đ" ca ngay hom do). Bu 20.000d qua
+// grossAdjustment. Seed qua code (giong TEN_DIEM_MASTER_DEFAULTS/
+// INVOICE_DIEM_ALIAS_DEFAULTS) de KHONG BI MAT khi server cua Chi Nhan tu ghi
+// de store.json bang ban cu dang giu trong bo nho (da xay ra 1 lan voi ban
+// ghi thu cong truc tiep, phai chuyen sang seed code moi giu duoc).
+const MANUAL_MATCH_DEFAULTS = {
+  bidv7702: {
+    "2026-07-10|GALAXY KINH DUONG VUONG PHCM": {
+      invoiceNumbers: ["9124"],
+      amount: 140000,
+      grossAdjustment: 20000,
+      note:
+        "Bo sung 20.000d ngan hang co ve nhung du lieu QR tai len thieu dong giao dich cho gian nay (hoa don 9124 = 140.000d, du lieu QR chi co 120.000d) - Chi Nhan xac nhan 30/07.",
+    },
+  },
+};
+
+// Chi Nhan, 2026-07-29: "2 cái mã công trình này là 1 á gộp lại vô cái CHKQT
+// CAM RANH cho tôi nhá" -- kenh mb11521268, san bay Cam Ranh dang bi tach
+// thanh 2 "gian" rieng o BUOC GROSS/QR (vi 2 nhom Ma cua hang cua Luyen tu
+// dat 2 "Tên điểm bán" hoi khac nhau: "1 JP SB Cam Ranh.new" va "POSH Sân bay
+// Quốc Tế Cam Ranh") du hoa don THAT SU LUON dung CHUNG 1 ma diem "CHKQT CAM
+// RANH" cho ca 2 nhom nay (xac nhan: 25/25 hoa don Cam Ranh cua kenh nay deu
+// ghi maDiem=CHKQT CAM RANH, khong co hoa don nao dung "SB CAM RANH PHN").
+// Sua tan goc bang override o viet_qr_ten_diem_master (dung TRUOC ca fuzzy
+// matcher trong resolveGianGross, xem utils/vietqrReconcile.js) thay vi tao
+// "Doi tru thu cong" tung ngay (~40 lan tung lam truoc do, xem doan xoa
+// manual_matches ben duoi) -- Seed qua code (chay lai moi request, giong
+// GIAN_MERGE_DEFAULTS/INVOICE_DIEM_ALIAS_DEFAULTS o tren) de KHONG BI MAT khi
+// server cua chi Nhan tu ghi de store.json bang ban cu dang giu trong bo nho.
+const TEN_DIEM_MASTER_DEFAULTS = {
+  mb11521268: {
+    "1 jp sb cam ranh.new": "CHKQT CAM RANH",
+  },
+  // Chi Nhan, 2026-07-29: "đây là 3 mã công trình chuẩn của 77020" -- chi Nhan
+  // xac nhan kenh bidv77020 chi co 3 gian that (san bay Vinh/Noi Bai/Cam Ranh),
+  // hoa don da dung dung 3 ma "SB VINH PHN"/"JPSBNB"/"SB CAM RANH PHN" (xem
+  // maDiem trong store.viet_qr_invoices.bidv77020) nhung ben gross/QR chua co
+  // override nen tu tao "gian" rieng theo dung ten Tên điểm bán tho (vd "POSH
+  // Sân bay Cam ranh", "1 JP SB Cam Ranh.new", "JP Sân Bay Nội Bài" deu la
+  // CUNG 1 diem that, chi khac ten do nhieu dot POS/QR khac nhau) -- gop ve
+  // dung 3 ma chuan de khop voi hoa don co san.
+  bidv77020: {
+    "posh san bay cam ranh": "SB CAM RANH PHN",
+    "posh san bay quoc te cam ranh": "SB CAM RANH PHN",
+    "1 jp sb cam ranh.new": "SB CAM RANH PHN",
+    "posh san bay vinh": "SB VINH PHN",
+    "jp san bay noi bai": "JPSBNB",
+    "1.jp san bay noi bai new": "JPSBNB",
+  },
+  // Chi Nhan, 2026-07-29: bang map "tên trên vn pay" -> "tên công trình" chi
+  // Nhan cung cap cho kenh VNPay KH Moi (02865168) -- "Điểm thu" tren file
+  // portal VNPay ("DanhSachGiaoDich...xlsx") la ten tho, chua tung khop duoc
+  // hoa don nao (invoice tenDiem rong, xem VNPAY_KHMOI_INVOICE_MADIEM_MAP
+  // trong utils/vietqrReconcile.js) nen PHAI dung override nay (khop truoc ca
+  // fuzzy matcher) thay vi de tu hoc qua gianCandidates nhu cac kenh khac.
+  // Chi Nhan, 2026-07-29: entry "vnpayKhMoi" tung o day da chuyen sang
+  // TEN_DIEM_TO_MA_CONG_TRINH trong routes/doisoat-vnpay-khmoi.js (kenh nay
+  // khong con dung kien truc VietQR nua -- xem ghi chu tai CHANNELS o tren).
 };
 
 function ensureChannelShape(store) {
@@ -317,6 +606,16 @@ function ensureChannelShape(store) {
   if (store.invoice_diem_alias["SNOWFUN AEON HẢI PHÒNG"] === "AM HP KVCN__FF") {
     store.invoice_diem_alias["SNOWFUN AEON HẢI PHÒNG"] = "AM HP KVCN";
   }
+  // Chi Nhan, 2026-07-29: don dep 1 dong alias RAC "CHKQT CAM RANH" -> "Chưa
+  // khớp" (rat co the do 1 dong trong file "gian master" cua chi Nhan co gia
+  // tri "Chưa khớp" o cot Ma cong trinh, bi merge thang vao bang nay -- xem
+  // ghi chu invoice_diem_alias trong store.js). Vi day la alias ngay TREN
+  // CHINH ma dich "CHKQT CAM RANH", no khien MOI hoa don that (25/25 hoa don
+  // Cam Ranh cua mb11521268) bi doi thanh "Chưa khớp" khi doi soat -- xoa moi
+  // lan phat hien (khong chi 1 lan) de tru khi file goc duoc sua.
+  if (store.invoice_diem_alias["CHKQT CAM RANH"] === "Chưa khớp") {
+    delete store.invoice_diem_alias["CHKQT CAM RANH"];
+  }
   Object.keys(MA_CONG_TRINH_DISPLAY_ALIAS_DEFAULTS).forEach((k) => {
     if (!store.ma_cong_trinh_display_alias[k]) {
       store.ma_cong_trinh_display_alias[k] = MA_CONG_TRINH_DISPLAY_ALIAS_DEFAULTS[k];
@@ -330,12 +629,104 @@ function ensureChannelShape(store) {
     if (!store.viet_qr_nocode_assignments[ch]) store.viet_qr_nocode_assignments[ch] = {};
     if (!store.viet_qr_store_uploads[ch]) store.viet_qr_store_uploads[ch] = [];
     if (!store.viet_qr_ten_diem_master[ch]) store.viet_qr_ten_diem_master[ch] = {};
+    // Ghi de KHONG DIEU KIEN (khac GIAN_MERGE_DEFAULTS o tren) -- day la 1 dong
+    // da xac nhan SAI can sua han (dang tro toi "SB CAM RANH PHN" cu), khong
+    // phai gia tri "dien vao cho trong" -- neu chi fill-if-empty se khong bao
+    // gio sua duoc gia tri SAI da co san trong store.json.
+    Object.keys(TEN_DIEM_MASTER_DEFAULTS[ch] || {}).forEach((k) => {
+      store.viet_qr_ten_diem_master[ch][k] = TEN_DIEM_MASTER_DEFAULTS[ch][k];
+    });
+    // Chi Nhan, 2026-07-29: xoa cac "Doi tru thu cong" GIA TAO (~40 dong, tao
+    // hang loat luc 28-29/7) tung dung de tach doi hoa don "CHKQT CAM RANH"
+    // sang "SB CAM RANH PHN" moi ngay -- gio da sua tan goc bang
+    // TEN_DIEM_MASTER_DEFAULTS o tren (gop thang 2 gian lam 1 tu buoc doc du
+    // lieu QR), nen cac dong "doi tru" nay khong con can nua; neu con ton tai
+    // (chay truoc khi co fix, hoac store.json bi ghi de lai) se tu xoa moi
+    // lan load() de gian tu dong tro ve 1 dong CHKQT CAM RANH duy nhat.
+    if (ch === "mb11521268" && store.viet_qr_manual_matches[ch]) {
+      Object.keys(store.viet_qr_manual_matches[ch]).forEach((k) => {
+        if (k.endsWith("|SB CAM RANH PHN") || k.endsWith("|CHKQT CAM RANH")) {
+          delete store.viet_qr_manual_matches[ch][k];
+        }
+      });
+    }
     if (!store.viet_qr_ref_override[ch]) store.viet_qr_ref_override[ch] = {};
     if (!store.viet_qr_store_names_baseline[ch]) {
       // Chup 1 lan duy nhat: du lieu diem ban HIEN CO ngay truoc khi tinh
       // nang lich su/xoa nay ton tai, de khong mat du lieu cu.
       store.viet_qr_store_names_baseline[ch] = Object.assign({}, store.viet_qr_store_names[ch]);
     }
+  });
+
+  // Chi Nhan, 2026-07-29: "tôi có 2 tài khoản viet qr chia nam bắc nhưng điểm
+  // bán lại chung á nên bạn lấy các map mã công trình điểm bán bên 77021
+  // giống với 11521268 đc á bạn map lại cho tôi đi" -- kenh mb11521268 va
+  // bidv77021 nhan tien tu CUNG 1 tap Ma cua hang vat ly (vd cac quay o San
+  // bay Phu Quoc), nhung 77021 la kenh chinh nen da co san day du "Tên điểm
+  // bán" cho chung; mb11521268 chi thinh thoang nhan duoc giao dich tu CUNG
+  // cac quay do nen hang chuc Ma cua hang bi "chua map" moi lan co du lieu QR
+  // moi (xac nhan: toan bo cac ma dang "chua map" cua mb11521268 ngay 29/7
+  // deu da co san trong viet_qr_store_names.bidv77021, cung tro ve "JP SÂN
+  // BAY PHÚ QUỐC QT"). Tu dong sao chep NHUNG ma nao mb11521268 CHUA CO
+  // (khong ghi de ma da duoc gan rieng ben mb11521268), chay lai moi lan
+  // load() de tu dong theo kip ma cua hang moi phat sinh sau nay o ca 2 kenh.
+  if (store.viet_qr_store_names.bidv77021 && store.viet_qr_store_names.mb11521268) {
+    const crossSource = store.viet_qr_store_names.bidv77021;
+    const crossTarget = store.viet_qr_store_names.mb11521268;
+    Object.keys(crossSource).forEach((maCuaHang) => {
+      if (!crossTarget[maCuaHang]) {
+        crossTarget[maCuaHang] = crossSource[maCuaHang];
+      }
+    });
+  }
+
+  // Chi Nhan, 2026-07-30: "thêm 1 ngân hàng 02865168 á các điểm bán với mã
+  // công trình map với 77021 á" -- dong bo danh sach diem ban + ten diem master
+  // tu bidv77021 sang mb02865168 (kenh moi, cung he thong QR/POS voi 77021, chi
+  // khac tai khoan nhan tien) moi lan load(), va don cac hoa don "tk 168" tung
+  // bi gom nham vao pool bidv77021 truoc khi sua tagPattern (xem CHANNELS
+  // ben tren + seedMb02865168FromBidv77021/migrateTk168Invoices trong
+  // utils/vietqrReconcile.js).
+  seedMb02865168FromBidv77021(store);
+  migrateTk168Invoices(store);
+
+  // Chi Nhan, 2026-07-30: "7702 tôi để nhầm tên á này của ngày 3 á" -- sua 29
+  // hoa don "MTD MN 4" (thuc ra la ngay 3, xem fixBidv7702Day3TaggedAsDay4
+  // trong utils/vietqrReconcile.js) -- chay lai moi lan load() de khong bi mat
+  // khi server cua Chi Nhan tu ghi de store.json bang ban cu dang giu trong bo
+  // nho (da xay ra 1 lan voi ban sua truc tiep khong qua code).
+  fixBidv7702Day3TaggedAsDay4(store);
+
+  // Chi Nhan, 2026-07-30: "chỗ này bị nhầm của ghi lộn ngày 3 thành ngày 4"
+  // -- BIDV77021 co cung loi (85 hoa don "VietQR POSH MB 4" thuc ra la ngay
+  // 3, xem fixBidv77021Day3TaggedAsDay4 trong utils/vietqrReconcile.js) --
+  // chay lai moi lan load() de khong bi mat khi server cua Chi Nhan tu ghi de
+  // store.json bang ban cu dang giu trong bo nho.
+  fixBidv77021Day3TaggedAsDay4(store);
+
+  // Chi Nhan, 2026-07-30: BIDV8613600999 07-03/07-04 "2 ngày này cấn trừ
+  // nhau á cấn trừ cho tôi đi để khớp" -- cung dang loi tag hoa don giong
+  // fixBidv7702Day3TaggedAsDay4 o tren (KHONG PHAI cap tru chuoi ngay): 6 hoa
+  // don so 8261-8266 dan tag rieng "QR JP 4" nhung thuc ra la doanh thu ngay
+  // 3 (xem fixBidv8613600999Day3TaggedAsDay4 trong utils/vietqrReconcile.js).
+  // Chay lai moi lan load() de khong bi mat khi server cua Chi Nhan tu ghi de
+  // store.json bang ban cu dang giu trong bo nho.
+  fixBidv8613600999Day3TaggedAsDay4(store);
+
+  // Ghi de KHONG DIEU KIEN (giong TEN_DIEM_MASTER_DEFAULTS o tren) -- cac ban
+  // ghi "Doi tru thu cong" mac dinh nay tung bi mat 1 lan vi chi luu truc tiep
+  // vao store.json (khong qua code) truoc khi server cua Chi Nhan ghi de lai
+  // ban cu dang giu trong bo nho -- seed lai moi lan load() de khong bao gio
+  // mat nua.
+  Object.keys(MANUAL_MATCH_DEFAULTS).forEach((ch) => {
+    if (!store.viet_qr_manual_matches[ch]) store.viet_qr_manual_matches[ch] = {};
+    Object.keys(MANUAL_MATCH_DEFAULTS[ch]).forEach((key) => {
+      store.viet_qr_manual_matches[ch][key] = Object.assign(
+        { created_at: new Date().toISOString() },
+        store.viet_qr_manual_matches[ch][key],
+        MANUAL_MATCH_DEFAULTS[ch][key]
+      );
+    });
   });
 }
 
@@ -530,6 +921,7 @@ function displayMaCongTrinhFor(code, company, store) {
 function buildChannelReconciliation(store, channelKey) {
   ensureChannelShape(store);
   if (ensureNo1388(store)) save(store);
+  if (migrateVnpayKhMoiInvoices(store)) save(store);
   const cfg = CHANNELS[channelKey];
   const bank = store.banks.find((b) => b.name === cfg.bankName);
   if (!bank) {
@@ -762,7 +1154,122 @@ function buildChannelReconciliation(store, channelKey) {
   // Xem ghi chu tai INVOICE_SHARE_PAIRS o tren -- chay SAU reconcileVietQr
   // (da bao gom ca chia theo ngay cho hoa don gop T7+CN) de tu dong chia lai
   // theo dung ty le doanh thu cho cac cap gian bi xuat chung 1 hoa don.
-  applyInvoiceSharePairs(reconciled, INVOICE_SHARE_PAIRS[channelKey]);
+  applyInvoiceSharePairs(reconciled, INVOICE_SHARE_PAIRS[channelKey], INVOICE_SHARE_PAIRS_STOP_FROM[channelKey]);
+  applySharePairChainNetting(reconciled, INVOICE_SHARE_PAIRS[channelKey], INVOICE_SHARE_PAIRS_STOP_FROM[channelKey]);
+
+  // Chi Nhan, 2026-07-29 (xem ghi chu day du tai CHANNELS.bidv77020 o tren):
+  // voi kenh co cfg.bankExcessDefaultCode, neu sau khi tinh het gross tu du
+  // lieu QR tai len, "Ngan hang" (da chi gom GD VietQR that, xem
+  // extractVietQrSettlements) VAN CON DU so voi tong gross da gan duoc cho
+  // cac gian (r.totalNetComputed) -- tuc la co tien VietQR ve nhung KHONG co
+  // dong du lieu QR nao khop -- so du do duoc cong THANG vao gian mac dinh
+  // (khong chi hien "goi y" nhu tanPhuSuggestion o refMatchFrom, vi kenh nay
+  // khong co co che khop tung GD ngan hang de biet CHINH XAC GD nao la du,
+  // nen coi CA PHAN DU cua ca ngay la thuoc ve gian mac dinh, dung y Chi Nhan
+  // "cho vô gian SB CAM RANH PHN"). Nguong 1.000d de bo qua sai so lam tron.
+  if (cfg.bankExcessDefaultCode) {
+    reconciled.forEach((r) => {
+      if (r.pendingBank) return;
+      const leftover = r.bankAmount - r.totalNetComputed;
+      if (leftover <= 1000) return;
+      let line = r.lines.find((l) => l.code === cfg.bankExcessDefaultCode);
+      if (!line) {
+        line = {
+          code: cfg.bankExcessDefaultCode,
+          maCongTrinh: cfg.bankExcessDefaultCode,
+          tkCo: store.gian_mapping[cfg.bankExcessDefaultCode] || "131",
+          gross: 0,
+          net: 0,
+          invoiceNumbers: [],
+          invoiceTotal: 0,
+          diff: 0,
+          matched: false,
+          manualOverride: false,
+        };
+        r.lines.push(line);
+      }
+      line.gross += leftover;
+      line.net = line.gross;
+      line.diff = line.invoiceTotal - line.gross;
+      line.matched = line.invoiceNumbers.length > 0 && Math.abs(line.diff) < 1;
+      line.bankExcessApplied = (line.bankExcessApplied || 0) + leftover;
+      line.manualNote = [
+        line.manualNote,
+        `Da tu dong cong ${leftover.toLocaleString("vi-VN")}d phan du ngan hang (co tien VietQR ve nhung khong co du lieu QR tai len khop) vao gian nay.`,
+      ]
+        .filter(Boolean)
+        .join(" -- ");
+      r.totalNetComputed += leftover;
+      r.diffVsBank = r.totalNetComputed - r.bankAmount;
+      r.lines.sort((a, b) => b.gross - a.gross);
+    });
+  }
+
+  // Chi Nhan, 2026-07-29: "không có lẻ với lấy ngân hàng làm chuẩn cái dư
+  // bên dữ liệu thì bỏ đi không cần lấy dựa vào tham chiếu á giống các viet
+  // qr khác để bt giao dịch Dữ liệu nào không có thì bỏ ra" -- chieu NGUOC
+  // lai cua block tren: khi "Tinh tu du lieu tai len" (r.totalNetComputed)
+  // NHIEU HON "Ngan hang" (r.bankAmount) -- tuc la co dong du lieu QR khong
+  // duoc ngan hang xac nhan thuc su ve ngay do -- Ngan hang duoc lay lam
+  // CHUAN, phan du BEN DU LIEU bi tru bot thay vi co gang do tim CHINH XAC
+  // dong QR nao la rac bang tham chieu ngan hang nhu bidv7702/77021 (Chi
+  // Nhan xac nhan KHONG can lam vay cho kenh nay).
+  //
+  // Uu tien 1: neu co dong nao KHAC gian mac dinh MA DA CO HOA DON rieng
+  // nhung gross dang VUOT invoiceTotal (diff am -- "gross du so hoa don cua
+  // CHINH gian do"), tru truoc tu chinh dong do (theo thu tu du nhieu nhat
+  // truoc) -- vua khop dung "Ngan hang<->Du lieu" ngay, vua tinh co khop
+  // luon "Du lieu<->Hoa don" cua dong do (vd SB VINH PHN ngay 20/07: gross du
+  // dung 20.000d so hoa don, khop tuyet doi voi phan du ca ngay). Chi sau khi
+  // het cac dong nay ma van con du thi moi don phan con lai vao gian mac
+  // dinh (nhu truoc), tranh lam xau di 1 dong dang khop dung khi co dong
+  // khac giai thich dung hon.
+  if (cfg.bankExcessDefaultCode) {
+    reconciled.forEach((r) => {
+      if (r.pendingBank) return;
+      let deficit = r.totalNetComputed - r.bankAmount;
+      if (deficit <= 1000) return;
+      const applyDeduction = (line, applied) => {
+        line.gross -= applied;
+        line.net = line.gross;
+        line.diff = line.invoiceTotal - line.gross;
+        line.matched = line.invoiceNumbers.length > 0 && Math.abs(line.diff) < 1;
+        line.bankDeficitApplied = (line.bankDeficitApplied || 0) + applied;
+        line.manualNote = [
+          line.manualNote,
+          `Da tu dong tru ${applied.toLocaleString("vi-VN")}d khoi gian nay (du lieu QR tai len nhieu hon so ngan hang thuc nhan trong ngay, lay ngan hang lam chuan).`,
+        ]
+          .filter(Boolean)
+          .join(" -- ");
+        r.totalNetComputed -= applied;
+        deficit -= applied;
+      };
+      const candidates = r.lines
+        .filter((l) => l.code !== cfg.bankExcessDefaultCode && l.invoiceNumbers.length > 0 && l.gross - l.invoiceTotal > 0)
+        .sort((a, b) => b.gross - b.invoiceTotal - (a.gross - a.invoiceTotal));
+      candidates.forEach((l) => {
+        if (deficit <= 1000) return;
+        const applied = Math.min(deficit, l.gross - l.invoiceTotal);
+        if (applied > 0) applyDeduction(l, applied);
+      });
+      if (deficit > 1000) {
+        const line = r.lines.find((l) => l.code === cfg.bankExcessDefaultCode);
+        if (line && line.gross > 0) {
+          const applied = Math.min(deficit, line.gross);
+          if (applied > 0) applyDeduction(line, applied);
+        }
+      }
+      r.diffVsBank = r.totalNetComputed - r.bankAmount;
+      r.lines.sort((a, b) => b.gross - a.gross);
+    });
+    // Chi Nhan, 2026-07-29: "mấy cái lệch lẻ lẻ này nè là gộp lại xuất 2
+    // ngày khớp mà đừng có để lệch cho tôi chớ" -- 1 hoa don gop nhieu ngay
+    // (vd 1824 ngay 4-5) co the CHI can bang dung SAU KHI 2 block tren dieu
+    // chinh lai gross theo ngan hang (xem ghi chu applyMultiDayGroupConsolidation
+    // trong utils/vietqrReconcile.js) -- goi lai lan 2 voi gross MOI de bat
+    // duoc ca truong hop nay, khong chi cac cap da can bang tu dau.
+    applyMultiDayGroupConsolidation(reconciled);
+  }
 
   // Luyen, 2026-07-27: "các giao dịch không phải của vietqr thì trừ ra nhá
   // cái nào có mã tham chiếu á" -- tu ngay cutover (refMatchFrom), 1 giao
@@ -772,16 +1279,32 @@ function buildChannelReconciliation(store, channelKey) {
   // trong refUnmatchedBankTx (canh bao) nhung truoc gio CHUA tru khoi tong
   // "Ngan hang" cua doi soat, lam Lech gia (ngan hang > du lieu tai len chi
   // vi cong nham cac dong khong lien quan). Tru dung so tien nay khoi
-  // bankAmount cua NGAY tuong ung roi tinh lai diffVsBank. Neu SAU KHI tru
-  // ngan hang van con nhieu hon du lieu doi soat (tien VietQR that nhung
-  // chua gian nao nhan), goi y gop vao "gian Tan Phu" (AM TP PHCM -- ma mac
-  // dinh cho giao dich khong xac dinh duoc gian tren kenh nay, xem
-  // cfg.defaultBlankCode) kem dung so tien du.
+  // bankAmount cua NGAY tuong ung roi tinh lai diffVsBank.
+  //
+  // Chi Nhan, 2026-07-30 (lan 1): "chênh lệch tk 7702 thì đưa vô tân phú còn
+  // 77021 thì đưa vô hải phòng nhá" -- xac nhan tu dong CONG LUON phan du con
+  // lai (tien VietQR that nhung chua gian nao nhan) vao gian mac dinh, CHI
+  // cho 2 kenh nay.
+  // Chi Nhan, 2026-07-30 (lan 2, sau khi thay 07-29 cua mb02865168 cung bi
+  // tu dong don vao AE HP PHN): "còn lại các tài khoản khác nếu lệch giữa
+  // ngân hàng và dữ liệu nếu hk có số tham chiếu á dư tiền thì để lệch đi
+  // tôi cấn sao á chớ đừng lúc nào cx đưa vô Hải Phòng chèn" -- CHINH LAI:
+  // co che tu-dong-cong-vao-gian-mac-dinh o day CHI ap dung cho DUNG 2 kenh
+  // bidv7702/bidv77021 (TAN_PHU_AUTO_APPLY_CHANNELS ben duoi), KHONG ap dung
+  // chung cho moi kenh co refMatchFrom nua (truoc day dung cfg.defaultBlankCode
+  // nen vo tinh ap luon ca mb02865168/bidv8613600999 -- ca 2 co defaultBlankCode
+  // cung la "AE HP PHN" nhu bidv77021 -- Chi Nhan khong muon vay, cac kenh do
+  // de nguyen "Lech Ngan hang-Du lieu" hien ra, tu chi can trung tay). Phan
+  // "tru giao dich khong phai VietQR" (excludedByDate) van ap dung cho MOI
+  // kenh co refMatchFrom nhu cu -- day la loai bo rac, khong phai gan tien
+  // that vao gian nao ca, khong nam trong yeu cau gioi han nay.
   if (cfg.refMatchFrom) {
     const excludedByDate = {};
     refUnmatchedBankTx.forEach((tx) => {
       excludedByDate[tx.date] = (excludedByDate[tx.date] || 0) + tx.amount;
     });
+    const tanPhuTarget = cfg.defaultBlankCode || "AM TP PHCM";
+    const autoApplyTanPhu = TAN_PHU_AUTO_APPLY_CHANNELS.has(channelKey);
     reconciled.forEach((r) => {
       if (r.settlementDate < cfg.refMatchFrom) return;
       const excluded = excludedByDate[r.settlementDate] || 0;
@@ -791,9 +1314,40 @@ function buildChannelReconciliation(store, channelKey) {
       }
       if (!r.pendingBank) {
         r.diffVsBank = r.totalNetComputed - r.bankAmount;
+        if (!autoApplyTanPhu) return;
         const leftover = r.bankAmount - r.totalNetComputed;
         if (leftover > 1000) {
-          r.tanPhuSuggestion = { amount: leftover, targetCode: "AM TP PHCM" };
+          let line = r.lines.find((l) => l.code === tanPhuTarget);
+          if (!line) {
+            line = {
+              code: tanPhuTarget,
+              maCongTrinh: tanPhuTarget,
+              tkCo: store.gian_mapping[tanPhuTarget] || "131",
+              gross: 0,
+              net: 0,
+              invoiceNumbers: [],
+              invoiceTotal: 0,
+              diff: 0,
+              matched: false,
+              manualOverride: false,
+            };
+            r.lines.push(line);
+          }
+          line.gross += leftover;
+          line.net = line.gross;
+          line.diff = line.invoiceTotal - line.gross;
+          line.matched = line.invoiceNumbers.length > 0 && Math.abs(line.diff) < 1;
+          line.bankExcessApplied = (line.bankExcessApplied || 0) + leftover;
+          line.manualNote = [
+            line.manualNote,
+            `Da tu dong cong ${leftover.toLocaleString("vi-VN")}d phan du ngan hang (tien VietQR ve nhung khong co du lieu QR tai len khop) vao gian nay.`,
+          ]
+            .filter(Boolean)
+            .join(" -- ");
+          r.totalNetComputed += leftover;
+          r.diffVsBank = r.totalNetComputed - r.bankAmount;
+          r.lines.sort((a, b) => b.gross - a.gross);
+          r.tanPhuSuggestion = { amount: leftover, targetCode: tanPhuTarget, applied: true };
         }
       }
     });
@@ -913,16 +1467,15 @@ function buildChannelReconciliation(store, channelKey) {
   };
 }
 
-router.get("/doi-soat/vietqr", (req, res) => {
+// Chi Nhan, 2026-07-29: "cái đối soát vn paykh mới này cho nó riêng 1 trang
+// ... cho nó chung với payoo á" -- tach phan than trang (dung chung cho ca
+// /doi-soat/vietqr va /doi-soat/vnpay-khmoi ben duoi) thanh 1 ham rieng,
+// nhan activeKeys/pageTitle/pageSubtitle tu 2 route khac nhau -- ban than
+// logic doi soat/hien thi giu NGUYEN, chi khac danh sach kenh nao duoc hien.
+function renderVietQrPage(req, res, activeKeys, pageTitle, pageSubtitle) {
   const store = load();
   ensureChannelShape(store);
-
-  // Chi hien cac ngan hang thuoc cong ty dang chon (nut chuyen cong ty tren
-  // topbar) -- KH Cu van thay ca 3 ngan hang nhu truoc gio, KH Moi thay
-  // BIDV 7702. Cac route upload/xoa/xuat file van nhan moi channelKey hop
-  // le (khong gioi han theo cong ty) vi Luyen la nguoi dung duy nhat.
   const activeCompany = getCompany(req);
-  const activeKeys = CHANNEL_KEYS.filter((ch) => CHANNELS[ch].company === activeCompany);
 
   const built = {};
   activeKeys.forEach((ch) => {
@@ -1197,8 +1750,28 @@ router.get("/doi-soat/vietqr", (req, res) => {
     partnerBankId: store.viet_qr_partner_bank_id || {},
     error: req.query.error || null,
     success: req.query.success || null,
+    pageTitle,
+    pageSubtitle,
   });
+}
+
+router.get("/doi-soat/vietqr", (req, res) => {
+  // Chi hien cac ngan hang thuoc cong ty dang chon (nut chuyen cong ty tren
+  // topbar) -- KH Cu van thay ca 3 ngan hang nhu truoc gio, KH Moi thay
+  // BIDV 7702. Cac route upload/xoa/xuat file van nhan moi channelKey hop
+  // le (khong gioi han theo cong ty) vi Luyen la nguoi dung duy nhat. Cac
+  // kenh co pageGroup hien o trang RIENG (khong con kenh nao dung pageGroup
+  // nua sau khi vnpayKhMoi chuyen sang routes/doisoat-vnpay-khmoi.js, nhung
+  // giu dieu kien nay phong khi co kenh moi dung lai co che nay).
+  const activeCompany = getCompany(req);
+  const activeKeys = CHANNEL_KEYS.filter((ch) => CHANNELS[ch].company === activeCompany && !CHANNELS[ch].pageGroup);
+  renderVietQrPage(req, res, activeKeys);
 });
+
+// Chi Nhan, 2026-07-29: trang "/doi-soat/vnpay-khmoi" (VNPay/Payoo KH Moi)
+// tung dung kien truc VietQR o day da CHUYEN HAN sang routes/doisoat-vnpay-khmoi.js
+// (kien truc ZVP dung ngan hang VTB982) -- xem ghi chu day du tai CHANNELS o
+// tren. Route GET/POST rieng cho trang do khong con o file nay nua.
 
 // Luyen, 2026-07-24: "mã cửa hàng mới này ... chỗ chọn mã công trình để gán
 // vào nhá" -- gan THANG 1 Ma cua hang (con chua co trong danh sach diem ban)
@@ -1218,6 +1791,32 @@ router.post("/doi-soat/vietqr/gan-ma-cua-hang/:channel", requireDataEntry, (req,
     res.redirect(
       "/doi-soat/vietqr?success=" +
         encodeURIComponent(`Da gan ma cua hang "${maCuaHang}" -> "${maCongTrinh}". Ket qua doi soat da tu cap nhat.`)
+    );
+  } catch (e) {
+    res.redirect("/doi-soat/vietqr?error=" + encodeURIComponent(e.message));
+  }
+});
+
+// Chi Nhan, 2026-07-30: "nếu chưa có á thì cho tôi 1 chỗ mã công trình nx để
+// tô nhập pass vô á" -- thay vi bat phai sua file "Ten diem- Ma cong trinh"
+// roi tai lai (nhu ghi chu trong view), cho gan truc tiep ngay tren web,
+// cung kieu voi gan-ma-cua-hang o duoi. Ghi thang vao viet_qr_ten_diem_master
+// (key da chuan hoa qua normText(tenDiem), dung KHOP voi cach resolveGianGrossByBankRef
+// tra cuu -- xem utils/vietqrReconcile.js).
+router.post("/doi-soat/vietqr/gan-ten-diem/:channel", requireDataEntry, (req, res) => {
+  const store = load();
+  ensureChannelShape(store);
+  const channelKey = req.params.channel;
+  try {
+    if (!CHANNELS[channelKey]) throw new Error("Kenh khong hop le.");
+    const { tenDiemBan, maCongTrinh } = req.body;
+    if (!tenDiemBan || !maCongTrinh) throw new Error("Thieu ten diem ban hoac ma cong trinh de gan.");
+    if (!store.viet_qr_ten_diem_master[channelKey]) store.viet_qr_ten_diem_master[channelKey] = {};
+    store.viet_qr_ten_diem_master[channelKey][normText(tenDiemBan)] = maCongTrinh;
+    save(store);
+    res.redirect(
+      "/doi-soat/vietqr?success=" +
+        encodeURIComponent(`Da gan ten diem "${tenDiemBan}" -> "${maCongTrinh}". Ket qua doi soat da tu cap nhat.`)
     );
   } catch (e) {
     res.redirect("/doi-soat/vietqr?error=" + encodeURIComponent(e.message));
@@ -1415,22 +2014,35 @@ router.post("/doi-soat/vietqr/upload-raw/:channel", requireDataEntry, upload.sin
     // sheet "VIET QR" + "Ma Cua Hang APP") -- khong co cot "Noi dung TT"/
     // token VQR nhu 3 kenh kia nen phai dung parser rieng.
     const isMn = CHANNELS[channelKey].parseMode === "mn";
-    const parsed = isMn ? parseVietQrMnRawWorkbook(req.file.buffer) : parseVietQrRawWorkbook(req.file.buffer);
-    // QUAN TRONG (Luyen, 2026-07-16): file giao dich re-export hang ngay
-    // ("transactions_....xlsx") thuong CHI co sheet giao dich, KHONG kem sheet
-    // "Cua hang"/"Ma Cua Hang APP" (sheet do da nap rieng qua nut "Danh sach
-    // diem ban rieng" ben duoi, hoac tu 1 lan tai truoc). Truoc day
-    // parseMaCuaHangAppSheet/parseCuaHangSheet throw loi khi thieu sheet nay
-    // se lam HONG CA request -- 44xxx dong giao dich hop le cung bi mat theo,
-    // dung y het loi "Chua co du lieu de doi soat" du da bam Tai len nhieu
-    // lan. Bat loi rieng: thieu sheet cua hang thi chi coi la 0 cua hang MOI
-    // (giu nguyen danh sach cua hang da co), KHONG chan viec luu cac dong
-    // giao dich.
+    // Chi Nhan, 2026-07-29: kenh vnpayKhMoi (02865168) dung file xuat truc
+    // tiep tu portal VNPay ("DanhSachGiaoDich...xlsx"), dinh dang khac han 2
+    // kieu tren -- xem parseVnpayPortalWorkbook trong utils/vietqrReconcile.js.
+    // File nay da tra ve LUON storeMap (Diem thu la ten mo ta day du san,
+    // khong can sheet "Cua hang" rieng), nen xu ly rieng ca 2 buoc trong 1
+    // if thay vi ghep chung logic voi 2 kieu con lai ben duoi.
+    const isVnpayPortal = CHANNELS[channelKey].parseMode === "vnpayPortal";
+    let parsed;
     let storeMap = {};
-    try {
-      storeMap = isMn ? parseMaCuaHangAppSheet(req.file.buffer) : parseCuaHangSheet(req.file.buffer);
-    } catch (eStore) {
-      storeMap = {};
+    if (isVnpayPortal) {
+      parsed = parseVnpayPortalWorkbook(req.file.buffer);
+      storeMap = parsed.storeMap || {};
+    } else {
+      parsed = isMn ? parseVietQrMnRawWorkbook(req.file.buffer) : parseVietQrRawWorkbook(req.file.buffer);
+      // QUAN TRONG (Luyen, 2026-07-16): file giao dich re-export hang ngay
+      // ("transactions_....xlsx") thuong CHI co sheet giao dich, KHONG kem sheet
+      // "Cua hang"/"Ma Cua Hang APP" (sheet do da nap rieng qua nut "Danh sach
+      // diem ban rieng" ben duoi, hoac tu 1 lan tai truoc). Truoc day
+      // parseMaCuaHangAppSheet/parseCuaHangSheet throw loi khi thieu sheet nay
+      // se lam HONG CA request -- 44xxx dong giao dich hop le cung bi mat theo,
+      // dung y het loi "Chua co du lieu de doi soat" du da bam Tai len nhieu
+      // lan. Bat loi rieng: thieu sheet cua hang thi chi coi la 0 cua hang MOI
+      // (giu nguyen danh sach cua hang da co), KHONG chan viec luu cac dong
+      // giao dich.
+      try {
+        storeMap = isMn ? parseMaCuaHangAppSheet(req.file.buffer) : parseCuaHangSheet(req.file.buffer);
+      } catch (eStore) {
+        storeMap = {};
+      }
     }
 
     // Chi Nhan, 2026-07-24: file "du lieu tai len" moi cho BIDV7702 (tu

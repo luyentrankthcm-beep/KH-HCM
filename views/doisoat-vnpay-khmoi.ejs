@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <%- include('partials/head') %>
+</head>
+<body>
+  <%- include('partials/nav') %>
+  <main class="container">
+    <h1>Đối soát VNPay / Payoo — KH Mới (TK VTB982 - Vietinbank)</h1>
+    <p class="muted">
+      Web tự lấy các khoản VNPay/Payoo đã về ngân hàng VTB982 (theo đợt, gộp nhiều ngày giống VNPay Offline/Payoo
+      bên KH Cũ), tách theo từng gian dựa trên file "Danh sách giao dịch" tải từ cổng VNPay, rồi dò khớp với hóa
+      đơn (TUTU TRAIN AM HUẾ/VC TIMES/VC ROYAL, FARM SAVICO).
+    </p>
+
+    <% if (error) { %><div class="alert alert-error" id="autohide-error"><%= error %></div><% } %>
+    <% if (success) { %><div class="alert alert-success" id="autohide-success"><%= success %></div><% } %>
+    <script>
+      (function () {
+        ["autohide-success", "autohide-error"].forEach(function (id) {
+          var el = document.getElementById(id);
+          if (!el) return;
+          setTimeout(function () {
+            el.style.transition = "opacity 0.6s ease, max-height 0.6s ease, margin 0.6s ease, padding 0.6s ease";
+            el.style.opacity = "0";
+            el.style.maxHeight = "0";
+            el.style.overflow = "hidden";
+            el.style.marginTop = "0";
+            el.style.marginBottom = "0";
+            el.style.paddingTop = "0";
+            el.style.paddingBottom = "0";
+          }, 3000);
+        });
+      })();
+    </script>
+
+    <section class="panel">
+      <details open>
+        <summary style="font-weight:700;color:#111;cursor:pointer;">1. Tải file "Danh sách giao dịch" (cổng VNPay Merchant)</summary>
+        <div style="margin-top:12px;">
+      <p class="muted">
+        File export trực tiếp từ cổng VNPay ("DanhSachGiaoDich_...xlsx") — web tự đọc cột Điểm thu + Thời gian GD +
+        Số tiền sau KM, chỉ lấy giao dịch "Thành công", quy đổi Điểm thu về đúng Mã công trình
+        (AE HUE KVCN / KVC TIMES / KVC ROYAL / SAVICO KVCN).
+      </p>
+      <form method="POST" action="/doi-soat/vnpay-khmoi/upload" enctype="multipart/form-data" class="form-inline">
+        <input type="file" name="file" accept=".xlsx,.xls" required />
+        <button type="submit" class="btn btn-primary">Tải lên</button>
+      </form>
+      <details style="margin-top:12px;">
+        <summary class="muted" style="cursor:pointer;">Đã tải <%= uploads.length %> lần (bấm để xem chi tiết)</summary>
+        <table class="table" style="margin-top:10px;">
+          <thead><tr><th>File</th><th>Sheet</th><th>Khoảng ngày</th><th>Số mã công trình</th><th>Lúc tải</th><th></th></tr></thead>
+          <tbody>
+            <% uploads.forEach(function(u) { %>
+            <tr>
+              <td><%= u.file_name %></td>
+              <td><%= u.sheetName %></td>
+              <td><%= u.dates[0] %> → <%= u.dates[u.dates.length-1] %></td>
+              <td><%= u.codes.length %></td>
+              <td><%= new Date(u.uploaded_at).toLocaleString('vi-VN') %></td>
+              <td>
+                <form method="POST" action="/doi-soat/vnpay-khmoi/upload/<%= u.id %>/delete" onsubmit="return confirm('Xoá bảng doanh thu này?');">
+                  <button type="submit" class="link-btn link-danger">Xoá</button>
+                </form>
+              </td>
+            </tr>
+            <% }) %>
+            <% if (uploads.length === 0) { %>
+            <tr><td colspan="6" class="muted">Chưa tải file nào.</td></tr>
+            <% } %>
+          </tbody>
+        </table>
+      </details>
+        </div>
+      </details>
+    </section>
+
+    <section class="panel">
+      <details>
+        <summary style="font-weight:700;color:#111;cursor:pointer;">1b. Tải file "Dữ liệu báo cáo phí theo GD thanh toán" (có tách phí — giống bên KH Cũ 31268)</summary>
+        <div style="margin-top:12px;">
+      <p class="muted">
+        File "Danh sách giao dịch" ở mục 1 chỉ có "Số tiền sau KM" (chưa trừ phí VNPay), nên cột "Ngân hàng" luôn
+        lệch nhẹ. File này (chọn báo cáo "Dữ liệu báo cáo phí theo GD thanh toán" trên cổng VNPay, cùng dạng file
+        chị đang dùng cho VNPay Offline bên KH Cũ 31268) có tách riêng số tiền gốc / phí / số tiền sau khi trừ phí —
+        web sẽ dùng số trước trừ để đối chiếu hóa đơn, số sau trừ phí để đối chiếu đúng với ngân hàng. Tải file này
+        cho ngày nào sẽ tự thay số cũ (chỉ có gross) của đúng ngày đó ở mục 1, không cần xoá tay.
+      </p>
+      <form method="POST" action="/doi-soat/vnpay-khmoi/upload-phi" enctype="multipart/form-data" class="form-inline">
+        <input type="file" name="file" accept=".xlsx,.xls" required />
+        <button type="submit" class="btn btn-primary">Tải lên</button>
+      </form>
+        </div>
+      </details>
+    </section>
+
+    <section class="panel">
+      <details>
+        <summary style="font-weight:700;color:#111;cursor:pointer;">2. Tải file doanh thu Payoo (chỉ 1 gian "KVC ROYAL")</summary>
+        <div style="margin-top:12px;">
+      <p class="muted">
+        Payoo bên KH Mới chỉ có 1 gian duy nhất ("KVC ROYAL") — không cần bảng tra tên điểm, mọi giao dịch đọc được
+        đều gộp thẳng vào gian này. Có thể tải 1 trong 2 dạng file dưới đây, tải lại file mới hơn (phủ ngày rộng
+        hơn) sẽ tự thay thế đúng những ngày trùng, không cộng dồn/trùng doanh thu.
+      </p>
+      <div style="display:flex; gap:24px; flex-wrap:wrap;">
+        <div>
+          <p class="muted" style="margin-bottom:4px;"><strong>2a. File tổng hợp</strong> (sheet "Dữ liệu Payoo cơ sở...")</p>
+          <form method="POST" action="/doi-soat/vnpay-khmoi/upload-payoo" enctype="multipart/form-data" class="form-inline">
+            <input type="file" name="file" accept=".xlsx,.xls" required />
+            <button type="submit" class="btn btn-primary">Tải lên</button>
+          </form>
+        </div>
+        <div>
+          <p class="muted" style="margin-bottom:4px;"><strong>2b. File thô hàng ngày</strong> (xuất trực tiếp từ cổng Payoo)</p>
+          <form method="POST" action="/doi-soat/vnpay-khmoi/upload-payoo-raw" enctype="multipart/form-data" class="form-inline">
+            <input type="file" name="file" accept=".xlsx,.xls" required />
+            <button type="submit" class="btn btn-primary">Tải lên</button>
+          </form>
+        </div>
+      </div>
+      <details style="margin-top:12px;">
+        <summary class="muted" style="cursor:pointer;">Đã tải <%= payooUploads.length %> lần (bấm để xem chi tiết)</summary>
+        <table class="table" style="margin-top:10px;">
+          <thead><tr><th>File</th><th>Sheet</th><th>Khoảng ngày</th><th>Lúc tải</th><th></th></tr></thead>
+          <tbody>
+            <% payooUploads.forEach(function(u) { %>
+            <tr>
+              <td><%= u.file_name %></td>
+              <td><%= u.sheetName %></td>
+              <td><%= u.dates[0] %> → <%= u.dates[u.dates.length-1] %></td>
+              <td><%= new Date(u.uploaded_at).toLocaleString('vi-VN') %></td>
+              <td>
+                <form method="POST" action="/doi-soat/vnpay-khmoi/upload-payoo/<%= u.id %>/delete" onsubmit="return confirm('Xoá bảng doanh thu Payoo này?');">
+                  <button type="submit" class="link-btn link-danger">Xoá</button>
+                </form>
+              </td>
+            </tr>
+            <% }) %>
+            <% if (payooUploads.length === 0) { %>
+            <tr><td colspan="5" class="muted">Chưa tải file Payoo nào.</td></tr>
+            <% } %>
+          </tbody>
+        </table>
+      </details>
+        </div>
+      </details>
+    </section>
+
+    <section class="panel">
+      <% if (months.length > 0) { %>
+      <form method="GET" action="/doi-soat/vnpay-khmoi" class="form-inline">
+        <label style="margin:0;">Chọn tháng:</label>
+        <select name="month" onchange="this.form.submit()">
+          <option value="" <%= selectedMonth === '' ? 'selected' : '' %>>-- Tất cả --</option>
+          <% months.forEach(function(m) { %>
+          <option value="<%= m %>" <%= selectedMonth === m ? 'selected' : '' %>><%= m %></option>
+          <% }) %>
+        </select>
+      </form>
+      <% } %>
+    </section>
+
+    <section class="panel">
+      <p class="muted" style="margin-bottom:6px;">
+        🔒 Khóa sổ: các ngày từ đầu đến ngày khóa (bao gồm ngày đó) sẽ không còn hiện cảnh báo "Chưa có HĐ"/"Lệch" nữa.
+        <% if (lockDate) { %><strong>Đang khóa đến hết ngày <%= lockDate %>.</strong><% } else { %><em>Chưa khóa.</em><% } %>
+      </p>
+      <form method="POST" action="/doi-soat/vnpay-khmoi/khoa-so" class="form-inline">
+        <input type="date" name="lockDate" value="<%= lockDate %>" required />
+        <button type="submit" class="btn btn-secondary">Khóa đến ngày này</button>
+      </form>
+      <% if (lockDate) { %>
+      <form method="POST" action="/doi-soat/vnpay-khmoi/khoa-so" class="form-inline" style="margin-top:6px;">
+        <input type="hidden" name="lockDate" value="" />
+        <button type="submit" class="btn btn-secondary" onclick="return confirm('Mở khóa sổ?');">Mở khóa</button>
+      </form>
+      <% } %>
+    </section>
+
+    <script>
+      function vkmJumpToDay(ch, date) {
+        var id = 'vkm-day-' + ch + '-' + date;
+        var el = document.getElementById(id);
+        if (!el) return;
+        el.open = true;
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    </script>
+
+    <% ['offline', 'payoo'].forEach(function(ch) { %>
+    <section class="panel">
+      <h2><%= ch === 'offline' ? 'Kết quả đối soát VNPay' : 'Kết quả đối soát Payoo' %></h2>
+      <% var list = reconciled[ch] || []; %>
+      <% if (list.length === 0) { %>
+        <p class="muted">Chưa có dữ liệu để đối soát kênh này (trong tháng đang chọn).</p>
+      <% } else { %>
+      <% var dayList = list.filter(function(r){ return r.lines.length > 0 || !r.pendingBank; }); %>
+        <table class="table" style="font-size:12px;">
+          <thead>
+            <tr><th>Khoản về ngày</th><th>Ngân hàng</th><th>Tính từ dữ liệu tải lên</th><th>Lệch: Ngân hàng ↔ Dữ liệu</th><th>Lệch: Dữ liệu ↔ Hóa đơn</th></tr>
+          </thead>
+          <tbody>
+            <% dayList.forEach(function(r) {
+              // Chi Nhan, 2026-07-29: "cái lệch hóa đơn vẫn hiển thị cho tôi
+              // đi để tui bt tui check lại á" -- them lai cot lech hoa don o
+              // bang tom tat (giong het trang VietQR), khong chi rieng lech
+              // ngan hang, de biet ngay nao can mo ra xem/sua ma khong phai
+              // mo tung dong.
+              var invDiffSum = r.lines.reduce(function(s, l) { return s + (l.tkCo !== 'SKIP' ? l.diff : 0); }, 0);
+            %>
+            <tr onclick="vkmJumpToDay('<%= ch %>','<%= r.settlementDate %>')" style="cursor:pointer;<%= r.locked ? ' opacity:0.6;' : '' %>">
+              <td><%= r.settlementDate %><%= r.locked ? ' 🔒' : '' %></td>
+              <% if (r.pendingBank) { %>
+              <td colspan="3"><span class="badge badge-warn">⏳ Chưa có ngân hàng — tính từ dữ liệu: <%= r.totalNetComputed.toLocaleString('vi-VN') %> đ</span></td>
+              <% } else { %>
+              <td><%= r.bankAmount.toLocaleString('vi-VN') %> đ</td>
+              <td><%= r.totalNetComputed.toLocaleString('vi-VN') %> đ</td>
+              <td class="<%= Math.abs(r.diffVsBank) < 1000 ? 'text-pos' : 'text-neg' %>"><%= r.diffVsBank.toLocaleString('vi-VN') %> đ</td>
+              <% } %>
+              <td class="<%= Math.abs(invDiffSum) < 1000 ? 'text-pos' : 'text-neg' %>"><%= invDiffSum.toLocaleString('vi-VN') %> đ</td>
+            </tr>
+            <% }) %>
+          </tbody>
+        </table>
+
+        <% dayList.forEach(function(r) { %>
+        <details id="vkm-day-<%= ch %>-<%= r.settlementDate %>" style="background:#fafbfc; border:1px solid #eee; border-radius:8px; margin-top:8px; padding:8px 12px;">
+          <summary style="cursor:pointer; font-size:13px; display:flex; justify-content:space-between; flex-wrap:wrap; gap:6px;">
+            <span style="font-weight:600;">
+              Khoản về ngày <%= r.settlementDate %><%= r.locked ? ' 🔒 (đã khóa sổ)' : '' %> (doanh thu <%= r.from %><%= r.from !== r.to ? ' → ' + r.to : '' %>)
+              <% if (r.pendingBank) { %> <span class="badge badge-warn">⏳ Chưa có ngân hàng</span><% } %>
+            </span>
+            <span>
+              <% if (r.pendingBank) { %>
+              Tính từ dữ liệu tải lên: <strong><%= r.totalNetComputed.toLocaleString('vi-VN') %> đ</strong>
+              <% } else { %>
+              Ngân hàng: <strong><%= r.bankAmount.toLocaleString('vi-VN') %> đ</strong>
+              &nbsp;|&nbsp; Tính từ dữ liệu tải lên: <strong><%= r.totalNetComputed.toLocaleString('vi-VN') %> đ</strong>
+              &nbsp;|&nbsp;
+              <span class="<%= Math.abs(r.diffVsBank) < 1000 ? 'text-pos' : 'text-neg' %>">
+                Chênh lệch: <%= r.diffVsBank.toLocaleString('vi-VN') %> đ
+              </span>
+              <% } %>
+            </span>
+          </summary>
+          <% if (r.lines.length === 0) { %>
+            <p class="muted" style="font-size:12px; margin-top:8px;">Ngân hàng đã có tiền về nhưng chưa có file doanh thu để tách theo gian.</p>
+          <% } else { %>
+          <table class="table" style="margin-top:8px;">
+            <thead>
+              <tr><th>Mã công trình (gian)</th><th>TK Có</th><th>Doanh thu gộp</th><th>Tiền về NH (net)</th><th>Số HĐ khớp</th><th>Tổng tiền HĐ</th><th>Trạng thái</th></tr>
+            </thead>
+            <tbody>
+              <% r.lines.forEach(function(l) { %>
+              <tr<%= l.tkCo === 'SKIP' ? ' style="opacity:0.6;"' : '' %>>
+                <td><%= l.maCongTrinh %></td>
+                <td><%= l.tkCo === 'SKIP' ? '—' : l.tkCo %></td>
+                <td><%= l.gross.toLocaleString('vi-VN') %> đ</td>
+                <td><%= l.net.toLocaleString('vi-VN') %> đ</td>
+                <td><%= l.invoiceNumbers.join(', ') || '-' %></td>
+                <td><%= l.invoiceTotal.toLocaleString('vi-VN') %> đ</td>
+                <td>
+                  <% if (l.locked) { %>
+                    <span class="badge">🔒 Đã khóa sổ</span>
+                  <% } else if (l.manualOverride) { %>
+                    <span class="badge badge-thu">Khớp (bù thủ công)</span>
+                    <form method="POST" action="/doi-soat/vnpay-khmoi/manual-match/delete" style="display:inline;" onsubmit="return confirm('Xoá đánh dấu thủ công này?');">
+                      <input type="hidden" name="channel" value="<%= ch %>" />
+                      <input type="hidden" name="settlementDate" value="<%= r.settlementDate %>" />
+                      <input type="hidden" name="code" value="<%= l.code %>" />
+                      <button type="submit" class="link-btn link-danger" style="font-size:11px;">Xoá</button>
+                    </form>
+                    <% if (l.manualNote) { %><div class="muted" style="font-size:11px;"><%= l.manualNote %></div><% } %>
+                  <% } else if (l.invoiceNumbers.length === 0) { %>
+                    <span class="badge badge-chi">Chưa có HĐ</span>
+                    <form method="POST" action="/doi-soat/vnpay-khmoi/manual-match" style="margin-top:6px;">
+                      <input type="hidden" name="channel" value="<%= ch %>" />
+                      <input type="hidden" name="settlementDate" value="<%= r.settlementDate %>" />
+                      <input type="hidden" name="code" value="<%= l.code %>" />
+                      <input type="text" name="invoiceNumbers" placeholder="Số HĐ bù" style="width:80px; font-size:11px;" />
+                      <input type="text" name="amount" placeholder="Số tiền" style="width:80px; font-size:11px;" />
+                      <button type="submit" class="link-btn" style="font-size:11px;">Đã có HĐ bù</button>
+                    </form>
+                  <% } else if (l.matched) { %>
+                    <span class="badge badge-thu">Khớp</span>
+                  <% } else { %>
+                    <span class="badge badge-chi">Lệch <%= l.diff.toLocaleString('vi-VN') %> đ</span>
+                    <form method="POST" action="/doi-soat/vnpay-khmoi/manual-match" style="margin-top:6px;">
+                      <input type="hidden" name="channel" value="<%= ch %>" />
+                      <input type="hidden" name="settlementDate" value="<%= r.settlementDate %>" />
+                      <input type="hidden" name="code" value="<%= l.code %>" />
+                      <input type="text" name="invoiceNumbers" value="<%= l.invoiceNumbers.join(', ') %>" placeholder="Số HĐ" style="width:100px; font-size:11px;" />
+                      <input type="text" name="amount" value="<%= l.invoiceTotal %>" placeholder="Số tiền" style="width:80px; font-size:11px;" />
+                      <button type="submit" class="link-btn" style="font-size:11px;">Sửa HĐ</button>
+                    </form>
+                  <% } %>
+                </td>
+              </tr>
+              <% }) %>
+            </tbody>
+            <% var tongGross = r.lines.reduce(function(s, l) { return s + l.gross; }, 0);
+               var tongNet = r.lines.reduce(function(s, l) { return s + l.net; }, 0);
+               var tongHd = r.lines.reduce(function(s, l) { return s + l.invoiceTotal; }, 0); %>
+            <tfoot>
+              <tr style="font-weight:700; background:#f3f6f9;">
+                <td>Tổng cộng</td>
+                <td></td>
+                <td><%= tongGross.toLocaleString('vi-VN') %> đ</td>
+                <td><%= tongNet.toLocaleString('vi-VN') %> đ</td>
+                <td></td>
+                <td><%= tongHd.toLocaleString('vi-VN') %> đ</td>
+                <td></td>
+              </tr>
+            </tfoot>
+          </table>
+          <% } %>
+        </details>
+        <% }) %>
+      <% } %>
+    </section>
+    <% }) %>
+  </main>
+</body>
+</html>
