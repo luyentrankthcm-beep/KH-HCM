@@ -471,6 +471,16 @@ const INVOICE_DIEM_ALIAS_DEFAULTS = {
   // ra da khop hoa don rat tot (85.430.000/88.760.000d, chi 6.400.000d la phan
   // du that su chua co du lieu QR), gian THUC SU chua map dung la Noi Bai.
   "JP SB NOI BAI": "JPSBNB",
+  // Chi Nhan, 2026-07-30: "hóa đơn kubo bắc gian á hóa đơn để chữ như này nè
+  // mốt map cho tôi nhá" -- kenh bidv77021, hoa don so 11377 (ngay 07-30, tien
+  // ve ngay 29, 70.000d) ghi maDiem "FUNZONE BẮC GIANG GHẾ" thay vi dung ten
+  // "Kubo Bắc Giang"/"KUBO BAC GIANG PHN" da co san alias -- day la 1 bien the
+  // ten CHUA TUNG THAY (khac ca "Kubo Bắc Giang" lan "KUBO BẮC GIANG" da co
+  // alias tu truoc), khien dong 70.000d nay hien "Chưa có HĐ" du tien QR that
+  // ra da ve du (xem viet_qr_ten_diem_master.bidv77021 "posh funzone bac
+  // giang" -> "KUBO BAC GIANG PHN", vay ben Gross/QR da tu quy dung roi, chi
+  // thieu ben hoa don).
+  "FUNZONE BẮC GIANG GHẾ": "KUBO BAC GIANG PHN",
 };
 
 // Chi Nhan, 2026-07-30: "Số hóa đơn á có 20k xem nó đưa vô gian nào á bạn đưa
