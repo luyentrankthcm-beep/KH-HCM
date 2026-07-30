@@ -19,6 +19,43 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 80 
 function ensureShape(store) {
   if (!store.phap_danh_hop_dong_thue) store.phap_danh_hop_dong_thue = [];
   if (!store.phap_danh_hop_dong_ncc) store.phap_danh_hop_dong_ncc = [];
+  fillSnowAeBinhDuongFromContract(store);
+}
+
+// Chi Nhan, 2026-07-30: "có mà đọc file lấy ra cho tôi đi" -- gian "SNow AE
+// Binh Duong" (Nha Tuyet Binh Duong, id=255, nhap tay 30/7) con thieu het cac
+// truong ngay/tien vi luc them chua co hop dong. Nhan chup man hinh 1 phan
+// hop dong (Google Doc lien ket san o linkHopDongChuaDuDau) -- doc duoc:
+// Ngay Bat Dau Kinh Doanh/Tinh Gia Thue 05/08/2026, Ngay Het Han 06/09/2026,
+// Gia Thue = 50.000.000d/thang HOAC 10% Tong doanh thu (ap dung muc nao cao
+// hon), Tien Coc Dam Bao 50.000.000d (truoc ngay ban giao). KHONG thay "So
+// HD" hay "Ngay ky" trong phan anh chup gui -- de trong, can Nhan bo sung
+// rieng. Chi dien vao neu truong DANG TRONG (khong ghi de neu da tu sua tay).
+function fillSnowAeBinhDuongFromContract(store) {
+  const g = store.phap_danh_hop_dong_thue.find((x) => x.gian === "SNow AE Bình Dương");
+  if (!g) return false;
+  let changed = false;
+  const fill = (key, value) => {
+    if (!g[key] && value) {
+      g[key] = value;
+      changed = true;
+    }
+  };
+  fill("ngayBatDauHD", "2026-08-05");
+  fill("ngayHetHanHD", "2026-09-06");
+  fill("thoiHanHopDong", "05/08/2026-06/09/2026");
+  fill("tienCocDamBao", 50000000);
+  fill(
+    "tongTienThueThangHCM",
+    "50.000.000đ/tháng (giá thuê cơ sở) HOẶC 10% Tổng doanh thu trong Thời hạn thuê -- áp dụng mức nào cao hơn (theo hợp đồng)"
+  );
+  if (!g.ghiChu) {
+    g.ghiChu =
+      "Con thieu So HD va Ngay ky (khong thay trong anh chup hop dong Nhan gui) -- can bo sung tay.";
+    changed = true;
+  }
+  if (changed) save(store);
+  return changed;
 }
 
 // ---------- Hop Dong Thue Gian Hang ----------
