@@ -55,6 +55,111 @@
         </tbody>
       </table>
     </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Sao kê chi tiết theo ngân hàng (từng giao dịch)</h2>
+        <% if (stmtMonths.length > 0) { %>
+        <form method="GET" action="/bao-cao/thu-chi-theo-gian" class="form-inline-tight">
+          <input type="hidden" name="bank" value="<%= bankFilter %>">
+          <input type="hidden" name="month" value="<%= selectedMonth %>">
+          <select name="stmtMonth" onchange="this.form.submit()">
+            <option value="" <%= stmtMonth === '' ? 'selected' : '' %>>-- Tất cả --</option>
+            <% stmtMonths.forEach(function(m) { %>
+            <option value="<%= m %>" <%= stmtMonth === m ? 'selected' : '' %>><%= m %></option>
+            <% }) %>
+          </select>
+        </form>
+        <% } %>
+      </div>
+      <p class="muted">
+        Toàn bộ giao dịch lấy trực tiếp từ sao kê ngân hàng (không qua đối soát), sắp xếp theo ngày tăng dần, mỗi
+        ngân hàng 1 tab. Dòng tô <span style="background:var(--color-primary-soft); padding:1px 6px; border-radius:4px;">xanh nhạt</span>
+        là giao dịch đã được đưa vào 1 trong các trang đối soát (Momo / Zalo-VNPay-Payoo / VietQR / VNPay KH Mới);
+        dòng trắng là giao dịch khác (chi phí, chuyển nội bộ, chưa đối soát...).
+      </p>
+
+      <section class="cards">
+        <div class="card">
+          <div class="card-label">Tổng <%= COMPANIES.kh_cu.label %></div>
+          <div class="card-value" style="color:var(--color-success)">Thu <%= stmtCompanyTotals.kh_cu.thu.toLocaleString('vi-VN') %> đ</div>
+          <div class="muted" style="font-size:12px;">Chi <%= stmtCompanyTotals.kh_cu.chi.toLocaleString('vi-VN') %> đ</div>
+        </div>
+        <div class="card">
+          <div class="card-label">Tổng <%= COMPANIES.kh_moi.label %></div>
+          <div class="card-value" style="color:var(--color-success)">Thu <%= stmtCompanyTotals.kh_moi.thu.toLocaleString('vi-VN') %> đ</div>
+          <div class="muted" style="font-size:12px;">Chi <%= stmtCompanyTotals.kh_moi.chi.toLocaleString('vi-VN') %> đ</div>
+        </div>
+      </section>
+
+      <% if (stmtTabs.length === 0) { %>
+      <p class="muted" style="margin-top:14px;">Chưa có giao dịch nào cho bộ lọc này.</p>
+      <% } else { %>
+      <div id="stmtTabButtons" class="form-inline" style="flex-wrap:wrap; gap:6px; margin:14px 0;">
+        <% stmtTabs.forEach(function(tab, i) { %>
+        <button type="button" class="btn btn-secondary<%= i === 0 ? ' is-active' : '' %>"
+          data-stmt-tab="stmtTab<%= tab.bankId %>" onclick="switchStmtTab('stmtTab<%= tab.bankId %>', this)">
+          <%= tab.bankName %> (<%= COMPANIES[tab.company].shortLabel %>)
+        </button>
+        <% }) %>
+      </div>
+
+      <input type="text" id="stmtSearchInput" placeholder="Lọc theo diễn giải / tên đối ứng..."
+        style="width:100%; max-width:420px; margin-bottom:12px; padding:7px 10px; border:1px solid var(--color-hairline); border-radius:6px;"
+        onkeyup="filterStmtRows(this.value)">
+
+      <% stmtTabs.forEach(function(tab, i) { %>
+      <div class="stmt-tab-panel<%= i === 0 ? '' : ' is-hidden' %>" id="stmtTab<%= tab.bankId %>">
+        <p class="muted" style="margin-bottom:8px;">
+          Số dư đầu kỳ: <strong><%= tab.openingBalance.toLocaleString('vi-VN') %> đ</strong> —
+          Tổng thu: <strong style="color:var(--color-success)"><%= tab.totalThu.toLocaleString('vi-VN') %> đ</strong> —
+          Tổng chi: <strong style="color:var(--color-danger)"><%= tab.totalChi.toLocaleString('vi-VN') %> đ</strong>
+        </p>
+        <div class="table-scroll">
+          <table class="table">
+            <thead>
+              <tr><th>Ngày</th><th class="num">Thu</th><th class="num">Chi</th><th>Diễn giải</th><th>Tên đối ứng</th><th class="num">Số dư</th></tr>
+            </thead>
+            <tbody>
+              <% tab.rows.forEach(function(r) { %>
+              <tr class="<%= r.matched ? 'tx-matched' : '' %>">
+                <td><%= r.date %></td>
+                <td class="num"><%= r.type === 'thu' ? r.amount.toLocaleString('vi-VN') + ' đ' : '' %></td>
+                <td class="num"><%= r.type === 'chi' ? r.amount.toLocaleString('vi-VN') + ' đ' : '' %></td>
+                <td style="font-size:12px; max-width:360px; word-break:break-all;"><%= r.description %></td>
+                <td><%= r.tenDoiUng || '—' %></td>
+                <td class="num"><%= r.balance.toLocaleString('vi-VN') %> đ</td>
+              </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <% }) %>
+      <% } %>
+    </section>
   </main>
+  <script>
+    function switchStmtTab(tabId, btn) {
+      document.querySelectorAll('.stmt-tab-panel').forEach(function (p) { p.classList.add('is-hidden'); });
+      var target = document.getElementById(tabId);
+      if (target) target.classList.remove('is-hidden');
+      document.querySelectorAll('#stmtTabButtons .btn').forEach(function (b) { b.classList.remove('is-active'); });
+      if (btn) btn.classList.add('is-active');
+      var searchInput = document.getElementById('stmtSearchInput');
+      filterStmtRows(searchInput ? searchInput.value : '');
+    }
+    function filterStmtRows(q) {
+      q = (q || '').toLowerCase().trim();
+      var activePanel = document.querySelector('.stmt-tab-panel:not(.is-hidden)');
+      if (!activePanel) return;
+      var rows = activePanel.querySelectorAll('tbody tr');
+      rows.forEach(function (tr) {
+        if (!q) { tr.style.display = ''; return; }
+        var text = (tr.cells[3].textContent + ' ' + tr.cells[4].textContent).toLowerCase();
+        tr.style.display = text.indexOf(q) !== -1 ? '' : 'none';
+      });
+    }
+  </script>
 </body>
 </html>

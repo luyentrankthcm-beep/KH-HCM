@@ -308,6 +308,10 @@ function parseOfflineVnpayWorkbook(buffer) {
       if (!v || typeof v !== "string") return;
       const s = normText(v);
       if (idx.grossCol === undefined && s.includes("so tien hach toan thu ho")) idx.grossCol = c;
+      // Chi Nhan, 2026-07-31: cung 1 ly do da sua o parseOnlineVnpayWorkbook
+      // (xem chu thich ben do) -- uu tien "Số tiền trước KM" neu file co, vi
+      // khuyen mai la CUA VNPAY tu bu, khong phai cong ty giam gia.
+      if (idx.grossColTruocKM === undefined && s.includes("so tien truoc km")) idx.grossColTruocKM = c;
       if (idx.netCol === undefined && s.includes("so tien sau khi tru phi")) idx.netCol = c;
       if (idx.dateCol === undefined && s.includes("ngay hach toan thu ho")) idx.dateCol = c;
       if (s === "trang thai") idx.statusCol = c;
@@ -328,13 +332,14 @@ function parseOfflineVnpayWorkbook(buffer) {
   const grossByCode = {};
   const netByCode = {};
   let matched = 0;
+  const grossColToUseOffline = cols.grossColTruocKM !== undefined ? cols.grossColTruocKM : cols.grossCol;
   for (let r = headerRowIdx + 1; r < grid.length; r++) {
     const row = grid[r] || [];
     const status = cols.statusCol !== undefined ? row[cols.statusCol] : null;
     if (status !== null && !/thanh cong|th.nh c.ng/i.test(String(status))) continue;
     const diem = cols.diemCol !== undefined ? String(row[cols.diemCol] || "").trim() : "";
     if (!diem) continue;
-    const gross = cols.grossCol !== undefined ? Number(row[cols.grossCol]) || 0 : 0;
+    const gross = grossColToUseOffline !== undefined ? Number(row[grossColToUseOffline]) || 0 : 0;
     if (!gross) continue;
     const net = cols.netCol !== undefined ? Number(row[cols.netCol]) || 0 : gross;
     const dateRaw = cols.dateCol !== undefined ? row[cols.dateCol] : null;
@@ -653,6 +658,17 @@ function parseOnlineVnpayWorkbook(buffer) {
         if (!v || typeof v !== "string") return;
         const s = normText(v);
         if (idx.grossCol === undefined && s.includes("so tien hach toan thu ho")) idx.grossCol = c;
+        // Chi Nhan, 2026-07-31: "làm gì có số tiền khuyến mãi đâu ... đây là
+        // khuyến mãi của vnpay mà" -- file VNPay co the co them cot "Số tiền
+        // trước KM" (truoc khi tru khuyen mai). Khuyen mai o day la CUA VNPAY
+        // tu bu, KHONG phai cong ty tu giam gia cho khach -- nen doanh thu gop
+        // phai lay THEO COT NAY (neu file co), KHONG lay "so tien hach toan
+        // thu ho" (= sau khi da tru khuyen mai, thieu mat phan VNPay bu) --
+        // vd thuc te: truoc KM 24.532.500d nhung hach toan thu ho chi
+        // 24.442.500d, lech dung 90.000d = tong khuyen mai cac dong. Uu tien
+        // cot nay, fallback ve "hach toan thu ho" cho cac file cu khong co
+        // cot trước KM.
+        if (idx.grossColTruocKM === undefined && s.includes("so tien truoc km")) idx.grossColTruocKM = c;
         if (idx.netCol === undefined && s.includes("so tien sau khi tru phi")) idx.netCol = c;
         if (idx.dateCol === undefined && s.includes("ngay hach toan thu ho")) idx.dateCol = c;
         if (s === "trang thai") idx.statusCol = c;
@@ -666,13 +682,14 @@ function parseOnlineVnpayWorkbook(buffer) {
     }
     if (headerRowIdx < 0) continue;
 
+    const grossColToUse = cols.grossColTruocKM !== undefined ? cols.grossColTruocKM : cols.grossCol;
     for (let r = headerRowIdx + 1; r < grid.length; r++) {
       const row = grid[r] || [];
       const status = cols.statusCol !== undefined ? row[cols.statusCol] : null;
       if (status !== null && !/thanh cong|th.nh c.ng/i.test(String(status))) continue;
       const product = cols.productCol !== undefined ? String(row[cols.productCol] || "").trim() : "";
       if (!product) continue;
-      const gross = cols.grossCol !== undefined ? Number(row[cols.grossCol]) || 0 : 0;
+      const gross = grossColToUse !== undefined ? Number(row[grossColToUse]) || 0 : 0;
       if (!gross) continue;
       const net = cols.netCol !== undefined ? Number(row[cols.netCol]) || 0 : gross;
       const dateRaw = cols.dateCol !== undefined ? row[cols.dateCol] : null;
@@ -1810,6 +1827,15 @@ function parseFeeReportWorkbook(buffer, orderMap) {
       if (idx.chiNhanh === undefined && s.includes("chi nhanh")) idx.chiNhanh = c;
       if (idx.orderInfo === undefined && s.includes("thong tin dat hang")) idx.orderInfo = c;
       if (idx.grossCol === undefined && s.includes("so tien hach toan thu ho")) idx.grossCol = c;
+      // Chi Nhan, 2026-07-31: "làm gì có số tiền khuyến mãi đâu ... đây là
+      // khuyến mãi của vnpay mà" -- file nay co cot "Số tiền trước KM" (truoc
+      // khi tru khuyen mai VNPay tu bu) rieng voi "so tien hach toan thu ho"
+      // (= sau khi da tru phan khuyen mai do) -- xac nhan thuc te 24.07.2026:
+      // truoc KM 24.532.500d vs hach toan thu ho 24.442.500d, lech dung
+      // 90.000d (= tong "Số tiền khuyến mại"). Uu tien cot "truoc KM" cho
+      // dung doanh thu gop, fallback ve "hach toan thu ho" neu file khong co
+      // cot nay (file cu hon).
+      if (idx.grossColTruocKM === undefined && s.includes("so tien truoc km")) idx.grossColTruocKM = c;
       if (idx.netCol === undefined && s.includes("so tien sau khi tru phi")) idx.netCol = c;
       if (idx.feeCol === undefined && s.includes("so tien phi thu ho")) idx.feeCol = c;
       if (idx.dateCol === undefined && s.includes("ngay hach toan thu ho")) idx.dateCol = c;
@@ -1823,6 +1849,7 @@ function parseFeeReportWorkbook(buffer, orderMap) {
   if (headerRowIdx < 0) {
     throw new Error('Khong doc duoc dong tieu de trong file "Du lieu bao cao phi theo GD thanh toan".');
   }
+  const grossColFeeReport = cols.grossColTruocKM !== undefined ? cols.grossColTruocKM : cols.grossCol;
 
   const onlineDates = new Set();
   const products = new Set();
@@ -1841,7 +1868,7 @@ function parseFeeReportWorkbook(buffer, orderMap) {
     const row = grid[r] || [];
     const diemThu = cols.diemThu !== undefined ? String(row[cols.diemThu] || "").trim() : "";
     if (!diemThu) continue;
-    const gross = cols.grossCol !== undefined ? Number(row[cols.grossCol]) || 0 : 0;
+    const gross = grossColFeeReport !== undefined ? Number(row[grossColFeeReport]) || 0 : 0;
     if (!gross) continue;
     const netRaw = cols.netCol !== undefined ? row[cols.netCol] : null;
     const fee = cols.feeCol !== undefined ? Number(row[cols.feeCol]) || 0 : 0;
@@ -1938,6 +1965,9 @@ function parseVnpayOfflineFeeReport(buffer) {
       if (idx.chiNhanh === undefined && s.includes("chi nhanh")) idx.chiNhanh = c;
       if (idx.maGiaoDich === undefined && s.includes("ma giao dich")) idx.maGiaoDich = c;
       if (idx.grossCol === undefined && s.includes("so tien hach toan thu ho")) idx.grossCol = c;
+      // Chi Nhan, 2026-07-31: cung ly do da sua o parseFeeReportWorkbook ben
+      // tren -- uu tien "Số tiền trước KM" (khuyen mai la VNPay tu bu).
+      if (idx.grossColTruocKM === undefined && s.includes("so tien truoc km")) idx.grossColTruocKM = c;
       if (idx.netCol === undefined && s.includes("so tien sau khi tru phi")) idx.netCol = c;
       if (idx.feeCol === undefined && s.includes("so tien phi thu ho")) idx.feeCol = c;
       if (idx.dateCol === undefined && s.includes("ngay hach toan thu ho")) idx.dateCol = c;
@@ -1955,6 +1985,7 @@ function parseVnpayOfflineFeeReport(buffer) {
   if (headerRowIdx < 0) {
     throw new Error('Khong doc duoc dong tieu de trong file "Du lieu bao cao phi theo GD thanh toan".');
   }
+  const grossColOfflineFee = cols.grossColTruocKM !== undefined ? cols.grossColTruocKM : cols.grossCol;
 
   const transactions = [];
   let excludedFunzone = 0;
@@ -1975,7 +2006,7 @@ function parseVnpayOfflineFeeReport(buffer) {
       excludedFailedStatus++;
       continue;
     }
-    const gross = cols.grossCol !== undefined ? Number(row[cols.grossCol]) || 0 : 0;
+    const gross = grossColOfflineFee !== undefined ? Number(row[grossColOfflineFee]) || 0 : 0;
     if (!gross) continue;
     const netRaw = cols.netCol !== undefined ? row[cols.netCol] : null;
     const fee = cols.feeCol !== undefined ? Number(row[cols.feeCol]) || 0 : 0;

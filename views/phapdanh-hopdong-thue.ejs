@@ -221,6 +221,30 @@
                 <%= r.doanhThuChiaSe ? '☑ Doanh thu chia sẻ' : '☐ Đánh dấu doanh thu chia sẻ' %>
               </button>
             </form>
+            <% if (r.doanhThuChiaSe) { %>
+            <!-- Chi Nhan, 2026-07-31: "nó sẽ chia ra làm 2 loại doanh thu chia
+                 sẻ ... cũng chia làm 4 loại MTD miền nam KVC miền nam MTD
+                 miền bắc KVC miền bắc" -- 2 select rieng, CHI hien khi gian da
+                 duoc tich "doanh thu chia se" o tren. "MTĐ/KVC" lay tu
+                 loaiHinh co san (khong hoi lai), "Miền" la truong moi. Dung
+                 trang /phap-danh/doanh-thu-chia-se. -->
+            <form method="POST" action="/phap-danh/hop-dong-thue-gian-hang/<%= r.id %>/loai-chia-se" class="form-inline-tight" style="display:inline-flex;">
+              <input type="hidden" name="loai" value="<%= loaiFilter %>" />
+              <input type="hidden" name="thang" value="<%= thangFilter %>" />
+              <select name="loaiChiaSe" onchange="this.form.submit()" title="Cách nhận doanh thu chia sẻ">
+                <option value="giu_tien" <%= r.loaiChiaSe !== 'xuat_hoa_don' ? 'selected' : '' %>>Bên giữ tiền, chuyển khoản cuối tháng</option>
+                <option value="xuat_hoa_don" <%= r.loaiChiaSe === 'xuat_hoa_don' ? 'selected' : '' %>>Bên xuất hóa đơn theo báo cáo</option>
+              </select>
+            </form>
+            <form method="POST" action="/phap-danh/hop-dong-thue-gian-hang/<%= r.id %>/mien" class="form-inline-tight" style="display:inline-flex;">
+              <input type="hidden" name="loai" value="<%= loaiFilter %>" />
+              <input type="hidden" name="thang" value="<%= thangFilter %>" />
+              <select name="mien" onchange="this.form.submit()" title="Miền (dùng cho nhóm MTĐ/KVC Nam-Bắc)">
+                <option value="nam" <%= r.mien !== 'bac' ? 'selected' : '' %>>Miền Nam</option>
+                <option value="bac" <%= r.mien === 'bac' ? 'selected' : '' %>>Miền Bắc</option>
+              </select>
+            </form>
+            <% } %>
             <!-- Luyen, 2026-07-23 (lan 2): "có thể viết tắc á" -- Luyen tu
                  dien cac ma viet tat (cach nhau boi dau phay) Chi Phi hay
                  dung cho gian nay (vd "TAU BT, TÀU BT"), de khop CHINH XAC

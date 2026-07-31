@@ -88,31 +88,46 @@ function mergeResolvedGross(uploads) {
   return { codes: Array.from(codes), grossByCode, netByCode };
 }
 
+// Chi Nhan, 2026-07-31: "cứ hiện thị cái ch xuất phải chuyển qua 131 rồi lưu
+// lất qua lại vẫn hiện của kh mưới là sao" -- store.gian_mapping (Momo) va
+// store.zvp_gian_mapping (day) TUNG la 1 bang duy nhat dung chung, khien
+// ensureGianHidden ben Momo (ep 4 gian KH Moi ve SKIP MOI LAN mo trang Momo)
+// de luon len ca ZVP cho cung ten gian -- Chi Nhan doi lai 131 ben ZVP xong
+// quay lai la bi ghi de mat. Tach hoan toan tu day: zvp_gian_mapping la bang
+// RIENG cua trang nay, khoi tao 1 LAN DUY NHAT bang cach sao chep gian_mapping
+// hien co (giu lai cac TK Co dang dung dung), roi hoan toan doc lap ve sau --
+// Momo sua gian_mapping KHONG con anh huong ZVP nua va nguoc lai.
+function ensureZvpGianMapping(store) {
+  if (!store.zvp_gian_mapping) {
+    store.zvp_gian_mapping = Object.assign({}, store.gian_mapping || {});
+    return true; // doi -- caller nen save(store)
+  }
+  return false;
+}
+
 // New codes seen for the first time on any channel default to "1388" if
 // they're the CSE/chia-se half (the "__FF" suffixed code), otherwise "131" --
-// exactly the same convention as Momo's seedGianMappingDefaults. The mapping
-// table itself (store.gian_mapping) is SHARED with Momo, so a code that
-// already has a TK Co assigned there (e.g. from Momo) is left untouched.
+// exactly the same convention as Momo's seedGianMappingDefaults. Rieng bang
+// zvp_gian_mapping cua trang nay (xem ensureZvpGianMapping o tren).
 function seedGianMappingDefaults(store, codes) {
+  ensureZvpGianMapping(store);
   codes.forEach((c) => {
-    if (!(c in store.gian_mapping)) {
+    if (!(c in store.zvp_gian_mapping)) {
       // Luyen, 2026-07-17: "doi xuat ra 1388 thanh 131 het" -- TK Co 1388
       // (doanh thu chia se/CSE) khong con duoc dung nua, moi gian moi deu
       // mac dinh 131.
-      store.gian_mapping[c] = "131";
+      store.zvp_gian_mapping[c] = "131";
     }
   });
 }
 
-// Luyen, 2026-07-17: "doi xuat ra 1388 thanh 131 het" -- gian_mapping dung
-// chung voi trang Momo (routes/doisoat.js co cung 1 ham ten nay); lap lai o
-// day de trang nay tu sua duoc ngay ca khi duoc mo TRUOC trang Momo.
+// Luyen, 2026-07-17: "doi xuat ra 1388 thanh 131 het".
 function ensureNo1388(store) {
-  if (!store.gian_mapping) return false;
+  ensureZvpGianMapping(store);
   let changed = false;
-  for (const code of Object.keys(store.gian_mapping)) {
-    if (store.gian_mapping[code] === "1388") {
-      store.gian_mapping[code] = "131";
+  for (const code of Object.keys(store.zvp_gian_mapping)) {
+    if (store.zvp_gian_mapping[code] === "1388") {
+      store.zvp_gian_mapping[code] = "131";
       changed = true;
     }
   }
@@ -295,7 +310,7 @@ function buildReconciliation(store) {
       offline: { invoices: vnpayInvoicesRedirected },
       payoo: { invoices: payooInvoicesRedirected },
     },
-    store.gian_mapping,
+    store.zvp_gian_mapping,
     manualMatches,
     store.invoice_diem_alias,
     cseOverrideCodes
@@ -324,7 +339,7 @@ function buildReconciliation(store) {
   // Uses the SAME gian-redirected invoices as reconciliation above, so this
   // list only shows what's STILL unmatched after the zvp_gian_list redirect
   // -- not names that are already fixed there.
-  const knownCodesForAlias = new Set([...allCodes, ...Object.keys(store.gian_mapping || {})]);
+  const knownCodesForAlias = new Set([...allCodes, ...Object.keys(store.zvp_gian_mapping || {})]);
   const invoiceDiemAlias = store.invoice_diem_alias || {};
   const unmatchedInvoiceCodesSet = new Set();
   [zaloInvoicesRedirected, vnpayInvoicesRedirected, payooInvoicesRedirected].forEach((list) => {
@@ -481,7 +496,7 @@ router.get("/doi-soat/zvp", (req, res) => {
     selectedMonth,
     days,
     selectedDay,
-    gianMapping: store.gian_mapping,
+    gianMapping: store.zvp_gian_mapping,
     allCodes: built.allCodes || [],
     unmappedWarnings: built.unmappedWarnings || [],
     invoiceDiemAlias: built.invoiceDiemAlias || {},
@@ -1277,11 +1292,12 @@ router.post("/doi-soat/zvp/upload-hoadon", requireDataEntry, upload.single("file
 
 router.post("/doi-soat/zvp/mapping", requireAdmin, (req, res) => {
   const store = load();
+  ensureZvpGianMapping(store);
   const body = req.body || {};
   for (const [key, val] of Object.entries(body)) {
     if (key.startsWith("tkco_")) {
       const code = key.slice("tkco_".length);
-      if (TKCO_VALUES.includes(val)) store.gian_mapping[code] = val;
+      if (TKCO_VALUES.includes(val)) store.zvp_gian_mapping[code] = val;
     }
   }
   save(store);

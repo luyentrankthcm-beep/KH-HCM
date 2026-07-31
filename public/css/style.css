@@ -516,6 +516,14 @@ a.report-tile.accent-gian { --report-accent: #1d8a4a; }
 .table-pivot td a { color: var(--color-primary); text-decoration: none; }
 .table-pivot td a:hover { text-decoration: underline; }
 
+/* Luyen, 2026-07-31: sao ke chi tiet theo NH tren /bao-cao/thu-chi-theo-gian
+   -- dong da duoc dua vao 1 kenh doi soat to xanh nhat (giao dich khac giu
+   trang, khong dung nth-child zebra o day de mau "da doi soat" luon ro rang
+   khong bi zebra lam nhat di). */
+.table tbody tr.tx-matched,
+.table tbody tr.tx-matched:nth-child(even) { background: var(--color-primary-soft); }
+.stmt-tab-panel.is-hidden { display: none; }
+
 /* Chi Nhan, 2026-07-28: "thêm ngắn quá cho tôi đi" -- trang Hóa Đơn Đầu Vào
    co nhieu cot + ten NCC dai lam dong bang qua cao. .table-compact giam
    padding/font cho gon hon; .truncate-1line cat ngan 1 dong (vd Ten NCC) voi

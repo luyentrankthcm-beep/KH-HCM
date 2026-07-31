@@ -8,51 +8,114 @@
   <main class="container">
     <h1>🤝 Đối Soát Doanh Thu Chia Sẻ Theo Tháng</h1>
     <p class="muted" style="margin-top:-10px;margin-bottom:10px;">
-      Tổng doanh thu đối soát (mọi kênh: Momo/Zalo/VNPay/Payoo/Viet QR) của các gian được đánh dấu
-      <strong>"doanh thu chia sẻ"</strong> ở Hợp Đồng Thuê Gian Hàng — số tự động tính lại mỗi lần xem, luôn khớp với các
-      trang đối soát gốc. Cột Ghi chú do chị tự nhập, lưu riêng theo tháng.
+      Doanh thu chia sẻ chia làm 2 loại: (1) <strong>Bên giữ tiền</strong> — họ giữ tiền, giữa tháng gửi file đối chiếu,
+      cuối tháng trừ tiền thuê + chi phí rồi chuyển khoản phần còn lại (số tự động tính từ đối soát); (2)
+      <strong>Bên xuất hóa đơn</strong> — họ xuất hóa đơn dựa trên số chị báo cáo cho họ (chị tự liệt kê, lưu bên dưới).
+      Mỗi gian còn được phân nhóm MTĐ (Máy tự động) / KVC (Khu vui chơi) × Miền Nam/Bắc.
     </p>
     <p class="muted" style="margin-top:0;margin-bottom:20px;">
       Đang tính theo <%= gianDoanhThuChiaSe.length %> gian: <%= gianDoanhThuChiaSe.map(function(g){ return g.gian; }).join(', ') %>.
-      Muốn thêm/bớt gian, vào <a href="/phap-danh/hop-dong-thue-gian-hang">Hợp Đồng Thuê Gian Hàng</a> tích/bỏ tích ô "doanh thu chia sẻ".
+      Muốn thêm/bớt gian hoặc đổi loại/miền, vào <a href="/phap-danh/hop-dong-thue-gian-hang">Hợp Đồng Thuê Gian Hàng</a>.
     </p>
 
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
     <% if (success) { %><div class="alert alert-success"><%= success %></div><% } %>
 
     <section class="panel">
-      <h2>Theo tháng</h2>
+      <h2>Loại 1 — Bên giữ tiền, chuyển khoản cuối tháng</h2>
+      <% if (giuTien.monthRows.length === 0) { %>
+      <p class="muted">Chưa có dòng đối soát nào cho loại này.</p>
+      <% } else { %>
       <div class="table-scroll">
         <table class="table">
           <thead>
             <tr>
               <th>Tháng</th>
-              <th class="num">KH Cũ</th>
-              <th class="num">KH Mới</th>
+              <% giuTien.nhoms.forEach(function(n) { %>
+              <th class="num"><%= n %></th>
+              <% }) %>
               <th class="num">Tổng</th>
               <th>Ghi chú</th>
-              <th></th>
             </tr>
           </thead>
           <tbody>
-            <% rows.forEach(function(r) { %>
+            <% giuTien.monthRows.forEach(function(r) { %>
             <tr>
               <td><%= r.month %></td>
-              <td class="num"><%= r.kh_cu.toLocaleString('vi-VN') %> đ</td>
-              <td class="num"><%= r.kh_moi.toLocaleString('vi-VN') %> đ</td>
+              <% r.cells.forEach(function(v) { %>
+              <td class="num"><%= v.toLocaleString('vi-VN') %> đ</td>
+              <% }) %>
               <td class="num" style="font-weight:600;"><%= r.total.toLocaleString('vi-VN') %> đ</td>
               <td>
                 <form method="POST" action="/phap-danh/doanh-thu-chia-se/ghi-chu" class="form-inline-tight">
                   <input type="hidden" name="thang" value="<%= r.month %>" />
-                  <input type="text" name="ghiChu" value="<%= r.ghiChu %>" placeholder="Ghi chú..." style="min-width:220px;" />
+                  <input type="text" name="ghiChu" value="<%= r.ghiChu %>" placeholder="Ghi chú..." style="min-width:200px;" />
                   <button type="submit" class="btn btn-secondary">Lưu</button>
                 </form>
               </td>
-              <td></td>
             </tr>
             <% }) %>
-            <% if (rows.length === 0) { %>
-            <tr><td colspan="6" class="muted">Chưa có dòng đối soát nào gắn TK Có 1388.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <% } %>
+    </section>
+
+    <section class="panel">
+      <h2>Loại 2 — Bên xuất hóa đơn theo báo cáo (nhập tay)</h2>
+      <form method="POST" action="/phap-danh/doanh-thu-chia-se/xuat-hoa-don" class="form-grid">
+        <label>Tháng <input type="month" name="thang" required /></label>
+        <label>
+          Gian
+          <select name="gian" required>
+            <option value="">-- Chọn gian --</option>
+            <% xuatHoaDonGianOptions.forEach(function(g) { %>
+            <option value="<%= g.gian %>"><%= g.gian %></option>
+            <% }) %>
+          </select>
+        </label>
+        <label>Doanh thu đã báo cáo <input type="text" name="doanhThuBaoCao" placeholder="vd 50000000" /></label>
+        <label>Số hóa đơn nhận <input type="text" name="soHoaDon" /></label>
+        <label>Ngày hóa đơn <input type="date" name="ngayHoaDon" /></label>
+        <label>Số tiền hóa đơn <input type="text" name="soTienHoaDon" placeholder="vd 50000000" /></label>
+        <label style="grid-column: 1 / -1;">Ghi chú <input type="text" name="ghiChu" /></label>
+        <button type="submit" class="btn btn-primary">Lưu</button>
+      </form>
+      <% if (xuatHoaDonGianOptions.length === 0) { %>
+      <p class="muted" style="margin-top:10px;">
+        Chưa có gian nào được đánh dấu "Bên xuất hóa đơn theo báo cáo" — vào
+        <a href="/phap-danh/hop-dong-thue-gian-hang">Hợp Đồng Thuê Gian Hàng</a> để đổi loại cho gian phù hợp.
+      </p>
+      <% } %>
+
+      <div class="table-scroll" style="margin-top:16px;">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Tháng</th><th>Gian</th><th>Nhóm</th><th class="num">DT đã báo cáo</th>
+              <th>Số HĐ</th><th>Ngày HĐ</th><th class="num">Tiền HĐ</th><th>Ghi chú</th><th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <% xuatHoaDonRows.forEach(function(r) { %>
+            <tr>
+              <td><%= r.thang %></td>
+              <td><%= r.gian %></td>
+              <td><%= r.nhom %></td>
+              <td class="num"><%= (r.doanhThuBaoCao||0).toLocaleString('vi-VN') %> đ</td>
+              <td><%= r.soHoaDon || '—' %></td>
+              <td><%= r.ngayHoaDon || '—' %></td>
+              <td class="num"><%= (r.soTienHoaDon||0).toLocaleString('vi-VN') %> đ</td>
+              <td class="desc-cell" title="<%= r.ghiChu %>"><%= r.ghiChu || '—' %></td>
+              <td>
+                <form method="POST" action="/phap-danh/doanh-thu-chia-se/xuat-hoa-don/<%= r.id %>/delete" onsubmit="return confirm('Xóa dòng này?')" style="display:inline;">
+                  <button type="submit" class="link-btn">Xóa</button>
+                </form>
+              </td>
+            </tr>
+            <% }) %>
+            <% if (xuatHoaDonRows.length === 0) { %>
+            <tr><td colspan="9" class="muted">Chưa có dòng nào.</td></tr>
             <% } %>
           </tbody>
         </table>

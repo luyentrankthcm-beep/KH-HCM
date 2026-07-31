@@ -5,6 +5,7 @@ const { load, save, nextId } = require("../store");
 const { requireLogin, requireAdmin, requireDataEntry } = require("../middleware/auth");
 const { getCompany, COMPANIES } = require("../utils/companies");
 const { parseHopDongHcmWorkbook, isNccRow } = require("../utils/hopDongHcmParser");
+const { parseAmount } = require("../utils/parse");
 
 const router = express.Router();
 router.use(requireLogin);
@@ -23,6 +24,10 @@ function ensureShape(store) {
   // theo thang" (xem route ben duoi) -- key la thang "YYYY-MM", value la
   // chuoi ghi chu tu do Chi Nhan nhap, doc lap voi so lieu tu dong tinh.
   if (!store.phap_danh_doanhthu_chiase_ghichu) store.phap_danh_doanhthu_chiase_ghichu = {};
+  // Chi Nhan, 2026-07-31: bang NHAP TAY rieng cho loai "xuat_hoa_don" (ben
+  // cho thue xuat hoa don dua tren so Chi Nhan tu bao cao cho ho -- KHONG the
+  // tu tinh tu doi soat nhu loai "giu_tien" o tren).
+  if (!store.phap_danh_doanhthu_chiase_xuathoadon) store.phap_danh_doanhthu_chiase_xuathoadon = [];
   fillSnowAeBinhDuongFromContract(store);
 }
 
@@ -130,6 +135,24 @@ function ensureThueDefaults(row) {
       // dung cho ca cot Tai Khoan (131/1388) ben trang Chi Phi (xem
       // isDoanhThuChiaSeRecord trong utils/rentPaymentMatcher.js).
       doanhThuChiaSe: false,
+      // Chi Nhan, 2026-07-31: "nó sẽ chia ra làm 2 loại doanh thu chia sẻ" --
+      // rieng cac gian doanhThuChiaSe=true, phan biet THEM 2 kieu quan he khac
+      // han nhau ve mat ke toan: "giu_tien" (mac dinh -- ben cho thue GIU
+      // TIEN, giua thang gui file doi chieu, cuoi thang TRU tien thue+phi roi
+      // CHUYEN KHOAN phan con lai -- tu dong tinh duoc tu doi soat + giao dich
+      // NH) vs "xuat_hoa_don" (ben cho thue XUAT HOA DON dua tren so MINH tu
+      // bao cao doanh thu cho ho -- KHONG the tu dong tinh tu doi soat, Chi
+      // Nhan se tu liet ke gui rieng, xem trang "Đối Soát Doanh Thu Chia Sẻ").
+      loaiChiaSe: "giu_tien",
+      // Chi Nhan, 2026-07-31: "chia làm 4 loại MTD miền nam KVC miền nam MTD
+      // miền bắc KVC miền bắc trong cái doanh thu chia sẻ này" -- "MTD"="Máy
+      // tự động"/"KVC"="Khu vui chơi" da co san qua truong loaiHinh o tren,
+      // CHI thieu chieu Nam/Bac -- them truong "mien" rieng (doc lap voi
+      // "khuVuc" cu, dang la text tu do "HCM"/rong, khong phai Nam/Bac ro
+      // rang), cung quy uoc "nam"/"bac" nhu store.chi_phi.mien. TAT CA gian
+      // doanh thu chia se hien co deu o khuVuc "HCM" nen mac dinh "nam", giong
+      // cach lam voi Chi Phi truoc do.
+      mien: "nam",
       // Luyen, 2026-07-23 (lan 2): "có thể viết tắc á" -- ten gian ben Chi Phi
       // thuong la ma viet tat rieng cua Luyen (vd "TÀU BT", "GHOST AMBD") ma
       // khac han ten day du trong hop dong nay nen he thong khong tu khop
@@ -429,6 +452,31 @@ router.post("/phap-danh/hop-dong-thue-gian-hang/:id/doanh-thu-chia-se", requireA
   r.doanhThuChiaSe = req.body.doanhThuChiaSe === "1";
   save(store);
   redirectBackToThueGianList(req, res, { success: "Đã cập nhật doanh thu chia sẻ." });
+});
+
+// Chi Nhan, 2026-07-31: 2 truong phan loai rieng cho gian doanh thu chia se
+// (xem ensureThueDefaults) -- "loaiChiaSe" (giu tien cuoi thang chuyen khoan
+// vs doi tac xuat hoa don theo bao cao) va "mien" (Nam/Bac, ket hop voi
+// loaiHinh co san = MTD/KVC ra du 4 nhom Chi Nhan yeu cau). Dung select tu
+// dong submit (giong cac bo loc thang khac trong app), khong can nut Luu rieng.
+router.post("/phap-danh/hop-dong-thue-gian-hang/:id/loai-chia-se", requireAdmin, (req, res) => {
+  const store = load();
+  ensureShape(store);
+  const r = store.phap_danh_hop_dong_thue.find((x) => String(x.id) === req.params.id);
+  if (!r) return redirectBackToThueGianList(req, res, { error: "Không tìm thấy gian này." });
+  r.loaiChiaSe = req.body.loaiChiaSe === "xuat_hoa_don" ? "xuat_hoa_don" : "giu_tien";
+  save(store);
+  redirectBackToThueGianList(req, res, { success: "Đã cập nhật loại chia sẻ." });
+});
+
+router.post("/phap-danh/hop-dong-thue-gian-hang/:id/mien", requireAdmin, (req, res) => {
+  const store = load();
+  ensureShape(store);
+  const r = store.phap_danh_hop_dong_thue.find((x) => String(x.id) === req.params.id);
+  if (!r) return redirectBackToThueGianList(req, res, { error: "Không tìm thấy gian này." });
+  r.mien = req.body.mien === "bac" ? "bac" : "nam";
+  save(store);
+  redirectBackToThueGianList(req, res, { success: "Đã cập nhật miền." });
 });
 
 // Luyen, 2026-07-23 (lan 2): "có thể viết tắc á" -- cho Luyen tu dien cac ma
@@ -940,47 +988,85 @@ router.post("/phap-danh/hop-dong-ncc/:id/delete", requireAdmin, (req, res) => {
 // (giong cach routes/chi-phi.js computeTaiKhoanChiPhi dang lam cho Chi Phi),
 // loc cac dong doi soat theo GIAN thuoc 1 hop dong duoc danh dau nay, roi cong
 // theo thang.
+// Chi Nhan, 2026-07-31: "nó sẽ chia ra làm 2 loại doanh thu chia sẻ ... cũng
+// chia làm 4 loại MTD miền nam KVC miền nam MTD miền bắc KVC miền bắc" -- viet
+// lai hoan toan trang nay lam 2 phan rieng biet:
+//   Loai 1 "giu_tien": ben cho thue GIU TIEN, cuoi thang tru phi roi chuyen
+//     khoan phan con lai -- TU DONG tinh duoc tu doi soat (giong cach lam cu),
+//     pivot theo thang x 4 nhom (MTĐ/KVC lay tu loaiHinh san co, ghep voi Nam/
+//     Bac tu truong "mien" moi -- xem nhomLabelFor).
+//   Loai 2 "xuat_hoa_don": ben cho thue XUAT HOA DON dua tren so Chi Nhan tu
+//     bao cao cho ho -- KHONG tu tinh duoc tu doi soat (khong phai tien ve
+//     thang ngan hang), Chi Nhan TU LIET KE va luu vao bang rieng
+//     (store.phap_danh_doanhthu_chiase_xuathoadon).
+function nhomLabelFor(rec) {
+  if (!rec) return "Chưa phân loại";
+  const loai = rec.loaiHinh === "Khu vui chơi" ? "KVC" : rec.loaiHinh === "Máy tự động" ? "MTĐ" : "";
+  const mienLabel = rec.mien === "bac" ? "Miền Bắc" : rec.mien === "nam" ? "Miền Nam" : "";
+  if (!loai || !mienLabel) return "Chưa phân loại";
+  return loai + " " + mienLabel;
+}
+
 router.get("/phap-danh/doanh-thu-chia-se", (req, res) => {
   const store = load();
   ensureShape(store);
   const { buildAllFlatLines } = require("../utils/overviewAggregate");
   const { isDoanhThuChiaSeRecord, buildGianAliasIndex, findContractForGianText } = require("../utils/rentPaymentMatcher");
 
-  let rows = [];
-  let gianDoanhThuChiaSe = [];
-  try {
-    const gianList = store.phap_danh_hop_dong_thue || [];
-    const aliasIndex = buildGianAliasIndex(gianList);
-    gianDoanhThuChiaSe = gianList.filter(isDoanhThuChiaSeRecord);
-    const gianNameSet = new Set(gianDoanhThuChiaSe.map((r) => r.gian));
-
-    const flat = buildAllFlatLines(store).filter((l) => {
-      if (gianNameSet.has(l.gian)) return true;
-      const rec = findContractForGianText(l.gian, gianList, aliasIndex);
-      return rec && isDoanhThuChiaSeRecord(rec);
-    });
-
-    const byMonth = {};
-    flat.forEach((l) => {
-      const rec = gianNameSet.has(l.gian) ? gianList.find((r) => r.gian === l.gian) : findContractForGianText(l.gian, gianList, aliasIndex);
-      const company = (rec && rec.congTy) || "kh_cu";
-      if (!byMonth[l.month]) byMonth[l.month] = { month: l.month, kh_cu: 0, kh_moi: 0 };
-      byMonth[l.month][company] += l.gross;
-    });
-    rows = Object.values(byMonth).sort((a, b) => b.month.localeCompare(a.month));
-    rows.forEach((r) => {
-      r.ghiChu = store.phap_danh_doanhthu_chiase_ghichu[r.month] || "";
-      r.total = r.kh_cu + r.kh_moi;
-    });
-  } catch (e) {
-    console.error("Loi tong hop doanh thu chia se:", e);
+  const gianList = store.phap_danh_hop_dong_thue || [];
+  const aliasIndex = buildGianAliasIndex(gianList);
+  const gianDoanhThuChiaSe = gianList.filter(isDoanhThuChiaSeRecord);
+  const gianNameSet = new Set(gianDoanhThuChiaSe.map((r) => r.gian));
+  function findRec(gianText) {
+    if (gianNameSet.has(gianText)) return gianList.find((r) => r.gian === gianText);
+    const rec = findContractForGianText(gianText, gianList, aliasIndex);
+    return rec && isDoanhThuChiaSeRecord(rec) ? rec : null;
   }
+
+  let giuTien = { nhoms: [], monthRows: [] };
+  try {
+    const flat = buildAllFlatLines(store).filter((l) => {
+      const rec = findRec(l.gian);
+      return !!rec && (rec.loaiChiaSe || "giu_tien") === "giu_tien";
+    });
+    const byMonthNhom = {};
+    const nhomSet = new Set();
+    flat.forEach((l) => {
+      const nhom = nhomLabelFor(findRec(l.gian));
+      nhomSet.add(nhom);
+      if (!byMonthNhom[l.month]) byMonthNhom[l.month] = {};
+      byMonthNhom[l.month][nhom] = (byMonthNhom[l.month][nhom] || 0) + l.gross;
+    });
+    const nhoms = [...nhomSet].sort();
+    const monthRows = Object.keys(byMonthNhom)
+      .sort()
+      .reverse()
+      .map((month) => {
+        const cells = nhoms.map((n) => byMonthNhom[month][n] || 0);
+        return {
+          month,
+          cells,
+          total: cells.reduce((s, v) => s + v, 0),
+          ghiChu: store.phap_danh_doanhthu_chiase_ghichu[month] || "",
+        };
+      });
+    giuTien = { nhoms, monthRows };
+  } catch (e) {
+    console.error("Loi tong hop doanh thu chia se (giu tien):", e);
+  }
+
+  const xuatHoaDonGianOptions = gianDoanhThuChiaSe.filter((r) => r.loaiChiaSe === "xuat_hoa_don");
+  const xuatHoaDonRows = (store.phap_danh_doanhthu_chiase_xuathoadon || [])
+    .map((r) => ({ ...r, nhom: nhomLabelFor(findRec(r.gian)) }))
+    .sort((a, b) => (a.thang < b.thang ? 1 : -1));
 
   res.render("phapdanh-doanhthuchiase", {
     userName: req.session.userName,
     COMPANIES,
-    rows,
+    giuTien,
     gianDoanhThuChiaSe,
+    xuatHoaDonGianOptions,
+    xuatHoaDonRows,
     error: req.query.error || null,
     success: req.query.success || null,
   });
@@ -996,6 +1082,45 @@ router.post("/phap-danh/doanh-thu-chia-se/ghi-chu", requireDataEntry, (req, res)
   store.phap_danh_doanhthu_chiase_ghichu[thang] = (ghiChu || "").trim();
   save(store);
   res.redirect("/phap-danh/doanh-thu-chia-se?success=" + encodeURIComponent("Đã lưu ghi chú."));
+});
+
+// Chi Nhan, 2026-07-31: "họ xuất hóa đơn cho mình dựa trên số mình báo cáo
+// doanh thu cho bên họ tôi sẽ liệt kê và gửi đối soát bạn lưu lại cho tôi" --
+// bang nhap tay cho loai 2, Chi Nhan tu dien tung dong sau khi doi chieu voi
+// ben cho thue.
+router.post("/phap-danh/doanh-thu-chia-se/xuat-hoa-don", requireDataEntry, (req, res) => {
+  const store = load();
+  ensureShape(store);
+  try {
+    const { thang, gian, doanhThuBaoCao, soHoaDon, ngayHoaDon, soTienHoaDon, ghiChu } = req.body;
+    if (!thang) throw new Error("Thiếu tháng.");
+    if (!gian || !gian.trim()) throw new Error("Thiếu gian.");
+    store.phap_danh_doanhthu_chiase_xuathoadon.push({
+      id: nextId(store, "phap_danh_doanhthu_chiase_xuathoadon_seq") || Date.now(),
+      thang,
+      gian: gian.trim(),
+      doanhThuBaoCao: Math.abs(parseAmount(doanhThuBaoCao)),
+      soHoaDon: (soHoaDon || "").trim(),
+      ngayHoaDon: ngayHoaDon || "",
+      soTienHoaDon: Math.abs(parseAmount(soTienHoaDon)),
+      ghiChu: (ghiChu || "").trim(),
+      createdAt: new Date().toISOString(),
+    });
+    save(store);
+    res.redirect("/phap-danh/doanh-thu-chia-se?success=" + encodeURIComponent("Đã lưu dòng xuất hóa đơn."));
+  } catch (e) {
+    res.redirect("/phap-danh/doanh-thu-chia-se?error=" + encodeURIComponent(e.message));
+  }
+});
+
+router.post("/phap-danh/doanh-thu-chia-se/xuat-hoa-don/:id/delete", requireDataEntry, (req, res) => {
+  const store = load();
+  ensureShape(store);
+  store.phap_danh_doanhthu_chiase_xuathoadon = store.phap_danh_doanhthu_chiase_xuathoadon.filter(
+    (r) => String(r.id) !== req.params.id
+  );
+  save(store);
+  res.redirect("/phap-danh/doanh-thu-chia-se?success=" + encodeURIComponent("Đã xóa dòng."));
 });
 
 module.exports = router;

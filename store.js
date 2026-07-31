@@ -54,7 +54,18 @@ function emptyStore() {
     // trong routes/doisoat.js.
     momo_moi_gross_uploads: [],
     momo_moi_invoices: [],
-    gian_mapping: {}, // { "MA CONG TRINH": "131" | "1388" | "SKIP" } -- shared across Momo AND Zalo/VNPay/Payoo
+    gian_mapping: {}, // { "MA CONG TRINH": "131" | "1388" | "SKIP" } -- Momo ONLY (xem zvp_gian_mapping ben duoi)
+    // Chi Nhan, 2026-07-31: "cứ hiện thị cái ch xuất phải chuyển qua 131 rồi
+    // lưu lất qua lại vẫn hiện của kh mưới là sao" -- gian_mapping o tren
+    // TUNG la "shared across Momo AND Zalo/VNPay/Payoo" (xem comment cu), gay
+    // bug: 4 gian duoc Momo ep ve SKIP (vi thuoc KH Moi ben kenh Momo rieng --
+    // xem ensureGianHidden trong routes/doisoat.js, chay lai MOI LAN mo trang
+    // Momo) lam LUON ca ben ZVP hien "Chưa xuất MISA (KH mới)" cho CUNG ten
+    // gian, du ben ZVP la doanh thu KH Cu binh thuong (131) -- Chi Nhan doi
+    // lai 131 tren trang ZVP xong quay lai trang Momo la bi de len lai. Tach
+    // rieng bang nay CHI cho ZVP (routes/doisoat-zvp.js), KHONG con dung
+    // chung voi Momo nua -- moi ben tu quan ly TK Co cua minh doc lap.
+    zvp_gian_mapping: {}, // { "MA CONG TRINH": "131" | "1388" | "SKIP" } -- Zalo/VNPay/Payoo ONLY
     cua_hang_mapping: {}, // { "MA CUA HANG": { maCongTrinh, code, gian } } -- learned from "Tong Momo Gop" uploads
     // Some invoices get issued with a "Ma diem" text that names a specific
     // sub-brand/corner (e.g. "SNOWFUN TAN PHU", "FUNFEST SC VIVO") instead of

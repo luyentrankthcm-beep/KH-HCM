@@ -4,14 +4,93 @@ const { load } = require("../store");
 const { requireLogin } = require("../middleware/auth");
 const momo = require("../utils/momoReconcile");
 const zvp = require("../utils/zvpReconcile");
+const vietqr = require("../utils/vietqrReconcile");
 const overviewAggregate = require("../utils/overviewAggregate");
 const { COMPANIES, getCompany } = require("../utils/companies");
+const { BANK_COMPANY } = require("../utils/bankCompany");
 
 const router = express.Router();
 router.use(requireLogin);
 
 const MOMO_BANK_NAME = "BIDV123456";
 const ZVP_BANK_NAME = "ACB31268";
+const VNPAY_KHMOI_BANK_NAME = "VTB982";
+// Cac ngan hang dang chay qua kien truc VietQR (routes/doisoat-vietqr.js
+// CHANNELS) -- dung chung 1 kieu loc giao dich "thu" hop le (khong phai
+// Momo/ngoai le) cua utils/vietqrReconcile.js de xac dinh giao dich nao DA
+// duoc dua vao doi soat.
+const VIETQR_BANK_NAMES = new Set([
+  "BIDV7704",
+  "BIDV77020",
+  "MB11521268",
+  "BIDV7702",
+  "BIDV77021",
+  "MB02865168",
+  "BIDV8613600999",
+]);
+
+// Luyen, 2026-07-31: "cái nào trả của bên đối soát thì tô màu xanh nhạt" --
+// xac dinh 1 giao dich ngan hang co nam trong danh sach da duoc 1 trong cac
+// engine doi soat (Momo / Zalo-VNPay-Payoo / VietQR / VNPay KH Moi) "gom vao"
+// hay chua, DUNG LAI chinh cac ham trich xuat da co (khong tu viet lai logic
+// nhan dien de tranh lech voi trang doi soat that). Ngan hang KHONG thuoc bat
+// ky kenh doi soat nao (vd tai khoan vay, tai khoan noi bo thuan) thi khong
+// co khai niem "da doi soat" nen luon tra ve set rong (khong to mau).
+function matchedTxIdsForBank(bank, txs) {
+  const ids = new Set();
+  if (!bank) return ids;
+  if (bank.name === MOMO_BANK_NAME) {
+    momo.extractMomoSettlements(txs).forEach((s) => ids.add(s.id));
+  } else if (bank.name === ZVP_BANK_NAME || bank.name === VNPAY_KHMOI_BANK_NAME) {
+    const ext = zvp.extractZvpSettlements(txs);
+    ["online", "offline", "payoo"].forEach((k) => (ext[k] || []).forEach((s) => (s.txIds || []).forEach((id) => ids.add(id))));
+  } else if (VIETQR_BANK_NAMES.has(bank.name)) {
+    vietqr.extractVietQrThuTransactions(txs).forEach((t) => ids.add(t.id));
+  }
+  return ids;
+}
+
+function companyOfBankRow(b) {
+  return b.company || BANK_COMPANY[b.name] || "kh_cu";
+}
+
+// Sao ke chi tiet tung giao dich, gop tat ca ngan hang, tach tab theo tung
+// ngan hang (giong cac sheet rieng trong file Excel Luyen gui). Danh dau
+// giao dich nao da duoc dua vao 1 kenh doi soat (matchedTxIdsForBank).
+function buildBankStatementTabs(store) {
+  const tabs = [];
+  const banksSorted = [...store.banks].sort((a, b) => a.name.localeCompare(b.name));
+  for (const bank of banksSorted) {
+    const txs = store.transactions
+      .filter((t) => t.bank_id === bank.id)
+      .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : a.id - b.id));
+    if (txs.length === 0) continue;
+    const matchedIds = matchedTxIdsForBank(bank, txs);
+    let bal = bank.opening_balance || 0;
+    const rows = txs.map((t) => {
+      bal += t.type === "thu" ? t.amount : -t.amount;
+      return {
+        date: t.date,
+        type: t.type,
+        amount: t.amount,
+        description: t.description || "",
+        tenDoiUng: t.tenDoiUng || "",
+        balance: bal,
+        matched: matchedIds.has(t.id),
+      };
+    });
+    tabs.push({
+      bankId: bank.id,
+      bankName: bank.name,
+      company: companyOfBankRow(bank),
+      openingBalance: bank.opening_balance || 0,
+      rows,
+      totalThu: rows.reduce((s, r) => (r.type === "thu" ? s + r.amount : s), 0),
+      totalChi: rows.reduce((s, r) => (r.type === "chi" ? s + r.amount : s), 0),
+    });
+  }
+  return tabs;
+}
 
 // ---------- Shared helpers ----------
 
@@ -177,18 +256,40 @@ function detectInternalTransfers(store, company) {
   return rows;
 }
 
+// Luyen bao 2026-07-31: "cho chỗ chọn thời gian đi ưu tiên hiển thị thnág
+// hiện tại nhá" -- them bo loc thang, mac dinh uu tien THANG HIEN TAI (neu co
+// giao dich), khong con thang hien tai thi lui ve thang gan nhat co du lieu,
+// van giu tuy chon "Tat ca" de xem full lich su nhu truoc gio.
+function pickDefaultMonth(availableMonths) {
+  const currentMonth = new Date().toISOString().slice(0, 7);
+  if (availableMonths.includes(currentMonth)) return currentMonth;
+  return availableMonths[0] || "";
+}
+
 router.get("/bao-cao/chuyen-tien-noi-bo", (req, res) => {
   const store = load();
   const activeCompany = getCompany(req);
-  const rows = detectInternalTransfers(store, activeCompany);
+  const allRows = detectInternalTransfers(store, activeCompany);
+
+  const monthSet = new Set();
+  allRows.forEach((r) => { const m = (r.date || "").slice(0, 7); if (m) monthSet.add(m); });
+  const availableMonths = [...monthSet].sort().reverse();
+  const thangFilter = req.query.thang !== undefined ? req.query.thang : pickDefaultMonth(availableMonths);
+  const rows = thangFilter ? allRows.filter((r) => (r.date || "").slice(0, 7) === thangFilter) : allRows;
+
   const totalInternal = rows.filter((r) => r.isFullyInternal).reduce((s, r) => s + r.amount, 0);
-  res.render("baocao-noibo", { userName: req.session.userName, rows, totalInternal });
+  res.render("baocao-noibo", { userName: req.session.userName, rows, totalInternal, availableMonths, thangFilter });
 });
 
 router.get("/bao-cao/chuyen-tien-noi-bo/export.xlsx", (req, res) => {
   const store = load();
   const activeCompany = getCompany(req);
-  const rows = detectInternalTransfers(store, activeCompany).map((r) => ({
+  const allRows = detectInternalTransfers(store, activeCompany);
+  const monthSet = new Set();
+  allRows.forEach((r) => { const m = (r.date || "").slice(0, 7); if (m) monthSet.add(m); });
+  const availableMonths = [...monthSet].sort().reverse();
+  const thangFilter = req.query.thang !== undefined ? req.query.thang : pickDefaultMonth(availableMonths);
+  const rows = (thangFilter ? allRows.filter((r) => (r.date || "").slice(0, 7) === thangFilter) : allRows).map((r) => ({
     "Ngày": r.date,
     "Ngân hàng": r.bankName,
     "Loại": r.type === "chi" ? "Chi (đi)" : "Thu (đến)",
@@ -201,7 +302,7 @@ router.get("/bao-cao/chuyen-tien-noi-bo/export.xlsx", (req, res) => {
   XLSX.utils.book_append_sheet(wb, ws, "Chuyen tien noi bo");
   const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
   res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-  res.setHeader("Content-Disposition", "attachment; filename=chuyen-tien-noi-bo.xlsx");
+  res.setHeader("Content-Disposition", `attachment; filename=chuyen-tien-noi-bo-${thangFilter || "TatCa"}.xlsx`);
   res.send(buf);
 });
 
@@ -317,6 +418,43 @@ router.get("/bao-cao/thu-chi-theo-gian", (req, res) => {
   let filtered = bankFilter ? allRows.filter((r) => r.bankName === bankFilter) : allRows;
   if (selectedMonth) filtered = filtered.filter((r) => r.settlementDate.slice(0, 7) === selectedMonth);
 
+  // Sao ke chi tiet tung giao dich, tach tab theo ngan hang -- xem
+  // buildBankStatementTabs() o tren. Loc theo cung "thang" da chon o bang tren
+  // (neu co) de 2 bang khop nhau; rieng bo loc thang cua bang sao ke van co
+  // dropdown tach doc lap (stmtMonth) phong khi Luyen muon xem thang khac voi
+  // bang doi soat theo gian o tren.
+  const stmtTabsAll = buildBankStatementTabs(store);
+  const stmtMonthSet = new Set();
+  stmtTabsAll.forEach((tab) => tab.rows.forEach((r) => stmtMonthSet.add(r.date.slice(0, 7))));
+  const stmtMonths = Array.from(stmtMonthSet).sort().reverse();
+  // Chi dung selectedMonth (thang cua bang doi soat theo gian o tren) lam mac
+  // dinh NEU thang do thuc su co giao dich sao ke -- tranh truong hop bang
+  // doi soat co dong ngay trong tuong lai (vd khoan ve du kien) nhung sao ke
+  // ngan hang thuc te chua toi ngay do, se lam bang sao ke moi trong rong.
+  const stmtMonth =
+    req.query.stmtMonth !== undefined
+      ? req.query.stmtMonth
+      : stmtMonths.includes(selectedMonth)
+      ? selectedMonth
+      : stmtMonths[0] || "";
+  const stmtTabs = stmtTabsAll
+    .map((tab) => {
+      const rows = stmtMonth ? tab.rows.filter((r) => r.date.slice(0, 7) === stmtMonth) : tab.rows;
+      return {
+        ...tab,
+        rows,
+        totalThu: rows.reduce((s, r) => (r.type === "thu" ? s + r.amount : s), 0),
+        totalChi: rows.reduce((s, r) => (r.type === "chi" ? s + r.amount : s), 0),
+      };
+    })
+    .filter((tab) => tab.rows.length > 0);
+  const stmtCompanyTotals = { kh_cu: { thu: 0, chi: 0 }, kh_moi: { thu: 0, chi: 0 } };
+  stmtTabs.forEach((tab) => {
+    const bucket = stmtCompanyTotals[tab.company] || stmtCompanyTotals.kh_cu;
+    bucket.thu += tab.totalThu;
+    bucket.chi += tab.totalChi;
+  });
+
   res.render("baocao-thuchi", {
     userName: req.session.userName,
     rows: filtered,
@@ -324,6 +462,11 @@ router.get("/bao-cao/thu-chi-theo-gian", (req, res) => {
     bankFilter,
     months,
     selectedMonth,
+    COMPANIES,
+    stmtTabs,
+    stmtMonths,
+    stmtMonth,
+    stmtCompanyTotals,
   });
 });
 
