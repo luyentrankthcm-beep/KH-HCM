@@ -437,7 +437,7 @@ router.get("/bao-cao/thu-chi-theo-gian", (req, res) => {
       : stmtMonths.includes(selectedMonth)
       ? selectedMonth
       : stmtMonths[0] || "";
-  const stmtTabs = stmtTabsAll
+  const stmtTabsAllWithRows = stmtTabsAll
     .map((tab) => {
       const rows = stmtMonth ? tab.rows.filter((r) => r.date.slice(0, 7) === stmtMonth) : tab.rows;
       return {
@@ -448,12 +448,21 @@ router.get("/bao-cao/thu-chi-theo-gian", (req, res) => {
       };
     })
     .filter((tab) => tab.rows.length > 0);
+
+  // Tong theo cong ty tinh tren CA 2 cong ty (khong phu thuoc dang xem cong
+  // ty nao) de van doi chieu duoc nhanh giua KH Cu / KH Moi cung luc.
   const stmtCompanyTotals = { kh_cu: { thu: 0, chi: 0 }, kh_moi: { thu: 0, chi: 0 } };
-  stmtTabs.forEach((tab) => {
+  stmtTabsAllWithRows.forEach((tab) => {
     const bucket = stmtCompanyTotals[tab.company] || stmtCompanyTotals.kh_cu;
     bucket.thu += tab.totalThu;
     bucket.chi += tab.totalChi;
   });
+
+  // Luyen, 2026-07-31: "tôi chọn bên kh cũ á thì hiển thị kh cũ thôi" -- danh
+  // sach tab/panel hien thi CHI theo cong ty dang chon o thanh tren (giong
+  // moi trang khac trong app), dung getCompany(req) nhu thuong le.
+  const activeCompany = getCompany(req);
+  const stmtTabs = stmtTabsAllWithRows.filter((tab) => tab.company === activeCompany);
 
   res.render("baocao-thuchi", {
     userName: req.session.userName,

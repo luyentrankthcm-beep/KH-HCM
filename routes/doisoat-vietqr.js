@@ -49,6 +49,16 @@ const upload = multer({
   limits: { fileSize: 80 * 1024 * 1024 },
 });
 
+// Luyen, 2026-07-31: mac dinh 2 o "Tu ngay/Den ngay" cua nut Xuat file MISA
+// (xem GET /doi-soat/vietqr/export.xlsx) = dau/cuoi thang dang chon o dropdown
+// "Chon thang" tren trang xem, giong het ben Momo (routes/doisoat.js).
+function monthBounds(m) {
+  if (!m) return { first: "", last: "" };
+  const [y, mo] = m.split("-").map(Number);
+  const lastDay = new Date(y, mo, 0).getDate();
+  return { first: `${m}-01`, last: `${m}-${String(lastDay).padStart(2, "0")}` };
+}
+
 // Each Viet QR bank posts individual QR payments (no batch settlement), so
 // the reconciliation is per calendar day per bank. Store.transactions'
 // bank.name is the join key against store.banks; the tag pattern is how a
@@ -1770,6 +1780,8 @@ function renderVietQrPage(req, res, activeKeys, pageTitle, pageSubtitle) {
     built,
     months,
     selectedMonth,
+    exportTuDefault: monthBounds(selectedMonth).first,
+    exportDenDefault: monthBounds(selectedMonth).last,
     gianMapping: store.gian_mapping,
     allCodes: Array.from(allCodes).sort(),
     allUnmappedStores,
@@ -2547,11 +2559,22 @@ router.get("/doi-soat/vietqr/export.xlsx", (req, res) => {
 
   let startNo = parseInt(req.query.start || "1", 10);
   if (isNaN(startNo) || startNo < 1) startNo = 1;
+
+  // Luyen, 2026-07-31: "tu ngay may toi ngay may" -- loc theo khoang ngay
+  // (query "tu"/"den", ISO yyyy-mm-dd) truoc khi xuat, giong Momo. Trang nay
+  // truoc gio KHONG loc theo thang/ngay o export nen mac dinh (khong truyen
+  // tu/den) van xuat toan bo nhu cu, tuong thich nguoc voi cach dung hien tai.
+  const tuFilter = req.query.tu || "";
+  const denFilter = req.query.den || "";
+  let reconciledForExport = built.reconciled;
+  if (tuFilter) reconciledForExport = reconciledForExport.filter((r) => r.settlementDate >= tuFilter);
+  if (denFilter) reconciledForExport = reconciledForExport.filter((r) => r.settlementDate <= denFilter);
+
   // Luyen, 2026-07-21: "lý do thu là Thu tiền khách hàng (không theo hóa đơn)
   // đổi hết các file xuất misa nhá" -- dung 1 cau CO DINH giong het Momo, bo
   // cau rieng theo tung kenh nhu truoc (vd "...qua Viet QR (BIDV 7702)").
   const { rows } = buildExportRows(
-    built.reconciled,
+    reconciledForExport,
     startNo,
     bank.account_number,
     `Ngân hàng ${bank.bank_name}`,

@@ -43,6 +43,16 @@ const { getCompany } = require("../utils/companies");
 const router = express.Router();
 router.use(requireLogin);
 
+// Luyen, 2026-07-31: mac dinh 2 o "Tu ngay/Den ngay" cua nut Xuat file MISA
+// (export-online.xlsx/export-offline.xlsx) = dau/cuoi thang dang chon o
+// dropdown "Chon thang" tren trang xem, giong het ben Momo/VietQR.
+function monthBounds(m) {
+  if (!m) return { first: "", last: "" };
+  const [y, mo] = m.split("-").map(Number);
+  const lastDay = new Date(y, mo, 0).getDate();
+  return { first: `${m}-01`, last: `${m}-${String(lastDay).padStart(2, "0")}` };
+}
+
 // Doi soat Zalo App/VNPay/Payoo hien chi ap dung cho KH Cu (KH Moi chua co
 // tai khoan nhan tien Zalo/VNPay/Payoo) -- chan truy cap truc tiep (vd bookmark
 // hoac go URL tay) khi dang xem KH Moi, dieu huong ve trang chu.
@@ -494,6 +504,8 @@ router.get("/doi-soat/zvp", (req, res) => {
     reconciled,
     months,
     selectedMonth,
+    exportTuDefault: monthBounds(selectedMonth).first,
+    exportDenDefault: monthBounds(selectedMonth).last,
     days,
     selectedDay,
     gianMapping: store.zvp_gian_mapping,
@@ -1480,6 +1492,17 @@ function buildExportRows(reconciledList, startNo, lyDoThu, suffixKenh, maDoiTuon
   return { rows, nextSeq: seq };
 }
 
+// Luyen, 2026-07-31: "tu ngay may toi ngay may" -- loc theo khoang ngay
+// (query "tu"/"den", ISO yyyy-mm-dd) truoc khi xuat, dung chung cho ca 2
+// export (online/offline) ben duoi. Khong truyen tu/den thi van xuat toan bo
+// nhu cu (tuong thich nguoc).
+function filterByDateRange(list, tuFilter, denFilter) {
+  let out = list;
+  if (tuFilter) out = out.filter((r) => r.settlementDate >= tuFilter);
+  if (denFilter) out = out.filter((r) => r.settlementDate <= denFilter);
+  return out;
+}
+
 router.get("/doi-soat/zvp/export-online.xlsx", (req, res) => {
   const store = load();
   const built = buildReconciliation(store);
@@ -1487,10 +1510,11 @@ router.get("/doi-soat/zvp/export-online.xlsx", (req, res) => {
 
   let startNo = parseInt(req.query.start || "1", 10);
   if (isNaN(startNo) || startNo < 1) startNo = 1;
+  const onlineForExport = filterByDateRange(built.reconciled.online, req.query.tu || "", req.query.den || "");
   // Luyen, 2026-07-21: "lý do thu là Thu tiền khách hàng (không theo hóa đơn)
   // đổi hết các file xuất misa nhá" -- dung 1 cau CO DINH giong het Momo, bo
   // cau rieng theo tung kenh nhu truoc.
-  const { rows } = buildExportRows(built.reconciled.online, startNo, "Thu tiền khách hàng (không theo hóa đơn)", "VNP");
+  const { rows } = buildExportRows(onlineForExport, startNo, "Thu tiền khách hàng (không theo hóa đơn)", "VNP");
 
   const ws = XLSX.utils.json_to_sheet(rows);
   const wb2 = XLSX.utils.book_new();
@@ -1508,18 +1532,20 @@ router.get("/doi-soat/zvp/export-offline.xlsx", (req, res) => {
 
   let startNo = parseInt(req.query.start || "1", 10);
   if (isNaN(startNo) || startNo < 1) startNo = 1;
+  const tuFilter = req.query.tu || "";
+  const denFilter = req.query.den || "";
   // Offline VNPay + Payoo folded into the SAME file (per Luyen: Payoo duoc
   // xu ly don gian giong nhu Offline), continuing the same document-number
   // sequence across both channels.
   const offlinePart = buildExportRows(
-    built.reconciled.offline,
+    filterByDateRange(built.reconciled.offline, tuFilter, denFilter),
     startNo,
     "Thu tiền khách hàng (không theo hóa đơn)",
     "VNP",
     "VN PAY0102182292"
   );
   const payooPart = buildExportRows(
-    built.reconciled.payoo,
+    filterByDateRange(built.reconciled.payoo, tuFilter, denFilter),
     offlinePart.nextSeq,
     "Thu tiền khách hàng (không theo hóa đơn)",
     "PAYOO"

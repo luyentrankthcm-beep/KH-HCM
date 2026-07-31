@@ -322,19 +322,32 @@
       <% if (reconciled.length === 0) { %>
         <p class="muted">Chưa có dữ liệu để đối soát — cần tải ít nhất 1 bảng "Tổng Momo tháng" ở bước 1.</p>
       <% } else { %>
-      <div class="form-inline" style="margin-bottom:14px;">
+      <div class="form-inline" style="margin-bottom:14px; flex-wrap:wrap; gap:10px;">
         <label style="margin:0;">Số chứng từ bắt đầu (NTTK...):</label>
         <input type="number" id="startNo" value="1" min="1" style="width:100px;" />
-        <a class="btn btn-secondary" id="exportBtn" href="/doi-soat/momo/export.xlsx?start=1&month=<%= encodeURIComponent(selectedMonth) %>">Xuất Excel (định dạng AMIS)</a>
+        <label style="margin:0;">Từ ngày:</label>
+        <input type="date" id="exportTu" value="<%= exportTuDefault %>" style="width:150px;" />
+        <label style="margin:0;">Đến ngày:</label>
+        <input type="date" id="exportDen" value="<%= exportDenDefault %>" style="width:150px;" />
+        <a class="btn btn-secondary" id="exportBtn" href="#">Xuất Excel (định dạng AMIS)</a>
       </div>
       <p class="muted" style="margin-top:-8px; margin-bottom:14px;">
 Các dòng mờ (KH mới, chưa xuất MISA) bên dưới sẽ tự động bị loại khỏi file xuất Excel.
-<% if (selectedMonth) { %>File xuất chỉ gồm đúng tháng <strong><%= selectedMonth %></strong> đang chọn ở trên — đổi "Chọn tháng" rồi bấm lại nút này để xuất tháng khác.<% } else { %>Đang chọn "Tất cả" nên file xuất gồm toàn bộ các khoản chưa xuất từ trước đến nay.<% } %>
+File xuất chỉ gồm các khoản có ngày về ngân hàng nằm trong khoảng "Từ ngày - Đến ngày" ở trên (mặc định = đúng tháng <strong><%= selectedMonth || 'đang chọn' %></strong>) — sửa lại 2 ô ngày rồi bấm nút để xuất khoảng ngày khác. Để trống 1 trong 2 ô để xuất không giới hạn đầu/cuối.
       </p>
       <script>
-        document.getElementById('startNo').addEventListener('input', function() {
-          document.getElementById('exportBtn').href = '/doi-soat/momo/export.xlsx?start=' + (this.value || 1) + '&month=<%= encodeURIComponent(selectedMonth) %>';
-        });
+        function updateMomoExportLink() {
+          var start = document.getElementById('startNo').value || 1;
+          var tu = document.getElementById('exportTu').value || '';
+          var den = document.getElementById('exportDen').value || '';
+          document.getElementById('exportBtn').href =
+            '/doi-soat/momo/export.xlsx?start=' + encodeURIComponent(start) +
+            '&tu=' + encodeURIComponent(tu) + '&den=' + encodeURIComponent(den);
+        }
+        document.getElementById('startNo').addEventListener('input', updateMomoExportLink);
+        document.getElementById('exportTu').addEventListener('change', updateMomoExportLink);
+        document.getElementById('exportDen').addEventListener('change', updateMomoExportLink);
+        updateMomoExportLink();
       </script>
 
       <% reconciled.forEach(function(r) { %>

@@ -617,22 +617,34 @@
     <section class="panel">
       <h2>Xuất file MISA</h2>
       <p class="muted" style="margin-bottom:14px;">
-        Xuất riêng từng ngân hàng. Các dòng "KH mới - chưa xuất MISA" sẽ tự động bị loại khỏi file xuất.
+        Xuất riêng từng ngân hàng. Các dòng "KH mới - chưa xuất MISA" sẽ tự động bị loại khỏi file xuất. Để trống 1
+        trong 2 ô ngày để xuất không giới hạn đầu/cuối.
       </p>
-      <div class="form-inline" style="margin-bottom:14px;">
+      <div class="form-inline" style="margin-bottom:14px; flex-wrap:wrap; gap:10px;">
         <label style="margin:0;">Số chứng từ bắt đầu (NTTK...):</label>
         <input type="number" id="startNo" value="1" min="1" style="width:100px;" />
+        <label style="margin:0;">Từ ngày:</label>
+        <input type="date" id="exportTu" value="<%= exportTuDefault %>" style="width:150px;" />
+        <label style="margin:0;">Đến ngày:</label>
+        <input type="date" id="exportDen" value="<%= exportDenDefault %>" style="width:150px;" />
         <% channels.forEach(function(chInfo) { %>
-        <a class="btn btn-secondary export-btn" data-channel="<%= chInfo.key %>" href="/doi-soat/vietqr/export.xlsx?channel=<%= chInfo.key %>&start=1">Xuất <%= chInfo.label %></a>
+        <a class="btn btn-secondary export-btn" data-channel="<%= chInfo.key %>" href="#">Xuất <%= chInfo.label %></a>
         <% }) %>
       </div>
       <script>
-        document.getElementById('startNo').addEventListener('input', function() {
-          var v = this.value || 1;
+        function updateVietQrExportLinks() {
+          var v = document.getElementById('startNo').value || 1;
+          var tu = document.getElementById('exportTu').value || '';
+          var den = document.getElementById('exportDen').value || '';
           document.querySelectorAll('.export-btn').forEach(function(a) {
-            a.href = '/doi-soat/vietqr/export.xlsx?channel=' + a.dataset.channel + '&start=' + v;
+            a.href = '/doi-soat/vietqr/export.xlsx?channel=' + a.dataset.channel + '&start=' + v +
+              '&tu=' + encodeURIComponent(tu) + '&den=' + encodeURIComponent(den);
           });
-        });
+        }
+        document.getElementById('startNo').addEventListener('input', updateVietQrExportLinks);
+        document.getElementById('exportTu').addEventListener('change', updateVietQrExportLinks);
+        document.getElementById('exportDen').addEventListener('change', updateVietQrExportLinks);
+        updateVietQrExportLinks();
       </script>
     </section>
 

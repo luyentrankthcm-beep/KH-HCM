@@ -27,6 +27,20 @@ const upload = multer({
   limits: { fileSize: 80 * 1024 * 1024 },
 });
 
+// Luyen, 2026-07-31: "mấy cái chỗ xuất ra chứng từ này nè từ ngày mấy tới
+// ngày mấy nhá" -- cac nut "Xuat Excel (dinh dang AMIS)" (Momo/VietQR/ZVP)
+// truoc day chi loc theo CA THANG (dropdown "Chon thang" tren trang xem);
+// them tuy chon loc chinh xac theo NGAY (tu ngay - den ngay) cho cac nut nay.
+// Mac dinh khi vao trang: tu = ngay dau, den = ngay cuoi cua thang dang chon,
+// de KHONG doi hanh vi xuat hien tai (van dung dung 1 thang) tru khi Luyen tu
+// tay sua lai 2 o ngay.
+function monthBounds(m) {
+  if (!m) return { first: "", last: "" };
+  const [y, mo] = m.split("-").map(Number);
+  const lastDay = new Date(y, mo, 0).getDate(); // ngay 0 cua thang sau = ngay cuoi thang nay
+  return { first: `${m}-01`, last: `${m}-${String(lastDay).padStart(2, "0")}` };
+}
+
 const MOMO_BANK_NAME = "BIDV123456"; // TK 8699123456, da co san trong he thong
 const MOMO_BANK_ACCOUNT = 8699123456;
 const MOMO_BANK_FULLNAME = "Ngân hàng TMCP Đầu tư và Phát triển Việt Nam";
@@ -486,6 +500,8 @@ router.get("/doi-soat/momo", (req, res) => {
     })
     .filter((r) => r.lines.length > 0);
 
+  const exportRange = monthBounds(selectedMonth);
+
   res.render("doisoat-momo", {
     userName: req.session.userName,
     bankLabel: momoCfg.label,
@@ -494,6 +510,8 @@ router.get("/doi-soat/momo", (req, res) => {
     reconciled,
     months,
     selectedMonth,
+    exportTuDefault: exportRange.first,
+    exportDenDefault: exportRange.last,
     gianMapping: store.gian_mapping,
     allCodes: Array.from(allCodes).sort(),
     invoiceDiemAlias: built.invoiceDiemAlias,
@@ -984,8 +1002,17 @@ router.get("/doi-soat/momo/export.xlsx", (req, res) => {
   // loc theo thang dang xem tren trang), nay xuat dung THEO THANG dang chon
   // (query "month", cung 1 dropdown voi trang xem) neu co chon; khong chon
   // thang nao ("Tat ca") thi van xuat het nhu cu.
+  //
+  // Luyen, 2026-07-31: "tu ngay may toi ngay may" -- them loc chinh xac theo
+  // ngay (query "tu"/"den", ISO yyyy-mm-dd) uu tien hon "month" neu co truyen
+  // vao; "month" van duoc giu de tuong thich nguoc voi link/bookmark cu.
   const monthFilter = req.query.month || "";
-  if (monthFilter) {
+  const tuFilter = req.query.tu || "";
+  const denFilter = req.query.den || "";
+  if (tuFilter || denFilter) {
+    if (tuFilter) reconciled = reconciled.filter((r) => r.settlementDate >= tuFilter);
+    if (denFilter) reconciled = reconciled.filter((r) => r.settlementDate <= denFilter);
+  } else if (monthFilter) {
     reconciled = reconciled.filter((r) => r.settlementDate.slice(0, 7) === monthFilter);
   }
 
@@ -1078,9 +1105,15 @@ router.get("/doi-soat/momo/export.xlsx", (req, res) => {
   // kenh la "- KL" (Khach Le), TK Co luon la 131 vi da co HD ro rang -- KHONG
   // an theo gian_hidden/SKIP nhu doanh thu Momo tong hop (khac ban chat: day
   // la tien co hoa don, khong phai cho "chua xuat MISA").
-  const klDeposits = (store.momo_kl_deposits || []).filter(
-    (d) => d.company === activeCompany && (!monthFilter || d.date.slice(0, 7) === monthFilter)
-  );
+  const klDeposits = (store.momo_kl_deposits || []).filter((d) => {
+    if (d.company !== activeCompany) return false;
+    if (tuFilter || denFilter) {
+      if (tuFilter && d.date < tuFilter) return false;
+      if (denFilter && d.date > denFilter) return false;
+      return true;
+    }
+    return !monthFilter || d.date.slice(0, 7) === monthFilter;
+  });
   klDeposits
     .sort((a, b) => (a.date > b.date ? 1 : a.date < b.date ? -1 : 0))
     .forEach((d) => {

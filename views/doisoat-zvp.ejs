@@ -507,21 +507,33 @@
       <h2>6. Xuất file MISA</h2>
       <p class="muted" style="margin-bottom:14px;">
         Các dòng đánh dấu "KH mới - chưa xuất MISA" bên dưới sẽ tự động bị loại khỏi 2 file xuất. Payoo được gộp
-        chung vào file OFFLINE (theo cách xử lý đơn giản như VNPay Offline). File xuất luôn gồm TOÀN BỘ các khoản
-        chưa xuất, không chỉ tháng đang lọc xem ở mục 7 bên dưới.
+        chung vào file OFFLINE (theo cách xử lý đơn giản như VNPay Offline). File xuất chỉ gồm các khoản có ngày về
+        ngân hàng nằm trong khoảng "Từ ngày - Đến ngày" bên dưới — để trống 1 trong 2 ô để xuất không giới hạn
+        đầu/cuối (mặc định = đúng tháng <strong><%= selectedMonth || 'đang chọn' %></strong> ở mục 7).
       </p>
-      <div class="form-inline" style="margin-bottom:14px;">
+      <div class="form-inline" style="margin-bottom:14px; flex-wrap:wrap; gap:10px;">
         <label style="margin:0;">Số chứng từ bắt đầu (NTTK...):</label>
         <input type="number" id="startNo" value="1" min="1" style="width:100px;" />
-        <a class="btn btn-secondary" id="exportOnlineBtn" href="/doi-soat/zvp/export-online.xlsx?start=1">Xuất MISATHuế (Online)</a>
-        <a class="btn btn-secondary" id="exportOfflineBtn" href="/doi-soat/zvp/export-offline.xlsx?start=1">Xuất MISAThue OFFLINE (Offline + Payoo)</a>
+        <label style="margin:0;">Từ ngày:</label>
+        <input type="date" id="exportTu" value="<%= exportTuDefault %>" style="width:150px;" />
+        <label style="margin:0;">Đến ngày:</label>
+        <input type="date" id="exportDen" value="<%= exportDenDefault %>" style="width:150px;" />
+        <a class="btn btn-secondary" id="exportOnlineBtn" href="#">Xuất MISATHuế (Online)</a>
+        <a class="btn btn-secondary" id="exportOfflineBtn" href="#">Xuất MISAThue OFFLINE (Offline + Payoo)</a>
       </div>
       <script>
-        document.getElementById('startNo').addEventListener('input', function() {
-          var v = this.value || 1;
-          document.getElementById('exportOnlineBtn').href = '/doi-soat/zvp/export-online.xlsx?start=' + v;
-          document.getElementById('exportOfflineBtn').href = '/doi-soat/zvp/export-offline.xlsx?start=' + v;
-        });
+        function updateZvpExportLinks() {
+          var v = document.getElementById('startNo').value || 1;
+          var tu = document.getElementById('exportTu').value || '';
+          var den = document.getElementById('exportDen').value || '';
+          var qs = '&tu=' + encodeURIComponent(tu) + '&den=' + encodeURIComponent(den);
+          document.getElementById('exportOnlineBtn').href = '/doi-soat/zvp/export-online.xlsx?start=' + v + qs;
+          document.getElementById('exportOfflineBtn').href = '/doi-soat/zvp/export-offline.xlsx?start=' + v + qs;
+        }
+        document.getElementById('startNo').addEventListener('input', updateZvpExportLinks);
+        document.getElementById('exportTu').addEventListener('change', updateZvpExportLinks);
+        document.getElementById('exportDen').addEventListener('change', updateZvpExportLinks);
+        updateZvpExportLinks();
       </script>
     </section>
 

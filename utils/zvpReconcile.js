@@ -2060,8 +2060,31 @@ function parseSharedInvoiceWorkbook(buffer, companyKey) {
   };
 }
 
+// Chi Nhan, 2026-07-31: "chỉnh lại cho tôi nhá đừng có sai lỗi đó nữa nhá
+// tránh trùng lập" -- phat hien 2 lan upload TRUNG (cung file, bam nham 2
+// lan cach nhau 1 giay) doi voi 1 file "gross theo ngay/gian" (VNPay/Zalo/
+// Payoo/VNPay KH Moi) lam so lieu 1 ngay bi ghi de sai (moi upload luon THANG
+// upload cu theo tung key ngay|gian). Ham dung chung nay so sanh NOI DUNG DA
+// TINH (grossByCode + netByCode) cua 1 lan upload moi voi TAT CA cac lan
+// upload da co san trong danh sach -- neu trung KHOP TUYET DOI voi bat ky lan
+// nao (bat ke ten file/thoi diem), coi la up trung, tu choi them ban ghi moi
+// de tranh de so lieu sai/trung mot lan nua. Dung deepEqualCanonical (sap
+// xep lai key) thay vi so sanh JSON.stringify truc tiep de khong bi false
+// negative do thu tu key khac nhau giua 2 lan parse.
+function canonicalJson(obj) {
+  const keys = Object.keys(obj || {}).sort();
+  return JSON.stringify(keys.map((k) => [k, obj[k]]));
+}
+
+function isDuplicateGrossUpload(existingUploads, grossByCode, netByCode) {
+  const g = canonicalJson(grossByCode);
+  const n = canonicalJson(netByCode);
+  return (existingUploads || []).some((u) => canonicalJson(u.grossByCode) === g && canonicalJson(u.netByCode) === n);
+}
+
 module.exports = {
   extractZvpSettlements,
+  isDuplicateGrossUpload,
   parseInvoiceWorkbookByTag,
   parseSharedInvoiceWorkbook,
   parseOfflineVnpayWorkbook,

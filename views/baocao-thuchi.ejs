@@ -118,17 +118,17 @@
         <div class="table-scroll">
           <table class="table">
             <thead>
-              <tr><th>Ngày</th><th class="num">Thu</th><th class="num">Chi</th><th>Diễn giải</th><th>Tên đối ứng</th><th class="num">Số dư</th></tr>
+              <tr><th>Ngày</th><th class="num">Thu</th><th class="num">Chi</th><th class="num">Số dư</th><th>Diễn giải</th><th>Tên đối ứng</th></tr>
             </thead>
             <tbody>
               <% tab.rows.forEach(function(r) { %>
               <tr class="<%= r.matched ? 'tx-matched' : '' %>">
                 <td><%= r.date %></td>
                 <td class="num"><%= r.type === 'thu' ? r.amount.toLocaleString('vi-VN') + ' đ' : '' %></td>
-                <td class="num"><%= r.type === 'chi' ? r.amount.toLocaleString('vi-VN') + ' đ' : '' %></td>
+                <td class="num" style="<%= r.type === 'chi' ? 'color:var(--color-danger);' : '' %>"><%= r.type === 'chi' ? r.amount.toLocaleString('vi-VN') + ' đ' : '' %></td>
+                <td class="num"><%= r.balance.toLocaleString('vi-VN') %> đ</td>
                 <td style="font-size:12px; max-width:360px; word-break:break-all;"><%= r.description %></td>
                 <td><%= r.tenDoiUng || '—' %></td>
-                <td class="num"><%= r.balance.toLocaleString('vi-VN') %> đ</td>
               </tr>
               <% }) %>
             </tbody>
@@ -156,7 +156,7 @@
       var rows = activePanel.querySelectorAll('tbody tr');
       rows.forEach(function (tr) {
         if (!q) { tr.style.display = ''; return; }
-        var text = (tr.cells[3].textContent + ' ' + tr.cells[4].textContent).toLowerCase();
+        var text = (tr.cells[4].textContent + ' ' + tr.cells[5].textContent).toLowerCase();
         tr.style.display = text.indexOf(q) !== -1 ? '' : 'none';
       });
     }

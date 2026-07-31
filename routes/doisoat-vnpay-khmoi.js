@@ -3,7 +3,14 @@ const multer = require("multer");
 const { load, save, nextId } = require("../store");
 const { requireLogin, requireAdmin, requireDataEntry } = require("../middleware/auth");
 const { parseVnpayPortalWorkbook, resolveGianGross, migrateVnpayKhMoiInvoices, normText } = require("../utils/vietqrReconcile");
-const { extractZvpSettlements, reconcileZvpChannel, parsePayooWorkbook, parsePayooRawReport, parseVnpayOfflineFeeReport } = require("../utils/zvpReconcile");
+const {
+  extractZvpSettlements,
+  reconcileZvpChannel,
+  parsePayooWorkbook,
+  parsePayooRawReport,
+  parseVnpayOfflineFeeReport,
+  isDuplicateGrossUpload,
+} = require("../utils/zvpReconcile");
 
 const router = express.Router();
 router.use(requireLogin);
@@ -356,6 +363,12 @@ router.post("/doi-soat/vnpay-khmoi/upload", requireDataEntry, upload.single("fil
     const dates = Array.from(new Set(parsed.rows.map((r) => r.date))).sort();
 
     if (!store.vnpay_khmoi_uploads) store.vnpay_khmoi_uploads = [];
+    // Chi Nhan, 2026-07-31: "đừng có sai lỗi đó nữa nhá tránh trùng lập" --
+    // chan up TRUNG (cung noi dung da tinh) de tranh lap lai vu KVC ROYAL
+    // 30/07 (up trung 1 file 2 lan -> so lieu 1 ngay bi ghi de sai).
+    if (isDuplicateGrossUpload(store.vnpay_khmoi_uploads, resolved.grossByCode, {})) {
+      throw new Error(`File "${req.file.originalname}" trùng hoàn toàn với 1 lần tải trước đó (cùng số liệu) — đã bỏ qua để tránh trùng lặp.`);
+    }
     store.vnpay_khmoi_uploads.push({
       id: nextId(store, "vnpay_khmoi_uploads_seq") || Date.now(),
       uploaded_at: new Date().toISOString(),
@@ -425,6 +438,9 @@ router.post("/doi-soat/vnpay-khmoi/upload-phi", requireDataEntry, upload.single(
     }
 
     if (!store.vnpay_khmoi_uploads) store.vnpay_khmoi_uploads = [];
+    if (isDuplicateGrossUpload(store.vnpay_khmoi_uploads, grossByCode, netByCode)) {
+      throw new Error(`File "${req.file.originalname}" trùng hoàn toàn với 1 lần tải trước đó (cùng số liệu) — đã bỏ qua để tránh trùng lặp.`);
+    }
     store.vnpay_khmoi_uploads.push({
       id: nextId(store, "vnpay_khmoi_uploads_seq") || Date.now(),
       uploaded_at: new Date().toISOString(),
@@ -484,6 +500,9 @@ router.post("/doi-soat/vnpay-khmoi/upload-payoo", requireDataEntry, upload.singl
     }
 
     if (!store.vnpay_khmoi_payoo_uploads) store.vnpay_khmoi_payoo_uploads = [];
+    if (isDuplicateGrossUpload(store.vnpay_khmoi_payoo_uploads, grossByCode, netByCode)) {
+      throw new Error(`File "${req.file.originalname}" trùng hoàn toàn với 1 lần tải trước đó (cùng số liệu) — đã bỏ qua để tránh trùng lặp.`);
+    }
     store.vnpay_khmoi_payoo_uploads.push({
       id: nextId(store, "vnpay_khmoi_payoo_uploads_seq") || Date.now(),
       uploaded_at: new Date().toISOString(),
@@ -527,6 +546,14 @@ router.post("/doi-soat/vnpay-khmoi/upload-payoo-raw", requireDataEntry, upload.s
     }
 
     if (!store.vnpay_khmoi_payoo_uploads) store.vnpay_khmoi_payoo_uploads = [];
+    // Chi Nhan, 2026-07-31: "đừng có sai lỗi đó nữa nhá tránh trùng lập" --
+    // day CHINH LA route gay ra vu KVC ROYAL 30/07 (up trung 1 file "[File
+    // thô] ...30072026-31072026.xlsx" 2 lan cach nhau 1 giay, lam gross ngay
+    // 30 bi ghi de tu 2.460.000d dung thanh 5.757.000d sai) -- chan up trung
+    // NOI DUNG tai day.
+    if (isDuplicateGrossUpload(store.vnpay_khmoi_payoo_uploads, grossByCode, netByCode)) {
+      throw new Error(`File "${req.file.originalname}" trùng hoàn toàn với 1 lần tải trước đó (cùng số liệu) — đã bỏ qua để tránh trùng lặp.`);
+    }
     store.vnpay_khmoi_payoo_uploads.push({
       id: nextId(store, "vnpay_khmoi_payoo_uploads_seq") || Date.now(),
       uploaded_at: new Date().toISOString(),
