@@ -208,6 +208,87 @@ function seedZvpInvoiceDiemAliasDefaults(store) {
   return changed;
 }
 
+// Luyen, 2026-07-31: "mã công trình Kh cũ đổi từ Nhà ma Go BÀ rịa thành AE GO
+// BA RIA KVC , FARM LOTTE PHAN THIET thành LM PHAN THIET KVC, KVC TIMES
+// thành Farm Times City đối với Kh cũ nhá" -- doi TEN CUOI CUNG (Ma cong
+// trinh) cho 3 gian KH Cu, ap dung NGUOC (retroactive) cho CA doanh thu da
+// resolve tu truoc (zvp_online/offline/payoo_uploads) lan hoa don da tai,
+// dung dung co che redirect da co san: them 1 hop redirect vao zvp_gian_list
+// (tenDiem = ma CU, dung nhu 1 "ten dien" duoc nhan dien, maCongTrinh = ma
+// MOI) -- xem applyGianRedirectToResolvedGross/applyGianRedirectToInvoices
+// trong utils/zvpReconcile.js, giong het cach da vá case "GHOST BRIDE MEGA DA
+// NANG" -> "GHOST BRIDE AE HUE" -> "AE HUE KVCN" truoc day (redirect nhieu
+// buoc, KHONG xoa dong goc trong zvp_gian_list vi dong goc van dung de nhan
+// dien tenDiem THAT tren hoa don/sheet gian). Kem theo don sach
+// invoice_diem_alias/zvp_gian_mapping/zvp_manual_matches dang tro vao ma CU
+// de khong bi mo coi/vong lap khong can thiet. Seed lai + ghi de MOI LAN
+// load() (giong moi hang so *_DEFAULTS khac trong file nay) de khong bi mat
+// khi server restart.
+const ZVP_GIAN_CODE_RENAMES = [
+  { from: "NHA MA GO BA RIA", to: "AE GO BA RIA KVC" },
+  { from: "FARM LOTTE PHAN THIET", to: "LM PHAN THIET KVC" },
+  { from: "KVC TIMES", to: "Farm Times City" },
+];
+
+function seedZvpGianCodeRenames(store) {
+  let changed = false;
+  if (!Array.isArray(store.zvp_gian_list)) store.zvp_gian_list = [];
+
+  ZVP_GIAN_CODE_RENAMES.forEach(({ from, to }) => {
+    // 1) Hop redirect chinh: ma CU (dung nhu 1 tenDiem) -> ma MOI.
+    const already = store.zvp_gian_list.some((g) => normText(g.tenDiem) === normText(from) && g.maCongTrinh === to);
+    if (!already) {
+      const oldEntry = store.zvp_gian_list.find((g) => g.maCongTrinh === from);
+      store.zvp_gian_list.push({ tenDiem: from, maCongTrinh: to, isCse: oldEntry ? !!oldEntry.isCse : false });
+      changed = true;
+    }
+
+    // 2) invoice_diem_alias dang tro thang vao ma CU -> tro thang sang ma
+    // MOI luon (tranh vong lap 2 buoc khong can thiet qua ma CU).
+    if (store.invoice_diem_alias) {
+      Object.keys(store.invoice_diem_alias).forEach((k) => {
+        if (store.invoice_diem_alias[k] === from) {
+          store.invoice_diem_alias[k] = to;
+          changed = true;
+        }
+      });
+    }
+
+    // 3) TK Co rieng cua trang ZVP (zvp_gian_mapping) -- giu nguyen TK Co da
+    // tung chon cho ma CU thay vi de ma MOI roi tu roi ve mac dinh 131.
+    if (store.zvp_gian_mapping && store.zvp_gian_mapping[from] !== undefined && store.zvp_gian_mapping[to] === undefined) {
+      store.zvp_gian_mapping[to] = store.zvp_gian_mapping[from];
+      changed = true;
+    }
+
+    // 4) Xac nhan thu cong "da co HD" (zvp_manual_matches, key "ngay|ma") --
+    // doi key sang ma MOI de khong bi mo coi.
+    if (store.zvp_manual_matches) {
+      ["online", "offline", "payoo"].forEach((ch) => {
+        const bucket = store.zvp_manual_matches[ch];
+        if (!bucket) return;
+        Object.keys(bucket).forEach((key) => {
+          const sep = key.indexOf("|");
+          if (sep < 0) return;
+          const date = key.slice(0, sep);
+          const code = key.slice(sep + 1);
+          const codeBase = code.endsWith("__FF") ? code.slice(0, -4) : code;
+          if (codeBase !== from) return;
+          const suffix = code.endsWith("__FF") ? "__FF" : "";
+          const newKey = date + "|" + to + suffix;
+          if (bucket[newKey] === undefined) {
+            bucket[newKey] = bucket[key];
+            delete bucket[key];
+            changed = true;
+          }
+        });
+      });
+    }
+  });
+
+  return changed;
+}
+
 // Chi Nhan, 2026-07-30: "sao ngân hàng trả ngày 16/07 á trả của ngày 15 á nó
 // có 19tr mấy sao bạn cộng lên mấy trăm triệu dữ vậy" -- khoan ve ngay 16/7
 // (doanh thu 15/7) kenh Offline (VNPay QR OFFLINE) hien Ngan hang 125.766.363d
@@ -254,6 +335,7 @@ function buildReconciliation(store) {
   if (ensureNo1388(store)) save(store);
   if (stripZvpGianListBadRedirects(store)) save(store);
   if (seedZvpInvoiceDiemAliasDefaults(store)) save(store);
+  if (seedZvpGianCodeRenames(store)) save(store);
   if (removeDuplicateOfflineTx20260716(store)) save(store);
   // Chi Nhan, 2026-07-29: xem ghi chu day du tai VNPAY_KHMOI_INVOICE_MADIEM_MAP
   // trong utils/vietqrReconcile.js -- hoa don KVC AE HUE/KVC TIMES/KVC ROYAL/
@@ -1427,9 +1509,15 @@ router.post("/doi-soat/zvp/manual-match/delete", requireAdmin, (req, res) => {
 // suffixKenh (Luyen, 2026-07-16): hau to phan biet kenh ngay tren Dien giai
 // cua file xuat Misa -- "VNP" cho Zalo App (Online) va VNPay offline, "PAYOO"
 // rieng cho Payoo (Momo dung "MM", Viet QR dung "QR" o 2 file route khac).
-// maDoiTuong (Luyen, 2026-07-20): "KL" (Khach le) mac dinh cho Zalo App/Payoo,
-// rieng kenh VNPay offline dung "VN PAY0102182292" -- xem 2 lan goi ham nay o
-// duoi (export-online/export-offline) de biet kenh nao truyen gi.
+// maDoiTuong (Luyen, 2026-07-20, cap nhat 2026-07-31: "mã đối tượng zalo app
+// với vn pay offline điều là này ... VN PAY0102182292 ... còn của Payoo là
+// DONGVIET0305458683"): Zalo App (Online) VA VNPay Offline dung CHUNG 1 ma
+// "VN PAY0102182292" (CTY CP GIAI PHAP THANH TOAN VIET NAM), rieng Payoo
+// dung "DONGVIET0305458683" (CTY CP DICH VU TRUC TUYEN CONG DONG...) --
+// KHONG con dung "KL" (Khach le) mac dinh cho 2 kenh nay nua. "Tên đối tượng"
+// van de trong ("") nhu truoc, de MISA tu tra theo Mã đối tượng trong danh
+// muc khach hang cua no. Xem 3 lan goi ham nay o duoi (export-online/
+// export-offline) de biet kenh nao truyen gi.
 function buildExportRows(reconciledList, startNo, lyDoThu, suffixKenh, maDoiTuong) {
   const doiTuong = maDoiTuong || "KL";
   let seq = startNo;
@@ -1514,7 +1602,7 @@ router.get("/doi-soat/zvp/export-online.xlsx", (req, res) => {
   // Luyen, 2026-07-21: "lý do thu là Thu tiền khách hàng (không theo hóa đơn)
   // đổi hết các file xuất misa nhá" -- dung 1 cau CO DINH giong het Momo, bo
   // cau rieng theo tung kenh nhu truoc.
-  const { rows } = buildExportRows(onlineForExport, startNo, "Thu tiền khách hàng (không theo hóa đơn)", "VNP");
+  const { rows } = buildExportRows(onlineForExport, startNo, "Thu tiền khách hàng (không theo hóa đơn)", "VNP", "VN PAY0102182292");
 
   const ws = XLSX.utils.json_to_sheet(rows);
   const wb2 = XLSX.utils.book_new();
@@ -1548,7 +1636,8 @@ router.get("/doi-soat/zvp/export-offline.xlsx", (req, res) => {
     filterByDateRange(built.reconciled.payoo, tuFilter, denFilter),
     offlinePart.nextSeq,
     "Thu tiền khách hàng (không theo hóa đơn)",
-    "PAYOO"
+    "PAYOO",
+    "DONGVIET0305458683"
   );
   const rows = [...offlinePart.rows, ...payooPart.rows];
 

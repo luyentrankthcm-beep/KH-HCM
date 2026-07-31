@@ -152,6 +152,19 @@ function emptyStore() {
     viet_qr_store_names: { bidv7704: {}, bidv77020: {}, mb11521268: {} }, // { "MA CUA HANG": { tenCuaHang, tenDiemBan, matchText } } from "Cua hang" sheet
     viet_qr_invoices: { bidv7704: [], bidv77020: [], mb11521268: [] }, // parsed invoice rows tagged per bank
     viet_qr_manual_matches: { bidv7704: {}, bidv77020: {}, mb11521268: {} },
+    // Luyen, 2026-07-31: "ngoài các giao dịch đối soát còn có doanh thu khách
+    // thu bằng tiền mặt cửa hàng trưởng sẽ thu về á rồi nộp sale bạn cộng vô
+    // ... mỗi gian điều có 1 mã nộp tiền á" -- bang tra "Ma noi dung nop
+    // tien" (ma cua hang truong ghi vao noi dung khi nop tien mat vao ngan
+    // hang) -> Ma cong trinh, hoc tu file upload (xem parseChtNopTienMasterSheet
+    // trong utils/zvpReconcile.js va route /bao-cao/xuat-hoa-don-ban-ra/
+    // upload-cht-nop-tien). Dung de nhan dien cac giao dich "thu" da co san
+    // trong store.transactions (sao ke chung, khong phai 1 kenh doi soat
+    // rieng) la tien nop tay cua cua hang truong, roi cong vao dong "CHT nộp
+    // tiền" trong bao cao Xuat Hoa Don Ban Ra. { "MA NOI DUNG NOP TIEN": {
+    // maCongTrinh, phapNhan, sheetName } }.
+    cht_nop_tien_map: {},
+    cht_nop_tien_uploads: [], // [{id, uploaded_at, file_name, sheetsParsed, rowCount}]
     seq: { users: 0, banks: 0, transactions: 0 },
   };
 }

@@ -17,14 +17,15 @@
     </p>
 
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+    <% if (success) { %><div class="alert alert-success"><%= success %></div><% } %>
 
     <section class="panel">
       <h2>Xuất file</h2>
       <p class="muted" style="margin-bottom:14px;">
         <% if (activeCompany === 'kh_cu') { %>
-        Sẽ gộp: Viet QR (BIDV 7704, BIDV 77020, MB 11521268) + Zalo app ACB31268 + VN Pay ACB31268 + Payoo ACB31268 + Momo BIDV123456.
+        Sẽ gộp: Viet QR (BIDV 7704, BIDV 77020, MB 11521268) + Zalo app ACB31268 + VN Pay ACB31268 + Payoo ACB31268 + Momo BIDV123456 + CHT nộp tiền.
         <% } else { %>
-        Sẽ gộp: Viet QR (BIDV 7702, BIDV 77021, MB 02865168, BIDV 8613600999) + VN Pay VTB982 + Payoo VTB982 + Momo BIDV7701.
+        Sẽ gộp: Viet QR (BIDV 7702, BIDV 77021, MB 02865168, BIDV 8613600999) + VN Pay VTB982 + Payoo VTB982 + Momo BIDV7701 + CHT nộp tiền.
         <% } %>
       </p>
       <div class="form-inline" style="margin-bottom:14px;">
@@ -62,6 +63,52 @@
         })();
       </script>
     </section>
+
+    <section class="panel">
+      <details>
+        <summary style="font-weight:700;color:#111;cursor:pointer;">
+          Bảng tra "Mã nội dung nộp tiền → Mã công trình" (CHT nộp tiền) -- đang có <%= chtMapCount %> mã
+        </summary>
+        <div style="margin-top:12px;">
+          <p class="muted">
+            Doanh thu tiền mặt cửa hàng trưởng thu rồi nộp lại ngân hàng -- mỗi gian có 1 mã nội dung nộp tiền riêng
+            (vd "KH989MTDMB0003") ghi trong nội dung chuyển khoản. Tải lên file có cột "Nội dung nộp tiền" và "Mã công
+            trình" (vd file KVC MB / KVC MN / MTD MB / MTD MN) để hệ thống tự nhận diện các giao dịch này trong sao kê
+            và cộng vào dòng "CHT nộp tiền" khi xuất hóa đơn. Có thể tải từng file một, lần tải sau không xóa mã đã có.
+          </p>
+          <form method="POST" action="/bao-cao/xuat-hoa-don-ban-ra/upload-cht-nop-tien" enctype="multipart/form-data" class="form-inline">
+            <input type="file" name="file" accept=".xlsx,.xls" required />
+            <button type="submit" class="btn btn-primary">Tải lên file mã nộp tiền</button>
+          </form>
+        </div>
+      </details>
+    </section>
+
+    <% if (chtUnmapped && chtUnmapped.length > 0) { %>
+    <section class="panel">
+      <div class="alert alert-error">
+        <strong>Cảnh báo:</strong> tìm thấy <%= chtUnmapped.length %> mã nội dung nộp tiền trong sao kê nhưng CHƯA có
+        trong bảng tra ở trên -- doanh thu của các mã này KHÔNG được cộng vào "CHT nộp tiền" cho tới khi tải lên file
+        có mã tương ứng.
+      </div>
+      <table class="table">
+        <thead>
+          <tr><th>Mã nội dung nộp tiền</th><th>Ngân hàng</th><th>Công ty</th><th>Số lần thấy</th><th>Lần gần nhất</th></tr>
+        </thead>
+        <tbody>
+          <% chtUnmapped.forEach(function(u) { %>
+          <tr>
+            <td><%= u.code %></td>
+            <td><%= u.bankName %></td>
+            <td><%= u.company === 'kh_cu' ? 'KH Cũ' : (u.company === 'kh_moi' ? 'KH Mới' : u.company) %></td>
+            <td><%= u.count %></td>
+            <td><%= u.lastDate %></td>
+          </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </section>
+    <% } %>
   </main>
 </body>
 </html>

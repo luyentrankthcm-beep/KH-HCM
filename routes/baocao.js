@@ -1,13 +1,19 @@
 const express = require("express");
+const multer = require("multer");
 const XLSX = require("xlsx");
-const { load } = require("../store");
-const { requireLogin } = require("../middleware/auth");
+const { load, save } = require("../store");
+const { requireLogin, requireDataEntry } = require("../middleware/auth");
 const momo = require("../utils/momoReconcile");
 const zvp = require("../utils/zvpReconcile");
 const vietqr = require("../utils/vietqrReconcile");
 const overviewAggregate = require("../utils/overviewAggregate");
 const { COMPANIES, getCompany } = require("../utils/companies");
 const { BANK_COMPANY } = require("../utils/bankCompany");
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 80 * 1024 * 1024 },
+});
 
 const router = express.Router();
 router.use(requireLogin);
@@ -708,6 +714,85 @@ const HOA_DON_BAN_RA_VIETQR_KEYS = {
   kh_cu: ["bidv7704", "bidv77020", "mb11521268"],
 };
 
+// Luyen, 2026-07-31: "ngoài các giao dịch đối soát còn có doanh thu khách
+// thu bằng tiền mặt cửa hàng trưởng sẽ thu về á rồi nộp sale bạn cộng vô
+// nếu hôm đó có tiền về nhá mỗi gian điều có 1 mã nộp tiền á" -- "Mã nội
+// dung nộp tiền" luon co dang <KH705|KH989><KVCMB|KVCMN|MTDMB|MTDMN><4 so>
+// (vd "KH989MTDMB0003") theo 4 file tham khao Luyen gui, nam san trong noi
+// dung giao dich cua store.transactions (sao ke ngan hang chung, KHONG phai
+// 1 kenh doi soat rieng -- an toan quet toan bo, khong trung voi Momo/ZVP/
+// VietQR vi cac kenh do dung bang upload rieng, khong dung store.transactions).
+const CHT_CODE_RE = /KH(?:705|989)(?:KVCMB|KVCMN|MTDMB|MTDMN)\d{3,4}/;
+
+function bankNameForId(store, bankId) {
+  const b = (store.banks || []).find((x) => x.id === bankId);
+  return b ? b.name : "";
+}
+
+// Luyen, 2026-07-31: BANK_COMPANY (utils/bankCompany.js) la danh sach VIET
+// TAY, thieu vai tai khoan tao SAU nay (vd VP58888, BIDV8681) du chinh ban
+// ghi ngan hang do (store.banks) DA CO SAN truong `company` dung (gan luc
+// tao/seed) -- neu chi dung BANK_COMPANY se bi tra ve "khong xac dinh cong
+// ty" cho cac tai khoan nay, khien doanh thu CHT nop tien cua chung khong
+// bao gio duoc cong vao ban xuat nao ca. Dung LAI companyOfBankRow (dinh
+// nghia o tren, cung ham dashboard.js/congno.js da dung on dinh) thay vi tu
+// viet lai -- da uu tien doc truong `company` truoc, fallback BANK_COMPANY.
+function companyForBankId(store, bankId) {
+  const b = (store.banks || []).find((x) => x.id === bankId);
+  return b ? companyOfBankRow(b) : null;
+}
+
+// Luyen, 2026-07-31: "nếu xuất đối soát ngày 30 mà ngày 31 xuất thì lấy 31
+// nếu giao dịch vô tiền trc lúc tôi xuất của ngày 31 thì cứ thêm vào cho lúc
+// tôi xuất của ngày 30 có của ngày 31 CHT nộp tiền đó ln" -- tien mat cua
+// hang truong thu trong ngay X thuong duoc mang di nop ngan hang vao SANG
+// HOM SAU (ngay X+1), giong het do tre T+1 da thay o Momo/ZVP settlement --
+// khac voi cac kenh do (co san truong `from`/`to` rieng cho tung dot), CHT
+// nop tien dung THANG giao dich ngan hang tho (khong co khai niem "dot"), nen
+// tu them 1 ngay "nhin truoc" (toDate + 1) khi loc, roi tinh het vao dung
+// khoang dang xuat (khong tach dong rieng theo ngay thuc nhan tien). CANH
+// BAO: neu Luyen xuat 2 lan CHONG NGAY (vd xuat rieng ngay 30 XONG ROI xuat
+// rieng ca ngay 31), giao dich CHT ngay 31 se bi tinh 2 LAN (1 lan qua do tre
+// cua ban ngay 30, 1 lan qua chinh ban than no o ban ngay 31) -- chi an toan
+// khi xuat TUNG khoang ngay KHONG CHONG LAP nhau.
+function addOneDay(dateStr) {
+  const d = new Date(dateStr + "T00:00:00Z");
+  d.setUTCDate(d.getUTCDate() + 1);
+  return d.toISOString().slice(0, 10);
+}
+
+// Quet TOAN BO store.transactions (giao dich "thu" trong khoang ngay), tim
+// giao dich nao co nhung 1 "Ma noi dung nop tien" trong mo ta -- cong ty xac
+// dinh qua CHINH tai khoan ngan hang nhan tien (BANK_COMPANY), KHONG doc cot
+// "Pháp nhân" cua file tham khao (tai khoan da lam dung viec nay on dinh cho
+// moi kenh khac trong file nay roi, tranh phai tin cay 1 nguon du lieu ngoai
+// them). Ma nao KHOP mau nhung CHUA co trong bang tra (store.cht_nop_tien_map)
+// duoc bao ve rieng (unmapped) thay vi bo qua doanh thu do trong im lang.
+function collectChtNopTienLines(store, company, fromDate, toDate) {
+  const lines = [];
+  const unmapped = new Map();
+  const toDatePlus1 = addOneDay(toDate);
+  (store.transactions || []).forEach((t) => {
+    if (t.type !== "thu") return;
+    if (!t.date || t.date < fromDate || t.date > toDatePlus1) return;
+    const desc = String(t.description || "").toUpperCase();
+    const match = desc.match(CHT_CODE_RE);
+    if (!match) return;
+    const code = match[0];
+    const txCompany = companyForBankId(store, t.bank_id);
+    if (txCompany !== company) return; // giao dich nay khong thuoc cong ty dang xuat
+    const mapped = (store.cht_nop_tien_map || {})[code];
+    if (!mapped || !mapped.maCongTrinh) {
+      if (!unmapped.has(code)) {
+        unmapped.set(code, { code, bankName: bankNameForId(store, t.bank_id), date: t.date, amount: t.amount, description: t.description });
+      }
+      return;
+    }
+    lines.push({ maCongTrinh: mapped.maCongTrinh, gross: t.amount });
+  });
+  return { lines, unmapped: Array.from(unmapped.values()) };
+}
+
 // Gop tat ca kenh doi soat cua 1 cong ty trong 1 khoang ngay thanh danh sach
 // { thuocDoiSoat, maCongTrinh, gross } DA CONG DON (khong con tach theo
 // ngay/thang nua) -- moi dong DUY NHAT 1 cap (thuocDoiSoat, maCongTrinh).
@@ -815,14 +900,88 @@ function buildHoaDonBanRaGroups(store, company, fromDate, toDate) {
     }
   }
 
-  return Array.from(groups.values())
+  // "CHT nộp tiền" -- tien mat cua hang truong thu roi nop lai ngan hang,
+  // ap dung cho CA 2 cong ty (moi cong ty co tai khoan nhan tien rieng cua
+  // no, xem BANK_COMPANY) -- Luyen xac nhan them 1 dong rieng ten "CHT nộp
+  // tiền" trong cot "Thuộc đối soát", giong cach dat ten "Viet QR <NH>"/
+  // "VN Pay <NH>" o tren.
+  const chtResult = collectChtNopTienLines(store, company, fromDate, toDate);
+  chtResult.lines.forEach((l) => addLine("CHT nộp tiền", l.maCongTrinh, l.gross));
+
+  const result = Array.from(groups.values())
     .filter((r) => r.gross !== 0)
     .sort((a, b) => a.thuocDoiSoat.localeCompare(b.thuocDoiSoat) || a.maCongTrinh.localeCompare(b.maCongTrinh));
+  result.chtUnmapped = chtResult.unmapped; // dinh kem canh bao (khong pha vo cac cho dang dung result nhu 1 mang thuong)
+  return result;
+}
+
+// Canh bao (khong phu thuoc khoang ngay) -- quet TOAN BO store.transactions
+// 1 lan cho ca 2 cong ty, liet ke moi "Ma noi dung nop tien" KHOP mau nhung
+// CHUA co trong bang tra, de Luyen thay ngay tren trang (khong can bam Xuat
+// file thu roi moi biet thieu mapping).
+function findAllUnmappedChtCodes(store) {
+  const byCode = new Map();
+  (store.transactions || []).forEach((t) => {
+    if (t.type !== "thu") return;
+    const desc = String(t.description || "").toUpperCase();
+    const match = desc.match(CHT_CODE_RE);
+    if (!match) return;
+    const code = match[0];
+    if ((store.cht_nop_tien_map || {})[code]) return; // da co mapping
+    const bankName = bankNameForId(store, t.bank_id);
+    if (!byCode.has(code)) {
+      byCode.set(code, { code, bankName, company: companyForBankId(store, t.bank_id) || "?", count: 0, lastDate: t.date });
+    }
+    const rec = byCode.get(code);
+    rec.count++;
+    if (t.date > rec.lastDate) rec.lastDate = t.date;
+  });
+  return Array.from(byCode.values()).sort((a, b) => a.code.localeCompare(b.code));
 }
 
 router.get("/bao-cao/xuat-hoa-don-ban-ra", (req, res) => {
+  const store = load();
   const activeCompany = getCompany(req);
-  res.render("baocao-hoadonbanra", { userName: req.session.userName, activeCompany, COMPANIES, error: req.query.error || null });
+  const chtMapCount = Object.keys(store.cht_nop_tien_map || {}).length;
+  const chtUnmapped = findAllUnmappedChtCodes(store);
+  res.render("baocao-hoadonbanra", {
+    userName: req.session.userName,
+    activeCompany,
+    COMPANIES,
+    error: req.query.error || null,
+    success: req.query.success || null,
+    chtMapCount,
+    chtUnmapped,
+  });
+});
+
+router.post("/bao-cao/xuat-hoa-don-ban-ra/upload-cht-nop-tien", requireDataEntry, upload.single("file"), (req, res) => {
+  const store = load();
+  try {
+    if (!req.file) throw new Error("Vui lòng chọn 1 file để tải lên.");
+    const { sheetsParsed, rows } = zvp.parseChtNopTienMasterSheet(req.file.buffer);
+    if (rows.length === 0) {
+      throw new Error(
+        'Không đọc được dòng nào -- cần sheet có cả cột "Nội dung nộp tiền" và "Mã công trình" (misa thuế).'
+      );
+    }
+    const { map, added, updated } = zvp.mergeChtNopTienMap(store.cht_nop_tien_map, rows);
+    store.cht_nop_tien_map = map;
+    store.cht_nop_tien_uploads.push({
+      id: (store.cht_nop_tien_uploads.length || 0) + 1,
+      uploaded_at: new Date().toISOString(),
+      file_name: req.file.originalname,
+      sheetsParsed,
+      rowCount: rows.length,
+    });
+    save(store);
+    const successMsg =
+      `Đã nạp file "${req.file.originalname}" (${sheetsParsed.map((s) => `${s.sheetName}: ${s.rows} dòng`).join(", ")}) -- ` +
+      `${added} mã mới, ${updated} mã cập nhật. Đang có ${Object.keys(store.cht_nop_tien_map).length} mã trong bảng tra.`;
+    res.redirect("/bao-cao/xuat-hoa-don-ban-ra?success=" + encodeURIComponent(successMsg));
+  } catch (e) {
+    res.redirect("/bao-cao/xuat-hoa-don-ban-ra?error=" + encodeURIComponent(e.message));
+  }
 });
 
 router.get("/bao-cao/xuat-hoa-don-ban-ra/xuat.xlsx", (req, res) => {

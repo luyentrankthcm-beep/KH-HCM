@@ -106,6 +106,27 @@ router.post("/banks/:id/mien", requireAdmin, (req, res) => {
   res.redirect("/banks");
 });
 
+// Luyen, 2026-07-31: "số dư làm gì có âm tài khoản á lấy số dư giống sao kê
+// nha thay đổi cái đầu kì đi" -- truoc gio "So du dau ky" chi dat duoc LUC
+// TAO MOI 1 ngan hang (POST /banks o tren), KHONG co cach nao sua lai sau do
+// neu ghi sai/can doi chieu lai voi sao ke that (vd VPBANK9997 dang de 0 hoac
+// sai, khien so du chay am khong thuc te) -- phai xoa han ngan hang do (mat
+// het lich su giao dich) roi tao lai moi sua duoc, qua nguy hiem. Them route
+// rieng sua THANG 2 truong nay (khong dung den xoa/tao lai), giong cach
+// /banks/:id/mien da lam.
+router.post("/banks/:id/so-du-dau-ky", requireAdmin, (req, res) => {
+  const store = load();
+  const id = Number(req.params.id);
+  const bank = store.banks.find((b) => b.id === id);
+  if (bank) {
+    const ob = parseFloat(req.body.opening_balance);
+    bank.opening_balance = isNaN(ob) ? bank.opening_balance : ob;
+    if (req.body.opening_date) bank.opening_date = req.body.opening_date;
+    save(store);
+  }
+  res.redirect("/banks");
+});
+
 router.post("/banks/:id/delete", requireAdmin, (req, res) => {
   const store = load();
   const id = Number(req.params.id);

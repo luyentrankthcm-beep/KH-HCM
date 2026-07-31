@@ -2082,9 +2082,96 @@ function isDuplicateGrossUpload(existingUploads, grossByCode, netByCode) {
   return (existingUploads || []).some((u) => canonicalJson(u.grossByCode) === g && canonicalJson(u.netByCode) === n);
 }
 
+// Luyen, 2026-07-31: "ngoài các giao dịch đối soát còn có doanh thu khách
+// thu bằng tiền mặt cửa hàng trưởng sẽ thu về á rồi nộp sale bạn cộng vô ...
+// mỗi gian điều có 1 mã nộp tiền á" -- moi gian co 1 "Ma noi dung nop tien"
+// rieng (vd "KH989KVCMB0001") ma cua hang truong ghi vao noi dung chuyen
+// khoan khi nop tien mat ve ngan hang -- ma nay da nam san trong
+// store.transactions (import tu sao ke ngan hang chung, khong phai 1 kenh
+// doi soat rieng) nhung KHONG co san mapping "ma -> ma cong trinh". Luyen
+// gui 4 file tham khao (KVC MB/MN, MTD MB/MN), moi file co THE co NHIEU
+// sheet (vd "KVC MB KH989" + "KVC MB KH705" trong cung 1 file) -- ham nay
+// quet TAT CA sheet trong file upload (khac voi parseGianMasterSheet/
+// parseOnlineProductMapSheet chi tim 1 sheet theo ten) vi khong the doan
+// truoc ten sheet, chi doan theo NOI DUNG cot. Sheet nao khong co du 2 cot
+// can thiet (vd sheet phu "DSNV dong BHXH") tu dong bi bo qua.
+function parseChtNopTienMasterSheet(buffer) {
+  const wbLite = XLSX.read(buffer, { type: "buffer", bookSheets: true });
+  const rows = [];
+  const sheetsParsed = [];
+  for (const sheetName of wbLite.SheetNames || []) {
+    const wb = XLSX.read(buffer, { type: "buffer", sheets: [sheetName] });
+    const ws = wb.Sheets[sheetName];
+    if (!ws) continue;
+    const grid = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: null });
+
+    let headerRowIdx = -1;
+    let noiDungCol = -1;
+    let maCongTrinhCol = -1;
+    let phapNhanCol = -1;
+    for (let r = 0; r < Math.min(grid.length, 10); r++) {
+      const row = grid[r] || [];
+      let nd = -1;
+      let mc = -1;
+      let pn = -1;
+      row.forEach((v, c) => {
+        if (!v || typeof v !== "string") return;
+        const s = normText(v);
+        if (nd === -1 && s.includes("noi dung nop tien")) nd = c;
+        if (mc === -1 && s.includes("ma cong trinh")) mc = c;
+        if (pn === -1 && s.includes("phap nhan")) pn = c;
+      });
+      if (nd !== -1 && mc !== -1) {
+        headerRowIdx = r;
+        noiDungCol = nd;
+        maCongTrinhCol = mc;
+        phapNhanCol = pn;
+        break;
+      }
+    }
+    if (headerRowIdx < 0) continue; // sheet nay khong co du 2 cot can thiet -- bo qua
+
+    let sheetRows = 0;
+    for (let r = headerRowIdx + 1; r < grid.length; r++) {
+      const row = grid[r] || [];
+      const noiDungNopTien = normCode(row[noiDungCol]);
+      const maCongTrinh = normCode(row[maCongTrinhCol]);
+      if (!noiDungNopTien || !maCongTrinh) continue;
+      const phapNhan = phapNhanCol >= 0 && row[phapNhanCol] ? String(row[phapNhanCol]).trim() : "";
+      rows.push({ sheetName, noiDungNopTien, maCongTrinh, phapNhan });
+      sheetRows++;
+    }
+    if (sheetRows > 0) sheetsParsed.push({ sheetName, rows: sheetRows });
+  }
+  return { sheetsParsed, rows };
+}
+
+// Gop rows moi vao store.cht_nop_tien_map (key = "Ma noi dung nop tien" da
+// chuan hoa qua normCode) -- GHI DE tren key trung (file/lan tai MOI HON
+// duoc coi la dung hon, giong quy uoc parseGianMasterSheet), KHONG XOA cac
+// key cu khong xuat hien trong lan tai nay (Luyen co the tai tung file 1,
+// khong nhat thiet tai du 4 file cung luc moi lan).
+function mergeChtNopTienMap(existingMap, rows) {
+  const map = Object.assign({}, existingMap || {});
+  let added = 0;
+  let updated = 0;
+  for (const r of rows || []) {
+    const cur = map[r.noiDungNopTien];
+    if (!cur) {
+      added++;
+    } else if (cur.maCongTrinh !== r.maCongTrinh) {
+      updated++;
+    }
+    map[r.noiDungNopTien] = { maCongTrinh: r.maCongTrinh, phapNhan: r.phapNhan, sheetName: r.sheetName };
+  }
+  return { map, added, updated };
+}
+
 module.exports = {
   extractZvpSettlements,
   isDuplicateGrossUpload,
+  parseChtNopTienMasterSheet,
+  mergeChtNopTienMap,
   parseInvoiceWorkbookByTag,
   parseSharedInvoiceWorkbook,
   parseOfflineVnpayWorkbook,

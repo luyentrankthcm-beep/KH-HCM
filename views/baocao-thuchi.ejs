@@ -122,8 +122,11 @@
             </thead>
             <tbody>
               <% tab.rows.forEach(function(r) { %>
-              <tr class="<%= r.matched ? 'tx-matched' : '' %>">
-                <td><%= r.date %></td>
+              <tr class="<%= r.matched ? 'tx-matched' : '' %>" data-type="<%= r.type %>" data-amount="<%= r.amount %>" data-date="<%= r.date %>">
+                <td>
+                  <button type="button" class="stmt-merge-btn" title="Gộp vào dòng phía trên (chỉ nhóm hiển thị, không đổi dữ liệu thật)" onclick="mergeStmtRowUp(this)">⇪</button>
+                  <%= r.date %>
+                </td>
                 <td class="num"><%= r.type === 'thu' ? r.amount.toLocaleString('vi-VN') + ' đ' : '' %></td>
                 <td class="num" style="<%= r.type === 'chi' ? 'color:var(--color-danger);' : '' %>"><%= r.type === 'chi' ? r.amount.toLocaleString('vi-VN') + ' đ' : '' %></td>
                 <td class="num"><%= r.balance.toLocaleString('vi-VN') %> đ</td>
@@ -155,11 +158,87 @@
       if (!activePanel) return;
       var rows = activePanel.querySelectorAll('tbody tr');
       rows.forEach(function (tr) {
-        if (!q) { tr.style.display = ''; return; }
+        if (!q) { tr.style.display = tr.dataset.stmtMerged === '1' ? 'none' : ''; return; }
         var text = (tr.cells[4].textContent + ' ' + tr.cells[5].textContent).toLowerCase();
-        tr.style.display = text.indexOf(q) !== -1 ? '' : 'none';
+        tr.style.display = text.indexOf(q) !== -1 && tr.dataset.stmtMerged !== '1' ? '' : 'none';
       });
     }
+
+    // Luyen, 2026-07-31: "có thể nhấn nút giữ để cộng 2 giao dịch lại với
+    // nhau" -- CHI gop HIEN THI (khong dung ho tro server/store.json gi ca),
+    // giup xem nhanh 2 dong cung ngay (vd 2 dong VNPay "DV QR OFFLINE"/"DV
+    // CTT" cung 1 ngay) cong lai bao nhieu ma khong can bam may tinh tay.
+    // Bam nut o dong duoi se gop vao dong PHIA TREN GAN NHAT dang hien (bo
+    // qua dong da an do gop truoc do), chi cho gop 2 dong CUNG loai (cung
+    // Thu hoac cung Chi). Dong da gop se AN di, dong con lai hien so da cong
+    // + 1 dong ghi chu nho co nut "Bo gop" de hoan tac -- KHONG luu lai qua
+    // lan tai trang (chi la cong cu xem nhanh tam thoi, dung y dinh).
+    function mergeStmtRowUp(btn) {
+      var row = btn.closest('tr');
+      var prev = row.previousElementSibling;
+      while (prev && prev.style.display === 'none') prev = prev.previousElementSibling;
+      if (!prev || prev.dataset.type === undefined) {
+        alert('Không có dòng phía trên (trong cùng ngân hàng) để gộp.');
+        return;
+      }
+      if (row.dataset.type !== prev.dataset.type) {
+        alert('Chỉ gộp được 2 dòng CÙNG LOẠI (cùng Thu hoặc cùng Chi) với nhau.');
+        return;
+      }
+      var amountCellIdx = row.dataset.type === 'thu' ? 1 : 2;
+      var rowAmount = parseFloat(row.dataset.amount);
+      var newAmount = parseFloat(prev.dataset.amount) + rowAmount;
+      prev.dataset.amount = String(newAmount);
+      prev.cells[amountCellIdx].textContent = newAmount.toLocaleString('vi-VN') + ' đ';
+
+      var dienGiaiCell = prev.cells[4];
+      var note = document.createElement('div');
+      note.className = 'muted stmt-merge-note';
+      note.style.cssText = 'font-size:11px; margin-top:4px; padding-top:4px; border-top:1px dashed var(--color-hairline);';
+      var descSnippet = row.cells[4] ? row.cells[4].textContent.trim().slice(0, 70) : '';
+      note.textContent = '+ Đã gộp ' + (row.dataset.date || '') + ': ' + descSnippet + ' (' + rowAmount.toLocaleString('vi-VN') + ' đ) ';
+      var undoBtn = document.createElement('button');
+      undoBtn.type = 'button';
+      undoBtn.textContent = '↩ Bỏ gộp';
+      undoBtn.className = 'stmt-merge-undo';
+      undoBtn.onclick = function () {
+        var restored = parseFloat(prev.dataset.amount) - rowAmount;
+        prev.dataset.amount = String(restored);
+        prev.cells[amountCellIdx].textContent = restored.toLocaleString('vi-VN') + ' đ';
+        note.remove();
+        row.style.display = '';
+        row.dataset.stmtMerged = '';
+      };
+      note.appendChild(undoBtn);
+      dienGiaiCell.appendChild(note);
+
+      row.dataset.stmtMerged = '1';
+      row.style.display = 'none';
+    }
   </script>
+  <style>
+    .stmt-merge-btn {
+      border: 1px solid var(--color-hairline);
+      background: #fff;
+      border-radius: 4px;
+      font-size: 11px;
+      line-height: 1;
+      padding: 2px 5px;
+      margin-right: 6px;
+      cursor: pointer;
+      color: var(--color-primary);
+    }
+    .stmt-merge-btn:hover { background: var(--color-primary-soft); }
+    .stmt-merge-undo {
+      border: none;
+      background: none;
+      color: var(--color-primary);
+      text-decoration: underline;
+      cursor: pointer;
+      font-size: 11px;
+      padding: 0;
+      margin-left: 4px;
+    }
+  </style>
 </body>
 </html>

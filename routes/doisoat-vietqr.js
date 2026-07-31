@@ -238,6 +238,11 @@ const GIAN_MERGE_DEFAULTS = {
   // trinh" cho ma cua hang MOI) thuc ra la CUNG 1 diem voi "LOTTE PHAN
   // THIET", khong phai gian rieng. Gop vinh vien vao "LOTTE PHAN THIET".
   "FARM LOTTE PHAN THIET": { maCongTrinh: "LOTTE PHAN THIET", isCse: false },
+  // Luyen, 2026-07-31: "tk 7704 đổi từ mã SB PHU QUOC PHCM qua đây cho tôi
+  // nhá CHKQT PHU QUOC" -- gop vinh vien (ca gross/QR lan hoa don) ve dung ma
+  // chuan da dung cho kenh mb11521268 ("CHKQT PHU QUOC", xem SÂN BAY PHÚ QUỐC
+  // trong INVOICE_DIEM_ALIAS_DEFAULTS o duoi).
+  "SB PHU QUOC PHCM": { maCongTrinh: "CHKQT PHU QUOC", isCse: false },
 };
 
 // Chi Nhan, 2026-07-29: "chia hóa đơn bị nhầm vô như 4 gian tôi nói á bị xuất

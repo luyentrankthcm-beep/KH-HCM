@@ -11,9 +11,27 @@ const {
   parseVnpayOfflineFeeReport,
   isDuplicateGrossUpload,
 } = require("../utils/zvpReconcile");
+const { getCompany } = require("../utils/companies");
 
 const router = express.Router();
 router.use(requireLogin);
+
+// Luyen, 2026-07-31: "payoo kh cũ và kh mới là khác nhau" -- trang nay
+// (VTB982) CHI danh cho KH Moi, KHONG lien quan KH Cu (Payoo/VNPay cua KH Cu
+// la kenh rieng ACB31268, xem routes/doisoat-zvp.js, gan voi gian khac hoan
+// toan -- vd "FUNZONE IPH KVCN" thay vi "KVC ROYAL"). Truoc day route nay
+// THIEU guard chan cong ty (khac voi doisoat-zvp.js da co guard nguoc lai
+// cho KH Moi) -- hau qua: nut chuyen cong ty CHUNG o goc tren (redirectTo =
+// trang hien tai) tu trang nay se quay LAI CHINH trang nay du da doi sang KH
+// Cu, hien lai Y HET du lieu KH Moi ("KVC ROYAL") lam tuong nham day la so
+// lieu cua KH Cu. Chan truy cap khi dang xem KH Cu, dieu huong ve trang chu,
+// giong het cach doisoat-zvp.js da lam cho chieu nguoc lai.
+router.use("/doi-soat/vnpay-khmoi", (req, res, next) => {
+  if (getCompany(req) === "kh_cu") {
+    return res.redirect("/");
+  }
+  next();
+});
 
 // Chi Nhan, 2026-07-29: "tôi nhầm rồi cái vn pay này trả vè ngân hàng VTB982
 // á đây á với payoo cx về đây á" -- doanh thu VNPay/Payoo cua "TUTU TRAIN"

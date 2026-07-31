@@ -86,7 +86,13 @@
                 </select>
               </form>
             </td>
-            <td><%= b.opening_balance.toLocaleString('vi-VN') %> đ</td>
+            <td>
+              <form method="POST" action="/banks/<%= b.id %>/so-du-dau-ky" class="form-inline" style="gap:4px; flex-wrap:nowrap;">
+                <input type="number" step="any" name="opening_balance" value="<%= b.opening_balance %>" style="width:130px;" title="Số dư đầu kỳ" />
+                <input type="date" name="opening_date" value="<%= b.opening_date %>" style="width:130px;" title="Ngày đầu kỳ" />
+                <button type="submit" class="btn btn-secondary" style="padding:3px 8px; font-size:12px;">Lưu</button>
+              </form>
+            </td>
             <td class="<%= b.balance < 0 ? 'text-neg' : '' %>"><%= b.balance.toLocaleString('vi-VN') %> đ</td>
             <td>
               <form method="POST" action="/banks/<%= b.id %>/delete" onsubmit="return confirm('Xoá ngân hàng này? Toàn bộ giao dịch liên quan cũng sẽ bị xoá.');">
