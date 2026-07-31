@@ -7,14 +7,18 @@
 <body>
   <%- include('partials/nav') %>
   <main class="container">
-    <h1>Tổng quan</h1>
+    <h1>Tổng quan — <%= COMPANIES[activeCompany].label %></h1>
+    <p class="muted" style="margin-top:-10px;margin-bottom:20px;">
+      <%= COMPANIES[activeCompany].fullName %>. Đổi công ty ở thanh trên để xem
+      <%= activeCompany === 'kh_cu' ? COMPANIES.kh_moi.label : COMPANIES.kh_cu.label %>.
+    </p>
 
     <% if (pwerror) { %><div class="alert alert-error"><%= pwerror %></div><% } %>
     <% if (pwsuccess) { %><div class="alert alert-success">Đổi mật khẩu thành công.</div><% } %>
 
     <section class="cards">
       <div class="card">
-        <div class="card-label">Tổng số dư tất cả ngân hàng</div>
+        <div class="card-label">Tổng số dư ngân hàng (<%= COMPANIES[activeCompany].shortLabel %>)</div>
         <div class="card-value"><%= totalBalance.toLocaleString('vi-VN') %> đ</div>
       </div>
       <div class="card card-thu">
@@ -24,6 +28,33 @@
       <div class="card card-chi">
         <div class="card-label">Chi tháng này</div>
         <div class="card-value"><%= monthSums.chi.toLocaleString('vi-VN') %> đ</div>
+      </div>
+    </section>
+
+    <section class="cards" style="align-items:stretch;">
+      <div class="panel" style="flex:1;min-width:300px;">
+        <div class="panel-head"><h2>Doanh thu Viet QR<% if (selectedGianMonth) { %> — <%= selectedGianMonth %><% } %></h2></div>
+        <% if (vietQrChannelSummary.length === 0) { %>
+        <p class="muted">Chưa có dữ liệu Viet QR tháng này.</p>
+        <% } else { %>
+        <div style="position:relative;height:220px;"><canvas id="chartVietQr"></canvas></div>
+        <% } %>
+      </div>
+      <div class="panel" style="flex:1;min-width:300px;">
+        <div class="panel-head"><h2>Chi phí nào nhiều — tháng <%= currentMonth %></h2></div>
+        <% if (chiPhiTheoLoai.length === 0) { %>
+        <p class="muted">Chưa có chi phí nào trong tháng này.</p>
+        <% } else { %>
+        <div style="position:relative;height:220px;"><canvas id="chartChiPhi"></canvas></div>
+        <% } %>
+      </div>
+      <div class="panel" style="flex:1;min-width:300px;">
+        <div class="panel-head"><h2>Top gian theo doanh thu<% if (selectedGianMonth) { %> — <%= selectedGianMonth %><% } %></h2></div>
+        <% if (topGian.length === 0) { %>
+        <p class="muted">Chưa có dữ liệu đối soát tháng này.</p>
+        <% } else { %>
+        <div style="position:relative;height:220px;"><canvas id="chartTopGian"></canvas></div>
+        <% } %>
       </div>
     </section>
 
@@ -121,7 +152,7 @@
     </section>
 
     <section class="panel">
-      <h2>Số dư theo từng ngân hàng</h2>
+      <h2>Số dư theo từng ngân hàng (<%= COMPANIES[activeCompany].shortLabel %>)</h2>
       <table class="table">
         <thead>
           <tr><th>Tên tài khoản</th><th>Khu vực</th><th>Ngân hàng</th><th>Số tài khoản</th><th>Số dư hiện tại</th></tr>
@@ -144,7 +175,7 @@
     </section>
 
     <section class="panel">
-      <h2>Thu / Chi 30 ngày gần nhất</h2>
+      <h2>Thu / Chi 30 ngày gần nhất (<%= COMPANIES[activeCompany].shortLabel %>)</h2>
       <canvas id="chartThuChi" height="90"></canvas>
     </section>
 
@@ -185,7 +216,27 @@
   </main>
 
   <script>
-    fetch('/api/summary?days=30')
+    // Chi Nhan, 2026-07-31: "trống không nè" -- neu 1 bieu do loi (vd du lieu
+    // bat ngo thieu truong) thi KHONG duoc lam sap luon 2 bieu do con lai (3
+    // IIFE nam chung 1 <script>, loi o 1 cai se chan het cac cau lenh sau no
+    // trong CUNG script neu khong bat loi) -- boc try/catch tung cai + bao
+    // ro rang neu chinh thu vien Chart.js khong tai duoc (vd mang bi chan).
+    function renderDashboardChart(elId, fn) {
+      var el = document.getElementById(elId);
+      if (!el) return;
+      if (typeof Chart === "undefined") {
+        el.parentElement.innerHTML = '<p class="muted">Không tải được thư viện biểu đồ (Chart.js) — kiểm tra lại kết nối mạng rồi bấm F5 tải lại trang.</p>';
+        return;
+      }
+      try {
+        fn(el);
+      } catch (e) {
+        console.error("Loi ve bieu do " + elId + ":", e);
+        el.parentElement.innerHTML = '<p class="muted">Có lỗi khi vẽ biểu đồ này — bấm F5 tải lại trang, nếu vẫn lỗi báo lại giúp.</p>';
+      }
+    }
+
+    fetch('/api/summary?days=30&company=<%= activeCompany %>')
       .then(r => r.json())
       .then(data => {
         const labels = data.map(d => d.date.slice(5));
@@ -206,6 +257,73 @@
           },
         });
       });
+
+    (function () {
+      var vietQr = <%- JSON.stringify(vietQrChannelSummary) %>;
+      if (vietQr.length === 0) return;
+      renderDashboardChart('chartVietQr', function (el) {
+        new Chart(el, {
+          type: 'bar',
+          data: {
+            labels: vietQr.map(function (s) { return s.channelLabel.replace('Viet QR ', ''); }),
+            datasets: [{ label: 'Doanh thu gộp', data: vietQr.map(function (s) { return s.totalGross; }), backgroundColor: '#1971c2' }],
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: { y: { beginAtZero: true, ticks: { callback: function (v) { return v.toLocaleString('vi-VN'); } } } },
+          },
+        });
+      });
+    })();
+
+    (function () {
+      // Chi Nhan, 2026-07-31: "muốn xem theo kiểu biểu đồ cột biểu đồ tròn" --
+      // doi panel nay sang bieu do TRON (ty le % chi phi theo loai de nhau
+      // hon), giu Viet QR/Top gian dang cot (hop voi xep hang hon).
+      var chiPhi = <%- JSON.stringify(chiPhiTheoLoai) %>;
+      if (chiPhi.length === 0) return;
+      var pieColors = ['#e8590c', '#1971c2', '#7048e8', '#2f9e44', '#e03131', '#f08c00', '#0c8599', '#9c36b5', '#495057'];
+      renderDashboardChart('chartChiPhi', function (el) {
+        new Chart(el, {
+          type: 'pie',
+          data: {
+            labels: chiPhi.map(function (r) { return r.loai; }),
+            datasets: [{ data: chiPhi.map(function (r) { return r.soTien; }), backgroundColor: chiPhi.map(function (_, i) { return pieColors[i % pieColors.length]; }), borderColor: '#fff', borderWidth: 2 }],
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } },
+              tooltip: { callbacks: { label: function (ctx) { return ctx.label + ': ' + (ctx.parsed || 0).toLocaleString('vi-VN') + ' đ'; } } },
+            },
+          },
+        });
+      });
+    })();
+
+    (function () {
+      var topGian = <%- JSON.stringify(topGian) %>;
+      if (topGian.length === 0) return;
+      renderDashboardChart('chartTopGian', function (el) {
+        new Chart(el, {
+          type: 'bar',
+          data: {
+            labels: topGian.map(function (r) { return r.gian; }),
+            datasets: [{ label: 'Doanh thu', data: topGian.map(function (r) { return r.gross; }), backgroundColor: '#7048e8' }],
+          },
+          options: {
+            indexAxis: 'y',
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: { x: { beginAtZero: true, ticks: { callback: function (v) { return v.toLocaleString('vi-VN'); } } } },
+          },
+        });
+      });
+    })();
   </script>
 </body>
 </html>

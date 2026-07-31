@@ -2,8 +2,8 @@ const express = require("express");
 const XLSX = require("xlsx");
 const multer = require("multer");
 const { load, save, nextId } = require("../store");
-const { requireLogin, requireAdmin } = require("../middleware/auth");
-const { getCompany } = require("../utils/companies");
+const { requireLogin, requireAdmin, requireDataEntry } = require("../middleware/auth");
+const { getCompany, COMPANIES } = require("../utils/companies");
 const { parseHopDongHcmWorkbook, isNccRow } = require("../utils/hopDongHcmParser");
 
 const router = express.Router();
@@ -19,6 +19,10 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 80 
 function ensureShape(store) {
   if (!store.phap_danh_hop_dong_thue) store.phap_danh_hop_dong_thue = [];
   if (!store.phap_danh_hop_dong_ncc) store.phap_danh_hop_dong_ncc = [];
+  // Chi Nhan, 2026-07-31: ghi chu tay cho trang "Doi soat doanh thu chia se
+  // theo thang" (xem route ben duoi) -- key la thang "YYYY-MM", value la
+  // chuoi ghi chu tu do Chi Nhan nhap, doc lap voi so lieu tu dong tinh.
+  if (!store.phap_danh_doanhthu_chiase_ghichu) store.phap_danh_doanhthu_chiase_ghichu = {};
   fillSnowAeBinhDuongFromContract(store);
 }
 
@@ -920,6 +924,78 @@ router.post("/phap-danh/hop-dong-ncc/:id/delete", requireAdmin, (req, res) => {
   store.phap_danh_hop_dong_ncc = store.phap_danh_hop_dong_ncc.filter((r) => String(r.id) !== req.params.id);
   save(store);
   res.redirect("/phap-danh/hop-dong-ncc?success=" + encodeURIComponent("Đã xóa hợp đồng."));
+});
+
+// Chi Nhan, 2026-07-31: "chõo pháp danh thêm 1 chõo lưu đối soát doanh thu chi
+// sẻ theo tháng cho tôi" -- hoi qua AskUserQuestion, Chi Nhan chon "Cả 2": (1)
+// bao cao TU DONG, (2) THEM 1 o ghi chu nhap tay rieng cho tung thang (luu
+// vao store, doc lap voi so tu dong).
+//
+// QUAN TRONG: ban dau dinh loc theo "TK Co = 1388" tren dong doi soat, nhung
+// Luyen da doi quy uoc nay tu 2026-07-17 ("đổi xuất ra 1388 thành 131 hết" --
+// xem utils/vietqrReconcile.js) nen KHONG CON dong doi soat nao mang TK Co
+// 1388 nua (da kiem tra thuc te: 0/4932 dong). "Doanh thu chia se" GIO CHI
+// con song qua co "doanhThuChiaSe"/dieuKhoanThanhToan tren TUNG HOP DONG THUE
+// GIAN (Phap danh, xem isDoanhThuChiaSeRecord) -- dung LAI chinh xac may nay
+// (giong cach routes/chi-phi.js computeTaiKhoanChiPhi dang lam cho Chi Phi),
+// loc cac dong doi soat theo GIAN thuoc 1 hop dong duoc danh dau nay, roi cong
+// theo thang.
+router.get("/phap-danh/doanh-thu-chia-se", (req, res) => {
+  const store = load();
+  ensureShape(store);
+  const { buildAllFlatLines } = require("../utils/overviewAggregate");
+  const { isDoanhThuChiaSeRecord, buildGianAliasIndex, findContractForGianText } = require("../utils/rentPaymentMatcher");
+
+  let rows = [];
+  let gianDoanhThuChiaSe = [];
+  try {
+    const gianList = store.phap_danh_hop_dong_thue || [];
+    const aliasIndex = buildGianAliasIndex(gianList);
+    gianDoanhThuChiaSe = gianList.filter(isDoanhThuChiaSeRecord);
+    const gianNameSet = new Set(gianDoanhThuChiaSe.map((r) => r.gian));
+
+    const flat = buildAllFlatLines(store).filter((l) => {
+      if (gianNameSet.has(l.gian)) return true;
+      const rec = findContractForGianText(l.gian, gianList, aliasIndex);
+      return rec && isDoanhThuChiaSeRecord(rec);
+    });
+
+    const byMonth = {};
+    flat.forEach((l) => {
+      const rec = gianNameSet.has(l.gian) ? gianList.find((r) => r.gian === l.gian) : findContractForGianText(l.gian, gianList, aliasIndex);
+      const company = (rec && rec.congTy) || "kh_cu";
+      if (!byMonth[l.month]) byMonth[l.month] = { month: l.month, kh_cu: 0, kh_moi: 0 };
+      byMonth[l.month][company] += l.gross;
+    });
+    rows = Object.values(byMonth).sort((a, b) => b.month.localeCompare(a.month));
+    rows.forEach((r) => {
+      r.ghiChu = store.phap_danh_doanhthu_chiase_ghichu[r.month] || "";
+      r.total = r.kh_cu + r.kh_moi;
+    });
+  } catch (e) {
+    console.error("Loi tong hop doanh thu chia se:", e);
+  }
+
+  res.render("phapdanh-doanhthuchiase", {
+    userName: req.session.userName,
+    COMPANIES,
+    rows,
+    gianDoanhThuChiaSe,
+    error: req.query.error || null,
+    success: req.query.success || null,
+  });
+});
+
+router.post("/phap-danh/doanh-thu-chia-se/ghi-chu", requireDataEntry, (req, res) => {
+  const store = load();
+  ensureShape(store);
+  const { thang, ghiChu } = req.body;
+  if (!thang) {
+    return res.redirect("/phap-danh/doanh-thu-chia-se?error=" + encodeURIComponent("Thiếu tháng."));
+  }
+  store.phap_danh_doanhthu_chiase_ghichu[thang] = (ghiChu || "").trim();
+  save(store);
+  res.redirect("/phap-danh/doanh-thu-chia-se?success=" + encodeURIComponent("Đã lưu ghi chú."));
 });
 
 module.exports = router;

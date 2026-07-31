@@ -37,6 +37,9 @@
   </form>
   <nav class="nav-links">
     <a href="/">Tổng quan</a>
+    <!-- Chi Nhan, 2026-07-30: "đổi chỗ báo cáo với ngân hàng" -- doi thu tu 2
+         muc nay tren thanh menu (Bao cao truoc, Ngan hang sau). -->
+    <a href="/bao-cao">Báo cáo</a>
     <!-- Luyen, 2026-07-19: "gộp lại thành 1 cái khung trên để là ngân hàng,
          nhấn vô hiện ra 1 list KH cũ KH mới" -- gop Giao dich/Sao ke, Ngan
          hang, va 3 trang Doi soat (Momo/ZVP/VietQR) vao 1 dropdown. 2 trang
@@ -64,12 +67,22 @@
         <form method="POST" action="/chon-cong-ty"><input type="hidden" name="company" value="kh_moi" /><input type="hidden" name="redirectTo" value="/doi-soat/chi-phi" /><button type="submit" class="nav-dropdown-item">Tài khoản Chi</button></form>
       </div>
     </div>
-    <a href="/bao-cao">Báo cáo</a>
     <!-- Luyen, 2026-07-19: tach "Cong no" thanh 2 trang rieng -- Cong No
          Khach Hang (trang cong-no cu, doi ten hien thi) va Cong No NCC
-         (moi, dua vao danh sach NCC + giao dich chi ben Doi soat Chi phi). -->
-    <a href="/cong-no/khach-hang">Công Nợ Khách Hàng</a>
-    <a href="/cong-no/ncc">Công Nợ NCC</a>
+         (moi, dua vao danh sach NCC + giao dich chi ben Doi soat Chi phi).
+         Chi Nhan, 2026-07-30: "công nợ khách hàng với công nợ ncc để 1 mục
+         công nợ sổ xuống cho tôi đi giống bên chi phí á" -- gop lai thanh 1
+         dropdown "Công Nợ" giong y het kieu Chi Phi/Phap danh o duoi, thay
+         vi 2 link doc rieng tren thanh menu. Duong dan/trang dich khong doi. -->
+    <div class="nav-dropdown" id="navDropdownCongNo">
+      <button type="button" class="nav-dropdown-toggle" onclick="toggleNavDropdown('navDropdownCongNo')">
+        Công Nợ <span class="caret">▾</span>
+      </button>
+      <div class="nav-dropdown-menu">
+        <a href="/cong-no/khach-hang">Công Nợ Khách Hàng</a>
+        <a href="/cong-no/ncc">Công Nợ NCC</a>
+      </div>
+    </div>
     <!-- Chi Nhan, 2026-07-28: "thêm cho tôi 1 trang hóa đơn đầu vào kh cũ và
          kh mới nhá nội dung tôi sẽ nối sao" -- trang moi, khung rong (giong
          tien le Phap danh) de Chi Nhan tu nhap tay, tach theo cong ty qua nut
@@ -110,6 +123,20 @@
       <div class="nav-dropdown-menu">
         <a href="/phap-danh/hop-dong-thue-gian-hang">Hợp Đồng Thuê Gian Hàng</a>
         <a href="/phap-danh/hop-dong-ncc">Hợp Đồng NCC</a>
+        <a href="/phap-danh/doanh-thu-chia-se">Đối Soát Doanh Thu Chia Sẻ</a>
+      </div>
+    </div>
+    <!-- Chi Nhan, 2026-07-31: "thêm 1 mục mới kế pháp danh là Tổng hợp cho
+         tôi sổ xuống sẽ có các mục nhỏ" -- muc dropdown moi, cung kieu
+         Chi Phi/Cong No/Phap danh o tren, 2 trang con: Luong (nhap tay) va
+         Theo Doi Dau Vao (bao cao hang hoa TK 156/242 tu Hoa Don Dau Vao). -->
+    <div class="nav-dropdown" id="navDropdownTongHop">
+      <button type="button" class="nav-dropdown-toggle" onclick="toggleNavDropdown('navDropdownTongHop')">
+        Tổng hợp <span class="caret">▾</span>
+      </button>
+      <div class="nav-dropdown-menu">
+        <a href="/tong-hop/luong">Lương</a>
+        <a href="/tong-hop/theo-doi-dau-vao">Theo Dõi Đầu Vào</a>
       </div>
     </div>
     <a href="/he-thong/sao-luu">Sao lưu</a>

@@ -16,15 +16,28 @@
 // line tagged with which channel/bank it came from + a "drill" URL back to
 // that channel's own detail page (pre-filtered to the same month) so a user
 // can click any dashboard number and land exactly on the rows behind it.
-function flattenChannel(reconciledDays, channelKey, channelLabel, drillUrlForMonth) {
+// `bankLabel`: ten TAI KHOAN NGAN HANG THUC (vd "ACB31268") -- khac voi
+// channelLabel co the la ten SAN PHAM/kenh (vd "Zalo Mini App (Online)")
+// trong khi 2-3 kenh cung don ve 1 tai khoan duy nhat. Them field nay de
+// trang Cong No co the nhom "theo tai khoan/ngan hang" (Chi Nhan yeu cau
+// 2026-07-30) ma khong lam mat granularity channelKey/channelLabel dang dung
+// cho drill-down.
+// `keepSkip`: mac dinh false (loai SKIP = "chua xuat MISA", dung cho hau het
+// kenh). Rieng Momo KH Moi (TK BIDV7701 rieng) dung TK Co = SKIP theo 1 nghia
+// KHAC HOAN TOAN -- co hieu "gian nay la cua KH Moi" (di san tu thoi KH Moi
+// chua co TK Momo rieng, xem routes/doisoat.js/ensureGianHidden) -- neu loai
+// SKIP nhu thuong thi TOAN BO du lieu Momo KH Moi bien mat (100% dong hien co
+// deu la SKIP). Truyen true cho dung 1 truong hop nay.
+function flattenChannel(reconciledDays, channelKey, channelLabel, drillUrlForMonth, bankLabel, keepSkip) {
   const out = [];
   (reconciledDays || []).forEach((day) => {
     const month = day.settlementDate.slice(0, 7);
     (day.lines || []).forEach((l) => {
-      if (l.tkCo === "SKIP") return; // KH moi chua len MISA -- khong tinh vao tong quan/cong no
+      if (l.tkCo === "SKIP" && !keepSkip) return; // chua xuat MISA -- khong tinh vao tong quan/cong no
       out.push({
         channelKey,
         channelLabel,
+        bankLabel: bankLabel || channelLabel,
         settlementDate: day.settlementDate,
         month,
         gian: l.maCongTrinh,
@@ -142,6 +155,7 @@ function buildAgingRows(flatLines, todayIso) {
     return {
       channelKey: l.channelKey,
       channelLabel: l.channelLabel,
+      bankLabel: l.bankLabel,
       settlementDate: l.settlementDate,
       gian: l.gian,
       status: l.invoiceNumbers.length === 0 ? "Chưa có HĐ" : "Lệch",
@@ -181,24 +195,44 @@ function buildAllFlatLines(store) {
   const momoRouter = require("../routes/doisoat");
   const zvpRouter = require("../routes/doisoat-zvp");
   const vietqrRouter = require("../routes/doisoat-vietqr");
+  const vnpayKhMoiRouter = require("../routes/doisoat-vnpay-khmoi");
 
   const flat = [];
 
-  const momoBuilt = momoRouter.buildMomoReconciliation(store);
+  const momoBuiltKhCu = momoRouter.buildMomoReconciliation(store, "kh_cu");
   flat.push(
-    ...flattenChannel(momoBuilt.reconciledAll, "momo", "Momo (BIDV123456)", (m) => `/doi-soat/momo?month=${m}`)
+    ...flattenChannel(momoBuiltKhCu.reconciledAll, "momo", "Momo (BIDV123456)", (m) => `/doi-soat/momo?month=${m}`, "BIDV123456")
+  );
+  // Chi Nhan, 2026-07-30: "chi tiết theo tài khoản cho tôi nhá các ngân hàng
+  // á" -- truoc gio trang Cong No CHUA HE co Momo KH Moi (BIDV7701) va
+  // VNPay/Payoo KH Moi (VTB982, ben duoi), lam thieu cong no thuc su cua cac
+  // TK nay. Them vao day, dung LAI cach xu ly SKIP dac biet cho Momo KH Moi
+  // da xac nhan o routes/baocao.js (keepSkip = true).
+  const momoBuiltKhMoi = momoRouter.buildMomoReconciliation(store, "kh_moi");
+  flat.push(
+    ...flattenChannel(momoBuiltKhMoi.reconciledAll, "momo_khmoi", "Momo (BIDV7701)", (m) => `/doi-soat/momo?month=${m}`, "BIDV7701", true)
   );
 
   const zvpBuilt = zvpRouter.buildZvpReconciliation(store);
   if (zvpBuilt && zvpBuilt.reconciled) {
     flat.push(
-      ...flattenChannel(zvpBuilt.reconciled.online, "zvp_online", "Zalo Mini App (Online)", (m) => `/doi-soat/zvp?month=${m}`)
+      ...flattenChannel(zvpBuilt.reconciled.online, "zvp_online", "Zalo Mini App (Online)", (m) => `/doi-soat/zvp?month=${m}`, "ACB31268")
     );
     flat.push(
-      ...flattenChannel(zvpBuilt.reconciled.offline, "zvp_offline", "VNPay thu hộ (Offline)", (m) => `/doi-soat/zvp?month=${m}`)
+      ...flattenChannel(zvpBuilt.reconciled.offline, "zvp_offline", "VNPay thu hộ (Offline)", (m) => `/doi-soat/zvp?month=${m}`, "ACB31268")
     );
     flat.push(
-      ...flattenChannel(zvpBuilt.reconciled.payoo, "zvp_payoo", "Payoo", (m) => `/doi-soat/zvp?month=${m}`)
+      ...flattenChannel(zvpBuilt.reconciled.payoo, "zvp_payoo", "Payoo", (m) => `/doi-soat/zvp?month=${m}`, "ACB31268")
+    );
+  }
+
+  const vnpayKhMoiBuilt = vnpayKhMoiRouter.buildReconciliation(store);
+  if (vnpayKhMoiBuilt && vnpayKhMoiBuilt.reconciled) {
+    flat.push(
+      ...flattenChannel(vnpayKhMoiBuilt.reconciled.offline, "vnpay_khmoi_offline", "VNPay (KH Mới)", (m) => `/doi-soat/vnpay-khmoi?month=${m}`, "VTB982")
+    );
+    flat.push(
+      ...flattenChannel(vnpayKhMoiBuilt.reconciled.payoo, "vnpay_khmoi_payoo", "Payoo (KH Mới)", (m) => `/doi-soat/vnpay-khmoi?month=${m}`, "VTB982")
     );
   }
 
@@ -207,7 +241,7 @@ function buildAllFlatLines(store) {
     if (built && built.reconciled) {
       const label = vietqrRouter.VIETQR_CHANNELS[chKey].label;
       flat.push(
-        ...flattenChannel(built.reconciled, `vietqr_${chKey}`, `Viet QR ${label}`, (m) => `/doi-soat/vietqr?channel=${chKey}&month=${m}`)
+        ...flattenChannel(built.reconciled, `vietqr_${chKey}`, `Viet QR ${label}`, (m) => `/doi-soat/vietqr?channel=${chKey}&month=${m}`, vietqrRouter.VIETQR_CHANNELS[chKey].bankName)
       );
     }
   });

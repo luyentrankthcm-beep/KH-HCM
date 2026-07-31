@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <%- include('partials/head') %>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+</head>
+<body>
+  <%- include('partials/nav') %>
+  <main class="container">
+    <h1>📦 Theo Dõi Đầu Vào (Hàng Hóa) — <%= COMPANIES[activeCompany].label %></h1>
+    <p class="muted" style="margin-top:-10px;margin-bottom:20px;">
+      Tổng hợp hàng hóa mua vào từ Hóa Đơn Đầu Vào, chỉ lấy các dòng gắn Tài khoản Nợ <strong>156</strong> (hàng hóa) và
+      <strong>242</strong> (chi phí trả trước/CCDC phân bổ). Đổi công ty ở thanh trên để xem
+      <%= activeCompany === 'kh_cu' ? COMPANIES.kh_moi.label : COMPANIES.kh_cu.label %>.
+    </p>
+
+    <section class="cards">
+      <div class="card">
+        <div class="card-label">TK 156 — Hàng hóa</div>
+        <div class="card-value"><%= tk156Total.toLocaleString('vi-VN') %> đ</div>
+      </div>
+      <div class="card">
+        <div class="card-label">TK 242 — Chi phí trả trước / CCDC</div>
+        <div class="card-value"><%= tk242Total.toLocaleString('vi-VN') %> đ</div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Theo hàng hóa<% if (thangFilter) { %> — tháng <%= thangFilter %><% } %></h2>
+        <% if (availableMonths.length > 0) { %>
+        <form method="GET" class="form-inline-tight">
+          <select name="thang" onchange="this.form.submit()">
+            <% availableMonths.forEach(function(m) { %>
+            <option value="<%= m %>" <%= m === thangFilter ? 'selected' : '' %>><%= m %></option>
+            <% }) %>
+            <option value="" <%= thangFilter === '' ? 'selected' : '' %>>Tất cả</option>
+          </select>
+        </form>
+        <% } %>
+      </div>
+      <% if (hangHoaRows.length === 0) { %>
+      <p class="muted">Chưa có hóa đơn đầu vào TK 156/242 nào cho tháng này.</p>
+      <% } else { %>
+      <div style="position:relative;height:280px;margin-bottom:16px;"><canvas id="chartHangHoa"></canvas></div>
+      <div class="table-scroll">
+        <table class="table">
+          <thead><tr><th>Tên hàng hóa</th><th>TK Nợ</th><th class="num">Số hóa đơn</th><th class="num">Tiền trước thuế</th></tr></thead>
+          <tbody>
+            <% hangHoaRows.forEach(function(r) { %>
+            <tr>
+              <td><%= r.tenHangHoa %></td>
+              <td><%= r.taiKhoanNo %></td>
+              <td class="num"><%= r.soHoaDon %></td>
+              <td class="num"><%= r.soTien.toLocaleString('vi-VN') %> đ</td>
+            </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+      <% } %>
+    </section>
+
+    <section class="panel">
+      <h2>Chi tiết hóa đơn</h2>
+      <div class="table-scroll">
+        <table class="table">
+          <thead><tr><th>Ngày HĐ</th><th>NCC</th><th>Số hóa đơn</th><th>Tên hàng hóa</th><th>TK Nợ</th><th class="num">Tiền trước thuế</th></tr></thead>
+          <tbody>
+            <% detailRows.forEach(function(r) { %>
+            <tr>
+              <td><%= r.ngayHD || '—' %></td>
+              <td><%= r.tenNCC || '—' %></td>
+              <td><%= r.soHoaDon || '—' %></td>
+              <td><%= r.tenHangHoaMisa || '—' %></td>
+              <td><%= r.taiKhoanNo %></td>
+              <td class="num"><%= (r.soTienTruocThue || 0).toLocaleString('vi-VN') %> đ</td>
+            </tr>
+            <% }) %>
+            <% if (detailRows.length === 0) { %>
+            <tr><td colspan="6" class="muted">Chưa có hóa đơn nào.</td></tr>
+            <% } %>
+          </tbody>
+        </table>
+      </div>
+      <p class="muted" style="margin-top:8px;">Muốn sửa dòng nào (tên hàng hóa, TK Nợ...), vào <a href="/hoa-don-dau-vao">Hóa Đơn Đầu Vào</a> để chỉnh trực tiếp.</p>
+    </section>
+  </main>
+  <script>
+    (function () {
+      var data = <%- JSON.stringify(hangHoaRows.slice(0, 10)) %>;
+      var el = document.getElementById('chartHangHoa');
+      if (el && data.length > 0) {
+        new Chart(el, {
+          type: 'bar',
+          data: {
+            labels: data.map(function (r) { return r.tenHangHoa; }),
+            datasets: [{ label: 'Tiền trước thuế', data: data.map(function (r) { return r.soTien; }), backgroundColor: '#2f9e44' }],
+          },
+          options: {
+            indexAxis: 'y',
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: { x: { beginAtZero: true, ticks: { callback: function (v) { return v.toLocaleString('vi-VN'); } } } },
+          },
+        });
+      }
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <%- include('partials/head') %>
+</head>
+<body>
+  <%- include('partials/nav') %>
+  <main class="container">
+    <h1>💰 Lương — <%= COMPANIES[activeCompany].label %></h1>
+    <p class="muted" style="margin-top:-10px;margin-bottom:20px;">
+      Sổ ghi lương nhân viên, nhập tay theo từng tháng. Đổi công ty ở thanh trên để xem
+      <%= activeCompany === 'kh_cu' ? COMPANIES.kh_moi.label : COMPANIES.kh_cu.label %>.
+    </p>
+
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+    <% if (success) { %><div class="alert alert-success"><%= success %></div><% } %>
+
+    <section class="panel">
+      <h2>Thêm lương mới (nhập tay)</h2>
+      <form method="POST" action="/tong-hop/luong" class="form-grid">
+        <label>Tháng <input type="month" name="thang" required value="<%= thangFilter %>" /></label>
+        <label>Họ tên <input type="text" name="hoTen" required /></label>
+        <label>Chức vụ <input type="text" name="chucVu" /></label>
+        <label>Gian/Bộ phận <input type="text" name="gian" /></label>
+        <label>Lương cơ bản <input type="text" name="luongCoBan" placeholder="vd 8000000" /></label>
+        <label>Phụ cấp <input type="text" name="phuCap" placeholder="vd 500000" /></label>
+        <label>Thưởng <input type="text" name="thuong" placeholder="vd 0" /></label>
+        <label>Khấu trừ <input type="text" name="khauTru" placeholder="vd BHXH, tạm ứng..." /></label>
+        <label style="grid-column: 1 / -1;">Ghi chú <input type="text" name="ghiChu" /></label>
+        <button type="submit" class="btn btn-primary">Lưu</button>
+      </form>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Danh sách lương (<%= rows.length %> người)</h2>
+        <% if (availableMonths.length > 0) { %>
+        <form method="GET" class="form-inline-tight">
+          <select name="thang" onchange="this.form.submit()">
+            <% availableMonths.forEach(function(m) { %>
+            <option value="<%= m %>" <%= m === thangFilter ? 'selected' : '' %>><%= m %></option>
+            <% }) %>
+            <option value="" <%= thangFilter === '' ? 'selected' : '' %>>Tất cả</option>
+          </select>
+          <a href="/tong-hop/luong/export.xlsx?thang=<%= encodeURIComponent(thangFilter) %>" class="btn btn-secondary">⬇ Xuất Excel</a>
+        </form>
+        <% } %>
+      </div>
+      <div class="table-scroll">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Họ tên</th>
+              <th>Chức vụ</th>
+              <th>Gian/Bộ phận</th>
+              <th class="num">Lương cơ bản</th>
+              <th class="num">Phụ cấp</th>
+              <th class="num">Thưởng</th>
+              <th class="num">Khấu trừ</th>
+              <th class="num">Thực nhận</th>
+              <th>Ghi chú</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <% rows.forEach(function(r) { %>
+            <tr>
+              <td><%= r.hoTen %></td>
+              <td><%= r.chucVu || '—' %></td>
+              <td><%= r.gian || '—' %></td>
+              <td class="num"><%= r.luongCoBan.toLocaleString('vi-VN') %> đ</td>
+              <td class="num"><%= r.phuCap.toLocaleString('vi-VN') %> đ</td>
+              <td class="num"><%= r.thuong.toLocaleString('vi-VN') %> đ</td>
+              <td class="num text-neg"><%= r.khauTru.toLocaleString('vi-VN') %> đ</td>
+              <td class="num" style="font-weight:600;"><%= r.thucNhan.toLocaleString('vi-VN') %> đ</td>
+              <td class="desc-cell" title="<%= r.ghiChu %>"><%= r.ghiChu || '—' %></td>
+              <td>
+                <form method="POST" action="/tong-hop/luong/<%= r.id %>/delete" onsubmit="return confirm('Xóa dòng lương của <%= r.hoTen %>?')" style="display:inline;">
+                  <button type="submit" class="link-btn">Xóa</button>
+                </form>
+              </td>
+            </tr>
+            <% }) %>
+            <% if (rows.length === 0) { %>
+            <tr><td colspan="10" class="muted">Chưa có dòng lương nào cho tháng này.</td></tr>
+            <% } %>
+          </tbody>
+          <tfoot>
+            <tr>
+              <td colspan="7" style="text-align:right;font-weight:600;">Tổng thực nhận</td>
+              <td class="num" style="font-weight:600;"><%= tongThucNhan.toLocaleString('vi-VN') %> đ</td>
+              <td colspan="2"></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

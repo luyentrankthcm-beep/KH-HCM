@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <%- include('partials/head') %>
+</head>
+<body>
+  <%- include('partials/nav') %>
+  <main class="container">
+    <h1>🧮 Tờ khai thuế GTGT (ước tính)</h1>
+    <p class="muted" style="margin-top:-10px;margin-bottom:6px;">
+      Thuế GTGT đầu ra (8% trên doanh thu gộp mọi đối soát trong tháng) trừ thuế GTGT đầu vào (cột "Tiền thuế" ở
+      Hóa Đơn Đầu Vào) = thuế phải nộp trong tháng — tính theo phương pháp khấu trừ, cho cả KH Cũ và KH Mới cùng lúc.
+    </p>
+    <p class="muted" style="margin-top:0;margin-bottom:20px;">
+      <strong>Lưu ý:</strong> đây là số ước tính dựa trên dữ liệu đã có trong app (có thể thiếu hóa đơn đầu vào chưa
+      nhập, hoặc doanh thu chưa chốt hết tháng) — không thay thế tờ khai chính thức nộp cơ quan thuế, chị vẫn cần đối
+      chiếu lại với kế toán/phần mềm hóa đơn trước khi nộp thật.
+    </p>
+
+    <form method="GET" class="form-inline-tight" style="margin-bottom:20px;">
+      <label style="margin:0;">Tháng:</label>
+      <input type="month" name="month" value="<%= selectedMonth %>" onchange="this.form.submit()" />
+    </form>
+
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+
+    <% if (data) { %>
+    <section class="cards" style="align-items:stretch;">
+      <% ['kh_cu', 'kh_moi'].forEach(function (companyKey) { %>
+      <% const d = data[companyKey]; %>
+      <div class="panel" style="flex:1;min-width:380px;">
+        <div class="panel-head"><h2><%= COMPANIES[companyKey].label %> — <%= COMPANIES[companyKey].fullName %></h2></div>
+        <% if (d.error) { %>
+        <p class="muted"><%= d.error %></p>
+        <% } else { %>
+        <table class="table">
+          <tbody>
+            <tr><td>Doanh thu gộp (đã gồm thuế, <%= d.soLuongDoiSoat %> dòng đối soát)</td><td class="num"><%= d.doanhThuGop.toLocaleString('vi-VN') %> đ</td></tr>
+            <tr><td>Doanh thu tính thuế (đã tách thuế)</td><td class="num"><%= d.doanhThuTinhThue.toLocaleString('vi-VN') %> đ</td></tr>
+            <tr><td><strong>Thuế GTGT đầu ra (<%= Math.round(vatRate * 100) %>%)</strong></td><td class="num"><strong><%= d.thueDauRa.toLocaleString('vi-VN') %> đ</strong></td></tr>
+            <tr><td colspan="2" style="border-bottom:2px solid var(--color-hairline);"></td></tr>
+            <tr><td>Tổng tiền mua vào (<%= d.soHoaDonDauVao %> hóa đơn đầu vào)</td><td class="num"><%= d.tongTienMuaVao.toLocaleString('vi-VN') %> đ</td></tr>
+            <tr><td><strong>Thuế GTGT đầu vào được khấu trừ</strong></td><td class="num"><strong><%= d.thueDauVao.toLocaleString('vi-VN') %> đ</strong></td></tr>
+          </tbody>
+          <tfoot>
+            <tr>
+              <td><%= d.thuePhaiNop >= 0 ? 'Thuế GTGT phải nộp' : 'Thuế GTGT còn được khấu trừ (chưa phải nộp)' %></td>
+              <td class="num">
+                <span class="badge <%= d.thuePhaiNop >= 0 ? 'badge-neg' : 'badge-thu' %>" style="font-size:14px;">
+                  <%= Math.abs(d.thuePhaiNop).toLocaleString('vi-VN') %> đ
+                </span>
+              </td>
+            </tr>
+          </tfoot>
+        </table>
+        <% } %>
+      </div>
+      <% }) %>
+    </section>
+    <% } %>
+  </main>
+</body>
+</html>

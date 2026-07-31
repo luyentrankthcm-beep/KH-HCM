@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <%- include('partials/head') %>
+</head>
+<body>
+  <%- include('partials/nav') %>
+  <main class="container">
+    <h1>🤝 Đối Soát Doanh Thu Chia Sẻ Theo Tháng</h1>
+    <p class="muted" style="margin-top:-10px;margin-bottom:10px;">
+      Tổng doanh thu đối soát (mọi kênh: Momo/Zalo/VNPay/Payoo/Viet QR) của các gian được đánh dấu
+      <strong>"doanh thu chia sẻ"</strong> ở Hợp Đồng Thuê Gian Hàng — số tự động tính lại mỗi lần xem, luôn khớp với các
+      trang đối soát gốc. Cột Ghi chú do chị tự nhập, lưu riêng theo tháng.
+    </p>
+    <p class="muted" style="margin-top:0;margin-bottom:20px;">
+      Đang tính theo <%= gianDoanhThuChiaSe.length %> gian: <%= gianDoanhThuChiaSe.map(function(g){ return g.gian; }).join(', ') %>.
+      Muốn thêm/bớt gian, vào <a href="/phap-danh/hop-dong-thue-gian-hang">Hợp Đồng Thuê Gian Hàng</a> tích/bỏ tích ô "doanh thu chia sẻ".
+    </p>
+
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+    <% if (success) { %><div class="alert alert-success"><%= success %></div><% } %>
+
+    <section class="panel">
+      <h2>Theo tháng</h2>
+      <div class="table-scroll">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Tháng</th>
+              <th class="num">KH Cũ</th>
+              <th class="num">KH Mới</th>
+              <th class="num">Tổng</th>
+              <th>Ghi chú</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <% rows.forEach(function(r) { %>
+            <tr>
+              <td><%= r.month %></td>
+              <td class="num"><%= r.kh_cu.toLocaleString('vi-VN') %> đ</td>
+              <td class="num"><%= r.kh_moi.toLocaleString('vi-VN') %> đ</td>
+              <td class="num" style="font-weight:600;"><%= r.total.toLocaleString('vi-VN') %> đ</td>
+              <td>
+                <form method="POST" action="/phap-danh/doanh-thu-chia-se/ghi-chu" class="form-inline-tight">
+                  <input type="hidden" name="thang" value="<%= r.month %>" />
+                  <input type="text" name="ghiChu" value="<%= r.ghiChu %>" placeholder="Ghi chú..." style="min-width:220px;" />
+                  <button type="submit" class="btn btn-secondary">Lưu</button>
+                </form>
+              </td>
+              <td></td>
+            </tr>
+            <% }) %>
+            <% if (rows.length === 0) { %>
+            <tr><td colspan="6" class="muted">Chưa có dòng đối soát nào gắn TK Có 1388.</td></tr>
+            <% } %>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

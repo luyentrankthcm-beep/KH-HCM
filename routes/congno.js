@@ -1,9 +1,41 @@
 const express = require("express");
 const multer = require("multer");
+const XLSX = require("xlsx");
 const { load, save, nextId } = require("../store");
 const { requireLogin, requireAdmin, requireDataEntry } = require("../middleware/auth");
 const { buildAllFlatLines, buildAgingRows } = require("../utils/overviewAggregate");
 const { parseMisaCongNoXlsx } = require("../utils/misaCongNo");
+const { COMPANIES, getCompany } = require("../utils/companies");
+const { BANK_COMPANY } = require("../utils/bankCompany");
+
+const COMPANY_LABEL_SHORT = { kh_cu: "KH Cũ", kh_moi: "KH Mới" };
+
+// Gop cac dong "chua khop" (aging.rows) lai THEO TAI KHOAN NGAN HANG THUC,
+// moi nhom giu nguyen danh sach dong + tong tien + link nhanh sang "Xuat Hoa
+// Don Ban Ra" cua dung cong ty do -- de Chi Nhan mo rong xem tung TK 1 thay
+// vi 1 bang dai lien tuc nhu truoc.
+function groupAgingByBank(rows) {
+  const map = new Map();
+  rows.forEach((r) => {
+    const bankLabel = r.bankLabel || r.channelLabel;
+    if (!map.has(bankLabel)) {
+      const company = BANK_COMPANY[bankLabel] || "kh_cu";
+      map.set(bankLabel, {
+        bankLabel,
+        company,
+        companyLabel: COMPANY_LABEL_SHORT[company],
+        rows: [],
+        total: 0,
+        count: 0,
+      });
+    }
+    const g = map.get(bankLabel);
+    g.rows.push(r);
+    g.total += r.amount;
+    g.count++;
+  });
+  return Array.from(map.values()).sort((a, b) => b.total - a.total);
+}
 
 const router = express.Router();
 router.use(requireLogin);
@@ -61,14 +93,34 @@ router.get("/cong-no/khach-hang", (req, res) => {
   const manualEntries = [...store.congno_manual_entries].sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
   const manualTotal = manualEntries.reduce((s, r) => s + r.amount, 0);
 
+  let months = [];
+  let selectedMonth = "";
+  // Chi Nhan, 2026-07-30: "kh cũ và kh mới là 2 công ty khác nhau á tách cho
+  // tôi khi chọn kh cũ hiển thị kh cũ còn khi chọn kh mới hiển thị kh mới" --
+  // truoc gio trang nay gop CHUNG ca 2 cong ty (khong loc theo nut Cu/Moi o
+  // topbar nhu Cong No NCC da lam), gay nham lan. Loc theo dung TAI KHOAN
+  // NGAN HANG thuoc activeCompany (BANK_COMPANY o tren) NGAY TU DAU, truoc ca
+  // buoc tinh thang/kenh/bucket, de TOAN BO trang (buckets, dropdown thang,
+  // dropdown kenh, tong tien...) deu chi phan anh dung 1 cong ty dang xem.
+  const activeCompany = getCompany(req);
   try {
-    const flat = buildAllFlatLines(store);
+    const flatAllCompanies = buildAllFlatLines(store);
+    const flat = flatAllCompanies.filter((l) => (BANK_COMPANY[l.bankLabel] || "kh_cu") === activeCompany);
     channelOptions = Array.from(
       new Map(flat.map((l) => [l.channelKey, l.channelLabel])).entries()
     ).map(([key, label]) => ({ key, label }));
 
+    // Chi Nhan, 2026-07-30: "đối soát tháng 7 cho tôi nhá" -- them bo loc
+    // THANG giong quy uoc cac trang doi soat khac (Momo/ZVP/VietQR), mac dinh
+    // chon thang GAN NHAT co du lieu (giong `months[0]` cua doisoat.js) de
+    // trang khong bi dai lien tuc tu thang 4 toi gio.
+    const monthSet = new Set(flat.map((l) => l.month));
+    months = Array.from(monthSet).sort().reverse();
+    selectedMonth = req.query.month !== undefined ? req.query.month : months[0] || "";
+    const monthFilteredFlat = selectedMonth ? flat.filter((l) => l.month === selectedMonth) : flat;
+
     const today = new Date().toISOString().slice(0, 10);
-    const fullAging = buildAgingRows(flat, today);
+    const fullAging = buildAgingRows(monthFilteredFlat, today);
 
     const selectedChannel = req.query.channel || "";
     const selectedBucket = req.query.bucket || "";
@@ -82,6 +134,7 @@ router.get("/cong-no/khach-hang", (req, res) => {
       grandTotal: rows.reduce((s, r) => s + r.amount, 0),
       selectedChannel,
       selectedBucket,
+      byBank: groupAgingByBank(rows),
     };
 
     // Tong "chua thu" theo tung gian (dung LAI dung so tu bang aging o tren,
@@ -121,8 +174,12 @@ router.get("/cong-no/khach-hang", (req, res) => {
 
   res.render("congno", {
     userName: req.session.userName,
+    activeCompany,
+    COMPANIES,
     aging,
     channelOptions,
+    months,
+    selectedMonth,
     error,
     success,
     manualEntries,
@@ -131,6 +188,65 @@ router.get("/cong-no/khach-hang", (req, res) => {
     misaComparison,
     misaCongTrinhOptions,
   });
+});
+
+// ---------- Xuat Excel "cong no theo doi tuong tung ngay" ----------
+// Chi Nhan, 2026-07-30, tra loi cau hoi lam ro: "đối tượng" = TUNG GIAN/MA
+// CONG TRINH (giong cach MISA goi 1 gian la 1 "doi tuong cong no" trong so
+// chi tiet cong no phai thu TK 131) -- "đối soát theo đối tượng rồi xuất ra
+// đối tượng từng ngày nữa" nghia la xuat 1 file Excel liet ke CHINH XAC cac
+// dong dang hien tren bang (aging.rows, sau khi loc theo kenh/bucket dang
+// chon), nhung SAP XEP lai theo Doi tuong (Gian) truoc, Ngay sau -- de doi
+// chieu tung doi tuong 1 qua tung ngay, giong cach nhin so sach MISA.
+router.get("/cong-no/khach-hang/export.xlsx", (req, res) => {
+  const store = load();
+  const activeCompany = getCompany(req);
+  try {
+    const flatAllCompanies = buildAllFlatLines(store);
+    const flat = flatAllCompanies.filter((l) => (BANK_COMPANY[l.bankLabel] || "kh_cu") === activeCompany);
+    const monthSet = new Set(flat.map((l) => l.month));
+    const months = Array.from(monthSet).sort().reverse();
+    const selectedMonth = req.query.month !== undefined ? req.query.month : months[0] || "";
+    const monthFilteredFlat = selectedMonth ? flat.filter((l) => l.month === selectedMonth) : flat;
+
+    const today = new Date().toISOString().slice(0, 10);
+    const fullAging = buildAgingRows(monthFilteredFlat, today);
+
+    const selectedChannel = req.query.channel || "";
+    const selectedBucket = req.query.bucket || "";
+    let rows = fullAging.rows;
+    if (selectedChannel) rows = rows.filter((r) => r.channelKey === selectedChannel);
+    if (selectedBucket) rows = rows.filter((r) => r.bucket === selectedBucket);
+
+    rows = rows.slice().sort((a, b) => {
+      const gianCmp = (a.gian || "").localeCompare(b.gian || "");
+      if (gianCmp !== 0) return gianCmp;
+      return (a.settlementDate || "").localeCompare(b.settlementDate || "");
+    });
+
+    const header = ["Đối tượng (Gian)", "Ngày", "Tài khoản ngân hàng", "Kênh", "Trạng thái", "Số ngày", "Số tiền", "HĐ liên quan"];
+    const dataRows = rows.map((r) => [
+      r.gian,
+      r.settlementDate,
+      r.bankLabel || r.channelLabel,
+      r.channelLabel,
+      r.status,
+      r.daysAged,
+      r.amount,
+      r.invoiceNumbers.length > 0 ? r.invoiceNumbers.join(", ") : "",
+    ]);
+    const aoa = [header, ...dataRows];
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+    const wb2 = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb2, ws, "Công nợ theo đối tượng");
+    const buf = XLSX.write(wb2, { type: "buffer", bookType: "xlsx" });
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    res.setHeader("Content-Disposition", `attachment; filename=CongNoTheoDoiTuong-${activeCompany}-${selectedMonth || "TatCa"}.xlsx`);
+    res.send(buf);
+  } catch (e) {
+    console.error("Loi xuat cong no theo doi tuong:", e);
+    res.status(400).send("Lỗi khi xuất file: " + e.message);
+  }
 });
 
 // ---------- Cong no nhap tay (da doi soat xong tu truoc, co so hoa don theo

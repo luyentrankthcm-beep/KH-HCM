@@ -6,10 +6,11 @@
 <body>
   <%- include('partials/nav') %>
   <main class="container">
-    <h1>Công Nợ Khách Hàng</h1>
+    <h1>Công Nợ Khách Hàng — <%= COMPANIES[activeCompany].label %></h1>
     <p class="muted" style="margin-top:-10px;margin-bottom:20px;">
-      Các dòng đối soát <strong>chưa có hóa đơn</strong> hoặc <strong>còn lệch</strong> trên mọi kênh
-      (Momo, Zalo/VNPay/Payoo, Viet QR), xếp theo số ngày kể từ ngày giao dịch.
+      Các dòng đối soát <strong>chưa có hóa đơn</strong> hoặc <strong>còn lệch</strong> trên mọi kênh của
+      <%= COMPANIES[activeCompany].label %> (Momo, Zalo/VNPay/Payoo, Viet QR), xếp theo số ngày kể từ ngày giao dịch.
+      Đổi nút "<%= activeCompany === 'kh_cu' ? 'Mới' : 'Cũ' %>" ở góc trên bên trái để xem công ty kia.
     </p>
 
     <% if (error) { %><div class="alert alert-error" id="autohide-error"><%= error %></div><% } %>
@@ -35,7 +36,7 @@
 
     <section class="cards">
       <% aging.buckets.forEach(function(b) { %>
-      <a href="/cong-no/khach-hang?bucket=<%= encodeURIComponent(b.bucket) %><%= aging.selectedChannel ? '&channel=' + encodeURIComponent(aging.selectedChannel) : '' %>"
+      <a href="/cong-no/khach-hang?bucket=<%= encodeURIComponent(b.bucket) %><%= aging.selectedChannel ? '&channel=' + encodeURIComponent(aging.selectedChannel) : '' %><%= selectedMonth ? '&month=' + encodeURIComponent(selectedMonth) : '' %>"
          class="card card-bucket <%= aging.selectedBucket === b.bucket ? 'card-bucket-active' : '' %>">
         <div class="card-label">Quá <%= b.bucket %> ngày</div>
         <div class="card-value"><%= b.total.toLocaleString('vi-VN') %> đ</div>
@@ -46,8 +47,14 @@
 
     <section class="panel">
       <div class="panel-head">
-        <h2>Danh sách chi tiết (<%= aging.rows.length %> dòng, tổng <%= aging.grandTotal.toLocaleString('vi-VN') %> đ)</h2>
+        <h2>Chi tiết theo tài khoản ngân hàng (<%= aging.rows.length %> dòng, tổng <%= aging.grandTotal.toLocaleString('vi-VN') %> đ)</h2>
         <form method="GET" class="form-inline-tight">
+          <select name="month" onchange="this.form.submit()">
+            <option value="">Tất cả tháng</option>
+            <% months.forEach(function(m) { %>
+            <option value="<%= m %>" <%= selectedMonth === m ? 'selected' : '' %>><%= m %></option>
+            <% }) %>
+          </select>
           <select name="channel" onchange="this.form.submit()">
             <option value="">Tất cả kênh</option>
             <% channelOptions.forEach(function(c) { %>
@@ -56,43 +63,95 @@
           </select>
           <% if (aging.selectedBucket) { %>
           <input type="hidden" name="bucket" value="<%= aging.selectedBucket %>" />
-          <span class="badge badge-warn">Lọc: quá <%= aging.selectedBucket %> ngày <a href="/cong-no/khach-hang<%= aging.selectedChannel ? '?channel=' + encodeURIComponent(aging.selectedChannel) : '' %>" style="color:inherit;margin-left:6px;">✕</a></span>
+          <span class="badge badge-warn">Lọc: quá <%= aging.selectedBucket %> ngày <a href="/cong-no/khach-hang?<%= selectedMonth ? 'month=' + encodeURIComponent(selectedMonth) + '&' : '' %><%= aging.selectedChannel ? 'channel=' + encodeURIComponent(aging.selectedChannel) : '' %>" style="color:inherit;margin-left:6px;">✕</a></span>
           <% } %>
         </form>
       </div>
-      <div class="table-scroll">
-        <table class="table">
-          <thead>
-            <tr>
-              <th>Kênh</th>
-              <th>Gian</th>
-              <th>Ngày</th>
-              <th>Số ngày</th>
-              <th>Trạng thái</th>
-              <th>Số tiền</th>
-              <th>HĐ liên quan</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            <% aging.rows.forEach(function(r) { %>
-            <tr>
-              <td><%= r.channelLabel %></td>
-              <td><%= r.gian %></td>
-              <td><%= r.settlementDate %></td>
-              <td class="num"><%= r.daysAged %></td>
-              <td><span class="badge <%= r.status === 'Lệch' ? 'badge-neg' : 'badge-warn' %>"><%= r.status %></span></td>
-              <td class="num"><%= r.amount.toLocaleString('vi-VN') %> đ</td>
-              <td><%= r.invoiceNumbers.length > 0 ? r.invoiceNumbers.join(', ') : '-' %></td>
-              <td><a href="<%= r.drillUrl %>" class="link-btn">Xem →</a></td>
-            </tr>
-            <% }) %>
-            <% if (aging.rows.length === 0) { %>
-            <tr><td colspan="8" class="muted">Không có dòng nào chưa khớp — mọi thứ đã đối soát xong.</td></tr>
-            <% } %>
-          </tbody>
-        </table>
+      <p class="muted" style="margin-top:-8px;">
+        Bấm vào 1 tài khoản để xem/ẩn ngay tại chỗ các dòng chưa khớp của tài khoản đó — không tải lại trang. Nút
+        "Xuất Hóa Đơn Bán Ra" mở đúng trang xuất hóa đơn, nhớ đổi nút "Cũ/Mới" ở góc trên bên trái đúng công ty của
+        tài khoản đó trước khi xuất.
+        <a href="/cong-no/khach-hang/export.xlsx?<%= selectedMonth ? 'month=' + encodeURIComponent(selectedMonth) + '&' : '' %><%= aging.selectedChannel ? 'channel=' + encodeURIComponent(aging.selectedChannel) + '&' : '' %><%= aging.selectedBucket ? 'bucket=' + encodeURIComponent(aging.selectedBucket) : '' %>" class="btn btn-secondary" style="margin-left:8px;">⬇ Xuất Excel theo đối tượng (gian) từng ngày</a>
+      </p>
+      <div class="bank-group-list">
+        <% aging.byBank.forEach(function (b, idx) { %>
+        <div class="bank-group <%= b.company %>">
+          <div class="bank-group-head" onclick="toggleBankDetail('bank-detail-<%= idx %>')">
+            <span class="bank-group-caret" id="bank-caret-<%= idx %>">▶</span>
+            <span class="bank-group-name"><%= b.bankLabel %></span>
+            <span class="bank-group-count muted"><%= b.count %> dòng chưa khớp</span>
+            <span class="bank-group-total"><%= b.total.toLocaleString('vi-VN') %> đ</span>
+            <a href="/bao-cao/xuat-hoa-don-ban-ra" class="btn btn-secondary" onclick="event.stopPropagation()">Xuất Hóa Đơn Bán Ra →</a>
+          </div>
+          <div class="bank-group-detail" id="bank-detail-<%= idx %>" style="display:none;">
+            <table class="table" style="margin:0;">
+              <thead>
+                <tr>
+                  <th>Kênh</th>
+                  <th>Gian</th>
+                  <th>Ngày</th>
+                  <th>Số ngày</th>
+                  <th>Trạng thái</th>
+                  <th>Số tiền</th>
+                  <th>HĐ liên quan</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                <% b.rows.forEach(function (r) { %>
+                <tr>
+                  <td><%= r.channelLabel %></td>
+                  <td><%= r.gian %></td>
+                  <td><%= r.settlementDate %></td>
+                  <td class="num"><%= r.daysAged %></td>
+                  <td><span class="badge <%= r.status === 'Lệch' ? 'badge-neg' : 'badge-warn' %>"><%= r.status %></span></td>
+                  <td class="num"><%= r.amount.toLocaleString('vi-VN') %> đ</td>
+                  <td><%= r.invoiceNumbers.length > 0 ? r.invoiceNumbers.join(', ') : '-' %></td>
+                  <td><a href="<%= r.drillUrl %>" class="link-btn">Xem →</a></td>
+                </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <% }) %>
+        <% if (aging.byBank.length === 0) { %>
+        <p class="muted">Không có dòng nào chưa khớp — mọi thứ đã đối soát xong.</p>
+        <% } %>
       </div>
+      <style>
+        .bank-group-list { display: flex; flex-direction: column; gap: 10px; }
+        .bank-group { border: 1px solid var(--color-hairline); border-radius: 12px; overflow: hidden; background: #fff; }
+        .bank-group.kh_moi { border-left: 4px solid #7c5cff; }
+        .bank-group.kh_cu { border-left: 4px solid #1aa3a3; }
+        .bank-group-head {
+          display: flex;
+          align-items: center;
+          gap: 14px;
+          padding: 14px 16px;
+          cursor: pointer;
+          transition: background 0.15s ease;
+        }
+        .bank-group-head:hover { background: var(--color-fog); }
+        .bank-group-caret { font-size: 12px; color: var(--color-graphite); width: 12px; }
+        .bank-group-name { font-weight: 700; font-size: 15px; min-width: 160px; }
+        .bank-group-count { font-size: 13px; }
+        .bank-group-total { font-weight: 700; font-size: 15px; margin-left: auto; font-variant-numeric: tabular-nums; }
+        .badge-co-cu { background: rgba(26, 163, 163, 0.12); color: #128080; }
+        .badge-co-moi { background: rgba(124, 92, 255, 0.12); color: #6540e6; }
+        .bank-group-detail { border-top: 1px solid var(--color-hairline); }
+        .bank-group-detail .table { font-size: 13px; }
+      </style>
+      <script>
+        function toggleBankDetail(id) {
+          var row = document.getElementById(id);
+          var caret = document.getElementById(id.replace('bank-detail-', 'bank-caret-'));
+          if (!row) return;
+          var isHidden = row.style.display === 'none' || !row.style.display;
+          row.style.display = isHidden ? 'block' : 'none';
+          if (caret) caret.textContent = isHidden ? '▼' : '▶';
+        }
+      </script>
     </section>
 
     <section class="panel">

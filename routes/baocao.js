@@ -821,4 +821,92 @@ router.get("/bao-cao/xuat-hoa-don-ban-ra/xuat.xlsx", (req, res) => {
   res.send(buf);
 });
 
+// ---------- 6) To khai thue GTGT (uoc tinh) theo cong ty ----------
+// Chi Nhan, 2026-07-30: "dưới kinh nghiệm kế toán 80 năm kế toán trưởng tôi
+// có đầu vào đầu ra rồi thêm cho tôi tờ khai thuế giá trị gia tăng đi nhá xem
+// số thuế phải nộp hay cần nộp là bao nhiêu ... 2 công ty cho tôi luôn nhá" --
+// bao cao MOI, tinh UOC TINH thue GTGT phai nop/duoc khau tru trong 1 thang,
+// theo dung phuong phap khau tru (Thue phai nop = Thue GTGT dau ra - Thue
+// GTGT dau vao duoc khau tru), cho CA 2 cong ty cung 1 luc (giong cach trang
+// "Trạng thái đối soát" da lam, 2 khung canh nhau).
+//
+// Dau ra: dung LAI CHINH XAC buildHoaDonBanRaGroups() o tren (da kiem chung
+// qua tinh nang "Xuất Hóa Đơn Bán Ra") de lay TONG DOANH THU GOP (da gom
+// thue) cua CA cong ty trong thang, roi tach thue 8% ra giong cong thuc dang
+// dung (Thanh tien = gross/1.08, Thue = gross - Thanh tien) -- dam bao KHONG
+// tinh sai lech so voi bao cao Xuat Hoa Don Ban Ra da co.
+// Dau vao: dung truc tiep store.hoa_don_dau_vao (routes/hoa-don-dau-vao.js),
+// cong don cot `tienThue` (thue GTGT tren hoa don mua vao, da co san tu luc
+// nhap/import) cho dung cong ty + dung thang.
+//
+// QUAN TRONG: day la SO UOC TINH tu du lieu app dang co (co the thieu hoa don
+// dau vao chua nhap, hoac doanh thu chua chot so het thang), KHONG thay the
+// to khai chinh thuc nop co quan thue -- Chi Nhan/ke toan van can doi chieu
+// lai truoc khi nop thuc te.
+function buildToKhaiThueGtgt(store, month) {
+  const fromDate = `${month}-01`;
+  const lastDay = new Date(Number(month.slice(0, 4)), Number(month.slice(5, 7)), 0).getDate();
+  const toDate = `${month}-${String(lastDay).padStart(2, "0")}`;
+
+  const result = {};
+  ["kh_cu", "kh_moi"].forEach((company) => {
+    let groups = [];
+    let error = null;
+    try {
+      groups = buildHoaDonBanRaGroups(store, company, fromDate, toDate);
+    } catch (e) {
+      error = e.message;
+    }
+    const doanhThuGop = groups.reduce((s, g) => s + g.gross, 0);
+    const doanhThuTinhThue = Math.round(doanhThuGop / (1 + HOA_DON_BAN_RA_VAT_RATE));
+    const thueDauRa = doanhThuGop - doanhThuTinhThue;
+
+    const hoaDonDauVaoRows = (store.hoa_don_dau_vao || []).filter(
+      (r) => r.congTy === company && (r.ngayHD || "").slice(0, 7) === month
+    );
+    const tongTienMuaVao = hoaDonDauVaoRows.reduce((s, r) => s + (r.soTien || 0), 0);
+    const thueDauVao = hoaDonDauVaoRows.reduce((s, r) => s + (r.tienThue || 0), 0);
+
+    const thuePhaiNop = thueDauRa - thueDauVao;
+
+    result[company] = {
+      error,
+      soLuongDoiSoat: groups.length,
+      doanhThuGop,
+      doanhThuTinhThue,
+      thueDauRa,
+      soHoaDonDauVao: hoaDonDauVaoRows.length,
+      tongTienMuaVao,
+      thueDauVao,
+      thuePhaiNop,
+    };
+  });
+  return result;
+}
+
+router.get("/bao-cao/to-khai-thue-gtgt", (req, res) => {
+  const store = load();
+  const today = new Date();
+  const defaultMonth = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}`;
+  const selectedMonth = /^\d{4}-\d{2}$/.test(req.query.month || "") ? req.query.month : defaultMonth;
+  let data = null;
+  let error = null;
+  try {
+    data = buildToKhaiThueGtgt(store, selectedMonth);
+  } catch (e) {
+    error = e.message;
+    console.error("Loi tinh to khai thue GTGT:", e);
+  }
+  res.render("baocao-tokhaigtgt", {
+    userName: req.session.userName,
+    COMPANIES,
+    selectedMonth,
+    data,
+    error,
+    vatRate: HOA_DON_BAN_RA_VAT_RATE,
+  });
+});
+
+router.buildHoaDonBanRaGroups = buildHoaDonBanRaGroups;
+
 module.exports = router;
