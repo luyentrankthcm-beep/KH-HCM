@@ -511,6 +511,15 @@ function parsePayooRawReport(buffer) {
         if (idx.dateCol === undefined && (s === "ngay giao dich" || s === "ngay thanh toan")) idx.dateCol = c;
         if (idx.invalidCol === undefined && s.includes("ly do gd khong hop le")) idx.invalidCol = c;
         if (idx.trangThaiCol === undefined && s === "trang thai") idx.trangThaiCol = c;
+        // Luyen, 2026-08-01: "tổng doanh thu trc khi trừ phí là 3.339.000₫ mà
+        // sao hiển thị số khác vậy payoo Kh mưới á" -- file Payoo co 1 muc
+        // "Loai tac nghiep" rieng ("Thanh toan" vs "Huy"), KHONG lien quan gi
+        // toi cot "Loai giao dich" (cot nay luon ghi "Ban hang" ke ca dong da
+        // Huy). Truoc gio parser khong doc cot nay nen 6 dong Huy (tien hoan
+        // lai) bi cong nham nhu doanh thu that, lam Doanh thu gop cao hon
+        // 2x tien Huy (18.180d) so voi bao cao Payoo that (3.375.360d thay vi
+        // 3.339.000d dung).
+        if (idx.tacNghiepCol === undefined && s.includes("loai tac nghiep")) idx.tacNghiepCol = c;
         if (idx.gianCol === undefined && s === "cua hang") idx.gianCol = c;
         if (idx.gianCol === undefined && s === "ten cua hang") idx.gianCol = c;
         if (idx.thamChieuCol === undefined && s.includes("so tham chieu")) idx.thamChieuCol = c;
@@ -548,13 +557,23 @@ function parsePayooRawReport(buffer) {
       }
       const gian = String(row[cols.gianCol] || "").trim();
       if (!gian) continue;
-      const gross = grossCol !== undefined ? Number(row[grossCol]) || 0 : 0;
+      let gross = grossCol !== undefined ? Number(row[grossCol]) || 0 : 0;
       if (!gross) continue;
       const dateRaw = cols.dateCol !== undefined ? row[cols.dateCol] : null;
       const date = toIsoDate(dateRaw);
       if (!date) continue;
-      const fee = cols.feeCol !== undefined ? Number(row[cols.feeCol]) || 0 : 0;
-      const net = cols.netCol !== undefined ? Number(row[cols.netCol]) || 0 : gross - fee;
+      let fee = cols.feeCol !== undefined ? Number(row[cols.feeCol]) || 0 : 0;
+      let net = cols.netCol !== undefined ? Number(row[cols.netCol]) || 0 : gross - fee;
+      // Dong "Huy" ghi so tien DUONG trong file goc (khong tu am), phai tru
+      // nguoc lai khoi doanh thu gop -- xem ghi chu o cho doc cot tacNghiepCol.
+      if (cols.tacNghiepCol !== undefined) {
+        const tacNghiep = normText(String(row[cols.tacNghiepCol] || ""));
+        if (tacNghiep.includes("huy")) {
+          gross = -gross;
+          fee = -fee;
+          net = -net;
+        }
+      }
 
       const thamChieu = cols.thamChieuCol !== undefined ? String(row[cols.thamChieuCol] || "").trim() : "";
       const dvtt = cols.dvttCol !== undefined ? String(row[cols.dvttCol] || "").trim() : "";
@@ -1585,7 +1604,14 @@ function reconcileZvpChannel(settlements, grossData, invoiceData, gianMapping, m
       for (const rawCode of grossData.codes) {
         const key = `${day}|${rawCode}`;
         const gross = grossData.grossByCode[key];
-        if (gross && gross > 0) {
+        // Luyen, 2026-08-01: truoc day gross luon >=0 (online/offline khong
+        // co khai niem "Huy") nen "gross > 0" chi la 1 cach viet khac cua
+        // "gross != 0". Tu khi Payoo co dong Huy tra ve gross AM (xem parser
+        // parsePayooRawReport), 1 (ngay|ma) co the gop lai ra so AM (vd chi
+        // co giao dich Huy, khong co Thanh toan cung ngay) -- neu van gioi
+        // han ">0" thi dong do BIEN MAT khoi bang doi soat thay vi hien -am,
+        // lam Doanh thu gop unn/Lech tinh thieu dung phan da Huy do.
+        if (gross) {
           const code = !rawCode.endsWith(FF_SUFFIX) && cseOverride.has(rawCode) ? rawCode + FF_SUFFIX : rawCode;
           if (!gianLines[code]) {
             gianLines[code] = { code, gross: 0, net: 0, invoices: new Set(), days: new Set() };

@@ -20,11 +20,17 @@ const { parseAmount } = require("./parse");
 //   cot G (6): "Tên đơn vị thụ hưởng" -- NCC
 //   cot J (9): "Ngân hàng" -- thuc te ghi "K VÀ H CŨ"/"K VÀ H MỚI" (cong ty)
 //
-// TT TIỀN MẶT la 1 tab RIÊNG, cau truc cot hoan toan khac (khong co ngay/NCC/
-// cong ty ro rang -- lan truoc phai mo tung link Drive/tra cuu hoa don bang
-// tay/OCR moi xac dinh duoc). KHONG tu dong parse tab nay o day (de tranh
-// nhap trung/sai du lieu da xu ly thu cong truoc do) -- chi bao cho Luyen biet
-// da bo qua tab nay.
+// Luyen, 2026-08-01: "gg sheet có chi phí mới ... cập nhật hết của tháng 7
+// cho tôi đi 2 sheet TT tiền mặt với lại Tháng 7 2026 á" -- mo truc tiep
+// Google Sheet (qua Claude in Chrome) de xem lai cau truc that cua tab "TT
+// TIỀN MẶT": KHONG co cot Ngay, KHONG co cot Ten NCC rieng -- chi co "Người
+// mua" (ten nguoi chi tien: THÁNG/SƠN/HIẾU...), "CƠ SỞ" (ten gian/hang muc
+// chi, vd "FZ ADV SC", "XĂNG XE 29D 550.88"), "Số tiền", "Link hóa đơn" (phai
+// mo tung link moi biet NCC/ngay hoa don that). Luyen xac nhan (2026-08-01):
+// "nhập phần biết được, còn không biết thì như cũ đưa lên trước đã" -- tu
+// dong nap SAN Nguoi mua/Co so/So tien/Link hoa don (dung lam Gian + Dien
+// giai, giong het quy uoc 105 dong da import bang tay truoc do), de TRONG
+// Ngay + NCC + So hoa don cho Luyen tu dien sau khi mo link (KHONG doan bua).
 
 function removeDiacritics(s) {
   return String(s)
@@ -193,14 +199,42 @@ function parseMonthSheet(ws, month, year) {
   return rows;
 }
 
+// Luyen, 2026-08-01: tab "TT TIỀN MẶT" -- header o dong 1 (BP | Người mua |
+// CƠ SỞ | CƠ SỞ | Số tiền | Link hóa đơn | TT), du lieu tu dong 2. KHONG co
+// cot Ngay/NCC rieng (xem ghi chu dau file) -- chi lay duoc Nguoi mua/Co so/
+// So tien/Link hoa don, de Ngay+NCC trong cho Luyen tu dien sau khi mo link.
+function parseTtTienMatSheet(ws) {
+  const grid = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: null });
+  const rows = [];
+  for (let r = 1; r < grid.length; r++) {
+    const row = grid[r] || [];
+    const nguoiMua = cellText(row[1]);
+    const coSo = cellText(row[2]) || cellText(row[3]);
+    const soTien = row[4];
+    const linkRawText = cellText(row[5]);
+    if (typeof soTien !== "number" || soTien === 0) continue;
+    if (!nguoiMua && !coSo) continue; // dong trong/tieu de phu
+    const linkHoaDon = /^(https?:|blob:)/i.test(linkRawText) ? linkRawText : "";
+    rows.push({ nguoiMua, coSo, soTien, linkHoaDon, linkRawText });
+  }
+  return rows;
+}
+
 // Doc toan bo workbook, tu do dò cac sheet "Thang N.YYYY" bang regex (khong
 // hardcode ten sheet) -- tra ve { monthRows: [{sheetName, month, year, rows}],
-// skippedSheets: [ten cac sheet khong khop pattern thang, vd "TT TIỀN MẶT"] }.
+// ttTienMatRows: [{nguoiMua, coSo, soTien, linkHoaDon, linkRawText}] (tab "TT
+// TIỀN MẶT", tach rieng vi cau truc cot khac han), skippedSheets: [ten cac
+// sheet khong khop ca 2 dang tren] }.
 function parseChiPhiSheetWorkbook(buffer) {
   const wb = XLSX.read(buffer, { type: "buffer" });
   const monthRows = [];
   const skippedSheets = [];
+  let ttTienMatRows = [];
   for (const sheetName of wb.SheetNames) {
+    if (removeDiacritics(sheetName).trim().toLowerCase() === "tt tien mat") {
+      ttTienMatRows = ttTienMatRows.concat(parseTtTienMatSheet(wb.Sheets[sheetName]));
+      continue;
+    }
     const m = sheetName.trim().match(MONTH_TAB_RE);
     if (!m) {
       skippedSheets.push(sheetName);
@@ -215,7 +249,7 @@ function parseChiPhiSheetWorkbook(buffer) {
     // truoc gio (khong khoang trang thua).
     monthRows.push({ sheetName: sheetName.trim(), month, year, rows });
   }
-  return { monthRows, skippedSheets };
+  return { monthRows, ttTienMatRows, skippedSheets };
 }
 
 // ---------- Parser cho file KVC MIEN BAC ("Tạo lệnh UNC KVC MB.xlsx") ----------
@@ -511,6 +545,7 @@ function parseKvcMienBacAutoWorkbook(buffer) {
 
 module.exports = {
   parseChiPhiSheetWorkbook,
+  parseTtTienMatSheet,
   parseKvcMienBacWorkbook,
   parseKvcMienBacAutoWorkbook,
   extractDate,

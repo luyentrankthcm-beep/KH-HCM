@@ -894,6 +894,15 @@ router.post("/hoa-don-dau-vao/cap-nhat-gian", requireDataEntry, async (req, res)
 // hoac Ten NCC. Chi BAT (true) cho hoa don MOI khop duoc, KHONG tu dong TAT
 // lai hoa don da duoc chi tu danh dau "Đã chi" tay truoc do (tranh xoa nham
 // xac nhan thu cong cua Chi Nhan).
+//
+// Luyen, 2026-08-01: "đối chiếu trực tiếp với ngân hàng cho tôi luôn á đối
+// chiếu tên ncc số tiền đồ cập nhật trực tiếp qua đây luôn á" -- doi UU TIEN:
+// truoc day doi chieu qua Chi Phi (3 kenh) TRUOC, chi khi KHONG khop moi thu
+// qua Ten doi ung tren sao ke ngan hang (foundInTx bi khoa boi "!foundInChiPhi").
+// Doi lai: doi chieu THANG voi sao ke ngan hang (MOI tai khoan cua cong ty,
+// khop Ten doi ung + So tien) la buoc CHINH, chay doc lap khong con phu
+// thuoc Chi Phi nua; Chi Phi (3 kenh) chi con la nguon DU PHONG cho cac
+// truong hop hiem sao ke chua co Ten doi ung nhung Chi Phi da ghi nhan.
 router.post("/hoa-don-dau-vao/cap-nhat-da-chi", requireDataEntry, (req, res) => {
   const store = load();
   ensureShape(store);
@@ -931,32 +940,36 @@ router.post("/hoa-don-dau-vao/cap-nhat-da-chi", requireDataEntry, (req, res) => 
     let matchedViaTx = 0;
     grouped.forEach((g) => {
       if (g.daChiTien) return; // da tu tay/lan truoc danh dau roi -- bo qua
-      const foundInChiPhi = chiLines.some((l) => {
-        if (Math.abs(l.debit - g.soTien) > 1000) return false;
-        const mstMatch = g.mstNCC && l.mstNCC && l.mstNCC === g.mstNCC;
-        const tenMatch =
-          g.tenNCC && (l.tenNCC || l.vendor) && normVN(l.tenNCC || l.vendor).includes(normVN(g.tenNCC).slice(0, 12));
-        return mstMatch || tenMatch;
-      });
+      // Buoc CHINH: doi chieu THANG voi sao ke ngan hang (Ten doi ung + So
+      // tien), doc lap khong con cho Chi Phi truoc nua.
       const foundInTx =
-        !foundInChiPhi &&
         g.tenNCC &&
         chiTx.some((t) => {
           if (Math.abs(t.amount - g.soTien) > 1000) return false;
           return normVN(t.tenDoiUng).includes(normVN(g.tenNCC).slice(0, 12));
         });
-      if (foundInChiPhi || foundInTx) {
+      // Du phong: chi kiem tra Chi Phi (3 kenh) khi ngan hang chua khop duoc.
+      const foundInChiPhi =
+        !foundInTx &&
+        chiLines.some((l) => {
+          if (Math.abs(l.debit - g.soTien) > 1000) return false;
+          const mstMatch = g.mstNCC && l.mstNCC && l.mstNCC === g.mstNCC;
+          const tenMatch =
+            g.tenNCC && (l.tenNCC || l.vendor) && normVN(l.tenNCC || l.vendor).includes(normVN(g.tenNCC).slice(0, 12));
+          return mstMatch || tenMatch;
+        });
+      if (foundInTx || foundInChiPhi) {
         const ids = g.idsCsv.split(",");
         store.hoa_don_dau_vao.forEach((r) => {
           if (ids.includes(String(r.id))) r.daChiTien = true;
         });
-        if (foundInChiPhi) matchedGroups++;
-        else matchedViaTx++;
+        if (foundInTx) matchedViaTx++;
+        else matchedGroups++;
       }
     });
     save(store);
-    let msg = `Đã đối chiếu với Chi Phí (${activeKeys.map((ch) => chiPhi.CHANNELS[ch].label).join(", ") || "chưa có kênh nào"}): đánh dấu "Đã chi" cho ${matchedGroups} hóa đơn.`;
-    if (matchedViaTx > 0) msg += ` Dò thêm qua Tên đối ứng trên sao kê ngân hàng: +${matchedViaTx} hóa đơn.`;
+    let msg = `Đã đối chiếu trực tiếp với ngân hàng (Tên đối ứng + Số tiền, mọi tài khoản của ${activeCompany === "kh_moi" ? "KH Mới" : "KH Cũ"}): đánh dấu "Đã chi" cho ${matchedViaTx} hóa đơn.`;
+    if (matchedGroups > 0) msg += ` Dò thêm qua Chi Phí (${activeKeys.map((ch) => chiPhi.CHANNELS[ch].label).join(", ") || "chưa có kênh nào"}): +${matchedGroups} hóa đơn.`;
     if (errors.length > 0) msg += ` (Lỗi: ${errors.join("; ")})`;
     res.redirect("/hoa-don-dau-vao?success=" + encodeURIComponent(msg));
   } catch (e) {

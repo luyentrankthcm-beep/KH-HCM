@@ -146,6 +146,20 @@ function findDuplicateGroups(store, bankId) {
   return dupGroups;
 }
 
+// Luyen, 2026-08-01: "cần để mốt tôi tải nhầm tôi có thể xóa á" -- danh sach
+// lich su tai sao ke (store.bank_statement_uploads) de hien tren trang, loc
+// theo ngan hang cua cong ty dang xem (giong cach banks/rows da loc), moi
+// nhat truoc. Dung chung cho MOI noi render view "transactions", giong
+// computeThuChiTotals o tren -- tranh crash "bankStatementUploads is not
+// defined" o 1 trong cac route neu quen truyen.
+function bankStatementUploadsFor(store, bankIds) {
+  return (store.bank_statement_uploads || [])
+    .filter((u) => bankIds.has(u.bank_id))
+    .slice()
+    .sort((a, b) => (a.uploaded_at < b.uploaded_at ? 1 : a.uploaded_at > b.uploaded_at ? -1 : 0))
+    .slice(0, 30);
+}
+
 function summarizeDuplicates(dupGroups) {
   let excessCount = 0;
   let excessAmount = 0;
@@ -198,6 +212,7 @@ router.get("/transactions", (req, res) => {
     maCongTrinhMaster: maCongTrinhMasterFor(store, activeCompany),
     maCongTrinhResult: null,
     duplicateSummary,
+    bankStatementUploads: bankStatementUploadsFor(store, companyBankIds(store, activeCompany)),
     error: req.query.error || null,
     success: req.query.success || null,
   });
@@ -301,6 +316,7 @@ router.post("/transactions/paste", requireDataEntry, (req, res) => {
       uploadResult: null,
       maCongTrinhMaster: maCongTrinhMasterFor(store, activeCompany),
       maCongTrinhResult: null,
+      bankStatementUploads: bankStatementUploadsFor(store, companyBankIds(store, activeCompany)),
       error: "Vui long chon ngan hang truoc khi dan sao ke.",
     });
   }
@@ -337,6 +353,7 @@ router.post("/transactions/paste", requireDataEntry, (req, res) => {
     uploadResult: null,
     maCongTrinhMaster: maCongTrinhMasterFor(store, activeCompany),
     maCongTrinhResult: null,
+    bankStatementUploads: bankStatementUploadsFor(store, companyBankIds(store, activeCompany)),
     error: null,
   });
 });
@@ -378,6 +395,7 @@ router.post("/transactions/upload-statement", requireDataEntry, upload.single("f
       uploadResult: null,
       maCongTrinhMaster: maCongTrinhMasterFor(store, activeCompany),
       maCongTrinhResult: null,
+      bankStatementUploads: bankStatementUploadsFor(store, companyBankIds(store, activeCompany)),
       error: message,
     });
   };
@@ -451,6 +469,7 @@ router.post("/transactions/upload-statement", requireDataEntry, upload.single("f
 
   let added = 0;
   let skipped = 0;
+  const insertedIds = [];
   // Chi Nhan, 2026-07-29: "tôi đã tải sao kê bên ngân hàng rồi ... sao lại
   // không có [Tên đối ứng]" -- tai khoan da co san du lieu TU TRUOC (luc
   // chua doc duoc cot Ten doi ung) se bi tinh la "trung" theo reference va bo
@@ -496,7 +515,28 @@ router.post("/transactions/upload-statement", requireDataEntry, upload.single("f
     };
     store.transactions.push(newRow);
     if (c.reference) existingByRef.set(c.reference, newRow);
+    insertedIds.push(newRow.id);
     added++;
+  }
+  // Luyen, 2026-08-01: "cần để mốt tôi tải nhầm tôi có thể xóa á" -- ghi lai
+  // DUNG cac id giao dich vua tao trong lan tai nay (khong phai cac dong da
+  // co san bi bo qua/backfill) de co the xoa nguyen 1 dot qua nut rieng neu
+  // phat hien tai nham file/nham ngan hang (xem vu MB02865168 nhan nham sao
+  // ke BIDV8681, 2026-08-01 -- luc do phai do tay id vi chua co so nay).
+  if (insertedIds.length > 0) {
+    if (!store.bank_statement_uploads) store.bank_statement_uploads = [];
+    store.bank_statement_uploads.push({
+      id: nextId(store, "bank_statement_uploads_seq") || Date.now(),
+      bank_id: bankIdNum,
+      bank_name: bank.name,
+      file_name: req.file.originalname,
+      sheetName: parsed.sheetName,
+      uploaded_at: new Date().toISOString(),
+      uploaded_by: req.session.userName || "",
+      transaction_ids: insertedIds,
+      rows_inserted: insertedIds.length,
+      rows_skipped: skipped,
+    });
   }
   if (added > 0 || healedRemoved > 0 || backfilledVendor > 0) save(store);
 
@@ -522,8 +562,36 @@ router.post("/transactions/upload-statement", requireDataEntry, upload.single("f
     },
     maCongTrinhMaster: maCongTrinhMasterFor(store, activeCompany),
     maCongTrinhResult: null,
+    bankStatementUploads: bankStatementUploadsFor(store, companyBankIds(store, activeCompany)),
     error: null,
   });
+});
+
+// Luyen, 2026-08-01: "cần để mốt tôi tải nhầm tôi có thể xóa á" -- xoa nguyen
+// 1 dot tai sao ke (dung DUNG cac giao dich do lan tai do tao ra, xem
+// transaction_ids da luu san o /transactions/upload-statement), khong dung
+// filter bank+ngay+loai chung (se dinh phai cac giao dich khac cung ngay,
+// giong vu MB02865168/BIDV8681). requireAdmin giong cac route xoa hang loat
+// khac trong file nay (khong the hoan tac).
+router.post("/transactions/upload-statement/:id/xoa", requireAdmin, (req, res) => {
+  const store = load();
+  const uploadId = Number(req.params.id);
+  const upload = (store.bank_statement_uploads || []).find((u) => u.id === uploadId);
+  if (!upload) {
+    return res.redirect("/transactions?error=" + encodeURIComponent("Khong tim thay lan tai nay (co the da bi xoa)."));
+  }
+  const idsToRemove = new Set(upload.transaction_ids || []);
+  const before = store.transactions.length;
+  store.transactions = store.transactions.filter((t) => !idsToRemove.has(t.id));
+  const removed = before - store.transactions.length;
+  store.bank_statement_uploads = store.bank_statement_uploads.filter((u) => u.id !== uploadId);
+  save(store);
+  res.redirect(
+    "/transactions?bank_id=" +
+      encodeURIComponent(upload.bank_id) +
+      "&success=" +
+      encodeURIComponent(`Da xoa ${removed} giao dich cua lan tai "${upload.file_name}".`)
+  );
 });
 
 // Chi Nhan, 2026-07-24: don giao dich TRUNG LAP cho 1 ngan hang (xem
@@ -632,6 +700,7 @@ router.post("/transactions/upload-ma-cong-trinh", requireDataEntry, upload.singl
       uploadResult: null,
       maCongTrinhMaster: maCongTrinhMasterFor(store, activeCompany),
       maCongTrinhResult,
+      bankStatementUploads: bankStatementUploadsFor(store, companyBankIds(store, activeCompany)),
       error: error || null,
     });
 

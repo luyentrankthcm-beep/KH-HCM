@@ -53,6 +53,38 @@
         <% } %>
       </div>
       <% } %>
+
+      <% var bsUploads = (typeof bankStatementUploads !== 'undefined' && bankStatementUploads) || []; %>
+      <details style="margin-top:10px;">
+        <summary class="muted" style="cursor:pointer;">
+          Lịch sử tải sao kê (<%= bsUploads.length %> lần gần đây — bấm để xem chi tiết, có thể xoá nếu lỡ tải nhầm)
+        </summary>
+        <table class="table" style="margin-top:10px;">
+          <thead><tr><th>Ngân hàng</th><th>File</th><th>Sheet</th><th>Thêm mới</th><th>Bỏ qua (trùng)</th><th>Lúc tải</th><th>Người tải</th><th></th></tr></thead>
+          <tbody>
+            <% bsUploads.forEach(function(u) { %>
+            <tr>
+              <td><%= u.bank_name %></td>
+              <td><%= u.file_name %></td>
+              <td><%= u.sheetName %></td>
+              <td><%= u.rows_inserted %></td>
+              <td><%= u.rows_skipped %></td>
+              <td><%= new Date(u.uploaded_at).toLocaleString('vi-VN') %></td>
+              <td><%= u.uploaded_by || '-' %></td>
+              <td>
+                <form method="POST" action="/transactions/upload-statement/<%= u.id %>/xoa"
+                      onsubmit="return confirm('Xoá toàn bộ ' + <%= u.rows_inserted %> + ' giao dịch vừa nạp từ file &quot;<%= u.file_name %>&quot;? Không ảnh hưởng các giao dịch khác cùng ngân hàng/ngày. Không thể hoàn tác.');">
+                  <button type="submit" class="link-btn link-danger">Xoá</button>
+                </form>
+              </td>
+            </tr>
+            <% }) %>
+            <% if (bsUploads.length === 0) { %>
+            <tr><td colspan="8" class="muted">Chưa có lịch sử tải sao kê nào.</td></tr>
+            <% } %>
+          </tbody>
+        </table>
+      </details>
     </section>
 
     <section class="panel">

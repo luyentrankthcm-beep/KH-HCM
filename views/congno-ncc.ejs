@@ -34,7 +34,71 @@
         <div class="card-label">Số hóa đơn chưa chi</div>
         <div class="card-value"><%= soHoaDonChuaChi %></div>
       </div>
+      <div class="card">
+        <div class="card-label">Chi rồi nhưng thiếu hóa đơn (<%= soLanMissingInvoice %> giao dịch)</div>
+        <div class="card-value text-neg"><%= grandTotalMissingInvoice.toLocaleString('vi-VN') %> đ</div>
+      </div>
     </section>
+
+    <% if (missingInvoiceSummary.length > 0) { %>
+    <section class="panel">
+      <div class="panel-head">
+        <h2>⚠ Giao dịch chi CHƯA có hóa đơn (<%= missingInvoiceSummary.length %> nhà cung cấp cần bổ sung)</h2>
+      </div>
+      <p class="muted">
+        Tiền đã chi thật ra khỏi 2 tài khoản Chi của <%= COMPANIES[activeCompany].label %> (khớp Tên đối ứng), nhưng
+        KHÔNG tìm thấy hóa đơn nào ở trang "Hóa Đơn Đầu Vào" khớp với khoản này -- có thể do quét Gmail lấy hóa đơn
+        hiện chưa dùng được (thiếu cấu hình Google OAuth trên Railway) nên chưa tự gắn được link hóa đơn. Đây KHÔNG
+        phải là còn nợ (tiền đã chi rồi), chỉ là còn thiếu hóa đơn giấy/PDF -- cần đi lấy bổ sung rồi nhập vào
+        "Hóa Đơn Đầu Vào". Tên NCC dưới đây lấy tạm theo "Tên đối ứng" trên sao kê, có thể chưa đúng chính xác tên
+        chính thức.
+      </p>
+      <div class="table-scroll">
+        <table class="table">
+          <thead>
+            <tr>
+              <th></th>
+              <th>Tên đối ứng (NCC tạm)</th>
+              <th>Số lần chi</th>
+              <th>Tổng tiền</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% missingInvoiceSummary.forEach(function (r, idx) { %>
+            <tr class="ncc-summary-row" style="cursor:pointer" onclick="toggleNccDetail('missing-detail-<%= idx %>')">
+              <td><span class="ncc-toggle-caret" id="missing-caret-<%= idx %>">▶</span></td>
+              <td><%= r.tenNCC %></td>
+              <td><%= r.soLan %></td>
+              <td class="text-neg"><%= r.tongSoTien.toLocaleString('vi-VN') %> đ</td>
+            </tr>
+            <tr class="ncc-detail-row" id="missing-detail-<%= idx %>" style="display:none;">
+              <td colspan="4" style="padding:0 0 14px 0; background:rgba(0,0,0,0.02);">
+                <table class="table" style="margin:0;">
+                  <thead>
+                    <tr>
+                      <th>Ngày chi</th>
+                      <th>Số tiền</th>
+                      <th>TK chi</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <% r.items.forEach(function (m) { %>
+                    <tr>
+                      <td><%= m.date %></td>
+                      <td><%= m.amount.toLocaleString('vi-VN') %> đ</td>
+                      <td><%= m.bankName %></td>
+                    </tr>
+                    <% }) %>
+                  </tbody>
+                </table>
+              </td>
+            </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </section>
+    <% } %>
 
     <section class="panel">
       <div class="panel-head">
@@ -116,7 +180,12 @@
       // rieng nhu truoc (gay cam giac "nhay len dau trang" moi lan bam).
       function toggleNccDetail(id) {
         var row = document.getElementById(id);
-        var caret = document.getElementById(id.replace('ncc-detail-', 'ncc-caret-'));
+        // Luyen, 2026-08-01: bang "Giao dịch chi CHƯA có hóa đơn" moi them
+        // dung tien to "missing-detail-"/"missing-caret-" (khac "ncc-detail-"
+        // /"ncc-caret-" cua bang NCC goc) de khong trung id -- ho tro ca 2
+        // tien to trong 1 ham dung chung, tranh phai copy nguyen ham cho bang moi.
+        var caretId = id.replace('ncc-detail-', 'ncc-caret-').replace('missing-detail-', 'missing-caret-');
+        var caret = document.getElementById(caretId);
         if (!row) return;
         var isHidden = row.style.display === 'none' || !row.style.display;
         row.style.display = isHidden ? 'table-row' : 'none';

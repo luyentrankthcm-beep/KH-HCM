@@ -165,6 +165,18 @@ function emptyStore() {
     // maCongTrinh, phapNhan, sheetName } }.
     cht_nop_tien_map: {},
     cht_nop_tien_uploads: [], // [{id, uploaded_at, file_name, sheetsParsed, rowCount}]
+    // Luyen, 2026-08-01: "cần để mốt tôi tải nhầm tôi có thể xóa á" -- muc
+    // "Tai file sao ke tai truc tiep tu ngan hang" (routes/transactions.js,
+    // POST /transactions/upload-statement) truoc gio nap giao dich THANG vao
+    // store.transactions, KHONG luu lai lich su tung lan tai (khac voi cac
+    // kenh Momo/ZVP/VietQR da co uploads rieng) -- neu tai nham file/nham
+    // ngan hang thi phai do tay tung dong de xoa (xem vu MB02865168 bi nap
+    // nham sao ke BIDV8681, 2026-08-01). Them so nay de moi lan tai luu lai
+    // DUNG cac id giao dich vua tao ra, cho phep xoa nguyen 1 dot bang 1 nut
+    // bam thay vi do tay. [{ id, bank_id, bank_name, file_name, sheetName,
+    // uploaded_at, uploaded_by, transaction_ids: [...], rows_inserted,
+    // rows_skipped }]
+    bank_statement_uploads: [],
     seq: { users: 0, banks: 0, transactions: 0 },
   };
 }
@@ -371,6 +383,247 @@ function fixDuplicateBidv8681BankId(store) {
   return true;
 }
 
+const SEED_CHT_NOP_TIEN_ROWS = [
+  {"noiDungNopTien":"KH989KVCMB0001","maCongTrinh":"AM LBIEN KVCN","phapNhan":"KH cũ","sheetName":"KVC MB KH989"},
+  {"noiDungNopTien":"KH989KVCMB0002","maCongTrinh":"AM HP KVCN","phapNhan":"KH cũ","sheetName":"KVC MB KH989"},
+  {"noiDungNopTien":"KH989KVCMB0003","maCongTrinh":"LOTTE LPH KVCN","phapNhan":"KH cũ","sheetName":"KVC MB KH989"},
+  {"noiDungNopTien":"KH989KVCMB0004","maCongTrinh":"AE HUE KVCN","phapNhan":"KH cũ","sheetName":"KVC MB KH989"},
+  {"noiDungNopTien":"KH989KVCMB0005","maCongTrinh":"AM HP KVCN","phapNhan":"KH cũ","sheetName":"KVC MB KH989"},
+  {"noiDungNopTien":"KH989KVCMB0006","maCongTrinh":"AM LBIEN KVCN","phapNhan":"KH cũ","sheetName":"KVC MB KH989"},
+  {"noiDungNopTien":"KH989KVCMB0007","maCongTrinh":"FARM TIMES CITY","phapNhan":"KH cũ","sheetName":"KVC MB KH989"},
+  {"noiDungNopTien":"KH989KVCMB0008","maCongTrinh":"AM LB KVCN","phapNhan":"KH cũ","sheetName":"KVC MB KH989"},
+  {"noiDungNopTien":"KH989KVCMB0009","maCongTrinh":"FUNZONE IPH KVCN","phapNhan":"KH cũ","sheetName":"KVC MB KH989"},
+  {"noiDungNopTien":"KH989KVCMB0011","maCongTrinh":"AE HUE KVCN","phapNhan":"KH cũ","sheetName":"KVC MB KH989"},
+  {"noiDungNopTien":"KH989KVCMB0012","maCongTrinh":"AM HP KVCN","phapNhan":"KH cũ","sheetName":"KVC MB KH989"},
+  {"noiDungNopTien":"KH989KVCMB0013","maCongTrinh":"AE HUE KVCN","phapNhan":"KH cũ","sheetName":"KVC MB KH989"},
+  {"noiDungNopTien":"KH989KVCMB0014","maCongTrinh":"FZ DNANG KVCN","phapNhan":"KH cũ","sheetName":"KVC MB KH989"},
+  {"noiDungNopTien":"KH989KVCMB0015","maCongTrinh":"KID FARM MM MARKET DA NANG","phapNhan":"KH cũ","sheetName":"KVC MB KH989"},
+  {"noiDungNopTien":"KH989KVCMB0016","maCongTrinh":"AM HP KVCN","phapNhan":"KH cũ","sheetName":"KVC MB KH989"},
+  {"noiDungNopTien":"KH989KVCMB0017","maCongTrinh":"FZ DNANG KVCN","phapNhan":"KH cũ","sheetName":"KVC MB KH989"},
+  {"noiDungNopTien":"KH989KVCMB0018","maCongTrinh":"AE HUE KVCN","phapNhan":"KH cũ","sheetName":"KVC MB KH989"},
+  {"noiDungNopTien":"KH989KVCMB0019","maCongTrinh":"AM HP KVCN","phapNhan":"KH cũ","sheetName":"KVC MB KH989"},
+  {"noiDungNopTien":"KH705KVCMB0001","maCongTrinh":"KVC TIMES","phapNhan":"KH mới","sheetName":"KVC MB KH705"},
+  {"noiDungNopTien":"KH705KVCMB0002","maCongTrinh":"KVC ROYAL","phapNhan":"KH mới","sheetName":"KVC MB KH705"},
+  {"noiDungNopTien":"KH705KVCMB0003","maCongTrinh":"KVC AE HUE","phapNhan":"KH mới","sheetName":"KVC MB KH705"},
+  {"noiDungNopTien":"KH705KVCMB0004","maCongTrinh":"KVC ROYAL","phapNhan":"KH mới","sheetName":"KVC MB KH705"},
+  {"noiDungNopTien":"KH705KVCMB0005","maCongTrinh":"AE HP KVC","phapNhan":"KH mới","sheetName":"KVC MB KH705"},
+  {"noiDungNopTien":"KH705KVCMB0006","maCongTrinh":"LOTTE VINH KVC","phapNhan":"KH mới","sheetName":"KVC MB KH705"},
+  {"noiDungNopTien":"KH705KVCMB0007","maCongTrinh":"KVC ROYAL","phapNhan":"KH mới","sheetName":"KVC MB KH705"},
+  {"noiDungNopTien":"KH705KVCMB0008","maCongTrinh":"SAVICO PHN","phapNhan":"KH mới","sheetName":"KVC MB KH705"},
+  {"noiDungNopTien":"KH705KVCMN0001","maCongTrinh":"KVC ESTELLA","phapNhan":"KH mới","sheetName":"KVC MN KH705"},
+  {"noiDungNopTien":"KH705KVCMN0002","maCongTrinh":"FARM LOTTE PHAN THIET","phapNhan":"KH mới","sheetName":"KVC MN KH705"},
+  {"noiDungNopTien":"KH705KVCMN0003","maCongTrinh":"AM TP KVCM","phapNhan":"KH mới","sheetName":"KVC MN KH705"},
+  {"noiDungNopTien":"KH705KVCMN0004","maCongTrinh":"FARM LOTTE NHA TRANG","phapNhan":"KH mới","sheetName":"KVC MN KH705"},
+  {"noiDungNopTien":"KH705KVCMN0005","maCongTrinh":"TUTU MN AEON MALL TÂN AN","phapNhan":"KH mới","sheetName":"KVC MN KH705"},
+  {"noiDungNopTien":"KH989KVCMN0001","maCongTrinh":"LOTTE GO VAP KVCM","phapNhan":"KH cũ","sheetName":"KVC MN KH989"},
+  {"noiDungNopTien":"KH989KVCMN0002","maCongTrinh":"AM TP KVCM","phapNhan":"KH cũ","sheetName":"KVC MN KH989"},
+  {"noiDungNopTien":"KH989KVCMN0003","maCongTrinh":"AE BT KVCM","phapNhan":"KH cũ","sheetName":"KVC MN KH989"},
+  {"noiDungNopTien":"KH989KVCMN0004","maCongTrinh":"AM BD KVCM","phapNhan":"KH cũ","sheetName":"KVC MN KH989"},
+  {"noiDungNopTien":"KH989KVCMN0005","maCongTrinh":"AM BD KVCM","phapNhan":"KH cũ","sheetName":"KVC MN KH989"},
+  {"noiDungNopTien":"KH989KVCMN0006","maCongTrinh":"FZ DIY SORA","phapNhan":"KH cũ","sheetName":"KVC MN KH989"},
+  {"noiDungNopTien":"KH989KVCMN0007","maCongTrinh":"KVC LOTTE VUNG TAU","phapNhan":"KH cũ","sheetName":"KVC MN KH989"},
+  {"noiDungNopTien":"KH989KVCMN0008","maCongTrinh":"SC VIVO KVCM","phapNhan":"KH cũ","sheetName":"KVC MN KH989"},
+  {"noiDungNopTien":"KH989KVCMN0009","maCongTrinh":"AM TP KVCM","phapNhan":"KH cũ","sheetName":"KVC MN KH989"},
+  {"noiDungNopTien":"KH989KVCMN0010","maCongTrinh":"FUNFEST SCVIVO","phapNhan":"KH cũ","sheetName":"KVC MN KH989"},
+  {"noiDungNopTien":"KH989KVCMN0010","maCongTrinh":"FUNFEST SCVIVO","phapNhan":"KH cũ","sheetName":"KVC MN KH989"},
+  {"noiDungNopTien":"KH705MTDMB0001","maCongTrinh":"AE LBIEN PHN","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0002","maCongTrinh":"0","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0003","maCongTrinh":"0","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0004","maCongTrinh":"IPH PHN","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0005","maCongTrinh":"BIG C HGUOM PHN","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0006","maCongTrinh":"BIG C LTT PHN","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0007","maCongTrinh":"BIG C TL PHN","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0008","maCongTrinh":"0","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0009","maCongTrinh":"LOTTY FRIENDS PHN","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0010","maCongTrinh":"MLINH PLAZA PHN","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0011","maCongTrinh":"MIPEC LB PHN","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0012","maCongTrinh":"NSTV BTL PHN","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0013","maCongTrinh":"NSTV OCP PHN","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0014","maCongTrinh":"NSTV SAVICO PHN","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0015","maCongTrinh":"NSTV ROY PHN","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0016","maCongTrinh":"VINKE-TCUNG","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0017","maCongTrinh":"TĐBS PHN","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0018","maCongTrinh":"THE GARDEN PHN","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0019","maCongTrinh":"IPH PHN","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0020","maCongTrinh":"SAVICO PHN","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0021","maCongTrinh":"RAP CPQG","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0022","maCongTrinh":"VC BA TRIEU PHN","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0023","maCongTrinh":"VC BTL PHN","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0024","maCongTrinh":"VC METROPOLIS (LIEU GIAI) PHN","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0025","maCongTrinh":"VC NCT PHN","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0026","maCongTrinh":"OCP PHN","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0027","maCongTrinh":"OCP PHN","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0028","maCongTrinh":"VC PHAM HUNG (SKYLAKE)","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0029","maCongTrinh":"VC PNT PHN","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0030","maCongTrinh":"VC ROY PHN","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0031","maCongTrinh":"VC SMART PHN","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0032","maCongTrinh":"VC TIMES PHN","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0033","maCongTrinh":"VC TDH PHN","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0034","maCongTrinh":"VINKE-TCUNG","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0035","maCongTrinh":"AE HP PHN","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0036","maCongTrinh":"AE HP PHN","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0037","maCongTrinh":"GO HP PHN","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0038","maCongTrinh":"BENH VIEN BAI CHAY PHN","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0039","maCongTrinh":"GO HA LONG PHN","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0040","maCongTrinh":"JP-KVC- P SUN HL","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0041","maCongTrinh":"VC HA LONG PHN","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0042","maCongTrinh":"GO NINH BINH PHN","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0043","maCongTrinh":"GO THAI NGUYEN PHN","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0044","maCongTrinh":"NSTV GO TN PHN","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0045","maCongTrinh":"NSTV VC TN PHN","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0046","maCongTrinh":"VC THAI NGUYEN PHN","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0047","maCongTrinh":"GO BAC GIANG PHN","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0048","maCongTrinh":"VC BAC GIANG PHN","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0049","maCongTrinh":"TAM CHUC PHN","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0050","maCongTrinh":"GO HA NAM PHN","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0051","maCongTrinh":"NSTV PHU LY PHN","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0052","maCongTrinh":"VC PHU LY PHN","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0053","maCongTrinh":"GO THAI BINH PHN","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0054","maCongTrinh":"NSTV THAI BINH PHN","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0055","maCongTrinh":"VC THAI BINH PHN","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0056","maCongTrinh":"CITY HUB VINH PHN","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0057","maCongTrinh":"GO VINH PHN","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0058","maCongTrinh":"LOTTE VINH PHN","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0059","maCongTrinh":"VINH CENTER PHN","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0060","maCongTrinh":"POSH AE HUE","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0061","maCongTrinh":"GO HUE PHN","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0062","maCongTrinh":"VC HUE PHN","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0063","maCongTrinh":"COOP DNANG PHN","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0064","maCongTrinh":"GO DA NANG PHN","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0065","maCongTrinh":"LOTTE ĐN PHN","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0066","maCongTrinh":"MIKAZUKI DN PHN","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0067","maCongTrinh":"0","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0068","maCongTrinh":"VC DN PHN","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0069","maCongTrinh":"BA NA HILL PHN","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0070","maCongTrinh":"VINPEARL HOI AN PHN","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0071","maCongTrinh":"P GOLD COAST NHA TRANG (RSM)","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0072","maCongTrinh":"GO NTRANG PHN","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0073","maCongTrinh":"NHA TRANG CENTER PHN","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0074","maCongTrinh":"VC MAXI TN NT PHN","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0075","maCongTrinh":"VC T.PHU N.TRANG PHN","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0076","maCongTrinh":"VPNT PHN","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0077","maCongTrinh":"JP-POSH VW NHA TRANG","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0078","maCongTrinh":"MOC CHAU PHN","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0079","maCongTrinh":"SUN FANSIPAN PHN","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0080","maCongTrinh":"JP-KVC-POSH SUN FANSIPAN","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0081","maCongTrinh":"NSTV TUYEN QUANG PHN","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0082","maCongTrinh":"VC TUYEN QUANG PNH","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0083","maCongTrinh":"GO THANH HOA PHN","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0084","maCongTrinh":"VC THANH HOA PHN","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0085","maCongTrinh":"GO NAM DINH PHN","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0086","maCongTrinh":"NSTV NAM DINH PHN","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0087","maCongTrinh":"P-JP-PF SUN CAT BA","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0088","maCongTrinh":"GO HAI DUONG PHN","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0089","maCongTrinh":"VC VU YEN PHN","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0090","maCongTrinh":"JP POSH VW VU YEN","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0091","maCongTrinh":"MM MARKET DA NANG MTD","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0092","maCongTrinh":"MM MARKET DA NANG MTD","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0093","maCongTrinh":"GO VIET TRI PHN","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0094","maCongTrinh":"VC VIET TRI PHN","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0095","maCongTrinh":"JP VC BA TRIEU","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0096","maCongTrinh":"JP IPH","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0097","maCongTrinh":"JP AE LBIEN","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0098","maCongTrinh":"JP VC ROY","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0099","maCongTrinh":"P-JP-PF SUN CAT BA","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0100","maCongTrinh":"JP POSH VW VU YEN","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0101","maCongTrinh":"JP GO ĐA NANG","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0102","maCongTrinh":"JP BA NA HILL","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0103","maCongTrinh":"JP-KVC- P SUN HL","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0104","maCongTrinh":"JP CTQT HLONG","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0105","maCongTrinh":"JP-KVC-POSH SUN FANSIPAN","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0106","maCongTrinh":"SUN FANSIPAN PHN","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0107","maCongTrinh":"JP VINPEARL NT","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0108","maCongTrinh":"JP GOLD COAST NHA TRANG (RSM)","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0109","maCongTrinh":"JP NT CENTER","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0110","maCongTrinh":"JP VINPEARL HOI AN","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0111","maCongTrinh":"MGG IPH (PICK FUN)","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0112","maCongTrinh":"TĐBS PF","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0113","maCongTrinh":"PF TIME CITY","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0114","maCongTrinh":"PF TAM CHUC","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0115","maCongTrinh":"P-JP-PF SUN CAT BA","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0116","maCongTrinh":"MGG BA NA HILL","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0117","maCongTrinh":"JP AE HUE","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0118","maCongTrinh":"POSH MB KUBO GO THĂNG LONG","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0119","maCongTrinh":"POSH MB ECOPARK VINH","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0120","maCongTrinh":"POSH MB KUBO GO NAM ĐỊNH","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0121","maCongTrinh":"POSH MB KUBO GO HẢI DƯƠNG","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0122","maCongTrinh":"POSH MB KUBO GO LONG BIÊN","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0123","maCongTrinh":"POSH MB KUBO GO ĐÀ NẴNG","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0124","maCongTrinh":"POSH MB KUBO GO NINH BÌNH","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0125","maCongTrinh":"POSH MB KUBO GO VIỆT TRÌ","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0126","maCongTrinh":"POSH GO VĨNH PHÚC","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0127","maCongTrinh":"POSH KUBO VĨNH PHÚC","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0128","maCongTrinh":"POSH COOPMART VĨNH PHÚC","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH705MTDMB0129","maCongTrinh":"KUBO NHA TRANG","phapNhan":"KH mới","sheetName":"MTD MB KH705"},
+  {"noiDungNopTien":"KH989MTDMB0001","maCongTrinh":"0","phapNhan":"KH cũ","sheetName":"MTĐ MB KH989"},
+  {"noiDungNopTien":"KH989MTDMB0002","maCongTrinh":"SB VINH PHN","phapNhan":"KH cũ","sheetName":"MTĐ MB KH989"},
+  {"noiDungNopTien":"KH989MTDMB0003","maCongTrinh":"SB CAM RANH PHN","phapNhan":"KH cũ","sheetName":"MTĐ MB KH989"},
+  {"noiDungNopTien":"KH989MTDMB0004","maCongTrinh":"CHKQT CAM RANH","phapNhan":"KH cũ","sheetName":"MTĐ MB KH989"},
+  {"noiDungNopTien":"KH989MTDMB0005","maCongTrinh":"JP SB NOI BAI","phapNhan":"KH cũ","sheetName":"MTĐ MB KH989"},
+  {"noiDungNopTien":"KH989MTDMB0006","maCongTrinh":"CHKQT CAM RANH","phapNhan":"KH cũ","sheetName":"MTĐ MB KH989"},
+  {"noiDungNopTien":"KH705MTDMN0001","maCongTrinh":"AE BINH TAN PHN","phapNhan":"KH mới","sheetName":"MTD MN KH705"},
+  {"noiDungNopTien":"KH705MTDMN0002","maCongTrinh":"AM TP PHCM","phapNhan":"KH mới","sheetName":"MTD MN KH705"},
+  {"noiDungNopTien":"KH705MTDMN0003","maCongTrinh":"BV 175 PHCM","phapNhan":"KH mới","sheetName":"MTD MN KH705"},
+  {"noiDungNopTien":"KH705MTDMN0004","maCongTrinh":"BV UNG BUOU PHCM","phapNhan":"KH mới","sheetName":"MTD MN KH705"},
+  {"noiDungNopTien":"KH705MTDMN0005","maCongTrinh":"ESTELLA PHN","phapNhan":"KH mới","sheetName":"MTD MN KH705"},
+  {"noiDungNopTien":"KH705MTDMN0006","maCongTrinh":"GIGAMALL PVD PHCM","phapNhan":"KH mới","sheetName":"MTD MN KH705"},
+  {"noiDungNopTien":"KH705MTDMN0007","maCongTrinh":"GO AU CO PHCM","phapNhan":"KH mới","sheetName":"MTD MN KH705"},
+  {"noiDungNopTien":"KH705MTDMN0008","maCongTrinh":"GO NTT PHCM","phapNhan":"KH mới","sheetName":"MTD MN KH705"},
+  {"noiDungNopTien":"KH705MTDMN0009","maCongTrinh":"GO TRUONG CHINH PHCM","phapNhan":"KH mới","sheetName":"MTD MN KH705"},
+  {"noiDungNopTien":"KH705MTDMN0010","maCongTrinh":"LOTTE Q7 (NSG) PHM","phapNhan":"KH mới","sheetName":"MTD MN KH705"},
+  {"noiDungNopTien":"KH705MTDMN0011","maCongTrinh":"LOTTE GO VAP VR-PHN","phapNhan":"KH mới","sheetName":"MTD MN KH705"},
+  {"noiDungNopTien":"KH705MTDMN0012","maCongTrinh":"POSH LOTTE PTHO","phapNhan":"KH mới","sheetName":"MTD MN KH705"},
+  {"noiDungNopTien":"KH705MTDMN0013","maCongTrinh":"SENSE CT PVĐ PHCM","phapNhan":"KH mới","sheetName":"MTD MN KH705"},
+  {"noiDungNopTien":"KH705MTDMN0014","maCongTrinh":"SC VIVO PHCM","phapNhan":"KH mới","sheetName":"MTD MN KH705"},
+  {"noiDungNopTien":"KH705MTDMN0015","maCongTrinh":"VC 3/2 JP-POSH","phapNhan":"KH mới","sheetName":"MTD MN KH705"},
+  {"noiDungNopTien":"KH705MTDMN0016","maCongTrinh":"JP-POSH GRAND PARK","phapNhan":"KH mới","sheetName":"MTD MN KH705"},
+  {"noiDungNopTien":"KH705MTDMN0017","maCongTrinh":"VC GV PHCM","phapNhan":"KH mới","sheetName":"MTD MN KH705"},
+  {"noiDungNopTien":"KH705MTDMN0018","maCongTrinh":"VC LVV PHCM","phapNhan":"KH mới","sheetName":"MTD MN KH705"},
+  {"noiDungNopTien":"KH705MTDMN0019","maCongTrinh":"VHANH MALL PHCM","phapNhan":"KH mới","sheetName":"MTD MN KH705"},
+  {"noiDungNopTien":"KH705MTDMN0020","maCongTrinh":"AE BD PHCM","phapNhan":"KH mới","sheetName":"MTD MN KH705"},
+  {"noiDungNopTien":"KH705MTDMN0021","maCongTrinh":"GO DI AN PHCM","phapNhan":"KH mới","sheetName":"MTD MN KH705"},
+  {"noiDungNopTien":"KH705MTDMN0022","maCongTrinh":"GO TDM","phapNhan":"KH mới","sheetName":"MTD MN KH705"},
+  {"noiDungNopTien":"KH705MTDMN0023","maCongTrinh":"VC BIEN HOA PHN","phapNhan":"KH mới","sheetName":"MTD MN KH705"},
+  {"noiDungNopTien":"KH705MTDMN0024","maCongTrinh":"SB PHU QUOC PHN","phapNhan":"KH mới","sheetName":"MTD MN KH705"},
+  {"noiDungNopTien":"KH705MTDMN0025","maCongTrinh":"PQ SUN HTHOM PHCM","phapNhan":"KH mới","sheetName":"MTD MN KH705"},
+  {"noiDungNopTien":"KH705MTDMN0026","maCongTrinh":"GO BA RIA PHCM","phapNhan":"KH mới","sheetName":"MTD MN KH705"},
+  {"noiDungNopTien":"KH705MTDMN0027","maCongTrinh":"MM MARKET DA NANG MTD","phapNhan":"KH mới","sheetName":"MTD MN KH705"},
+  {"noiDungNopTien":"KH705MTDMN0028","maCongTrinh":"CON DAO AIRPORT PHCM","phapNhan":"KH mới","sheetName":"MTD MN KH705"},
+  {"noiDungNopTien":"KH705MTDMN0029","maCongTrinh":"GO BEN TRE PHN","phapNhan":"KH mới","sheetName":"MTD MN KH705"},
+  {"noiDungNopTien":"KH705MTDMN0030","maCongTrinh":"SENSE BTRE PHCM","phapNhan":"KH mới","sheetName":"MTD MN KH705"},
+  {"noiDungNopTien":"KH705MTDMN0031","maCongTrinh":"GO MY THO PHCM","phapNhan":"KH mới","sheetName":"MTD MN KH705"},
+  {"noiDungNopTien":"KH705MTDMN0032","maCongTrinh":"GO TRA VINH","phapNhan":"KH mới","sheetName":"MTD MN KH705"},
+  {"noiDungNopTien":"KH705MTDMN0033","maCongTrinh":"GO CAN THO PHCM","phapNhan":"KH mới","sheetName":"MTD MN KH705"},
+  {"noiDungNopTien":"KH705MTDMN0034","maCongTrinh":"SB CAN THO PHCM","phapNhan":"KH mới","sheetName":"MTD MN KH705"},
+  {"noiDungNopTien":"KH705MTDMN0035","maCongTrinh":"SENSE CT CTHO PHCM","phapNhan":"KH mới","sheetName":"MTD MN KH705"},
+  {"noiDungNopTien":"KH705MTDMN0036","maCongTrinh":"GO BMT PHCM","phapNhan":"KH mới","sheetName":"MTD MN KH705"},
+  {"noiDungNopTien":"KH705MTDMN0037","maCongTrinh":"ZONE C KIEN GIANG PHCM","phapNhan":"KH mới","sheetName":"MTD MN KH705"},
+  {"noiDungNopTien":"KH705MTDMN0038","maCongTrinh":"SENSE CA MAU PHCM","phapNhan":"KH mới","sheetName":"MTD MN KH705"},
+  {"noiDungNopTien":"KH705MTDMN0039","maCongTrinh":"GO BAC LIEU PHCM","phapNhan":"KH mới","sheetName":"MTD MN KH705"},
+  {"noiDungNopTien":"KH705MTDMN0040","maCongTrinh":"LOTTE PHAN THIET","phapNhan":"KH mới","sheetName":"MTD MN KH705"},
+  {"noiDungNopTien":"KH705MTDMN0041","maCongTrinh":"JP AE TAN PHU","phapNhan":"KH mới","sheetName":"MTD MN KH705"},
+  {"noiDungNopTien":"KH705MTDMN0042","maCongTrinh":"VC 3/2 JP-POSH","phapNhan":"KH mới","sheetName":"MTD MN KH705"},
+  {"noiDungNopTien":"KH705MTDMN0043","maCongTrinh":"PQ SUN HTHOM JPHCM","phapNhan":"KH mới","sheetName":"MTD MN KH705"},
+  {"noiDungNopTien":"KH705MTDMN0044","maCongTrinh":"GO NTRANG PHN","phapNhan":"KH mới","sheetName":"MTD MN KH705"},
+  {"noiDungNopTien":"KH705MTDMN0045","maCongTrinh":"0","phapNhan":"KH mới","sheetName":"MTD MN KH705"},
+  {"noiDungNopTien":"KH705MTDMN0046","maCongTrinh":"AM HP KVCN","phapNhan":"KH mới","sheetName":"MTD MN KH705"},
+  {"noiDungNopTien":"KH705MTDMN0047","maCongTrinh":"POSH MN KUBO GO BÀ RỊA","phapNhan":"KH mới","sheetName":"MTD MN KH705"},
+  {"noiDungNopTien":"KH705MTDMN0048","maCongTrinh":"POSH MN KUBO GO CẦN THƠ","phapNhan":"KH mới","sheetName":"MTD MN KH705"},
+  {"noiDungNopTien":"KH705MTDMN0049","maCongTrinh":"POSH MN GALAXY KINH DƯƠNG VƯƠNG","phapNhan":"KH mới","sheetName":"MTD MN KH705"},
+  {"noiDungNopTien":"KH705MTDMN0050","maCongTrinh":"POSH MN GALAXY QUANG TRUNG","phapNhan":"KH mới","sheetName":"MTD MN KH705"},
+  {"noiDungNopTien":"KH705MTDMN0051","maCongTrinh":"POSH MN KUBO GO BIÊN HÒA","phapNhan":"KH mới","sheetName":"MTD MN KH705"},
+  {"noiDungNopTien":"KH705MTDMN0052","maCongTrinh":"POSH MN KUBO GO BUÔN MÊ THUỘT","phapNhan":"KH mới","sheetName":"MTD MN KH705"},
+  {"noiDungNopTien":"KH989MTDMN0001","maCongTrinh":"COOP PLAM PHCM","phapNhan":"KH cũ","sheetName":"MTĐ MN KH989"},
+  {"noiDungNopTien":"KH989MTDMN0002","maCongTrinh":"COOP BDUONG PHCM","phapNhan":"KH cũ","sheetName":"MTĐ MN KH989"},
+  {"noiDungNopTien":"KH989MTDMN0003","maCongTrinh":"PQ VINPERAL PHCM","phapNhan":"KH cũ","sheetName":"MTĐ MN KH989"},
+  {"noiDungNopTien":"KH989MTDMN0004","maCongTrinh":"AE BT JP","phapNhan":"KH cũ","sheetName":"MTĐ MN KH989"},
+  {"noiDungNopTien":"KH989MTDMN0005","maCongTrinh":"AE BD JP","phapNhan":"KH cũ","sheetName":"MTĐ MN KH989"},
+  {"noiDungNopTien":"KH989MTDMN0006","maCongTrinh":"JP SORA BECAMEX","phapNhan":"KH cũ","sheetName":"MTĐ MN KH989"},
+  {"noiDungNopTien":"KH989MTDMN0007","maCongTrinh":"JP VW PHÚ QUỐC","phapNhan":"KH cũ","sheetName":"MTĐ MN KH989"},
+  {"noiDungNopTien":"KH989MTDMN0008","maCongTrinh":"CHKQT PHU QUOC","phapNhan":"KH cũ","sheetName":"MTĐ MN KH989"},
+  {"noiDungNopTien":"KH989KVCMN0010","maCongTrinh":"FUNFEST SCVIVO","phapNhan":"KH cũ","sheetName":"MTĐ MN KH989"},
+];
+
 // ---- Seed default admin user + example bank on first run ----
 (function seed() {
   const store = load();
@@ -531,6 +784,174 @@ function fixDuplicateBidv8681BankId(store) {
     return true;
   }
   if (fixBidv77021Day1ThuMisreadAsChi(store)) changed = true;
+
+  // Luyen, 2026-07-31: "sao sao kê tháng 7 tôi chọn tk acb 1268 mà lại có
+  // giao dịch của 123456" -- ngay 30/7 luc 09:12:30, co 1 dot nhap NHAM 13
+  // giao dich (21/7-30/7, chu yeu la settlement Momo "CONG TY CP DICH VU DI
+  // DONG TRUC TUYEN") vao bank_id=3 (ACB31268, kenh Zalo/VNPay/Payoo) trong
+  // khi CA 13 dong nay da co san 1 ban SAO Y HET (cung so tham chieu/so tien/
+  // mo ta) duoi bank_id=4 (BIDV123456) hoac bank_id=11 (BIDV8651, ve "thu"
+  // cua 1 khoan CTNB noi bo) -- da doi chieu tung dong, xac nhan 100% la
+  // trung, KHONG phai giao dich that cua ACB31268 (tai khoan nay khong lien
+  // quan gi Momo). Xoa dung 13 dong nay khoi bank_id=3 theo SO THAM CHIEU
+  // (khong dung filter ngay+ngan hang chung vi thang 7 con ~83 giao dich
+  // THAT khac cua ACB31268 trong cung khoang ngay, xoa theo filter se xoa
+  // nham). Luyen xac nhan xoa 2026-07-31 ("xóa cái trùng nhá").
+  function removeAcb31268MomoMisimportBatch(store) {
+    const badRefs = new Set([
+      "0861EikM-8AlF3ofJp",
+      "1131kcay-8Amhw7f5I",
+      "086p9NG-8AmoYVNHl",
+      "08619UpK-8AoLpOFn2",
+      "0831EikM-8Apd6UJqS",
+      "0861oTJc-8Apnt1Rp8",
+      "0831eILI-8ApqsQcr9",
+      "0001401a-8AqULJ5dA",
+      "8682HcNQ-8AuCiVQQm",
+      "086MpJG-8AuOdjypJ",
+      "0861bGq4-8AvvYmLNq",
+      "0862HcJS-8AxOSx0Xr",
+      "086MpJG-8AyygZnnR",
+    ]);
+    const acb = store.banks.find((b) => b.name === "ACB31268");
+    if (!acb) return false;
+    const before = store.transactions.length;
+    store.transactions = store.transactions.filter((t) => !(t.bank_id === acb.id && badRefs.has(t.reference)));
+    return store.transactions.length !== before;
+  }
+  if (removeAcb31268MomoMisimportBatch(store)) changed = true;
+
+  // Luyen, 2026-08-01: "cho chỗ nhập tay nữa đi đây gian mưới á LOTTE BAC
+  // GIANG PHN đây á" -- gian moi "POSH Lotte Bac Giang" (Ma cua hang
+  // TDT9Y5GDVP, kenh VietQR bidv77021, KH Moi) chua co Ma cong trinh trong
+  // danh sach chuan (ma_cong_trinh_master.kh_moi) nen khong chon duoc trong
+  // dropdown o muc "Ten diem ban chua co Ma cong trinh tuong ung". Them dong
+  // moi vao danh sach chuan (giong cach dat ten cac gian PHN khac nhu "GO BAC
+  // GIANG PHN"/"KUBO BAC GIANG PHN"/"VC BAC GIANG PHN" da co san) + gan luon
+  // "POSH Lotte Bac Giang" -> "LOTTE BAC GIANG PHN" (viet_qr_ten_diem_master,
+  // giong co che nut "Gan" tren trang lam thu cong).
+  function seedLotteBacGiangGian(store) {
+    let didChange = false;
+    if (!store.ma_cong_trinh_master) store.ma_cong_trinh_master = {};
+    if (!store.ma_cong_trinh_master.kh_moi) store.ma_cong_trinh_master.kh_moi = { rows: [] };
+    if (!Array.isArray(store.ma_cong_trinh_master.kh_moi.rows)) store.ma_cong_trinh_master.kh_moi.rows = [];
+    const rows = store.ma_cong_trinh_master.kh_moi.rows;
+    const NEW_CODE = "LOTTE BAC GIANG PHN";
+    if (!rows.some((r) => (r.maCongTrinh || "").trim().toUpperCase() === NEW_CODE)) {
+      const maxStt = rows.reduce((mx, r) => {
+        const n = parseInt(r.stt, 10);
+        return Number.isFinite(n) && n > mx ? n : mx;
+      }, 0);
+      rows.push({
+        maCongTrinh: NEW_CODE,
+        stt: String(maxStt + 1),
+        tenCongTrinh: NEW_CODE,
+        loaiCongTrinh: "",
+        tinhTrang: "Đang thực hiện",
+        ngayBatDau: "",
+        ngayKetThuc: "",
+        duToan: "0",
+        chuDauTu: "",
+        chiNhanh: "CÔNG TY TNHH GIẢI TRÍ K&H",
+        trangThai: "Đang sử dụng",
+      });
+      didChange = true;
+    }
+    if (!store.viet_qr_ten_diem_master) store.viet_qr_ten_diem_master = {};
+    if (!store.viet_qr_ten_diem_master.bidv77021) store.viet_qr_ten_diem_master.bidv77021 = {};
+    const key = "posh lotte bac giang"; // normText("POSH Lotte Bắc Giang")
+    if (store.viet_qr_ten_diem_master.bidv77021[key] !== NEW_CODE) {
+      store.viet_qr_ten_diem_master.bidv77021[key] = NEW_CODE;
+      didChange = true;
+    }
+    return didChange;
+  }
+  if (seedLotteBacGiangGian(store)) changed = true;
+
+  // Luyen, 2026-08-01: "tôi tải nhầm sao kê lên rồi bạn cx nạp lận à
+  // 8670068681 mà tôi nạp nhầm vô tk MB 02865168 xóa cho tôi đi cái tôi mới
+  // nạp lên á" -- upload nham file sao ke tai khoan BIDV8681 (8670068681)
+  // vao bank_id=17 (MB02865168) ngay 2026-07-31. Xoa DUNG 6 dong cua lan
+  // upload sai (id 191390-191395, cung created_at giay 2026-08-01T01:25:58,
+  // ca 2 dong con nhac ro so tai khoan "8670068681" trong dien giai), KHONG
+  // dung xoa theo bank+ngay+loai chung vi con 4 dong QR MB02865168 THAT hop
+  // le cung ngay (id 188046-188049, tao tu hom truoc, 20.000d/dong, doanh
+  // thu ve QR that cua chinh MB02865168) khong duoc dung vao.
+  function removeMb02865168BidvMisimportBatch(store) {
+    const badIds = new Set([191390, 191391, 191392, 191393, 191394, 191395]);
+    const before = store.transactions.length;
+    store.transactions = store.transactions.filter((t) => !badIds.has(t.id));
+    return store.transactions.length !== before;
+  }
+  if (removeMb02865168BidvMisimportBatch(store)) changed = true;
+
+  // Luyen, 2026-08-01: "check ngân hàng luôn xem có tiền khác ngoài viet qr
+  // thì bỏ ra nha" -- phat hien 5 giao dich KHONG PHAI tien ve QR (khong co
+  // dinh dang "@VA_V3BLC...VQR..." nhu giao dich VietQR that) dang bi
+  // resolveGianGrossByBankRef gom nham vao gian mac dinh "AE HP PHN" (kenh
+  // mb02865168), gay hien "Chua co HD" sai lech ~723tr: 191296 (393.081.840d,
+  // "REM Tfr Ac:8670068681..." -- chuyen tien tu chinh TK BIDV8681 cua cong
+  // ty, noi bo), 191301 (3.130.000d, "YOKIDS TT TIEN MUA GHE MASSAGE..."),
+  // 191341 (78.549.000d, "S001...TT 70 doanh thu Game KH va 50 ghe Posh
+  // T062026" -- doanh thu gop tu nguon khac, khong phai ve QR), 191386 +
+  // 191389 (44.507.521d + 125.458.000d, "FSS...TT HTKD T6.2026..." = thanh
+  // toan Hop tac kinh doanh, khong phai ve QR). Luyen xac nhan qua
+  // AskUserQuestion: "Loại khỏi VietQR hết" (ca 5 khoan) -- dung dung co che
+  // excludeFromVietQrRecon da co san (giong dong "ctnb" da tu dong loai truoc
+  // do), tien VAN o lai Giao dich/Sao ke binh thuong, chi khong tinh vao
+  // doanh thu QR nua.
+  function seedExcludeNonVqrTxFromMb02865168(store) {
+    const ids = new Set([191296, 191301, 191341, 191386, 191389]);
+    let didChange = false;
+    store.transactions.forEach((t) => {
+      if (ids.has(t.id) && !t.excludeFromVietQrRecon) {
+        t.excludeFromVietQrRecon = true;
+        didChange = true;
+      }
+    });
+    return didChange;
+  }
+  if (seedExcludeNonVqrTxFromMb02865168(store)) changed = true;
+
+  // Luyen, 2026-08-01: "chỗ nội dung nộp tiền á có map với tên gian dựa vào 4
+  // sheet này á KVC MN KVC MB MTD MN MTD MB" -- gui 4 file tham khao (KVC
+  // MB/MN, MTD MB/MN), moi file 2 sheet (KH cũ "...KH989" + KH mới
+  // "...KH705"). store.cht_nop_tien_map dang RONG (tinh nang tu task #54 da
+  // co san UI upload rieng tren trang Xuat Hoa Don Ban Ra nhung Luyen chua tung
+  // tai file nao qua do) -- nap san 236 ma "Nội dung nộp tiền" -> "mã công
+  // trình misa thuế" doc duoc tu 4 file nay bang chinh parser/merge da co san
+  // (parseChtNopTienMasterSheet/mergeChtNopTienMap, utils/zvpReconcile.js) de
+  // Luyen khong phai tu tai lai qua UI. Idempotent: mergeChtNopTienMap chi
+  // "added" khi ma chua ton tai, nen chay lai nhieu lan (vd sau khi Luyen tu
+  // tai them file khac qua UI) khong lam gi them / khong ghi de sai.
+  function seedChtNopTienMapFromKvcMtdFiles(store) {
+    const rows = SEED_CHT_NOP_TIEN_ROWS;
+    const { mergeChtNopTienMap } = require("./utils/zvpReconcile");
+    const { map, added } = mergeChtNopTienMap(store.cht_nop_tien_map, rows);
+    if (added > 0) {
+      store.cht_nop_tien_map = map;
+      if (!store.cht_nop_tien_uploads) store.cht_nop_tien_uploads = [];
+      store.cht_nop_tien_uploads.push({
+        id: (store.cht_nop_tien_uploads.length || 0) + 1,
+        uploaded_at: new Date().toISOString(),
+        file_name: "KVC MB.xlsx + KVC MN.xlsx + MTD MB.xlsx + MTD MN.xlsx (nạp sẵn)",
+        sheetsParsed: [
+          { sheetName: "KVC MB KH989", rows: 18 },
+          { sheetName: "KVC MB KH705", rows: 8 },
+          { sheetName: "KVC MN KH705", rows: 5 },
+          { sheetName: "KVC MN KH989", rows: 11 },
+          { sheetName: "MTD MB KH705", rows: 129 },
+          { sheetName: "MTĐ MB KH989", rows: 6 },
+          { sheetName: "MTD MN KH705", rows: 52 },
+          { sheetName: "MTĐ MN KH989", rows: 9 },
+        ],
+        rowCount: rows.length,
+      });
+      return true;
+    }
+    return false;
+  }
+  if (seedChtNopTienMapFromKvcMtdFiles(store)) changed = true;
 
   if (changed) save(store);
 })();

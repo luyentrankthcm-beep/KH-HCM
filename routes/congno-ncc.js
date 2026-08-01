@@ -42,6 +42,7 @@ function buildInvoiceDebt(store) {
   const allRows = (store.hoa_don_dau_vao || []).map(hoaDonDauVao.ensureDefaults);
 
   const invoices = [];
+  const missingInvoiceChi = [];
   ["kh_cu", "kh_moi"].forEach((company) => {
     const bankNames = TAI_KHOAN_CHI_THEO_CONG_TY[company] || [];
     const bankIds = new Set(
@@ -59,6 +60,7 @@ function buildInvoiceDebt(store) {
         date: t.date,
         amount: t.amount,
         tenDoiUngNorm: normVN(t.tenDoiUng),
+        tenDoiUngGoc: t.tenDoiUng,
         bankName: (banksById.get(t.bank_id) || {}).name || "",
         used: false,
       }));
@@ -107,8 +109,33 @@ function buildInvoiceDebt(store) {
           conNo: daChi ? 0 : g.soTien,
         });
       });
+
+    // Chi Nhan, 2026-08-01: "đa phần đi từ tk công ty là cần lấy hóa đơn á bạn
+    // xthêm cho tôi các ncc mà nếu chi của ngân hàng mà hk thấy hóa đơn thêm
+    // vô ln nhá tôi không thể quét dc gmail để gắn link háo đơn vô dc nè" --
+    // OAuth Google chưa cấu hình trên Railway nên không tự quét Gmail lấy hóa
+    // đơn được (xem lỗi trên trang Chi Phí), nên Luyến cần thấy rõ: giao dịch
+    // "chi" nào trên đúng 2 TK Chi của công ty này ĐÃ rời khỏi ngân hàng
+    // nhưng KHÔNG khớp được với hóa đơn nào ở trên (used vẫn false sau vòng
+    // lặp khớp) -- nghĩa là tiền đã chi thật nhưng CHƯA có hóa đơn ghi nhận.
+    // Tách RIÊNG khỏi `invoices`/Còn nợ (tiền này không phải nợ, chỉ là THIẾU
+    // CHỨNG TỪ) để không làm sai lệch các số Còn nợ NCC đang có, chỉ thêm 1
+    // bảng cảnh báo riêng liệt kê Tên đối ứng (coi như tên NCC tạm) để Luyến
+    // biết cần đi lấy hóa đơn bổ sung cho khoản nào.
+    chiTx
+      .filter((t) => !t.used)
+      .forEach((t) => {
+        missingInvoiceChi.push({
+          company,
+          companyLabel: COMPANY_LABEL[company],
+          date: t.date,
+          amount: t.amount,
+          tenNCC: t.tenDoiUngGoc || "(không rõ tên đối ứng)",
+          bankName: t.bankName,
+        });
+      });
   });
-  return invoices;
+  return { invoices, missingInvoiceChi };
 }
 
 // Gop cac hoa don cung 1 NCC (trong cung 1 cong ty) thanh 1 dong tong hop --
@@ -155,6 +182,31 @@ function summarizeByNcc(invoices) {
     });
 }
 
+// Gop cac giao dich chi CHUA co hoa don theo Ten doi ung (coi nhu 1 "NCC tam"
+// -- co the trung/khong dung chinh xac ten NCC chinh thuc vi day la Ten doi
+// ung tren sao ke, khong phai ten da chuan hoa qua file Hoa Don Dau Vao) --
+// cung cach trinh bay voi summarizeByNcc de Luyen quen mat, nhung KHONG cong
+// vao Con no (xem ghi chu o buildInvoiceDebt).
+function summarizeMissingInvoiceByNcc(missingInvoiceChi) {
+  const map = new Map();
+  missingInvoiceChi.forEach((m) => {
+    const key = m.company + "||" + normVN(m.tenNCC);
+    if (!map.has(key)) {
+      map.set(key, { tenNCC: m.tenNCC, company: m.company, companyLabel: m.companyLabel, tongSoTien: 0, soLan: 0, items: [] });
+    }
+    const s = map.get(key);
+    s.tongSoTien += m.amount;
+    s.soLan++;
+    s.items.push(m);
+  });
+  return Array.from(map.values())
+    .sort((a, b) => b.tongSoTien - a.tongSoTien)
+    .map((r) => {
+      r.items.sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+      return r;
+    });
+}
+
 router.get("/cong-no/ncc", (req, res) => {
   const store = load();
   const activeCompany = getCompany(req);
@@ -162,8 +214,11 @@ router.get("/cong-no/ncc", (req, res) => {
   let invoicesAllCompanies = [];
   let invoices = [];
   let nccSummary = [];
+  let missingInvoiceChi = [];
+  let missingInvoiceSummary = [];
   try {
-    invoicesAllCompanies = buildInvoiceDebt(store);
+    const built = buildInvoiceDebt(store);
+    invoicesAllCompanies = built.invoices;
     // Chi Nhan, 2026-07-30: "khi tôi chọn Kh mới hiện của kh mới tk kh mới hóa
     // đơn kh mới thôi còn khi tôi chọn kh cũ thì hiện ra kh cũ á" -- loc theo
     // DUNG cong ty dang xem o topbar (giong Hoa Don Dau Vao/Chi Phi/Phap
@@ -171,6 +226,8 @@ router.get("/cong-no/ncc", (req, res) => {
     // dau nua.
     invoices = invoicesAllCompanies.filter((i) => i.company === activeCompany);
     nccSummary = summarizeByNcc(invoices);
+    missingInvoiceChi = built.missingInvoiceChi.filter((m) => m.company === activeCompany);
+    missingInvoiceSummary = summarizeMissingInvoiceByNcc(missingInvoiceChi);
   } catch (e) {
     error = e.message;
     console.error("Loi tinh cong no NCC:", e);
@@ -207,6 +264,7 @@ router.get("/cong-no/ncc", (req, res) => {
   const grandTotalDaChi = invoices.reduce((s, i) => s + (i.daChi ? i.soTien : 0), 0);
   const grandTotalConNo = invoices.reduce((s, i) => s + i.conNo, 0);
   const soHoaDonChuaChi = invoices.filter((i) => !i.daChi).length;
+  const grandTotalMissingInvoice = missingInvoiceChi.reduce((s, m) => s + m.amount, 0);
 
   res.render("congno-ncc", {
     userName: req.session.userName,
@@ -224,6 +282,9 @@ router.get("/cong-no/ncc", (req, res) => {
     grandTotalDaChi,
     grandTotalConNo,
     soHoaDonChuaChi,
+    missingInvoiceSummary,
+    grandTotalMissingInvoice,
+    soLanMissingInvoice: missingInvoiceChi.length,
   });
 });
 

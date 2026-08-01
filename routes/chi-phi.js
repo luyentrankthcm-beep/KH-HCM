@@ -582,7 +582,62 @@ function applyChiPhiMonthRowsToStore(store, monthRows, sourceLabel, mien = "nam"
   return { added, addedNoGian, upgradedGian, monthSummary };
 }
 
-function buildChiPhiResultMessage(prefix, result, skippedSheets) {
+// Luyen, 2026-08-01: "gg sheet có chi phí mới ... cập nhật hết của tháng 7
+// cho tôi đi 2 sheet TT tiền mặt với lại Tháng 7 2026 á" -- tab "TT TIỀN MẶT"
+// khong co cot Ngay/NCC (xem ghi chu o utils/chiPhiSheetParser.js) nen KHONG
+// dung chiPhiRowKey (can r.ngay) duoc -- upsert rieng, uu tien khoa theo
+// linkHoaDon (gan nhu luon duy nhat 1-1 voi 1 hoa don that, khop dung voi ca
+// 105 dong da import bang tay/OCR truoc do dang co san linkHoaDon), dong
+// khong co link (vd ghi "chưa có hóa đơn") moi fallback ve nguoiMua+coSo+soTien.
+// Luyen xac nhan (AskUserQuestion, 2026-08-01): "nhập phần biết được, còn
+// không biết thì như cũ đưa lên trước đã" -- nap San Nguoi mua/Co so/So
+// tien/Link hoa don, DE TRONG Ngay+NCC+So hoa don cho Luyen tu dien sau khi
+// mo link (khong doan bua).
+function ttTienMatRowKey(r) {
+  return r.linkHoaDon ? `link|${r.linkHoaDon}` : `nolink|${r.nguoiMua}|${r.coSo}|${r.soTien}`;
+}
+function applyTtTienMatRowsToStore(store, ttRows, sourceLabel) {
+  const existingByKey = new Map();
+  store.chi_phi.forEach((r) => {
+    if (r.nguon === "TT TIỀN MẶT") existingByKey.set(ttTienMatRowKey({ linkHoaDon: r.linkHoaDon, nguoiMua: (r.dienGiai || "").trim(), coSo: r.gian, soTien: r.soTien }), r);
+  });
+  let added = 0;
+  for (const r of ttRows) {
+    const key = ttTienMatRowKey(r);
+    if (existingByKey.has(key)) continue;
+    const dienGiai = `Chi tiền mặt - người mua: ${r.nguoiMua} - cơ sở: ${r.coSo}`;
+    const newRow = {
+      id: nextId(store, "chi_phi_seq") || Date.now(),
+      congTy: "kh_cu",
+      mien: "nam",
+      ngay: "",
+      gian: r.coSo,
+      ncc: "",
+      soHoaDon: "",
+      soUNC: "",
+      soChungTuLienQuan: "",
+      dienGiai,
+      loaiChiPhi: "Chi tiền mặt",
+      soTien: r.soTien,
+      soTienHoaDonGoc: null,
+      linkHoaDon: r.linkHoaDon,
+      trangThaiHoaDon: r.linkHoaDon
+        ? "Cần mở link kiểm tra (chưa tự đọc được) -- điền Ngày + NCC"
+        : r.linkRawText || "Chưa có hóa đơn -- điền Ngày + NCC",
+      daHachToan: false,
+      nguon: "TT TIỀN MẶT",
+      ghiChu: "",
+      createdAt: new Date().toISOString(),
+      source: sourceLabel,
+    };
+    store.chi_phi.push(newRow);
+    existingByKey.set(key, newRow);
+    added++;
+  }
+  return { added };
+}
+
+function buildChiPhiResultMessage(prefix, result, skippedSheets, ttResult) {
   let msg = `${prefix} thêm ${result.added} khoản chi mới${
     result.monthSummary.length ? " (" + result.monthSummary.join(", ") + ")" : ""
   }.`;
@@ -592,10 +647,14 @@ function buildChiPhiResultMessage(prefix, result, skippedSheets) {
   if (result.addedNoGian > 0) {
     msg += ` CẢNH BÁO: ${result.addedNoGian} dòng không tự xác định được Gian (diễn giải không có cụm "ghế ...") -- cần chị tự điền tay, lọc theo cột Gian trống.`;
   }
+  // Luyen, 2026-08-01: tab "TT TIỀN MẶT" gio DA duoc tu dong nap (Nguoi mua/Co
+  // so/So tien/Link hoa don), khong con nam trong skippedSheets nua -- them
+  // dong rieng bao so dong moi + nhac lai can tu dien Ngay+NCC qua link.
+  if (ttResult && ttResult.added > 0) {
+    msg += ` TT TIỀN MẶT: thêm ${ttResult.added} khoản chi mới (đã có Cơ sở/Số tiền/Link hóa đơn, CẦN chị tự mở link điền Ngày + NCC + Số hóa đơn -- lọc theo Nguồn "TT TIỀN MẶT" và Ngày trống).`;
+  }
   if (skippedSheets.length > 0) {
-    msg += ` Đã bỏ qua sheet không phải "Tháng N.YYYY": ${skippedSheets.join(", ")}${
-      skippedSheets.includes("TT TIỀN MẶT") ? " (tab này cần mở từng link tra cứu thủ công như trước giờ, không tự động parse)" : ""
-    }.`;
+    msg += ` Đã bỏ qua sheet không khớp cấu trúc nào: ${skippedSheets.join(", ")}.`;
   }
   return msg;
 }
@@ -605,16 +664,17 @@ router.post("/chi-phi/upload", requireDataEntry, upload.single("file"), (req, re
   ensureShape(store);
   try {
     if (!req.file) throw new Error("Vui lòng chọn 1 file để tải lên.");
-    const { monthRows, skippedSheets } = parseChiPhiSheetWorkbook(req.file.buffer);
-    if (monthRows.length === 0) {
+    const { monthRows, ttTienMatRows, skippedSheets } = parseChiPhiSheetWorkbook(req.file.buffer);
+    if (monthRows.length === 0 && (!ttTienMatRows || ttTienMatRows.length === 0)) {
       throw new Error(
-        `File không có sheet nào khớp tên dạng "Tháng N.YYYY" (đã thấy: ${skippedSheets.join(", ") || "(không có sheet)"}).`
+        `File không có sheet nào khớp tên dạng "Tháng N.YYYY" hay tab "TT TIỀN MẶT" (đã thấy: ${skippedSheets.join(", ") || "(không có sheet)"}).`
       );
     }
     const sourceLabel = `upload "${req.file.originalname}" ${new Date().toISOString().slice(0, 10)}`;
     const result = applyChiPhiMonthRowsToStore(store, monthRows, sourceLabel, "nam");
+    const ttResult = applyTtTienMatRowsToStore(store, ttTienMatRows || [], sourceLabel);
     save(store);
-    const msg = buildChiPhiResultMessage(`Đã nạp "${req.file.originalname}":`, result, skippedSheets);
+    const msg = buildChiPhiResultMessage(`Đã nạp "${req.file.originalname}":`, result, skippedSheets, ttResult);
     // Sheet nay luon la du lieu Mien Nam (xem applyChiPhiMonthRowsToStore) --
     // ve thang Mien Nam de thay ngay du lieu vua nap, bat ke dang bam nut tu
     // trang Mien Nam hay Mien Bac.
@@ -663,16 +723,17 @@ router.post("/chi-phi/:mien(mien-nam|mien-bac)/cap-nhat-tu-sheet", requireDataEn
         );
       }
       const buf = Buffer.from(await resp.arrayBuffer());
-      const { monthRows, skippedSheets } = parseChiPhiSheetWorkbook(buf);
-      if (monthRows.length === 0) {
+      const { monthRows, ttTienMatRows, skippedSheets } = parseChiPhiSheetWorkbook(buf);
+      if (monthRows.length === 0 && (!ttTienMatRows || ttTienMatRows.length === 0)) {
         throw new Error(
-          `Google Sheet không có sheet nào khớp tên dạng "Tháng N.YYYY" (đã thấy: ${skippedSheets.join(", ") || "(không có sheet)"}).`
+          `Google Sheet không có sheet nào khớp tên dạng "Tháng N.YYYY" hay tab "TT TIỀN MẶT" (đã thấy: ${skippedSheets.join(", ") || "(không có sheet)"}).`
         );
       }
       const sourceLabel = "GG Sheet " + new Date().toISOString().slice(0, 10);
       const result = applyChiPhiMonthRowsToStore(store, monthRows, sourceLabel, "nam");
+      const ttResult = applyTtTienMatRowsToStore(store, ttTienMatRows || [], sourceLabel);
       save(store);
-      const msg = buildChiPhiResultMessage("Đã đọc thẳng từ Google Sheet:", result, skippedSheets);
+      const msg = buildChiPhiResultMessage("Đã đọc thẳng từ Google Sheet:", result, skippedSheets, ttResult);
       res.redirect("/chi-phi/mien-nam?success=" + encodeURIComponent(msg));
     } else {
       const monthRows = [];
