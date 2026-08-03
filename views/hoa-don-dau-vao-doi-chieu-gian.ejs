@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <%- include('partials/head') %>
+</head>
+<body>
+  <%- include('partials/nav') %>
+  <main class="container">
+    <h1>Đối chiếu gian XHD, Tiền thuê — <%= activeCompany === 'kh_cu' ? 'KH Cũ' : 'KH Mới' %></h1>
+    <p class="muted" style="margin-top:-10px;margin-bottom:20px;">
+      Với mỗi gian đã có tên "Bên cho thuê" ở trang Pháp danh (Hợp đồng thuê gian hàng), tìm các hóa đơn ở
+      "Hóa Đơn Đầu Vào" khớp đúng NCC đó (ưu tiên khớp theo MST, không có MST thì khớp theo tên). Đọc Diễn giải
+      từng hóa đơn để tự phân loại: Tiền thuê / Chi phí điện nước / Vượt doanh thu — chị xem qua vì phân loại
+      tự động theo từ khóa, có thể chưa chính xác 100%. Với hóa đơn loại "Tiền thuê", so số tiền với các con số
+      đọc được trong hợp đồng (Tiền thuê/tháng, Tổng tiền thuê/tháng theo sheet, Điều khoản thanh toán).
+    </p>
+
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+    <% if (success) { %><div class="alert alert-success"><%= success %></div><% } %>
+
+    <section class="cards">
+      <div class="card">
+        <div class="card-label">Số gian có hợp đồng (có tên Bên cho thuê)</div>
+        <div class="card-value"><%= soGianCoHopDong %></div>
+      </div>
+      <div class="card">
+        <div class="card-label">Số gian đã khớp được ít nhất 1 hóa đơn</div>
+        <div class="card-value"><%= soGianCoHoaDon %></div>
+      </div>
+    </section>
+
+    <% if (ambiguousInvoices.length > 0) { %>
+    <section class="panel">
+      <div class="panel-head">
+        <h2>⚠ Hóa đơn khớp TRÙNG nhiều gian (<%= ambiguousByNcc.length %> NCC, <%= ambiguousInvoices.length %> hóa đơn) — cần Luyến xem lại</h2>
+      </div>
+      <p class="muted">
+        Các hóa đơn dưới đây khớp tên/MST với NHIỀU hơn 1 hợp đồng thuê gian cùng lúc (thường do 2 gian dùng chung
+        tên rút gọn, ví dụ 1 hợp đồng ghi "Bên cho thuê" chỉ là tên khu vực chung chung) — chưa tự gán vào gian nào
+        để tránh tính trùng 2 lần. Chị bổ sung MST hoặc điền "Mã viết tắt" (aliasGian) rõ hơn ở từng hợp đồng
+        (trang Hợp Đồng Thuê Gian Hàng) để lần sau tự phân biệt được. Bấm vào từng NCC để xem chi tiết từng hóa đơn.
+      </p>
+      <div class="table-scroll">
+        <table class="table">
+          <thead>
+            <tr>
+              <th></th>
+              <th>Tên NCC</th>
+              <th>Số lần</th>
+              <th>Tổng tiền</th>
+              <th>Các gian trùng</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% ambiguousByNcc.forEach(function (g, idx) { %>
+            <tr class="ncc-summary-row" style="cursor:pointer" onclick="toggleNccDetail('ambig-detail-<%= idx %>')">
+              <td><span class="ncc-toggle-caret" id="ambig-caret-<%= idx %>">▶</span></td>
+              <td><%= g.tenNCC %></td>
+              <td><%= g.soLan %></td>
+              <td><%= g.tongSoTien.toLocaleString('vi-VN') %> đ</td>
+              <td><%= g.cacGianTrung %></td>
+            </tr>
+            <tr class="ncc-detail-row" id="ambig-detail-<%= idx %>" style="display:none;">
+              <td colspan="5" style="padding:0 0 14px 0; background:rgba(0,0,0,0.02);">
+                <table class="table" style="margin:0;">
+                  <thead>
+                    <tr>
+                      <th>Ngày HĐ</th>
+                      <th>Số HĐ</th>
+                      <th>Số tiền</th>
+                      <th>Diễn giải</th>
+                      <th>Các gian trùng</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <% g.items.forEach(function (a) { %>
+                    <tr>
+                      <td><%= a.ngayHD %></td>
+                      <td><%= a.soHoaDon %></td>
+                      <td><%= a.soTien.toLocaleString('vi-VN') %> đ</td>
+                      <td style="white-space:pre-line; max-width:320px;"><%= a.dienGiai %></td>
+                      <td><%= a.cacGianTrung %></td>
+                    </tr>
+                    <% }) %>
+                  </tbody>
+                </table>
+              </td>
+            </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </section>
+    <% } %>
+
+    <section class="panel">
+      <div class="table-scroll">
+        <table class="table">
+          <thead>
+            <tr>
+              <th></th>
+              <th>Gian</th>
+              <th>Bên cho thuê (NCC)</th>
+              <th>Tiền thuê/tháng (HĐ)</th>
+              <th>Số hóa đơn khớp</th>
+              <th>Tổng Tiền thuê (XHĐ)</th>
+              <th>Tổng Điện nước</th>
+              <th>Tổng Vượt doanh thu</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% gianResults.forEach(function (g, idx) { %>
+            <tr class="ncc-summary-row" style="cursor:pointer" onclick="toggleNccDetail('gianxhd-detail-<%= idx %>')">
+              <td><span class="ncc-toggle-caret" id="gianxhd-caret-<%= idx %>">▶</span></td>
+              <td><%= g.gian %></td>
+              <td><%= g.benChoThue %></td>
+              <td><%= g.tienThueThang ? g.tienThueThang.toLocaleString('vi-VN') + ' đ' : '(chưa có)' %></td>
+              <td><%= g.invoices.length %></td>
+              <td><%= g.tongTheoLoai['Tiền thuê'].toLocaleString('vi-VN') %> đ</td>
+              <td><%= g.tongTheoLoai['Chi phí điện nước'].toLocaleString('vi-VN') %> đ</td>
+              <td><%= g.tongTheoLoai['Vượt doanh thu'].toLocaleString('vi-VN') %> đ</td>
+            </tr>
+            <tr class="ncc-detail-row" id="gianxhd-detail-<%= idx %>" style="display:none;">
+              <td colspan="8" style="padding:0 0 14px 0; background:rgba(0,0,0,0.02);">
+                <% if (g.rentTiers && g.rentTiers.length > 0) { %>
+                <p class="muted" style="margin:8px 12px;">
+                  Các mức giá thuê theo thời gian đọc được từ hợp đồng (dùng đúng mức cho từng hóa đơn theo ngày):
+                  <% g.rentTiers.forEach(function (t, ti) { %>
+                    <%= ti > 0 ? '; ' : '' %>Từ <%= t.tuNgay %> đến <%= t.denNgay %>: <%= t.soTien.toLocaleString('vi-VN') %>đ/tháng
+                  <% }) %>
+                </p>
+                <% } else if (g.expectedAmounts.length > 0) { %>
+                <p class="muted" style="margin:8px 12px;">
+                  Số tiền thuê đọc được từ hợp đồng (để so sánh):
+                  <%= g.expectedAmounts.map(a => a.toLocaleString('vi-VN') + 'đ').join(', ') %>
+                </p>
+                <% } else { %>
+                <p class="muted" style="margin:8px 12px;">Hợp đồng chưa có số tiền thuê rõ ràng để so sánh.</p>
+                <% } %>
+                <% if (g.invoices.length === 0) { %>
+                <p class="muted" style="margin:8px 12px;">Chưa khớp được hóa đơn nào cho NCC này.</p>
+                <% } else { %>
+                <table class="table" style="margin:0;">
+                  <thead>
+                    <tr>
+                      <th>Tháng</th>
+                      <th>Ngày HĐ</th>
+                      <th>Số HĐ</th>
+                      <th>Diễn giải</th>
+                      <th>Số tiền</th>
+                      <th>Loại</th>
+                      <th>Khớp hợp đồng?</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <% g.invoices.forEach(function (inv) { %>
+                    <tr>
+                      <td><%= inv.thang %></td>
+                      <td><%= inv.ngayHD %></td>
+                      <td><%= inv.soHoaDon %><% if (inv.kyHieuHD) { %> <span class="muted">(<%= inv.kyHieuHD %>)</span><% } %></td>
+                      <td style="white-space:pre-line; max-width:320px;"><%= inv.dienGiai %></td>
+                      <td><%= inv.soTien.toLocaleString('vi-VN') %> đ</td>
+                      <td><%= inv.loai %></td>
+                      <td>
+                        <% if (inv.khopHopDong === true) { %>
+                        <span class="badge badge-thu">✓ Khớp</span>
+                        <% } else if (inv.khopHopDong === false) { %>
+                        <span class="badge badge-warn">Không khớp</span>
+                        <% } else { %>
+                        <span class="muted">-</span>
+                        <% } %>
+                      </td>
+                    </tr>
+                    <% }) %>
+                  </tbody>
+                </table>
+                <% } %>
+              </td>
+            </tr>
+            <% }) %>
+            <% if (gianResults.length === 0) { %>
+            <tr><td colspan="8" class="muted">Chưa có gian nào có tên "Bên cho thuê" ở Pháp danh — cần điền trước ở trang Hợp đồng thuê gian hàng.</td></tr>
+            <% } %>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <script>
+      function toggleNccDetail(id) {
+        var row = document.getElementById(id);
+        var caretId = id.replace('gianxhd-detail-', 'gianxhd-caret-').replace('ambig-detail-', 'ambig-caret-');
+        var caret = document.getElementById(caretId);
+        if (!row) return;
+        var isHidden = row.style.display === 'none' || !row.style.display;
+        row.style.display = isHidden ? 'table-row' : 'none';
+        if (caret) caret.textContent = isHidden ? '▼' : '▶';
+      }
+    </script>
+  </main>
+</body>
+</html>

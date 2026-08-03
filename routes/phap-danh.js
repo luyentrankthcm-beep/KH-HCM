@@ -6,6 +6,8 @@ const { requireLogin, requireAdmin, requireDataEntry } = require("../middleware/
 const { getCompany, COMPANIES } = require("../utils/companies");
 const { parseHopDongHcmWorkbook, isNccRow } = require("../utils/hopDongHcmParser");
 const { parseAmount } = require("../utils/parse");
+const { parseGianSheetWorkbook, normVN } = require("../utils/hoaDonDauVaoEnrich");
+const { removeDiacritics } = require("../utils/rentPaymentMatcher");
 
 const router = express.Router();
 router.use(requireLogin);
@@ -213,6 +215,17 @@ function resolveThangFilter(req) {
   return raw || currentMonthStr;
 }
 
+// Luyen, 2026-08-01 (lan 6): "tôi đang chọn Hợp đồng thuê gian của miền nam
+// cơ mà soa lại có cả miền bắc vào đấy" -- truoc gio trang Nam KHONG loc theo
+// "mien" (hien TAT CA gian bat ke Nam/Bac), khong sao khi CHUA co du lieu
+// Mien Bac that; nay Luyen da tu cap nhat xong trang Mien Bac (gian nhu KVC
+// ROYAL/KVC TIMES/LOTTE BAC GIANG KVC... co mien="bac") nen bi lan CHUNG vao
+// trang Nam. Them dieu kien loc r.mien !== "bac" (gian cu chua co truong mien
+// se mac dinh "nam" qua ensureThueDefaults, khong bi anh huong).
+function isMienNamRow(r) {
+  return r.mien !== "bac";
+}
+
 router.get("/phap-danh/hop-dong-thue-gian-hang", (req, res) => {
   const store = load();
   ensureShape(store);
@@ -222,7 +235,7 @@ router.get("/phap-danh/hop-dong-thue-gian-hang", (req, res) => {
   const todayStr = new Date().toISOString().slice(0, 10);
   let rows = store.phap_danh_hop_dong_thue
     .map(ensureThueDefaults)
-    .filter((r) => (r.congTy || "kh_cu") === activeCompany);
+    .filter((r) => (r.congTy || "kh_cu") === activeCompany && isMienNamRow(r));
   if (loaiFilter) rows = rows.filter((r) => r.loaiHinh === loaiFilter);
   if (thangFilter) rows = rows.filter((r) => monthOverlaps(r, thangFilter));
   rows.forEach((r) => {
@@ -230,8 +243,12 @@ router.get("/phap-danh/hop-dong-thue-gian-hang", (req, res) => {
   });
   rows.sort((a, b) => (a.loaiHinh === b.loaiHinh ? a.gian.localeCompare(b.gian) : a.loaiHinh.localeCompare(b.loaiHinh)));
   const counts = {
-    "Khu vui chơi": store.phap_danh_hop_dong_thue.filter((r) => (r.congTy || "kh_cu") === activeCompany && r.loaiHinh === "Khu vui chơi").length,
-    "Máy tự động": store.phap_danh_hop_dong_thue.filter((r) => (r.congTy || "kh_cu") === activeCompany && r.loaiHinh === "Máy tự động").length,
+    "Khu vui chơi": store.phap_danh_hop_dong_thue.filter(
+      (r) => (r.congTy || "kh_cu") === activeCompany && isMienNamRow(r) && r.loaiHinh === "Khu vui chơi"
+    ).length,
+    "Máy tự động": store.phap_danh_hop_dong_thue.filter(
+      (r) => (r.congTy || "kh_cu") === activeCompany && isMienNamRow(r) && r.loaiHinh === "Máy tự động"
+    ).length,
   };
   res.render("phapdanh-hopdong-thue", {
     userName: req.session.userName,
@@ -239,7 +256,9 @@ router.get("/phap-danh/hop-dong-thue-gian-hang", (req, res) => {
     loaiFilter,
     thangFilter,
     counts,
-    totalForCompany: store.phap_danh_hop_dong_thue.filter((r) => (r.congTy || "kh_cu") === activeCompany).length,
+    totalForCompany: store.phap_danh_hop_dong_thue.filter(
+      (r) => (r.congTy || "kh_cu") === activeCompany && isMienNamRow(r)
+    ).length,
     error: req.query.error || null,
     success: req.query.success || null,
   });
@@ -259,7 +278,7 @@ router.get("/phap-danh/hop-dong-thue-gian-hang/export.xlsx", (req, res) => {
   const todayStr = new Date().toISOString().slice(0, 10);
   let rows = store.phap_danh_hop_dong_thue
     .map(ensureThueDefaults)
-    .filter((r) => (r.congTy || "kh_cu") === activeCompany);
+    .filter((r) => (r.congTy || "kh_cu") === activeCompany && isMienNamRow(r));
   if (loaiFilter) rows = rows.filter((r) => r.loaiHinh === loaiFilter);
   if (thangFilter) rows = rows.filter((r) => monthOverlaps(r, thangFilter));
   rows.forEach((r) => {
@@ -389,7 +408,7 @@ router.post("/phap-danh/hop-dong-thue-gian-hang/:id/chuyen-sang-ncc", requireAdm
   ensureShape(store);
   const idx = store.phap_danh_hop_dong_thue.findIndex((r) => String(r.id) === req.params.id);
   if (idx === -1) {
-    return res.redirect("/phap-danh/hop-dong-thue-gian-hang?error=" + encodeURIComponent("Không tìm thấy hợp đồng này."));
+    return res.redirect(thueGianListPath(req) + "?error=" + encodeURIComponent("Không tìm thấy hợp đồng này."));
   }
   const r = ensureThueDefaults(store.phap_danh_hop_dong_thue[idx]);
   const nccRec = ensureNccDefaults({
@@ -426,8 +445,7 @@ router.post("/phap-danh/hop-dong-thue-gian-hang/:id/chuyen-sang-ncc", requireAdm
   store.phap_danh_hop_dong_thue.splice(idx, 1);
   save(store);
   res.redirect(
-    "/phap-danh/hop-dong-thue-gian-hang?success=" +
-      encodeURIComponent(`Đã chuyển "${nccRec.tenNCC}" sang Hợp đồng NCC.`)
+    thueGianListPath(req) + "?success=" + encodeURIComponent(`Đã chuyển "${nccRec.tenNCC}" sang Hợp đồng NCC.`)
   );
 });
 
@@ -436,12 +454,24 @@ router.post("/phap-danh/hop-dong-thue-gian-hang/:id/chuyen-sang-ncc", requireAdm
 // chon tay 1 gian la "doanh thu chia se" (dung cho cot Tai Khoan 131/1388 ben
 // trang Chi Phi), khong phu thuoc vao viec dieu khoan hop dong co ghi ro hay
 // khong. Giu nguyen loai/thang filter dang xem khi redirect ve.
+// Luyen, 2026-08-01: cac route hanh dong tren tung dong (doanh-thu-chia-se,
+// loai-chia-se, mien, alias-gian, chuyen-sang-ncc) dung CHUNG cho ca 2 trang
+// Nam/Bac (cung thao tac tren cung mang store.phap_danh_hop_dong_thue, chi
+// khac o trang hien thi) -- dung field an "listPath=mien-bac" tren form de
+// biet redirect ve trang nao, mac dinh ve trang Nam (form Nam khong gui field
+// nay, giu nguyen hanh vi cu).
+function thueGianListPath(req) {
+  return req.body && req.body.listPath === "mien-bac"
+    ? "/phap-danh/hop-dong-thue-gian-hang-mien-bac"
+    : "/phap-danh/hop-dong-thue-gian-hang";
+}
+
 function redirectBackToThueGianList(req, res, extra) {
   const qs = [];
   if (req.body.loai) qs.push("loai=" + encodeURIComponent(req.body.loai));
   if (req.body.thang) qs.push("thang=" + encodeURIComponent(req.body.thang));
   Object.entries(extra || {}).forEach(([k, v]) => qs.push(k + "=" + encodeURIComponent(v)));
-  res.redirect("/phap-danh/hop-dong-thue-gian-hang" + (qs.length ? "?" + qs.join("&") : ""));
+  res.redirect(thueGianListPath(req) + (qs.length ? "?" + qs.join("&") : ""));
 }
 
 router.post("/phap-danh/hop-dong-thue-gian-hang/:id/doanh-thu-chia-se", requireAdmin, (req, res) => {
@@ -665,6 +695,343 @@ router.post("/phap-danh/hop-dong-thue-gian-hang/cap-nhat-tu-sheet", requireAdmin
     res.redirect("/phap-danh/hop-dong-thue-gian-hang?success=" + encodeURIComponent(msg));
   } catch (e) {
     res.redirect("/phap-danh/hop-dong-thue-gian-hang?error=" + encodeURIComponent(e.message));
+  }
+});
+
+// ---------- Hop Dong Thue Gian Hang MIEN BAC ----------
+// Luyen, 2026-08-01: "có thêm tôi 1 trang là hợp đồng thuê gian hàng miền
+// bắc ... chia từ gg sheet [Danh sách các gian] để có thể lấy ra tên gian
+// với hợp đồng bên cạnh của 2 sheet Hà Nội MTD và HN KVC á nếu thiếu á bạn
+// sẽ lấy trên link giống miền nam [...] sheet HN-Chị Nhung". Khac voi trang
+// Nam o tren (nguon CHINH la sheet hop dong "THEO DOI HD HN-HCM", suy gian tu
+// dia diem), trang nay nguon CHINH la sheet "Danh sách các gian" (cung file
+// dung o Hoa Don Dau Vao, xem parseGianSheetWorkbook trong
+// utils/hoaDonDauVaoEnrich.js) -- loc rieng 2 tab "HÀ NỘI MTD"/"HÀ NỘI KVC"
+// lay danh sach gian That + "Mã Điểm Thuê" (dung lam "gian" xuyen suot app)
+// + ten/MST ben cho thue co san. BO SUNG THEM (neu khop duoc) chi tiet hop
+// dong (so HD, ngay ky/het han, tien coc, link...) tu tab "HN-Chị Nhung"
+// (cung 1 file voi sheet Hop Dong NCC, khac gid) qua parseHopDongHcmWorkbook
+// voi opts.anyRegion=true -- CHUA the xac nhan quy uoc cot "KV" cua tab nay
+// (tuong tu ket noi Google bi chan boi buoc xac minh tai khoan khac, xem
+// utils/hopDongHcmParser.js) nen dung an toan nhat la bo qua han loc do, Luyen
+// kiem tra ky ket qua lan chay dau tien (neu 0 dong hoac sai gian, bao lai).
+const GIAN_SHEET_MIEN_BAC_XLSX_URL =
+  process.env.HOA_DON_DAU_VAO_GIAN_SHEET_URL ||
+  "https://docs.google.com/spreadsheets/d/1Fd5v128o6eVuzHqtYzV5Eef62YtW6x5X/export?format=xlsx";
+const NCC_SHEET_MIEN_BAC_CSV_URL =
+  process.env.HOP_DONG_MIEN_BAC_SHEET_CSV_URL ||
+  "https://docs.google.com/spreadsheets/d/1Kh_IDjW580UFwyrB1ESqdAZvMLLe5sffLrjRUxjS-DI/export?format=csv&gid=480440647";
+
+function isHaNoiSheetLabel(label) {
+  return normVN(label).includes("ha noi");
+}
+
+function loaiHinhFromSheetLabel(label) {
+  const n = normVN(label);
+  if (n.includes("mtd")) return "Máy tự động";
+  if (n.includes("kvc")) return "Khu vui chơi";
+  return "";
+}
+
+// Khoa ghep AN TOAN gian mien Bac da co: "gian" (= Ma Diem Thue, nguon goc
+// xac dinh gian nay, khong nhu Nam dung soHopDongHCM vi nguon Nam la hop dong)
+// + congTy.
+function mienBacGroupKey(gian, congTy) {
+  return (gian || "") + "||" + (congTy || "");
+}
+
+router.get("/phap-danh/hop-dong-thue-gian-hang-mien-bac", (req, res) => {
+  const store = load();
+  ensureShape(store);
+  const activeCompany = getCompany(req);
+  const loaiFilter = req.query.loai || "";
+  const thangFilter = resolveThangFilter(req);
+  const todayStr = new Date().toISOString().slice(0, 10);
+  let rows = store.phap_danh_hop_dong_thue
+    .map(ensureThueDefaults)
+    .filter((r) => (r.congTy || "kh_cu") === activeCompany && r.mien === "bac");
+  if (loaiFilter) rows = rows.filter((r) => r.loaiHinh === loaiFilter);
+  if (thangFilter) rows = rows.filter((r) => monthOverlaps(r, thangFilter));
+  rows.forEach((r) => {
+    r.trangThaiHD = computeTrangThaiHD(r, todayStr);
+  });
+  rows.sort((a, b) => (a.loaiHinh === b.loaiHinh ? a.gian.localeCompare(b.gian) : a.loaiHinh.localeCompare(b.loaiHinh)));
+  const counts = {
+    "Khu vui chơi": store.phap_danh_hop_dong_thue.filter(
+      (r) => (r.congTy || "kh_cu") === activeCompany && r.mien === "bac" && r.loaiHinh === "Khu vui chơi"
+    ).length,
+    "Máy tự động": store.phap_danh_hop_dong_thue.filter(
+      (r) => (r.congTy || "kh_cu") === activeCompany && r.mien === "bac" && r.loaiHinh === "Máy tự động"
+    ).length,
+  };
+  res.render("phapdanh-hopdong-thue-mienbac", {
+    userName: req.session.userName,
+    rows,
+    loaiFilter,
+    thangFilter,
+    counts,
+    totalForCompany: store.phap_danh_hop_dong_thue.filter(
+      (r) => (r.congTy || "kh_cu") === activeCompany && r.mien === "bac"
+    ).length,
+    error: req.query.error || null,
+    success: req.query.success || null,
+  });
+});
+
+router.get("/phap-danh/hop-dong-thue-gian-hang-mien-bac/export.xlsx", (req, res) => {
+  const store = load();
+  ensureShape(store);
+  const activeCompany = getCompany(req);
+  const loaiFilter = req.query.loai || "";
+  const thangFilter = req.query.thang || "";
+  const todayStr = new Date().toISOString().slice(0, 10);
+  let rows = store.phap_danh_hop_dong_thue
+    .map(ensureThueDefaults)
+    .filter((r) => (r.congTy || "kh_cu") === activeCompany && r.mien === "bac");
+  if (loaiFilter) rows = rows.filter((r) => r.loaiHinh === loaiFilter);
+  if (thangFilter) rows = rows.filter((r) => monthOverlaps(r, thangFilter));
+  rows.forEach((r) => {
+    r.trangThaiHD = computeTrangThaiHD(r, todayStr);
+  });
+  rows.sort((a, b) => (a.loaiHinh === b.loaiHinh ? a.gian.localeCompare(b.gian) : a.loaiHinh.localeCompare(b.loaiHinh)));
+
+  const exportRows = rows.map((r) => ({
+    "Loại hình": r.loaiHinh,
+    Gian: r.gian,
+    "Tên điểm nội bộ": r.tenDiemNoiBo,
+    "Mã công trình": r.maCongTrinh,
+    "Mã KH": r.maKH,
+    "Bên cho thuê": r.benChoThue,
+    "MST bên cho thuê": r.mstBenChoThue,
+    "Hình thức HT": r.hinhThucHopTac,
+    "Hình thức thu tiền": r.hinhThucThuTien,
+    "Trạng thái HĐ": r.trangThaiHD,
+    "Thời hạn hợp đồng": r.thoiHanHopDong,
+    "Tiền thuê/tháng": r.tienThueThang,
+    "Số HĐ (sheet HN)": r.soHopDongHCM,
+    "Ngày ký HĐ": r.ngayKyHD,
+    "Ngày bắt đầu HĐ": r.ngayBatDauHD,
+    "Ngày hết hạn HĐ": r.ngayHetHanHD,
+    "Tiền cọc đảm bảo": r.tienCocDamBao,
+    "Tiền cọc thi công": r.tienCocThiCong,
+    "Tiền thuê/tháng (sheet HN)": r.tongTienThueThangHCM,
+    "Điều khoản thanh toán": r.dieuKhoanThanhToan,
+    "Link HĐ đủ dấu": r.linkHopDongDuDau,
+    "Link HĐ chưa đủ dấu": r.linkHopDongChuaDuDau,
+    "Ghi chú": r.ghiChu,
+  }));
+
+  const ws = XLSX.utils.json_to_sheet(exportRows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Thue gian hang MB");
+  const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
+
+  res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+  res.setHeader(
+    "Content-Disposition",
+    `attachment; filename=hop-dong-thue-gian-hang-mien-bac-${activeCompany}.xlsx`
+  );
+  res.send(buf);
+});
+
+router.post("/phap-danh/hop-dong-thue-gian-hang-mien-bac", requireAdmin, (req, res) => {
+  const store = load();
+  ensureShape(store);
+  const activeCompany = getCompany(req);
+  try {
+    const {
+      loaiHinh,
+      gian,
+      tenDiemNoiBo,
+      maCongTrinh,
+      maKH,
+      benChoThue,
+      mstBenChoThue,
+      hinhThucHopTac,
+      trangThaiHoatDong,
+      thoiHanHopDong,
+      tienThueThang,
+      ghiChu,
+      linkHopDongChuaDuDau,
+    } = req.body;
+    if (!gian || !gian.trim()) throw new Error("Thiếu Gian/Mặt bằng.");
+    const amt = tienThueThang ? Number(String(tienThueThang).replace(/[^\d]/g, "")) : 0;
+    store.phap_danh_hop_dong_thue.push({
+      id: nextId(store, "phap_danh_hop_dong_thue_seq") || Date.now(),
+      loaiHinh: loaiHinh || "",
+      congTy: activeCompany,
+      maDiemMisa: "",
+      tenDiemNoiBo: (tenDiemNoiBo || "").trim(),
+      khuVuc: "",
+      gian: gian.trim(),
+      maCongTrinh: (maCongTrinh || "").trim(),
+      maKH: (maKH || "").trim(),
+      benChoThue: (benChoThue || "").trim(),
+      mstBenChoThue: (mstBenChoThue || "").trim(),
+      hinhThucHopTac: (hinhThucHopTac || "").trim(),
+      trangThaiHoatDong: (trangThaiHoatDong || "").trim(),
+      thoiHanHopDong: (thoiHanHopDong || "").trim(),
+      tienThueThang: amt,
+      ghiChu: (ghiChu || "").trim(),
+      linkHopDongChuaDuDau: (linkHopDongChuaDuDau || "").trim(),
+      mien: "bac",
+      createdAt: new Date().toISOString(),
+      source: "nhap tay",
+    });
+    save(store);
+    res.redirect("/phap-danh/hop-dong-thue-gian-hang-mien-bac?success=" + encodeURIComponent("Đã lưu hợp đồng."));
+  } catch (e) {
+    res.redirect("/phap-danh/hop-dong-thue-gian-hang-mien-bac?error=" + encodeURIComponent(e.message));
+  }
+});
+
+router.post("/phap-danh/hop-dong-thue-gian-hang-mien-bac/:id/delete", requireAdmin, (req, res) => {
+  const store = load();
+  ensureShape(store);
+  store.phap_danh_hop_dong_thue = store.phap_danh_hop_dong_thue.filter((r) => String(r.id) !== req.params.id);
+  save(store);
+  res.redirect("/phap-danh/hop-dong-thue-gian-hang-mien-bac?success=" + encodeURIComponent("Đã xóa hợp đồng."));
+});
+
+router.post("/phap-danh/hop-dong-thue-gian-hang-mien-bac/cap-nhat-tu-sheet", requireAdmin, async (req, res) => {
+  const store = load();
+  ensureShape(store);
+  try {
+    const gianResp = await fetch(GIAN_SHEET_MIEN_BAC_XLSX_URL);
+    if (!gianResp.ok) {
+      throw new Error(`Không đọc được Google Sheet "Danh sách các gian" (mã lỗi ${gianResp.status}).`);
+    }
+    const gianBuf = Buffer.from(await gianResp.arrayBuffer());
+    const { rows: allGianRows, sheetsRead } = parseGianSheetWorkbook(gianBuf);
+    const gianRowsMienBac = allGianRows.filter((r) => isHaNoiSheetLabel(r.sheetLabel) && r.maDiemThue);
+    if (gianRowsMienBac.length === 0) {
+      throw new Error(
+        `Không tìm thấy dòng nào ở 2 tab Hà Nội có "Mã Điểm Thuê" (đã đọc được các tab: ${sheetsRead.join(", ")}).`
+      );
+    }
+
+    // Chi tiet hop dong bo sung (so HD, ngay, tien coc, link...) -- KHONG bat
+    // buoc, loi/khong doc duoc van tao/cap nhat gian binh thuong, chi thieu
+    // phan bo sung nay (Luyen tu dien tay sau).
+    let hdDetailRows = [];
+    let hdSheetWarning = "";
+    try {
+      const hdResp = await fetch(NCC_SHEET_MIEN_BAC_CSV_URL);
+      if (hdResp.ok) {
+        const hdBuf = Buffer.from(await hdResp.arrayBuffer());
+        const { rows } = parseHopDongHcmWorkbook(hdBuf, { anyRegion: true });
+        hdDetailRows = rows.filter((r) => !isNccRow(r));
+      } else {
+        hdSheetWarning = `Không đọc được sheet "HN-Chị Nhung" (mã lỗi ${hdResp.status}) -- vẫn tạo/cập nhật gian, chỉ thiếu phần chi tiết hợp đồng bổ sung.`;
+      }
+    } catch (e2) {
+      hdSheetWarning = `Lỗi đọc sheet "HN-Chị Nhung" (${e2.message}) -- vẫn tạo/cập nhật gian, chỉ thiếu phần chi tiết hợp đồng bổ sung.`;
+    }
+
+    function findHdDetailMatch(mst, ten) {
+      const mstNorm = (mst || "").replace(/\D/g, "");
+      if (mstNorm) {
+        const byMst = hdDetailRows.find((r) => (r.mstKH || "").replace(/\D/g, "") === mstNorm);
+        if (byMst) return byMst;
+      }
+      const tenNorm = normVN(ten);
+      if (!tenNorm) return null;
+      const byName = hdDetailRows.filter(
+        (r) => normVN(r.tenKH) === tenNorm || (r.diaDiem && normVN(r.diaDiem).includes(tenNorm))
+      );
+      return byName.length === 1 ? byName[0] : null;
+    }
+
+    const existingByGian = new Map();
+    store.phap_danh_hop_dong_thue.forEach((r) => {
+      if (r.mien === "bac" && r.gian) existingByGian.set(mienBacGroupKey(r.gian, r.congTy || "kh_cu"), r);
+    });
+
+    const SOURCE_TAG = "GG Sheet (Miền Bắc) " + new Date().toISOString().slice(0, 10);
+    let addedNew = 0;
+    let updatedExisting = 0;
+    let matchedHdDetail = 0;
+    const addedNames = [];
+    const updatedNames = [];
+
+    gianRowsMienBac.forEach((g) => {
+      const congTy = g.congTy || "kh_cu";
+      const key = mienBacGroupKey(g.maDiemThue, congTy);
+      const hd = findHdDetailMatch(g.mstKhachHang, g.tenKhachHang);
+      if (hd) matchedHdDetail++;
+      const hdFields = hd
+        ? {
+            soHopDongHCM: hd.soHopDong || "",
+            ngayKyHD: hd.ngayKyHD || "",
+            ngayBatDauHD: hd.ngayBatDauHD || "",
+            ngayHetHanHD: hd.ngayHetHan || "",
+            baoHanHD: hd.baoHanHD || "",
+            tienCocDamBao: hd.tienCocDamBao !== null && hd.tienCocDamBao !== undefined ? hd.tienCocDamBao : "",
+            tienCocThiCong: hd.tienCocThiCong !== null && hd.tienCocThiCong !== undefined ? hd.tienCocThiCong : "",
+            tongTienThueThangHCM:
+              hd.tongTienThueThang !== null && hd.tongTienThueThang !== undefined
+                ? String(hd.tongTienThueThang).trim()
+                : "",
+            linkHopDongDuDau: hd.linkHDduDau || "",
+            linkHopDongChuaDuDau: hd.linkHDchuaDuDau || "",
+            sheetHCMThamKhao: `HN-Chị Nhung, khớp qua ${g.mstKhachHang ? "MST" : "tên"}`,
+          }
+        : {};
+
+      const existing = existingByGian.get(key);
+      if (existing) {
+        Object.assign(existing, hdFields);
+        if (!existing.tenDiemNoiBo && g.gianHang) existing.tenDiemNoiBo = g.gianHang;
+        if (!existing.benChoThue && g.tenKhachHang) existing.benChoThue = g.tenKhachHang;
+        if (!existing.mstBenChoThue && g.mstKhachHang) existing.mstBenChoThue = g.mstKhachHang;
+        if (!existing.hinhThucHopTac && g.hinhThucHopTac) existing.hinhThucHopTac = g.hinhThucHopTac;
+        if (!existing.loaiHinh && loaiHinhFromSheetLabel(g.sheetLabel)) {
+          existing.loaiHinh = loaiHinhFromSheetLabel(g.sheetLabel);
+        }
+        updatedExisting++;
+        updatedNames.push(existing.gian);
+      } else {
+        store.phap_danh_hop_dong_thue.push({
+          id: nextId(store, "phap_danh_hop_dong_thue_seq") || Date.now(),
+          loaiHinh: loaiHinhFromSheetLabel(g.sheetLabel),
+          congTy,
+          maDiemMisa: "",
+          tenDiemNoiBo: g.gianHang || "",
+          khuVuc: "",
+          gian: g.maDiemThue,
+          maCongTrinh: "",
+          maKH: "",
+          benChoThue: g.tenKhachHang || "",
+          mstBenChoThue: g.mstKhachHang || "",
+          hinhThucHopTac: g.hinhThucHopTac || "",
+          trangThaiHoatDong: "",
+          thoiHanHopDong: "",
+          tienThueThang: 0,
+          ghiChu: hd
+            ? `Import tự động từ ${SOURCE_TAG} (khớp được chi tiết hợp đồng từ HN-Chị Nhung).`
+            : `Import tự động từ ${SOURCE_TAG} -- CHỊ CẦN TỰ ĐIỀN: Thời hạn HĐ, Tiền thuê/tháng (chưa khớp được chi tiết hợp đồng từ HN-Chị Nhung).`,
+          dieuKhoanThanhToan: "",
+          hinhThucThuTien: "",
+          mien: "bac",
+          ...hdFields,
+          createdAt: new Date().toISOString(),
+          source: SOURCE_TAG,
+        });
+        addedNew++;
+        addedNames.push(g.maDiemThue);
+      }
+    });
+
+    save(store);
+    let msg = `Đã đọc từ Google Sheet "Danh sách các gian" (${sheetsRead.join(
+      ", "
+    )}): ${gianRowsMienBac.length} gian miền Bắc. Khớp được chi tiết hợp đồng (số HĐ, ngày, tiền cọc...) cho ${matchedHdDetail} gian từ tab "HN-Chị Nhung". `;
+    if (updatedExisting > 0) msg += `Đã cập nhật ${updatedExisting} gian đã có: ${updatedNames.join(", ")}. `;
+    if (addedNew > 0) msg += `Thêm ${addedNew} gian MỚI: ${addedNames.join(", ")}. `;
+    if (hdSheetWarning) msg += hdSheetWarning;
+    res.redirect("/phap-danh/hop-dong-thue-gian-hang-mien-bac?success=" + encodeURIComponent(msg));
+  } catch (e) {
+    res.redirect("/phap-danh/hop-dong-thue-gian-hang-mien-bac?error=" + encodeURIComponent(e.message));
   }
 });
 
@@ -1124,3 +1491,13 @@ router.post("/phap-danh/doanh-thu-chia-se/xuat-hoa-don/:id/delete", requireDataE
 });
 
 module.exports = router;
+// Luyen, 2026-08-01: "từ cái hợp đồng thuê gian á nó sẽ có tên đối tác ký hợp
+// đồng với mình từ cái tên đó bạn map với lại hóa đơn đầu vào" -- trang moi
+// "Đối chiếu gian XHD, Tiền thuê" (routes/hoa-don-dau-vao.js) can doc lai
+// danh sach hop dong thue gian (benChoThue/tienThueThang/...) -- xuat them
+// cac ham nay (truoc gio chi co router duoc export) de dung LAI, khong doan
+// lai/copy code (giong cach congno-ncc.js dang dung lai ensureShape/
+// ensureDefaults/groupRowsByInvoice cua hoa-don-dau-vao.js).
+module.exports.ensureShape = ensureShape;
+module.exports.ensureThueDefaults = ensureThueDefaults;
+module.exports.computeTrangThaiHD = computeTrangThaiHD;

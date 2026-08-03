@@ -86,8 +86,22 @@
     <!-- Chi Nhan, 2026-07-28: "thêm cho tôi 1 trang hóa đơn đầu vào kh cũ và
          kh mới nhá nội dung tôi sẽ nối sao" -- trang moi, khung rong (giong
          tien le Phap danh) de Chi Nhan tu nhap tay, tach theo cong ty qua nut
-         Cu/Moi o topbar (khong can dropdown rieng). -->
-    <a href="/hoa-don-dau-vao">Hóa Đơn Đầu Vào</a>
+         Cu/Moi o topbar (khong can dropdown rieng).
+         Luyen, 2026-08-01: "thêm cho tôi trong Hóa đơn đầu vào này 2 trang á 1
+         là hóa đơn đầu vào như hiện tại 2 là Đối chiếu gian XHD,Tiền thuê nhá
+         thêm trang trc đi tôi sẽ diễn tả sao" -- gop thanh 1 dropdown giong
+         kieu Chi Phi/Phap danh o duoi, thay vi 1 link doc: giu nguyen trang
+         "Hóa đơn đầu vào" cu, them 1 trang MOI "Đối chiếu gian XHD, Tiền thuê"
+         (khung rong, cho Luyen mo ta noi dung cu the sau). -->
+    <div class="nav-dropdown" id="navDropdownHoaDonDauVao">
+      <button type="button" class="nav-dropdown-toggle" onclick="toggleNavDropdown('navDropdownHoaDonDauVao')">
+        Hóa Đơn Đầu Vào <span class="caret">▾</span>
+      </button>
+      <div class="nav-dropdown-menu">
+        <a href="/hoa-don-dau-vao">Hóa Đơn Đầu Vào</a>
+        <a href="/hoa-don-dau-vao/doi-chieu-gian-xhd-tien-thue">Đối chiếu gian XHD, Tiền thuê</a>
+      </div>
+    </div>
     <!-- Luyen, 2026-07-20: "thêm cho tôi 1 trang bên kh cũ và kh mới tên là
          Chi phí nhá" -- trang so ghi chi phi moi, khac voi "Doi soat Chi phi"
          trong dropdown Ngan hang. Tach theo cong ty qua nut Cu/Moi o topbar
@@ -122,6 +136,7 @@
       </button>
       <div class="nav-dropdown-menu">
         <a href="/phap-danh/hop-dong-thue-gian-hang">Hợp Đồng Thuê Gian Hàng</a>
+        <a href="/phap-danh/hop-dong-thue-gian-hang-mien-bac">Hợp Đồng Thuê Gian Hàng Miền Bắc</a>
         <a href="/phap-danh/hop-dong-ncc">Hợp Đồng NCC</a>
         <a href="/phap-danh/doanh-thu-chia-se">Đối Soát Doanh Thu Chia Sẻ</a>
       </div>

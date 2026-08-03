@@ -109,7 +109,20 @@ function normCongTy(v) {
 // co "PK" o dau), tu giai ma bang Buffer.toString("utf8") TRUOC roi moi dua
 // cho XLSX duoi dang "string" -- tranh hoan toan buoc doan sai encoding cua
 // XLSX cho truong hop nay.
-function parseHopDongHcmWorkbook(buffer) {
+// Luyen, 2026-08-01: "thêm tôi 1 trang là hợp đồng thuê gian hàng miền bắc
+// ... lấy trên link giống miền nam sheet HN-Chị Nhung nhá bố cục hay các
+// thông tin chi tiết hóa đơn bạn cx đọc như của Miền nam nhưng mà chỗ nội
+// dung khác thôi nhá" -- dung LAI chinh xac ham nay cho tab "HN-Chị Nhung"
+// (cung file, khac gid) vi vi tri cot giong het nhau, CHI khac o cho loc
+// cot A "KV" (truoc gio hardcode == "HCM", tab Ha Noi rieng co the ghi "HN"/
+// "Hà Nội"/khac hoac khong dung quy uoc nay). Them tham so `opts` de KHONG
+// pha vo 2 noi dang goi ham nay (Hop Dong NCC + Hop Dong Thue Gian Hang Mien
+// Nam) -- khong truyen gi van dung DUNG HANH VI CU (chi lay dong "HCM").
+// `opts.anyRegion=true`: bo qua han loc cot KV hoan toan (dung an toan nhat
+// khi chua chac chan quy uoc cot KV cua tab moi, tranh loc nham ra 0 dong).
+function parseHopDongHcmWorkbook(buffer, opts) {
+  const anyRegion = !!(opts && opts.anyRegion);
+  const regionValues = (opts && opts.regionValues) || ["HCM"];
   const isZip = Buffer.isBuffer(buffer) && buffer.length > 1 && buffer[0] === 0x50 && buffer[1] === 0x4b;
   const wb = isZip ? XLSX.read(buffer, { type: "buffer" }) : XLSX.read(buffer.toString("utf8"), { type: "string" });
   const sheetName = wb.SheetNames.includes(SHEET_NAME) ? SHEET_NAME : wb.SheetNames[0];
@@ -120,7 +133,7 @@ function parseHopDongHcmWorkbook(buffer) {
   for (let r = 1; r < grid.length; r++) {
     const row = grid[r] || [];
     const kv = cellText(row[0]);
-    if (kv.toUpperCase() !== "HCM") continue; // web nay chi theo doi khu vuc HCM
+    if (!anyRegion && !regionValues.includes(kv.toUpperCase())) continue; // gioi han khu vuc (mac dinh HCM, giu nguyen hanh vi cu)
     const soHopDong = cellText(row[9]);
     const noiDungHD = cellText(row[6]);
     const thuocBP = cellText(row[8]);

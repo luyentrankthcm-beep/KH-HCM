@@ -953,6 +953,76 @@ const SEED_CHT_NOP_TIEN_ROWS = [
   }
   if (seedChtNopTienMapFromKvcMtdFiles(store)) changed = true;
 
+  // Luyen, 2026-08-01 (lan 5): "bạn đọc hợp đồng cho tôi xem ... để khoong
+  // khớp hết vậy" -- trong luc dieu tra da phat hien 1 bug khac RIENG, nghiem
+  // trong hon: khoa upsert luc upload "Hóa Đơn Đầu Vào" (routes/hoa-don-dau-
+  // vao.js, route /upload) truoc gio dung ca "kyHieuHD" (Ky hieu hoa don) --
+  // truong nay KHONG ON DINH giua cac lan xuat file khac nhau tu he thong hoa
+  // don dien tu (co lan co gia tri "C26TNT", co lan lai RONG cho CUNG 1 hoa
+  // don that). Ket qua: 1191/5786 dong (~20%) bi TRUNG THAT tren toan bo du
+  // lieu (vd hoa don so 1199, 1187 cua "Go Nha Trang" -- xem chi tiet dieu
+  // tra). Da sua khoa upsert (dung ngayHD thay kyHieuHD, xem route) de KHONG
+  // TAO TRUNG MOI nua, nhung 1191 dong TRUNG DA CO SAN tu truoc van con --
+  // seed nay TU DONG DON DEP 1 LAN moi khi server khoi dong: gop cac dong
+  // trung (cung congTy+soHoaDon+ngayHD+dienGiai+soTien) ve LAI 1 dong duy
+  // nhat, uu tien giu dong co kyHieuHD (thuong la ban ghi cu hon, day du hon),
+  // dong thoi GOP LAI cac truong da nhap tay/lam giau tu dong (daHachToan,
+  // daChiTien, gianHang, hinhThucHopTac, taiKhoanCo, maDoiTuongNCC,
+  // tenHangHoaMisa, phanLoai, taiKhoanNo, ghiChu, linkHoaDon) -- neu 1 trong 2
+  // ban trung da duoc Luyen tick "Da chi tien"/"Da hach toan" hoac dien gian
+  // hang tay thi GIU LAI (khong mat), khong chi giu dong nao duoc chon lam
+  // "chinh". Idempotent tu nhien: sau lan chay dau, moi khoa chi con 1 dong
+  // nen cac lan sau khong tim thay gi de gop nua.
+  function dedupeHoaDonDauVaoRows(store) {
+    if (!Array.isArray(store.hoa_don_dau_vao) || store.hoa_don_dau_vao.length === 0) return false;
+    const groups = new Map();
+    store.hoa_don_dau_vao.forEach((r) => {
+      const key = [r.congTy, r.soHoaDon, r.ngayHD, r.dienGiai, r.soTien].join("||");
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(r);
+    });
+    const toRemoveIds = new Set();
+    let mergedGroups = 0;
+    groups.forEach((rows) => {
+      if (rows.length < 2) return;
+      // Uu tien giu dong co kyHieuHD (thuong la ban goc, xuat truoc); neu
+      // nhieu/khong dong nao co, giu id nho nhat (cu hon).
+      const withKy = rows.filter((r) => (r.kyHieuHD || "").trim());
+      const primary = (withKy.length > 0 ? withKy : rows).slice().sort((a, b) => a.id - b.id)[0];
+      const dupes = rows.filter((r) => r.id !== primary.id);
+      const MERGE_FIELDS = [
+        "gianHang",
+        "hinhThucHopTac",
+        "taiKhoanCo",
+        "maDoiTuongNCC",
+        "tenHangHoaMisa",
+        "phanLoai",
+        "taiKhoanNo",
+        "ghiChu",
+        "linkHoaDon",
+        "kyHieuHD",
+      ];
+      dupes.forEach((d) => {
+        MERGE_FIELDS.forEach((f) => {
+          if (!primary[f] && d[f]) primary[f] = d[f];
+        });
+        // Co/false la lua chon THEO Y THUC (co that su lam) -- OR lai de
+        // khong mat viec Luyen da tick tren BAT KY ban trung nao.
+        if (d.daHachToan) primary.daHachToan = true;
+        if (d.daChiTien) primary.daChiTien = true;
+        toRemoveIds.add(d.id);
+      });
+      mergedGroups++;
+    });
+    if (toRemoveIds.size === 0) return false;
+    store.hoa_don_dau_vao = store.hoa_don_dau_vao.filter((r) => !toRemoveIds.has(r.id));
+    console.log(
+      `[seed] Da don dep ${toRemoveIds.size} dong hoa don dau vao TRUNG THAT (${mergedGroups} nhom, gop lai con 1 dong/nhom).`
+    );
+    return true;
+  }
+  if (dedupeHoaDonDauVaoRows(store)) changed = true;
+
   if (changed) save(store);
 })();
 

@@ -43,6 +43,12 @@ const {
 // diem noi bo/ma diem thue nao trong danh sach gian (cua dung cong ty) khong
 // -- CHI dien khi khop DUY NHAT 1 gian, tranh doan nham.
 const { buildUncIndex, matchUncForPayment } = require("../utils/chiphiReconcile");
+// Luyen, 2026-08-01: "từ cái hợp đồng thuê gian á nó sẽ có tên đối tác ký hợp
+// đồng với mình từ cái tên đó bạn map với lại hóa đơn đầu vào" -- dung lai
+// danh sach hop dong thue gian (benChoThue/mstBenChoThue/tienThueThang/...)
+// cua trang Phap Danh cho trang "Đối chiếu gian XHD, Tiền thuê" ben duoi,
+// khong doan lai/copy schema.
+const phapDanh = require("./phap-danh");
 
 const router = express.Router();
 router.use(requireLogin);
@@ -74,6 +80,12 @@ function ensureShape(store) {
   if (!store.hoa_don_dau_vao_hang_hoa_meta) store.hoa_don_dau_vao_hang_hoa_meta = null;
   if (!store.hoa_don_dau_vao_gian_list) store.hoa_don_dau_vao_gian_list = [];
   if (!store.hoa_don_dau_vao_gian_meta) store.hoa_don_dau_vao_gian_meta = null;
+  // Luyen, 2026-08-01: "thêm cho tôi trong Hóa đơn đầu vào này 2 trang á 1 là
+  // hóa đơn đầu vào như hiện tại 2 là Đối chiếu gian XHD, Tiền thuê nhá thêm
+  // trang trc đi tôi sẽ diễn tả sao" -- tao truoc khung RONG (giong tien le
+  // Phap danh/Hoa Don Dau Vao ban dau) de co cho luu du lieu ngay khi Luyen mo
+  // ta chi tiet noi dung, chua doan truoc schema/cot cu the.
+  if (!store.hoa_don_dau_vao_doi_chieu_gian_xhd) store.hoa_don_dau_vao_doi_chieu_gian_xhd = [];
 }
 
 function ensureDefaults(row) {
@@ -398,6 +410,302 @@ router.get("/hoa-don-dau-vao/export.xlsx", (req, res) => {
   res.send(buf);
 });
 
+// Luyen, 2026-08-01: "thêm cho tôi trong Hóa đơn đầu vào này 2 trang á 1 là
+// hóa đơn đầu vào như hiện tại 2 là Đối chiếu gian XHD, Tiền thuê nhá" -- trang
+// MOI thu 2 trong dropdown "Hóa Đơn Đầu Vào" (xem views/partials/nav.ejs).
+// Luyen mo ta chi tiet (lan 2), 2026-08-01: "từ cái hợp đồng thuê gian á nó sẽ
+// có tên đối tác ký hợp đồng với mình từ cái tên đó bạn map với lại hóa đơn
+// đầu vào á nó sẽ có hóa đơn nội dung số tiền theo từng tháng map theo các ncc
+// trong hợp đồng thuê gian thôi nhá đọc cái nội dung diễn giải của hóa đơn xem
+// nó xuất cho mình là tiền thuê chi phí điện nước hay vượt doanh thu phân tích
+// ra cho tôi nhá và cả đọc luôn cái hợp đồng note ra số tiền nếu tiền nó xuất
+// có trong điều khoản hợp đồng cho tôi nhá" -- logic:
+//   1. Chi xet cac hop dong thue gian (phap_danh_hop_dong_thue) DA CO ten Ben
+//      cho thue (benChoThue) -- day la "cac NCC trong hop dong thue gian".
+//   2. Voi moi hop dong, tim TAT CA hoa don o Hoa Don Dau Vao co Ten NCC khop
+//      voi Ben cho thue do (uu tien khop qua MST neu ca 2 ben deu co, an toan
+//      hon ten vi nhieu chi nhanh cung 1 chuoi -- vd AEON MALL cac diem khac
+//      nhau -- co MST rieng; chi fallback ve so sanh ten khi thieu MST).
+//   3. Voi moi hoa don khop duoc, doc Dien giai (da gop het cac dong cung 1 so
+//      hoa don) phan loai theo tu khoa: "vượt doanh thu"/"phụ thu doanh thu" ->
+//      Vuot doanh thu, "điện"/"nước" -> Chi phi dien nuoc, "thuê" -> Tien thue,
+//      con lai -> Khac (CANH BAO: "thuê"/"thuế" deu ve "thue" sau khi bo dau,
+//      co the lan -- Luyen xem lai neu thay sai).
+//   4. Voi hoa don loai "Tien thue", so sanh so tien voi cac con so doc duoc tu
+//      hop dong (tienThueThang + cac so trich tu tongTienThueThangHCM/
+//      dieuKhoanThanhToan qua regex) -- khop thi bao "✓ Khớp", khong thi bao
+//      "Không khớp" kem cac so hop dong co de Luyen tu doi chieu (dieu khoan co
+//      the phuc tap, vd "10% doanh thu neu cao hon", khong doan chac chan duoc).
+function extractAmountsFromText(text) {
+  const amounts = new Set();
+  const re = /\d{1,3}(?:[.,]\d{3})+|\d{6,}/g;
+  const matches = String(text || "").match(re) || [];
+  matches.forEach((m) => {
+    const n = Number(m.replace(/[.,]/g, ""));
+    if (Number.isFinite(n) && n >= 100000) amounts.add(n);
+  });
+  return Array.from(amounts);
+}
+
+function classifyGianXhdInvoiceType(dienGiaiText) {
+  const t = normVN(dienGiaiText);
+  if (!t) return "Khác";
+  if (t.includes("vuot doanh thu") || t.includes("doanh thu vuot") || t.includes("phu thu doanh thu")) {
+    return "Vượt doanh thu";
+  }
+  if (t.includes("dien nuoc") || (t.includes("tien dien") && t.includes("tien nuoc")) || t.includes("dien, nuoc")) {
+    return "Chi phí điện nước";
+  }
+  if (t.includes("dien") || t.includes("nuoc")) return "Chi phí điện nước";
+  if (t.includes("thue")) return "Tiền thuê";
+  return "Khác";
+}
+
+// Luyen, 2026-08-01 (lan 4): "bạn đọc hợp đồng cho tôi xem nó của gian nào đi
+// rồi đưa vô cái nào khớp thì điền khớp cho tôi đi chèn soa để khoong khớp
+// hết vậy" -- gian "Go Nha Trang" hien "Không khớp" GAN NHU TAT CA dong Tien
+// thue, vi 2 nguyen nhan CUNG luc:
+//   1) tongTienThueThangHCM co NHIEU MOC GIA THEO THOI GIAN (vd "Từ
+//      27/11/2025-28/02/2026: 80.000.100đ/tháng" roi "Từ 01/03/2026-...:
+//      99.99.900đ/tháng") nhung code CU so hoa don voi TAT CA cac muc gia
+//      CUNG luc (khong phan biet hoa don thang nao thi ap dung muc gia nao) --
+//      hoa don thang 07/2026 (thuoc muc gia thu 2) khong bao gio khop duoc voi
+//      so 80.000.100 cua muc gia thu 1.
+//   2) Nhieu dong "Tiền thuê" thuc ra la dong "Điều chỉnh tăng/giảm ... từ
+//      ngày X đến ngày Y" (dieu chinh 1 phan thang do doi muc gia giua thang,
+//      KHONG PHAI hoa don tron thang) -- ban chat KHONG THE khop voi gia thue/
+//      thang tron (vd -7.351.667đ hay +3.675.834đ), so voi gia tron thang se
+//      LUON ra "Khong khop" oan uong. Doi sang tra ve null (khong ap dung, hien
+//      dau "-") cho cac dong nay thay vi "Khong khop" sai.
+// Ghi chu rieng cho Go Nha Trang: muc gia thu 2 "99.99.900đ/tháng" ghi trong
+// sheet co ve THIEU 1 CHU SO (khong dung dinh dang 3-so-1-nhom binh thuong,
+// vd đúng ra phải "999.999.900" hoặc "99.999.900") -- KHONG tu doan sua so nay,
+// Luyen kiem tra lai voi hop dong goc (link Drive o hop dong) va sua truc tiep
+// truong "Tiền thuê/tháng (sheet HCM)" o trang Hợp Đồng Thuê Gian Hàng neu sai.
+function parseDdMmYyyyToIso(s) {
+  const m = String(s || "").trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+  if (!m) return "";
+  let [, d, mo, y] = m;
+  if (y.length === 2) y = "20" + y;
+  return `${y.padStart(4, "0")}-${mo.padStart(2, "0")}-${d.padStart(2, "0")}`;
+}
+
+// Doc cac dong dang "Từ DD/MM/YYYY - DD/MM/YYYY: <số tiền>đ/tháng" trong
+// tongTienThueThangHCM -- tra ve danh sach {tuNgay, denNgay, soTien} (ISO) de
+// so hoa don theo DUNG khoang thoi gian ap dung, thay vi so voi TAT CA cac
+// muc gia cung luc. Hop dong khong viet theo dang nay (vd chi 1 gia co dinh,
+// hoac "22% tổng doanh thu") thi tra ve mang rong -- code goi ham nay se tu
+// dong fallback ve cach so sanh cu (so voi tat ca so doc duoc trong van ban).
+function parseRentTiers(text) {
+  const tiers = [];
+  const re = /Từ\s+(\d{1,2}\/\d{1,2}\/\d{2,4})\s*[-–]\s*(\d{1,2}\/\d{1,2}\/\d{2,4})\s*:\s*([^\n]+)/gi;
+  let m;
+  while ((m = re.exec(String(text || "")))) {
+    const tuNgay = parseDdMmYyyyToIso(m[1]);
+    const denNgay = parseDdMmYyyyToIso(m[2]);
+    const amounts = extractAmountsFromText(m[3]);
+    if (tuNgay && denNgay && amounts.length > 0) {
+      tiers.push({ tuNgay, denNgay, soTien: amounts[0] });
+    }
+  }
+  return tiers;
+}
+
+// Dong "Điều chỉnh tăng/giảm ... từ ngày X đến ngày Y" la dieu chinh 1 PHAN
+// thang (thuong do doi gia giua thang) -- khong phai hoa don tron thang, so
+// voi gia/thang se sai lech co y nghia, khong nen bao "Khong khop".
+function isProratedRentAdjustment(dienGiaiText) {
+  const t = normVN(dienGiaiText);
+  return t.includes("dieu chinh tang") || t.includes("dieu chinh giam");
+}
+
+// Uu tien khop qua MST (an toan hon vi nhieu chi nhanh chung 1 ten cong ty me
+// nhung MST rieng, vd cac diem AEON MALL khac nhau) -- CHI fallback ve so sanh
+// ten khi 1 trong 2 ben thieu MST, va chi khop 1 chieu khi phan text dai >= 8
+// ky tu (tranh khop nham qua tien to chung "cong ty tnhh...").
+function nccMatchesLandlord(mstNCC, tenNCC, mstBenChoThue, tenBenChoThue) {
+  const mstA = String(mstNCC || "").trim();
+  const mstB = String(mstBenChoThue || "").trim();
+  if (mstA && mstB) return mstA === mstB;
+  const nameA = normVN(tenNCC);
+  const nameB = normVN(tenBenChoThue);
+  if (!nameA || !nameB) return false;
+  if (nameA === nameB) return true;
+  if (nameB.length >= 8 && nameA.includes(nameB)) return true;
+  if (nameA.length >= 8 && nameB.includes(nameA)) return true;
+  return false;
+}
+
+// Luyen, 2026-08-01 (lan 3): "theo ncc đi tên ncc á xong rồi sổ xuống check
+// theo hóa đơn cho tôi nhá cả nam bắc vô chung ln nhá tách theo kh thôi nhá"
+// -- bang "Hóa đơn khớp TRÙNG nhiều gian" truoc gio liet ke PHANG tung hoa don
+// (cung 1 NCC lap lai nhieu dong lien tiep, kho quet mat), doi sang GOM NHOM
+// theo Ten NCC (giong pattern collapsible da dung o Cong No NCC/chinh trang
+// nay -- xem summarizeMissingInvoiceByNcc trong routes/congno-ncc.js), so
+// xuong moi thay tung hoa don. Nam/Bac da tu gop chung san (contracts o duoi
+// chi loc theo congTy, khong loc theo mien) -- CHI tach theo cong ty (KH Cu/
+// KH Moi, qua nut "Cũ/Mới" tren dau trang, activeCompany) nhu Luyen yeu cau.
+function summarizeAmbiguousByNcc(ambiguousInvoices) {
+  const map = new Map();
+  ambiguousInvoices.forEach((a) => {
+    const key = normVN(a.tenNCC);
+    if (!map.has(key)) {
+      map.set(key, { tenNCC: a.tenNCC, soLan: 0, tongSoTien: 0, cacGianTrungSet: new Set(), items: [] });
+    }
+    const g = map.get(key);
+    g.soLan++;
+    g.tongSoTien += a.soTien;
+    g.cacGianTrungSet.add(a.cacGianTrung);
+    g.items.push(a);
+  });
+  return Array.from(map.values())
+    .map((g) => ({
+      tenNCC: g.tenNCC,
+      soLan: g.soLan,
+      tongSoTien: g.tongSoTien,
+      // Da so truong hop 1 NCC luon trung CUNG 1 to hop gian -- chi khi nao
+      // that su co nhieu to hop khac nhau moi can hien tung dong rieng ("(nhiều
+      // tổ hợp gian khác nhau)"), tranh Luyen tuong nham la 1 to hop duy nhat.
+      cacGianTrung: g.cacGianTrungSet.size === 1 ? Array.from(g.cacGianTrungSet)[0] : "(nhiều tổ hợp gian khác nhau, xem từng hóa đơn bên dưới)",
+      items: g.items.slice().sort((a, b) => (b.ngayHD || "").localeCompare(a.ngayHD || "")),
+    }))
+    .sort((a, b) => b.tongSoTien - a.tongSoTien);
+}
+
+router.get("/hoa-don-dau-vao/doi-chieu-gian-xhd-tien-thue", (req, res) => {
+  const store = load();
+  ensureShape(store);
+  phapDanh.ensureShape(store);
+  const activeCompany = getCompany(req);
+
+  const contracts = (store.phap_danh_hop_dong_thue || [])
+    .map(phapDanh.ensureThueDefaults)
+    .filter((r) => r.congTy === activeCompany && (r.benChoThue || "").trim());
+
+  const invoiceRowsRaw = (store.hoa_don_dau_vao || []).map(ensureDefaults).filter((r) => r.congTy === activeCompany);
+  const invoicesGrouped = groupRowsByInvoice(invoiceRowsRaw);
+  const chiPhiForCompany = (store.chi_phi || []).filter((c) => c.congTy === activeCompany);
+
+  // Luyen, 2026-08-01 (lan 2): "note ra gian nào dựa vào hợp đồng hay bên Chi
+  // phí hay bên hóa đơn mua vào á do đây là hóa đơn mua vào" -- BUG phat hien
+  // qua screenshot thuc te: 2 hop dong CUNG chung 1 ten rut gon (vd "AE Bình
+  // Dương JP" ghi Ben cho thue rong la "BÌNH DƯƠNG", trung voi "AE Bình Dương
+  // kvc" co Ben cho thue day du "...TẠI BÌNH DƯƠNG") bi khop NHAM CA 2 cho
+  // CUNG 1 nhom hoa don khi chi so sanh ten/MST. Sua: xac dinh CHINH XAC 1 hop
+  // dong cho MOI hoa don (khong phai nguoc lai) theo thu tu uu tien Luyen yeu
+  // cau -- (a) chinh Gian Hang da co san tren hoa don ("bên hóa đơn mua vào",
+  // xem enrichNewRow o tren), (b) bang Chi Phí ("bên Chi phí", qua
+  // matchGianViaChiPhiLedger -- khop theo So hoa don hoac Ten NCC+So tien voi
+  // store.chi_phi, tra ve ten gian NEU duy nhat), (c) cuoi cung moi roi ve so
+  // sanh Ten NCC/MST voi Ben cho thue tren tung Hop Dong (nccMatchesLandlord)
+  // -- CHI gan khi khop DUY NHAT 1 hop dong; khop >=2 hop dong (con nhap nhang)
+  // thi KHONG gan vao gian nao ca (tranh nhan doi), liet ke rieng o
+  // "ambiguousInvoices" de Luyen tu xem va bo sung aliasGian/sua Ben cho thue
+  // cho ro hon.
+  const aliasIndex = buildGianAliasIndex(contracts);
+  const byContractId = new Map(contracts.map((c) => [c.id, []]));
+  const ambiguousInvoices = [];
+
+  invoicesGrouped.forEach((inv) => {
+    let contract = null;
+    if (inv.gianHang) contract = findContractForGianText(inv.gianHang, contracts, aliasIndex);
+    if (!contract) {
+      const gianNameFromChiPhi = matchGianViaChiPhiLedger(inv, chiPhiForCompany);
+      if (gianNameFromChiPhi) {
+        contract =
+          contracts.find((c) => c.gian === gianNameFromChiPhi) ||
+          findContractForGianText(gianNameFromChiPhi, contracts, aliasIndex);
+      }
+    }
+    if (!contract) {
+      const nameMatches = contracts.filter((c) => nccMatchesLandlord(inv.mstNCC, inv.tenNCC, c.mstBenChoThue, c.benChoThue));
+      if (nameMatches.length === 1) {
+        contract = nameMatches[0];
+      } else if (nameMatches.length > 1) {
+        ambiguousInvoices.push({
+          soHoaDon: inv.soHoaDon,
+          ngayHD: inv.ngayHD,
+          tenNCC: inv.tenNCC,
+          soTien: inv.soTien,
+          dienGiai: inv.dienGiai,
+          cacGianTrung: nameMatches.map((c) => c.gian).join(", "),
+        });
+        return;
+      } else {
+        return; // khong khop hop dong thue gian nao -- khong phai NCC can doi chieu o trang nay
+      }
+    }
+    if (byContractId.has(contract.id)) byContractId.get(contract.id).push(inv);
+  });
+
+  const gianResults = contracts.map((c) => {
+    const expectedAmounts = new Set(extractAmountsFromText(c.tongTienThueThangHCM));
+    extractAmountsFromText(c.dieuKhoanThanhToan).forEach((a) => expectedAmounts.add(a));
+    if (c.tienThueThang) expectedAmounts.add(Math.round(c.tienThueThang));
+    const rentTiers = parseRentTiers(c.tongTienThueThangHCM);
+
+    const matchedInvoices = (byContractId.get(c.id) || [])
+      .map((inv) => {
+        const loai = classifyGianXhdInvoiceType(inv.dienGiai);
+        let khopHopDong = null; // null = khong ap dung so sanh (khong phai Tien thue, hoac la dong dieu chinh 1 phan thang)
+        if (loai === "Tiền thuê" && !isProratedRentAdjustment(inv.dienGiai)) {
+          // Uu tien so theo DUNG muc gia ap dung cho ngay cua hoa don (hop
+          // dong nhieu muc gia theo thoi gian) -- chi fallback ve so voi TAT
+          // CA cac so doc duoc trong van ban khi khong doc duoc muc gia theo
+          // ngay (hop dong 1 gia co dinh, hoac dang % doanh thu...).
+          const tier = rentTiers.find((t) => inv.ngayHD && inv.ngayHD >= t.tuNgay && inv.ngayHD <= t.denNgay);
+          khopHopDong = tier
+            ? Math.abs(tier.soTien - inv.soTien) <= 1000
+            : Array.from(expectedAmounts).some((a) => Math.abs(a - inv.soTien) <= 1000);
+        }
+        return {
+          soHoaDon: inv.soHoaDon,
+          kyHieuHD: inv.kyHieuHD,
+          ngayHD: inv.ngayHD,
+          thang: (inv.ngayHD || "").slice(0, 7),
+          dienGiai: inv.dienGiai,
+          soTien: inv.soTien,
+          loai,
+          khopHopDong,
+          linkHoaDon: inv.linkHoaDon,
+        };
+      })
+      .sort((a, b) => (b.ngayHD || "").localeCompare(a.ngayHD || ""));
+
+    const tongTheoLoai = { "Tiền thuê": 0, "Chi phí điện nước": 0, "Vượt doanh thu": 0, Khác: 0 };
+    matchedInvoices.forEach((inv) => {
+      tongTheoLoai[inv.loai] = (tongTheoLoai[inv.loai] || 0) + inv.soTien;
+    });
+
+    return {
+      gian: c.gian,
+      benChoThue: c.benChoThue,
+      mstBenChoThue: c.mstBenChoThue,
+      tienThueThang: c.tienThueThang,
+      tongTienThueThangHCM: c.tongTienThueThangHCM,
+      dieuKhoanThanhToan: c.dieuKhoanThanhToan,
+      expectedAmounts: Array.from(expectedAmounts),
+      rentTiers,
+      invoices: matchedInvoices,
+      tongTheoLoai,
+    };
+  });
+
+  gianResults.sort((a, b) => b.invoices.length - a.invoices.length || a.gian.localeCompare(b.gian));
+
+  res.render("hoa-don-dau-vao-doi-chieu-gian", {
+    userName: req.session.userName,
+    activeCompany,
+    gianResults,
+    ambiguousInvoices,
+    ambiguousByNcc: summarizeAmbiguousByNcc(ambiguousInvoices),
+    soGianCoHopDong: contracts.length,
+    soGianCoHoaDon: gianResults.filter((g) => g.invoices.length > 0).length,
+    error: req.query.error || null,
+    success: req.query.success || null,
+  });
+});
+
 function parseAmt(v) {
   return v ? Number(String(v).replace(/[^\d]/g, "")) : 0;
 }
@@ -470,20 +778,33 @@ router.post("/hoa-don-dau-vao/upload", requireDataEntry, upload.single("file"), 
     if (rows.length === 0) {
       throw new Error("File không đọc được dòng hóa đơn nào.");
     }
+    // Luyen, 2026-08-01 (lan 5): phat hien qua thuc te (gian Go Nha Trang) --
+    // khoa upsert dung "kyHieuHD" GAY RA 1191/5786 dong TRUNG THAT tren toan
+    // bo du lieu: cung 1 hoa don that duoc xuat lai o file sau (vd "...(4).
+    // xlsx" ngay 31/07) nhung cot Ký hiệu HĐ LAI RONG (khac file truoc "...(1).
+    // xlsx" ngay 28/07 co dien "C26TNT") -- 2 khoa khac nhau nen bi coi la 2
+    // hoa don khac nhau, tao THEM 1 dong thay vi cap nhat dong cu (xem seed
+    // dedupeHoaDonDauVaoRows trong store.js -- da tu dong don dep cac dong
+    // trung co san). Doi khoa: bo kyHieuHD (khong on dinh giua cac lan xuat
+    // file), dung ngayHD thay the (luon co, on dinh) -- van giu dienGiai+
+    // soTien lam phan biet chinh (xem bug fix 2026-07-28 o tren, van dung).
     const existingByKey = new Map();
     store.hoa_don_dau_vao.forEach((r) => {
       if (r.congTy !== activeCompany) return;
-      const key = [r.congTy, r.soHoaDon, r.kyHieuHD || "", r.dienGiai || "", r.soTien].join("|");
+      const key = [r.congTy, r.soHoaDon, r.ngayHD || "", r.dienGiai || "", r.soTien].join("|");
       existingByKey.set(key, r);
     });
     let added = 0;
     let updated = 0;
     rows.forEach((r) => {
-      const key = [activeCompany, r.soHoaDon, r.kyHieuHD || "", r.dienGiai || "", r.soTien].join("|");
+      const key = [activeCompany, r.soHoaDon, r.ngayHD || "", r.dienGiai || "", r.soTien].join("|");
       const existing = existingByKey.get(key);
       if (existing) {
         // Da co dong y het (cung hoa don + dien giai + so tien) -- khong tao
-        // trung, chi dam bao ngay/NCC dong bo (thuong khong doi).
+        // trung, chi dam bao ngay/NCC dong bo (thuong khong doi). Neu dong cu
+        // dang thieu Ky hieu HD ma file moi co, dien bo sung (khong ghi de
+        // neu da co, tranh mat du lieu neu file sau lai thieu).
+        if (!existing.kyHieuHD && r.kyHieuHD) existing.kyHieuHD = r.kyHieuHD;
         existing.ngayHD = r.ngayHD || existing.ngayHD;
         existing.tenNCC = r.tenNCC || existing.tenNCC;
         existing.mstNCC = r.mstNCC || existing.mstNCC;
