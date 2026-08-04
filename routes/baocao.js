@@ -446,9 +446,25 @@ router.get("/bao-cao/thu-chi-theo-gian", (req, res) => {
   const stmtTabsAllWithRows = stmtTabsAll
     .map((tab) => {
       const rows = stmtMonth ? tab.rows.filter((r) => r.date.slice(0, 7) === stmtMonth) : tab.rows;
+      // Luyen, 2026-08-03: khi loc theo 1 thang cu the (khong phai "Tat ca"),
+      // "So du dau ky" phai la so du THUC KE THUA tu cac giao dich truoc do
+      // (de doi chieu voi sao ke ngan hang that), KHONG phai luon la
+      // bank.opening_balance tinh cua ca tai khoan (chi dung cho thang dau
+      // tien). Tim dong cuoi cung TRONG TOAN BO lich su (tab.rows, chua loc)
+      // co ngay truoc ngay dau tien cua thang dang xem -- so du cua dong do
+      // chinh la so du dau ky thuc su cua thang nay.
+      let openingBalance = tab.openingBalance;
+      if (stmtMonth && rows.length > 0) {
+        const firstDate = rows[0].date;
+        const priorRows = tab.rows.filter((r) => r.date < firstDate);
+        if (priorRows.length > 0) {
+          openingBalance = priorRows[priorRows.length - 1].balance;
+        }
+      }
       return {
         ...tab,
         rows,
+        openingBalance,
         totalThu: rows.reduce((s, r) => (r.type === "thu" ? s + r.amount : s), 0),
         totalChi: rows.reduce((s, r) => (r.type === "chi" ? s + r.amount : s), 0),
       };

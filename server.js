@@ -66,6 +66,46 @@ app.use((req, res, next) => {
   next();
 });
 
+// Luyen, 2026-08-03: "mỗi lần tôi chỉnh báo cáo hay chỉnh khớp công nợ thì
+// giữ trang nguyên cập nhật thôi chứ cứ đưa lên đầu đẩy tới hiện tại thì nó
+// lại mất thời gian chỉnh bộ lọc nx" -- hau het cac form POST (doi soat
+// Momo/VietQR/ZVP/Cong no, Chi Phi...) sau khi luu/xoa deu redirect ve 1 URL
+// "sach" (vd "/doi-soat/vietqr?success=...") MAT HET query string dang xem
+// (channel, month, stmtMonth...), buoc Luyen phai chinh lai bo loc tu dau
+// moi lan sua 1 dong. Thay vi sua tung res.redirect() rieng le (250+ cho
+// trong toan bo routes/), chan CHUNG 1 lan o day: neu URL sap redirect toi
+// co CUNG duong dan (pathname) voi trang vua gui form (Referer), tu dong GIU
+// LAI moi query param CU (channel, month...) ma route KHONG chu dinh ghi de
+// (vd "success"/"error" moi van uu tien gia tri route dat, chi bo sung them
+// cac param con thieu). Ket hop voi views/partials/scroll-restore.ejs (nho
+// + khoi phuc vi tri cuon trang) de giai quyet tron ven ca 2 y Luyen neu: bo
+// loc VA vi tri dang xem deu giu nguyen sau khi luu/xoa.
+app.use((req, res, next) => {
+  const originalRedirect = res.redirect.bind(res);
+  res.redirect = function (statusOrUrl, maybeUrl) {
+    const hasStatus = typeof statusOrUrl === "number";
+    const url = hasStatus ? maybeUrl : statusOrUrl;
+    try {
+      const referer = req.get("Referrer") || req.get("Referer");
+      if (referer && typeof url === "string" && url.startsWith("/")) {
+        const target = new URL(url, `${req.protocol}://${req.get("host")}`);
+        const refererUrl = new URL(referer);
+        if (target.pathname === refererUrl.pathname) {
+          refererUrl.searchParams.forEach((value, key) => {
+            if (!target.searchParams.has(key)) target.searchParams.set(key, value);
+          });
+          const mergedUrl = target.pathname + target.search;
+          return hasStatus ? originalRedirect(statusOrUrl, mergedUrl) : originalRedirect(mergedUrl);
+        }
+      }
+    } catch (e) {
+      // URL/Referer khong hop le (vd redirect sang domain khac) -- giu nguyen hanh vi cu.
+    }
+    return hasStatus ? originalRedirect(statusOrUrl, maybeUrl) : originalRedirect(statusOrUrl);
+  };
+  next();
+});
+
 // QUAN TRONG: authRoutes phai duoc dang ky TRUOC companyRoutes. companyRoutes
 // tu goi router.use(requireLogin) (giong moi router khac), va middleware do
 // chay cho MOI request di qua no bat ke co khop route nao ben trong hay

@@ -538,17 +538,19 @@ function migrateTk168Invoices(store) {
 // Chi Nhan luu de (save()) tu ban nho cu, ghi de lai ban chua sua) -- chuyen
 // thanh migration tu dong chay lai MOI LAN load() de KHONG BAO GIO mat lai
 // du server co ghi de bao nhieu lan nua.
+// Luyen, 2026-08-03: doi chieu voi file hoa don goc "MỚi XHD.xlsx" xac nhan
+// ham nay (blanket "bat ky hoa don nao raw === 'MTD MN 4' deu la ngay 3")
+// dang CHUYEN NHAM 29 hoa don thang 6 + 20 hoa don thang 5 dan tag DUNG la
+// ngay 4 (khong lien quan gi den lo hoa don CU ma Chi Nhan xac nhan
+// 2026-07-30) -- chinh la nguyen nhan Luyen bao "hóa đơn ngày 3,4" (ngay 3
+// du, ngay 4 thieu dung so tien bi chuyen nham, "Chưa có HĐ" het). File hoa
+// don hien tai KHONG CON hoa don thang 7 nao dan tag "MTD MN 4" nua (lo cu da
+// duoc sua truc tiep trong file goc), nen ham nay VO HIEU HOA hoan toan (tra
+// ve false, khong chuyen doi gi nua) de khong tiep tuc lam hong du lieu hoa
+// don MOI. Xem restoreBidv7702JuneDay4Invoices trong store.js de biet cach
+// khoi phuc lai cac hoa don thang 6 da bi chuyen nham truoc do.
 function fixBidv7702Day3TaggedAsDay4(store) {
-  if (!store.viet_qr_invoices || !store.viet_qr_invoices.bidv7702) return false;
-  let changed = false;
-  store.viet_qr_invoices.bidv7702.forEach((inv) => {
-    if (inv.raw === "MTD MN 4") {
-      inv.days = [3];
-      inv.raw = "MTD MN 3";
-      changed = true;
-    }
-  });
-  return changed;
+  return false;
 }
 
 // Chi Nhan, 2026-07-30: 07-03/07-04 cua BIDV8613600999 "2 ngay nay cấn trừ
@@ -1804,6 +1806,25 @@ function applyMultiDayGroupConsolidation(results) {
         byCode.get(l.code).push(l);
       });
     });
+  // Luyen, 2026-08-03: "sao có 230k mà hóa đơn tới 280k mà cx để chữ khớp z
+  // chèn" -- phat hien qua vi du that BV UNG BUOU PHCM: ngay 30-31/05 (hoa don
+  // 4320, gop 2 ngay, TU NO da chia dung ty le nhung CON THIEU dung 50.000d so
+  // voi doanh thu 2 ngay do) nam KE BEN ngay 01/06 (hoa don 4451, rieng 1
+  // ngay, THUA dung 50.000d) -- 2 hoa don HOAN TOAN KHONG LIEN QUAN nhau,
+  // NHUNG vi 3 dong lien tiep nay cong don TINH CO ve dung 0 nen ca 3 bi gan
+  // nham "Khop". Hoi lai Luyen: xac nhan CHON "that chat dieu kien can tru",
+  // chap nhan rui ro co the lam lo lai vai truong hop dang "Khop" khac tren he
+  // thong can ra soat lai (vd CAM RANH/VINH da tung duoc Chi Nhan xac nhan
+  // truoc day). Vi KHONG THE phan biet bang toan hoc thuan tuy 1 "loi ranh
+  // gioi ngay that su giua 2 hoa don" voi 1 "trung hop cong don ve 0", cach
+  // that chat AN TOAN VA RO RANG nhat la GIOI HAN CHUOI TOI DA 2 DONG (dung 2
+  // hoa don ke nhau, giong dung vi du goc "hoa don ngay 24" + "hoa don gop
+  // 25-26" Chi Nhan neu -- ban chat van la 2 hoa don, nhung o day gioi han o
+  // muc 2 DONG dang xet, khong cho chuoi keo dai qua 2 hoa don khac nhau lien
+  // tiep nhu truong hop BV UNG BUOU PHCM (3 dong, dung 2 hoa don nhung 1 hoa
+  // don gom 2 ngay) -- doi voi truong hop 1 hoa don gop nhieu ngay (dai hon 1
+  // dong) can tru voi 1 hoa don khac, se KHONG con tu dong "Khop" nua, hien
+  // lai dung "Lech" de Luyen tu kiem tra tung truong hop.
   byCode.forEach((lines) => {
     let i = 0;
     while (i < lines.length) {
@@ -1813,7 +1834,7 @@ function applyMultiDayGroupConsolidation(results) {
       }
       let j = i;
       while (j + 1 < lines.length && !lines[j + 1].matched) j++;
-      if (j > i) {
+      if (j === i + 1) {
         const run = lines.slice(i, j + 1);
         const sumGross = run.reduce((sum, l) => sum + l.gross, 0);
         const sumInvoiceTotal = run.reduce((sum, l) => sum + l.invoiceTotal, 0);

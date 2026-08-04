@@ -18,6 +18,7 @@ const {
 } = require("../utils/momoReconcile");
 const { parseSharedInvoiceWorkbook } = require("../utils/zvpReconcile");
 const { getCompany } = require("../utils/companies");
+const { BANK_COMPANY } = require("../utils/bankCompany");
 
 const router = express.Router();
 router.use(requireLogin);
@@ -64,6 +65,11 @@ const MOMO_CHANNELS = {
     bankFullName: MOMO_BANK_FULLNAME,
     grossKey: "momo_gross_uploads",
     invoicesKey: "momo_invoices",
+    // Luyen, 2026-08-03: hoa don "CHT nop tien" (tien mat CHT nop truc tiep
+    // NH) tag rieng trong sheet danh sach hoa don dung chung -- luu tach
+    // khoi invoicesKey vi day KHONG phai doanh thu momo, dung cho tinh nang
+    // xuat Excel AMIS rieng (xem buildMomoChtDeposits).
+    chtInvoicesKey: "momo_cht_invoices",
     label: "BIDV 123456",
     exportSheet: "MISATHUE123456",
   },
@@ -74,10 +80,19 @@ const MOMO_CHANNELS = {
     bankFullName: "Ngân hàng TMCP Đầu tư và Phát triển Việt Nam",
     grossKey: "momo_moi_gross_uploads",
     invoicesKey: "momo_moi_invoices",
+    chtInvoicesKey: "momo_moi_cht_invoices",
     label: "BIDV 7701",
     exportSheet: "MISATHUE7701",
   },
 };
+
+// Luyen, 2026-07-21: "may cai lech 1d hay may dong do ban them vao phi neu
+// lam tron .5 nha con khong thi cong vao phi gian nao do cong len nha roi
+// tru ra" -- xem dinh nghia goc/ly do day du tai GET /doi-soat/momo ben duoi
+// (noi ap dung cho hien thi). Hoist ra module-scope (2026-08-03) de
+// export.xlsx dung LAI CHINH XAC nguong nay, tranh dinh nghia trung lap/lech
+// nhau giua 2 noi.
+const ROUNDING_ABSORB_THRESHOLD = 2000;
 
 // A gian/ma cong trinh can be mapped to "131" (thu thuong), "1388" (doanh thu
 // chia se, vd FF SC VIVO), or "SKIP" -- meaning: van hien thi tren trang doi
@@ -262,6 +277,16 @@ const KNOWN_INVOICE_DIEM_ALIASES = {
   "DIY ESTELLA KVC": "KVC ESTELLA",
   "LM NHA TRANG KVC": "FARM LOTTE NHA TRANG",
   "LM PHAN THIẾT KVC": "FARM LOTTE PHAN THIET",
+  // Luyen, 2026-08-03: "đây hóa đơn chỗ lệch đây á thêm vô cho tôi nhá" --
+  // gian "AM TP KVCM" (khoan ve 2026-06-08, doanh thu 05-07/06) hien "Lệch
+  // -104.994.000đ": doanh thu gop 155.539.000 vs tong tien HD khop chi
+  // 50.545.000 (HD 1050, 1079). Hoa don 1082 (ngay HD 08/06, 104.994.000,
+  // "momo 6,7") dung KHOP CHINH XAC so tien con thieu, nhung maDiem luu tren
+  // he thong lai la "AE BT KVCM" (ten CU/khac cua cung 1 gian nay -- da co
+  // san alias "SNOWFUN TÂN PHÚ" -> "AM TP KVCM" tu truoc, xac nhan day cung
+  // la 1 ten khac cua CUNG gian Tan Phu). Them alias nay de hoa don 1082 tu
+  // dong duoc tinh vao "AM TP KVCM", het "Lệch".
+  "AE BT KVCM": "AM TP KVCM",
 };
 
 function ensureKnownInvoiceDiemAliases(store) {
@@ -274,6 +299,104 @@ function ensureKnownInvoiceDiemAliases(store) {
     }
   }
   return changed;
+}
+
+// Luyen, 2026-08-01 (lan 7): "đây hóa đơn gian Farm Phan thiết đây á" -- gian
+// "FARM LOTTE PHAN THIET" hien "Chưa có HĐ" du hoa don 7609 that su co (Mã
+// điểm ghi chú HT Misa = "LM PHAN THIẾT KVC"). Nguyen nhan: store.invoice_diem_
+// alias la 1 bang DUNG CHUNG giua Momo/ZVP (xem chu thich store.js), nhung
+// ngay 2026-07-31 tinh nang doi ma cong trinh RIENG cua ZVP (xem
+// ZVP_GIAN_CODE_RENAMES/seedZvpGianCodeRenames trong routes/doisoat-zvp.js)
+// da GHI DE LEN entry "LM PHAN THIẾT KVC" tu "FARM LOTTE PHAN THIET" (dung
+// cho Momo) sang "LM PHAN THIET KVC" (dung cho ZVP sau khi doi ma) -- 2 tinh
+// nang can 2 gia tri KHAC NHAU cho CUNG 1 khoa nen khong the dung chung mai
+// duoc (sua lai tay qua UI se bi ZVP ghi de lai lan sau tai trang ZVP). Thay
+// vi tach han 2 bang rieng (rui ro dung cham nhieu noi), Momo tu BAO VE 3 alias
+// da biet chac chan cua rieng minh (KNOWN_INVOICE_DIEM_ALIASES) bang cach de
+// chung LUON THANG (ghi de) khi doi soat -- khong quan tam bang dung chung dang
+// bi ZVP doi thanh gi, khong anh huong ZVP (ZVP van doc thang store.invoice_
+// diem_alias binh thuong, khong sua o day).
+function momoEffectiveDiemAlias(store) {
+  return { ...(store.invoice_diem_alias || {}), ...KNOWN_INVOICE_DIEM_ALIASES };
+}
+
+// Luyen, 2026-08-03: "ngân hàng có các giao dịch của Cửa Hàng trưởng nộp tiền
+// vào á... như 7701 thì có gian nội dung là Lotte Phan Thiết á hay Nha trang
+// dựa vào nội dung có mã nộp tiền á" -- ma nop tien (vd "KH705KVCMN0002")
+// nam san trong mo ta giao dich ngan hang (cung quy uoc voi tinh nang CHT nop
+// tien cua Hoa Don Ban Ra, xem routes/baocao.js CHT_CODE_RE/collectChtNopTienLines
+// -- KHONG import lai file do vi cac ham do khong duoc export rieng, chi co
+// router; dinh nghia lai 1 ban gon o day, dung CHUNG bang tra store.cht_nop_
+// tien_map da co san (seedChtNopTienMapFromKvcMtdFiles, store.js).
+//
+// Luyen, 2026-08-03 (lan 2): "Ngân hàng có khoản này với gian này đâu sao lại
+// có trên xuất ra z" -- phat hien qua vi du that: dong "MM MARKET DA NANG
+// MTD" 11.040.000đ (02/06, VP58888, ma KH705MTDMN0027) bi dua NHAM vao file
+// xuat MISA cua Momo. "MTD" (May Tu Dong -- vending/game may rieng) la 1
+// LOAI HINH/NGHIEP VU HOAN TOAN KHAC voi "KVC" (Khu Vui Choi -- doanh thu
+// theo gian entertainment park ma Momo dang xu ly), co pipeline doi soat
+// RIENG (xem sheet MISAMTD/skill cap-nhat-misa-mtd-kvc, sao ke ngan hang
+// rieng MTD40222/KVC40111) -- KHONG lien quan gi den settlement Momo. Ham
+// collectChtNopTienLines (routes/baocao.js, cho tinh nang Xuat Hoa Don Ban
+// Ra) dung ca 2 loai vi tinh nang do gom TAT CA nghiep vu, nhung
+// buildMomoChtDeposits (ben duoi, RIENG cho Momo) chi duoc lay CHT nop tien
+// cua gian KVC -- dung regex rieng, loai han MTDMB/MTDMN.
+const CHT_CODE_RE = /KH(?:705|989)(?:KVCMB|KVCMN|MTDMB|MTDMN)\d{3,4}/;
+const CHT_CODE_RE_KVC_ONLY = /KH(?:705|989)(?:KVCMB|KVCMN)\d{3,4}/;
+
+function companyForBankRow(b) {
+  if (!b) return null;
+  return b.company || BANK_COMPANY[b.name] || null;
+}
+
+// Quet TOAN BO giao dich ngan hang (khong phai 1 kenh doi soat rieng, xem ghi
+// chu CHT_CODE_RE o tren) tim cac khoan CHT nop tien mat, cong don theo (ngay
+// ngan hang nhan tien, gian) roi khop voi hoa don "CHT nộp tiền N" da nap qua
+// upload-hoadon (store[momoCfg.chtInvoicesKey], xem parseInvoiceWorkbook/
+// momoReconcile.js) theo CUNG ngay + gian. Tra ve 1 dong / (ngay, gian) --
+// dung cho export.xlsx (thay the hoan toan store.momo_kl_deposits cu, hand-
+// populated 1 lan, chi co 17 dong 2026-07-03->07-20).
+function buildMomoChtDeposits(store, activeCompany, chtInvoicesKey) {
+  const diemAlias = momoEffectiveDiemAlias(store);
+  const depositsByKey = new Map(); // "date|gian" -> tong tien
+  (store.transactions || []).forEach((t) => {
+    if (t.type !== "thu" || !t.date) return;
+    const desc = String(t.description || "").toUpperCase();
+    const match = desc.match(CHT_CODE_RE_KVC_ONLY);
+    if (!match) return;
+    const bank = store.banks.find((b) => b.id === t.bank_id);
+    if (companyForBankRow(bank) !== activeCompany) return;
+    const mapped = (store.cht_nop_tien_map || {})[match[0]];
+    if (!mapped || !mapped.maCongTrinh) return;
+    const key = `${t.date}|${mapped.maCongTrinh}`;
+    depositsByKey.set(key, (depositsByKey.get(key) || 0) + (t.amount || 0));
+  });
+
+  const invoicesByKey = new Map(); // cung key -> [{soHd, ngayHd, tongTt}]
+  (store[chtInvoicesKey] || []).forEach((inv) => {
+    if (!inv.ngayNopTien) return;
+    const gian = diemAlias[inv.maDiem] || inv.maDiem;
+    const key = `${inv.ngayNopTien}|${gian}`;
+    if (!invoicesByKey.has(key)) invoicesByKey.set(key, []);
+    invoicesByKey.get(key).push(inv);
+  });
+
+  const results = [];
+  for (const [key, amount] of depositsByKey) {
+    const [date, gian] = key.split("|");
+    const candidates = invoicesByKey.get(key) || [];
+    const invoiceTotal = candidates.reduce((s, c) => s + (c.tongTt || 0), 0);
+    const soHd = candidates.map((c) => c.soHd).filter(Boolean).join(", ");
+    results.push({
+      date,
+      gian,
+      amount,
+      soHd,
+      invoiceTotal,
+      matched: candidates.length > 0 && Math.abs(invoiceTotal - amount) <= 1000,
+    });
+  }
+  return results.sort((a, b) => (a.date > b.date ? 1 : a.date < b.date ? -1 : 0));
 }
 
 // KH Moi CHUA co tai khoan Momo rieng thuc su nhan tien ve (BIDV7701 con 0
@@ -349,7 +472,7 @@ function buildMomoReconciliation(store, companyKey) {
     const grossData = applyCuaHangAlias(mergeGross(grossUploads), store.cua_hang_mapping || {});
     const invoiceData = { invoices };
     if (grossData.codes.length > 0) {
-      reconciledAll = reconcileMomo(settlements, grossData, invoiceData, store.gian_mapping, store.invoice_diem_alias);
+      reconciledAll = reconcileMomo(settlements, grossData, invoiceData, store.gian_mapping, momoEffectiveDiemAlias(store));
       // Chi Nhan, 2026-07-30: "các đối soát tất cả các trang điều xếp theo
       // ngày cho tôi nhá" -- reconcileMomo tra ve ket qua theo THU TU giao
       // dich ngan hang trong store.transactions (thu tu tai/nhap lieu, KHONG
@@ -386,7 +509,7 @@ function buildMomoReconciliation(store, companyKey) {
   // silently can't count them yet. See mục 3b on the page: cho phép Luyen
   // ánh xạ tên này về đúng Ma Cong Trinh, áp dụng ngay không cần tải lại HĐ.
   const knownCodes = new Set([...allCodes, ...Object.keys(store.gian_mapping || {})]);
-  const invoiceDiemAlias = store.invoice_diem_alias || {};
+  const invoiceDiemAlias = momoEffectiveDiemAlias(store);
   const unmatchedInvoiceCodesSet = new Set();
   invoices.forEach((inv) => {
     if (!inv.maDiem) return;
@@ -475,8 +598,8 @@ router.get("/doi-soat/momo", (req, res) => {
   // Nguong 2.000d (Luyen xac nhan khoan 693d/07-06 cung la lam tron, khong
   // phai thieu du lieu that) -- van du thap de neu sau nay co khoan thieu
   // that su lon (hang trieu tro len, nhu vu 200tr/50tr da gap truoc do) thi
-  // van hien ra chu khong bi am tham nuot mat.
-  const ROUNDING_ABSORB_THRESHOLD = 2000;
+  // van hien ra chu khong bi am tham nuot mat. (ROUNDING_ABSORB_THRESHOLD
+  // dinh nghia o module-scope phia tren, dung chung voi export.xlsx.)
   const reconciled = reconciledMonth
     .map((r) => {
       const lines = r.lines.filter((l) => (activeCompany === "kh_moi" ? l.tkCo === "SKIP" : l.tkCo !== "SKIP"));
@@ -762,6 +885,22 @@ router.post("/doi-soat/momo/upload-hoadon", requireDataEntry, upload.single("fil
       addedMomo++;
     }
 
+    // Luyen, 2026-08-03: hoa don "CHT nop tien" tag rieng trong cot ghi chu
+    // (khong phai "Dich vu thu ho") -- luu tach rieng khoi invoicesKey, dung
+    // cho tinh nang xuat Excel AMIS "CHT nop tien" (buildMomoChtDeposits).
+    if (!store[momoCfg.chtInvoicesKey]) store[momoCfg.chtInvoicesKey] = [];
+    const existingKeysCht = new Set(
+      store[momoCfg.chtInvoicesKey].map((i) => `${i.soHd}|${i.ngayHd}|${i.maDiem}`)
+    );
+    let addedCht = 0;
+    for (const inv of shared.momoCht || []) {
+      const key = `${inv.soHd}|${inv.ngayHd}|${inv.maDiem}`;
+      if (existingKeysCht.has(key)) continue;
+      existingKeysCht.add(key);
+      store[momoCfg.chtInvoicesKey].push(inv);
+      addedCht++;
+    }
+
     // Zalo/VNPay/Payoo (store.zvp_invoices) la cua rieng cong ty KH Cu (chua
     // co tai khoan ZVP nao cho KH Moi) -- chi gop vao cac kenh nay khi dang
     // xem KH Cu, tranh lay hoa don cua KH Moi gan nham vao so sach KH Cu.
@@ -786,6 +925,9 @@ router.post("/doi-soat/momo/upload-hoadon", requireDataEntry, upload.single("fil
     let msg = `Da nap sheet "${shared.sheetName}": them moi ${addedMomo} HD momo (${momoCfg.label}).`;
     if (blockedMomo > 0) {
       msg += ` (Bo qua ${blockedMomo} HD da xac dinh la gan nham tag momo tu truoc, khong tinh lai.)`;
+    }
+    if (addedCht > 0) {
+      msg += ` ${addedCht} HD "CHT nộp tiền" (dung cho xuat Excel AMIS tien mat CHT).`;
     }
     if (activeCompany === "kh_cu") {
       msg += ` ${addedCounts.zalo} HD zalo, ${addedCounts.vnpay} HD vnpay, ${addedCounts.payoo} HD payoo (da cap nhat cho ca 2 trang Doi soat Momo va Zalo/VNPay/Payoo).`;
@@ -987,7 +1129,7 @@ router.get("/doi-soat/momo/export.xlsx", (req, res) => {
   const settlements = extractMomoSettlements(txs);
   const grossData = applyCuaHangAlias(mergeGross(store[sourceCfg.grossKey] || []), store.cua_hang_mapping || {});
   const invoiceData = { invoices: store[momoCfg.invoicesKey] || [] };
-  let reconciled = reconcileMomo(settlements, grossData, invoiceData, store.gian_mapping, store.invoice_diem_alias);
+  let reconciled = reconcileMomo(settlements, grossData, invoiceData, store.gian_mapping, momoEffectiveDiemAlias(store));
   // An gian theo yeu cau rieng cua cong ty dang xuat (dung 1 danh sach voi
   // trang xem -- xem ensureGianHidden o tren), de khong xuat nham gian
   // thuoc ve cong ty kia vao file MISA cua cong ty nay.
@@ -1042,6 +1184,26 @@ router.get("/doi-soat/momo/export.xlsx", (req, res) => {
       );
       if (exportableLines.length === 0) return; // khong co dong nao thuoc cong ty dang xuat
 
+      // Luyen, 2026-08-03: "Số tiền ngân hàng trả về á sao lại khi xuất ra nó
+      // không khớp với nhau" -- phat hien qua vi du that: gian KVC ESTELLA
+      // (HD 4081) hien 14.699.136đ tren trang xem nhung xuat Excel lai ra
+      // 14.700.134đ (lech 998đ, dung bang phan lam tron ma trang xem da tu
+      // dong hap thu vao gian LON NHAT trong khoan -- xem ROUNDING_ABSORB_
+      // THRESHOLD/GET "/doi-soat/momo" o tren). Route xuat file truoc gio
+      // KHONG ap dung buoc hap thu nay nen so tien xuat ra la so THO chua
+      // dieu chinh, khong khop voi so tien NGAN HANG THUC NHAN (va khong
+      // khop voi trang xem). Ap dung LAI dung 1 logic nay o day (chi kh_moi,
+      // giong het dieu kien/nguong ben trang xem) de file xuat luon dung
+      // bang tien thuc te ve ngan hang.
+      if (activeCompany === "kh_moi" && !r.pendingBank && typeof r.bankAmount === "number") {
+        let totalNetComputed = exportableLines.reduce((sum, l) => sum + l.net, 0);
+        let diffVsBank = totalNetComputed - r.bankAmount;
+        if (diffVsBank !== 0 && Math.abs(diffVsBank) <= ROUNDING_ABSORB_THRESHOLD && exportableLines.length > 0) {
+          const biggest = exportableLines.reduce((a, b) => (b.gross > a.gross ? b : a), exportableLines[0]);
+          biggest.net -= diffVsBank;
+        }
+      }
+
       const soCt = "NTTK" + String(seq).padStart(7, "0") + "/26";
       seq++;
       const ngayDmy = isoToDmy(r.settlementDate);
@@ -1070,7 +1232,14 @@ router.get("/doi-soat/momo/export.xlsx", (req, res) => {
           "Mã nhân viên thu": "",
           "Diễn giải (hạch toán)": dienGiai,
           "TK Nợ (*)": 1121,
-          "TK Có (*)": l.tkCo,
+          // Luyen, 2026-08-03: "tk có là 131 hết á" -- "SKIP" chi la 1 co
+          // hieu NOI BO danh dau "gian nay thuoc rieng KH Moi" (xem loc
+          // exportableLines o tren), KHONG phai 1 tai khoan ke toan that --
+          // truoc gio bi ghi THANG chu "SKIP" vao chinh cot TK Co cua file
+          // xuat MISA (sai, AMIS khong hieu duoc). Doi lai thanh "131" (dung
+          // nhu cac dong con lai) khi ghi ra file, chi giu "SKIP" cho logic
+          // loc/an noi bo.
+          "TK Có (*)": l.tkCo === "SKIP" ? "131" : l.tkCo,
           "Số tiền": l.net,
           "Mã đối tượng (hạch toán)": "TRỰC TUYẾN0305289153",
           "Số khế ước đi vay": "",
@@ -1094,19 +1263,20 @@ router.get("/doi-soat/momo/export.xlsx", (req, res) => {
       });
     });
 
-  // Luyen, 2026-07-21: "KH705KVCMN0002/0004 la Phan Thiet/Nha Trang,
-  // KH989KVCMN0007 la Vung Tau -- hach toan vo tren file luon nha va xuat
-  // cong chung voi file momo excel luon nha, ghi la 'Thu tien dich vu vui
-  // choi giai tri - KL theo HD hoa don'" -- day la tien KHACH LE (MTT) nop
-  // truc tiep vao TK Momo (BIDV7701/BIDV123456), KHAC voi settlement REM
-  // Momo tong hop o tren: doi chieu qua so tien + ngay voi file "MTT" (danh
-  // sach xuat HD MTT - 705/989) de tim dung so HD, luu san trong
-  // store.momo_kl_deposits (xem __add_kl.js/tin nhan 2026-07-21). Hau to
-  // kenh la "- KL" (Khach Le), TK Co luon la 131 vi da co HD ro rang -- KHONG
-  // an theo gian_hidden/SKIP nhu doanh thu Momo tong hop (khac ban chat: day
-  // la tien co hoa don, khong phai cho "chua xuat MISA").
-  const klDeposits = (store.momo_kl_deposits || []).filter((d) => {
-    if (d.company !== activeCompany) return false;
+  // Luyen, 2026-08-03: "ngân hàng có các giao dịch của Cửa Hàng trưởng nộp
+  // tiền vào... đối tượng là khách lẻ số tiền là số tiền nợ 1121 có lúc nào
+  // cx 131 cho tôi nhá mã công trình là gian đó mỗi 1 ngày là 1 chứng từ có
+  // số hóa đơn nữa hôm sau sẽ xuất cho hôm trước gắn vô mẫu á để chỗ diễn
+  // giải á là Thu tiền dịch vụ vui chơi giải trí - KL theo HĐ rồi găn số hóa
+  // đơn vô nhá" -- thay the hoan toan store.momo_kl_deposits cu (hand-
+  // populated 1 lan, chi co 17 dong 2026-07-03->07-20, xem __add_kl.js) bang
+  // buildMomoChtDeposits: quet TRUC TIEP tu giao dich ngan hang (ma nop tien
+  // trong mo ta -> gian qua store.cht_nop_tien_map) roi tu khop voi hoa don
+  // "CHT nộp tiền N" (tag rieng trong cot ghi chu cua sheet danh sach hoa don
+  // dung chung, xem parseInvoiceWorkbook/momoReconcile.js) theo CUNG ngay
+  // ngan hang nhan tien + gian -- khong con phai tay them tay tung dong nua,
+  // tu dong cap nhat khi Luyen nap them sao ke/hoa don moi.
+  const chtDeposits = buildMomoChtDeposits(store, activeCompany, momoCfg.chtInvoicesKey).filter((d) => {
     if (tuFilter || denFilter) {
       if (tuFilter && d.date < tuFilter) return false;
       if (denFilter && d.date > denFilter) return false;
@@ -1114,55 +1284,55 @@ router.get("/doi-soat/momo/export.xlsx", (req, res) => {
     }
     return !monthFilter || d.date.slice(0, 7) === monthFilter;
   });
-  klDeposits
-    .sort((a, b) => (a.date > b.date ? 1 : a.date < b.date ? -1 : 0))
-    .forEach((d) => {
-      const soCt = "NTTK" + String(seq).padStart(7, "0") + "/26";
-      seq++;
-      const ngayDmy = isoToDmy(d.date);
-      const dienGiai = `Thu tiền dịch vụ vui chơi giải trí - KL theo HĐ ${d.soHd}`;
-      rows.push({
-        "Ngày hạch toán (*)": ngayDmy,
-        "Ngày chứng từ (*)": ngayDmy,
-        "Số chứng từ (*)": soCt,
-        // Luyen, 2026-07-21: "7701 á nếu là KL cửa hàng trưởng nạp vô á thì
-        // là đối tượng KL luôn nhá" -- cac khoan nay la CHT (cua hang truong)
-        // nop tien mat truc tiep, KHONG phai settlement Momo that, nen dung
-        // ma doi tuong "KL" (Khach le, mac dinh cho cac kenh khac -- xem ghi
-        // chu tai buildExportRows/routes/doisoat-zvp.js), KHONG dung
-        // "TRUC TUYEN0305289153" (chi danh rieng cho doanh thu Momo settlement).
-        "Mã đối tượng": "KL",
-        "Tên đối tượng": "",
-        "Địa chỉ": "",
-        "Nộp vào TK": momoCfg.bankAccount,
-        "Mở tại ngân hàng": momoCfg.bankFullName,
-        "Lý do thu": "Thu tiền khách hàng (không theo hóa đơn)",
-        "Diễn giải lý do thu": dienGiai,
-        "Mã nhân viên thu": "",
-        "Diễn giải (hạch toán)": dienGiai,
-        "TK Nợ (*)": 1121,
-        "TK Có (*)": "131",
-        "Số tiền": d.amount,
-        "Mã đối tượng (hạch toán)": "KL",
-        "Số khế ước đi vay": "",
-        "Số khế ước cho vay": "",
-        "Mã khoản mục chi phí": "",
-        "Mã đơn vị": "",
-        "Mã đối tượng THCP": "",
-        "Mã công trình": d.gian,
-        "Số đơn đặt hàng": "",
-        "Số đơn mua hàng": "",
-        "Số hợp đồng mua": "",
-        "Số hợp đồng bán": "",
-        "Mã thống kê": "",
-        "CP không hợp lý": "",
-        "Số HĐ khớp": d.soHd,
-        "Tổng tiền HĐ khớp": d.amount,
-        "Doanh thu gộp (trước phí)": d.amount,
-        "Chênh lệch HĐ vs doanh thu": 0,
-        "Trạng thái": "Khớp (MTT khách lẻ)",
-      });
+  chtDeposits.forEach((d) => {
+    const soCt = "NTTK" + String(seq).padStart(7, "0") + "/26";
+    seq++;
+    const ngayDmy = isoToDmy(d.date);
+    const dienGiai = d.soHd
+      ? `Thu tiền dịch vụ vui chơi giải trí - KL theo HĐ ${d.soHd}`
+      : "Thu tiền dịch vụ vui chơi giải trí - KL";
+    rows.push({
+      "Ngày hạch toán (*)": ngayDmy,
+      "Ngày chứng từ (*)": ngayDmy,
+      "Số chứng từ (*)": soCt,
+      // Luyen, 2026-07-21: "7701 á nếu là KL cửa hàng trưởng nạp vô á thì
+      // là đối tượng KL luôn nhá" -- cac khoan nay la CHT (cua hang truong)
+      // nop tien mat truc tiep, KHONG phai settlement Momo that, nen dung
+      // ma doi tuong "KL" (Khach le, mac dinh cho cac kenh khac -- xem ghi
+      // chu tai buildExportRows/routes/doisoat-zvp.js), KHONG dung
+      // "TRUC TUYEN0305289153" (chi danh rieng cho doanh thu Momo settlement).
+      "Mã đối tượng": "KL",
+      "Tên đối tượng": "",
+      "Địa chỉ": "",
+      "Nộp vào TK": momoCfg.bankAccount,
+      "Mở tại ngân hàng": momoCfg.bankFullName,
+      "Lý do thu": "Thu tiền khách hàng (không theo hóa đơn)",
+      "Diễn giải lý do thu": dienGiai,
+      "Mã nhân viên thu": "",
+      "Diễn giải (hạch toán)": dienGiai,
+      "TK Nợ (*)": 1121,
+      "TK Có (*)": "131",
+      "Số tiền": d.amount,
+      "Mã đối tượng (hạch toán)": "KL",
+      "Số khế ước đi vay": "",
+      "Số khế ước cho vay": "",
+      "Mã khoản mục chi phí": "",
+      "Mã đơn vị": "",
+      "Mã đối tượng THCP": "",
+      "Mã công trình": d.gian,
+      "Số đơn đặt hàng": "",
+      "Số đơn mua hàng": "",
+      "Số hợp đồng mua": "",
+      "Số hợp đồng bán": "",
+      "Mã thống kê": "",
+      "CP không hợp lý": "",
+      "Số HĐ khớp": d.soHd,
+      "Tổng tiền HĐ khớp": d.invoiceTotal,
+      "Doanh thu gộp (trước phí)": d.amount,
+      "Chênh lệch HĐ vs doanh thu": d.invoiceTotal - d.amount,
+      "Trạng thái": !d.soHd ? "Chưa có HĐ (CHT nộp tiền)" : d.matched ? "Khớp (CHT nộp tiền)" : "Lệch (CHT nộp tiền)",
     });
+  });
 
   const ws = XLSX.utils.json_to_sheet(rows);
   const wb2 = XLSX.utils.book_new();

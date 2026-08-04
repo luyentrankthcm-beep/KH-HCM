@@ -2083,6 +2083,11 @@ function parseSharedInvoiceWorkbook(buffer, companyKey) {
     zalo: zaloParsed.invoices,
     vnpay: vnpayParsed.invoices,
     payoo: payooParsed.invoices,
+    // Luyen, 2026-08-03: hoa don "CHT nop tien" (Cua hang truong nop tien
+    // mat truc tiep) duoc tag rieng trong cot "ghi chu" cua CHINH sheet danh
+    // sach hoa don nay (khong phai cot "Dich vu thu ho" nhu momo) -- xem
+    // parseInvoiceWorkbook trong momoReconcile.js. Dung chung 1 lan upload.
+    momoCht: momoParsed.chtInvoices || [],
   };
 }
 

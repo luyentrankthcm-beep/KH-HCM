@@ -633,6 +633,56 @@ function resolveRawPortalGross(transactions, cuaHangMapping) {
   };
 }
 
+// Luyen, 2026-08-03: "ngân hàng có các giao dịch của Cửa Hàng trưởng nộp tiền
+// vào... hôm sau sẽ xuất [HĐ] cho hôm trước" -- besides "momo N"-tagged rows,
+// the SAME invoice tracking sheet also tags some rows as "CHT nộp tiền N"
+// (or "CHT nộp tiền D/M" when a month is needed to avoid ambiguity, e.g.
+// across a month boundary) to mark a store-manager cash deposit invoice.
+// Luyen, 2026-08-03 (lan 2): "chỗ dịch vụ thu hộ để CHT nộp tiền rồi mà" --
+// ban dau tuong tag nay nam rieng o cot "ghi chu", nhung thuc te Luyen ghi
+// CHUNG vao cot "Dịch vụ thu hộ" (cung cot voi tag "momo N") -- ham nay dung
+// chung cho ca 2 truong hop, goi voi gia tri cua BAT KY cot nao (xem call
+// site ben duoi, thu ghiChu truoc, fallback dvth). These follow the same T+1
+// convention as momo ("N" = the calendar day the CASH was collected/
+// deposited; the invoice itself is dated the next day).
+function parseChtGhiChu(ghiChu) {
+  if (!ghiChu) return null;
+  const t = normText(String(ghiChu));
+  const m = t.match(/cht\s*nop\s*tien\s*(\d{1,2})(?:[\/\-](\d{1,2}))?/);
+  if (!m) return null;
+  const day = parseInt(m[1], 10);
+  const month = m[2] ? parseInt(m[2], 10) : null;
+  if (isNaN(day) || day < 1 || day > 31) return null;
+  return { day, month };
+}
+
+// Resolve a CHT ghi-chu's day (+ optional explicit month) into a full ISO
+// date, anchored to the invoice's own ngayHd (same rollback-to-previous-month
+// rule as the momo bare-"momo" fallback above: the deposit day can't be
+// numerically AFTER the invoice's own issue day within the same month, since
+// the invoice is always issued the day after the cash was collected).
+function resolveChtDateIso(day, month, ngayHd) {
+  if (!ngayHd) return null;
+  const [y, mo, d] = ngayHd.split("-").map(Number);
+  let yy = y;
+  let mm = month != null ? month : mo;
+  if (month == null) {
+    if (day > d) {
+      mm -= 1;
+      if (mm === 0) {
+        mm = 12;
+        yy -= 1;
+      }
+    }
+  } else if (mm > mo) {
+    // Explicit month is chronologically after the invoice's own month --
+    // only possible if the deposit happened in December and the invoice was
+    // issued in January of the following year.
+    yy -= 1;
+  }
+  return `${yy}-${String(mm).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
 // ---------- Parse invoice list workbook ("ke ds xuat HD MTT" style) ----------
 // Looks for a sheet name containing "xuat HD" / "hoa don" / "danh sach ...
 // don" (accent/case insensitive), then a header row containing "So HD" and
@@ -685,6 +735,7 @@ function parseInvoiceWorkbook(buffer, companyKey) {
       if (s.includes("thu ho")) idx.dichVuThuHo = c;
       if (s.includes("hinh thuc hop tac")) idx.hinhThuc = c;
       if (s.includes("ten diem xuat hoa don")) idx.tenDiem = c;
+      if (s.includes("ghi chu")) idx.ghiChu = c;
     });
     if (idx.soHd !== undefined && idx.maDiem !== undefined) {
       headerRowIdx = r;
@@ -697,20 +748,62 @@ function parseInvoiceWorkbook(buffer, companyKey) {
   }
 
   const invoices = [];
+  const chtInvoices = [];
   for (let r = headerRowIdx + 1; r < grid.length; r++) {
     const row = grid[r] || [];
     const dvth = cols.dichVuThuHo !== undefined ? row[cols.dichVuThuHo] : null;
-    if (!dvth || !/momo/i.test(String(dvth))) continue;
+    const isMomo = dvth && /momo/i.test(String(dvth));
+    const ghiChu = cols.ghiChu !== undefined ? row[cols.ghiChu] : null;
+    // Luyen, 2026-08-03 (lan 2): "chỗ dịch vụ note khi cửa hàng trưởng nộp
+    // tiền vào rồi mà chỗ dịch vụ thu hộ để CHT nộp tiền rồi mà" -- ban dau
+    // tuong tag "CHT nộp tiền N" nam o cot "ghi chú" rieng, nhung thuc te
+    // Luyen ghi CHUNG vao cot "Dịch vụ thu hộ" (cung cot voi tag "momo N")
+    // -- kiem tra ca 2 cot (uu tien ghiChu neu co, fallback sang chinh cot
+    // dvth) de khong bo sot du Luyen ghi o cot nao.
+    const chtTagFromGhiChu = !isMomo ? parseChtGhiChu(ghiChu) : null;
+    const chtTag = chtTagFromGhiChu || (!isMomo ? parseChtGhiChu(dvth) : null);
+    const chtRawSource = chtTagFromGhiChu ? ghiChu : dvth;
+    if (!isMomo && !chtTag) continue;
+    const ngayHdRaw = cols.ngayHd !== undefined ? row[cols.ngayHd] : null;
+    const ngayHd = toIsoDate(ngayHdRaw);
+
+    if (chtTag) {
+      chtInvoices.push({
+        soHd: cols.soHd !== undefined ? row[cols.soHd] : null,
+        ngayHd,
+        ngayNopTien: resolveChtDateIso(chtTag.day, chtTag.month, ngayHd),
+        maDiem: normCode(cols.maDiem !== undefined ? row[cols.maDiem] : null),
+        tongTt: cols.tongTt !== undefined ? Number(row[cols.tongTt]) || 0 : 0,
+        raw: String(chtRawSource || "").trim(),
+      });
+      continue;
+    }
     // Day list after "momo" is usually comma-separated ("MOMO 11, 12") but
     // some rows use "+" instead ("momo 11+12"); accept both separators.
     const m = String(dvth).trim().match(/momo\s+([\d,+\s]+)/i);
-    const days = m
+    let days = m
       ? m[1]
           .split(/[,+]/)
           .map((x) => parseInt(x.trim(), 10))
           .filter((x) => !isNaN(x))
       : [];
-    const ngayHdRaw = cols.ngayHd !== undefined ? row[cols.ngayHd] : null;
+    // Luyen, 2026-08-01 (lan 8): "đây là các hóa đơn ngày 30.31 với 29 nè bạn
+    // khớp mà" -- phat hien qua vi du that: hoa don 4082 (ngày HĐ 30/05, Dịch
+    // vụ thu hộ CHI ghi "momo" -- KHONG co so ngay sau) truoc gio bi BO QUA
+    // HOAN TOAN khoi doi soat (days=[], xem dieu kien loc "!inv.days.length"
+    // ben duoi trong reconcileMomo) vi khong doc duoc so ngay nao ca. Doi
+    // chieu voi cac hoa don "momo NN" khac (co so ngay) cho thay quy uoc luon
+    // la: hoa don xuat NGAY HOM SAU de ghi nhan doanh thu NGAY HOM TRUOC (T+1)
+    // -- vay "momo" TRO KHONG co so ngay van co 1 ngay doanh thu CU THE, chi
+    // la ngam hieu = ngay truoc ngay xuat HD (invD - 1), KHONG phai bo trong.
+    // Tinh toan ngay ngay tai day (thay vi de rong roi doan lai o reconcileMomo)
+    // vi da co san ngayHd o day. Anh huong khong nho: ~8% hoa don KH Cu va
+    // ~23% hoa don KH Moi la dang "momo" tron (khong so ngay).
+    if (days.length === 0 && ngayHd) {
+      const [y, mo, d] = ngayHd.split("-").map(Number);
+      const prevDate = new Date(Date.UTC(y, mo - 1, d - 1));
+      days = [prevDate.getUTCDate()];
+    }
 
     let maDiem = normCode(cols.maDiem !== undefined ? row[cols.maDiem] : null);
     if (maDiem === SPLIT_PARENT_CODE) {
@@ -724,7 +817,7 @@ function parseInvoiceWorkbook(buffer, companyKey) {
 
     invoices.push({
       soHd: cols.soHd !== undefined ? row[cols.soHd] : null,
-      ngayHd: toIsoDate(ngayHdRaw),
+      ngayHd,
       thang: cols.thang !== undefined ? row[cols.thang] : null,
       maDiem,
       tongTt: cols.tongTt !== undefined ? Number(row[cols.tongTt]) || 0 : 0,
@@ -733,7 +826,7 @@ function parseInvoiceWorkbook(buffer, companyKey) {
     });
   }
 
-  return { sheetName, invoices };
+  return { sheetName, invoices, chtInvoices };
 }
 
 // ---------- Extract momo settlements from already-imported bank transactions ----------
@@ -778,18 +871,40 @@ function reconcileMomo(settlements, grossData, invoiceData, gianMapping, diemAli
   // build invoicesByDiemDay.
   const resolvedInvoices = [];
   for (const inv of invoiceData.invoices) {
-    if (!inv.ngayHd || !inv.days || inv.days.length === 0) continue;
-    // The invoice date tells us the month/year; revenue day(s) are inv.days,
+    if (!inv.ngayHd) continue;
+    const [invY, invMo, invD] = inv.ngayHd.split("-").map(Number);
+    // Luyen, 2026-08-01 (lan 8): "đây là các hóa đơn ngày 30.31 với 29 nè bạn
+    // khớp mà" -- hoa don "momo" TRON (khong so ngay sau, vd hoa don 4082)
+    // truoc gio bi BO QUA HOAN TOAN (days=[] -> continue) thay vi hieu ngam
+    // la doanh thu NGAY HOM TRUOC ngay xuat HD (T+1, giong quy uoc "momo NN"
+    // co so ngay). Sua o DAY (luc doi soat) thay vi chi o parseInvoiceWorkbook
+    // vi phan lon hoa don da luu san trong store.json TU TRUOC KHI co fix nay
+    // (days=[] da ghi cung), sua o parse-time khong hoi to duoc du lieu cu --
+    // phai tu suy lai o day moi ap dung duoc ngay cho ca du lieu da co san.
+    let invDays = inv.days;
+    if (!invDays || invDays.length === 0) {
+      const prevDate = new Date(Date.UTC(invY, invMo - 1, invD - 1));
+      invDays = [prevDate.getUTCDate()];
+    }
+    // The invoice date tells us the month/year; revenue day(s) are invDays,
     // which normally fall in the same month as ngayHd, but a day like 30/31
     // on an invoice dated the 1st-2nd of the next month means the revenue
     // was from the LAST day of the previous month.
-    const [invY, invMo, invD] = inv.ngayHd.split("-").map(Number);
     const effectiveMaDiem = alias[inv.maDiem] || inv.maDiem;
-    const isos = inv.days.map((day) => {
+    const isos = invDays.map((day) => {
       let y = invY;
       let mo = invMo;
-      if (day > 20 && invD <= 3) {
-        // likely previous month's tail end
+      // Luyen, 2026-08-01 (lan 8): "đây là các hóa đơn ngày 30.31 với 29 nè
+      // bạn khớp mà" -- nguong cu "day > 20 && invD <= 3" bo sot truong hop
+      // that (hoa don 1515, ngày HĐ 04/05, "momo 29,30"): invD=4 vua qua
+      // nguong <=3 nen KHONG lui thang, hieu nham thanh "29,30 thang 5" (trung
+      // voi ngay dang xet) thay vi dung ra la "29,30 thang 4" (thang truoc,
+      // vi hoa don xuat luon SAU ngay doanh thu -- T+1 hoac hon vai ngay khi
+      // gop nhieu ngay). Quy tac dung hon, khong con so "20"/"3" tuy tien:
+      // ngay doanh thu KHONG THE lon hon ngay xuat hoa don TRONG CUNG 1 thang
+      // (hoa don luon xuat SAU khi co doanh thu) -- day > invD moi chinh la
+      // dau hieu dang tin cay de biet ngay do thuoc THANG TRUOC.
+      if (day > invD) {
         mo -= 1;
         if (mo === 0) {
           mo = 12;
@@ -817,8 +932,11 @@ function reconcileMomo(settlements, grossData, invoiceData, gianMapping, diemAli
   // HOAN TOAN khoi doi soat (khong cong vao bat ky ngay nao), thay vi cong
   // them lam du doanh thu.
   const singleDayIsoByCode = {}; // "CODE|ISO" -> true, tu cac hoa don CHI 1 ngay
-  for (const { inv, effectiveMaDiem, isos } of resolvedInvoices) {
-    if (inv.days.length === 1) {
+  for (const { effectiveMaDiem, isos } of resolvedInvoices) {
+    // Dung isos.length (so ngay THAT SU da suy ra, ke ca truong hop "momo"
+    // tron duoc tu suy 1 ngay o tren) thay vi inv.days.length (co the la 0
+    // ngay goc chua qua suy luan) -- giu dung tinh than "1 hoa don = 1 ngay".
+    if (isos.length === 1) {
       singleDayIsoByCode[`${effectiveMaDiem}|${isos[0]}`] = true;
     }
   }
@@ -826,7 +944,7 @@ function reconcileMomo(settlements, grossData, invoiceData, gianMapping, diemAli
   const invoicesByDiemDay = {}; // "CODE|YYYY-MM-DD" -> [invoice,...]
   for (const { inv, effectiveMaDiem, isos } of resolvedInvoices) {
     const isDuplicateCombinedInvoice =
-      inv.days.length > 1 &&
+      isos.length > 1 &&
       isos.some((iso) => singleDayIsoByCode[`${effectiveMaDiem}|${iso}`]);
     if (isDuplicateCombinedInvoice) continue; // hoa don gop trung -- bo qua hoan toan
 

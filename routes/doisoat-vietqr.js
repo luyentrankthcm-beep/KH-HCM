@@ -516,6 +516,86 @@ const MANUAL_MATCH_DEFAULTS = {
       note:
         "Bo sung 20.000d ngan hang co ve nhung du lieu QR tai len thieu dong giao dich cho gian nay (hoa don 9124 = 140.000d, du lieu QR chi co 120.000d) - Chi Nhan xac nhan 30/07.",
     },
+    // Luyen, 2026-08-03: doi chieu voi file "Book5.xlsx" (phieu thu MISA thang
+    // 6 chi tiet theo tung hoa don, Luyen tu lam va coi la chuan) -- 2 ngay
+    // 01/06 va 05/06 co hoa don (4437 va 4966) dan tag DUY NHAT "AM TP PHCM"
+    // (khong nhac gi den "LM NHA TRANG KVC") nhung mac dinh INVOICE_SHARE_PAIRS
+    // (["AM TP PHCM","LM NHA TRANG KVC"]) da tu dong CHIA hoa don + doanh thu
+    // 2 ngay nay giua 2 gian (vd hoa don 4437 = 5.540.000d bi chia thanh
+    // 5.140.000d cho AM TP PHCM + 400.000d cho LM NHA TRANG KVC) -- ĐÚNG NHU
+    // LOI LUYEN DA YEU CAU TRUOC DO (vu SB CAN THO/CON DAO AIRPORT): "nếu bị
+    // nhầm 2 gian mà trên hóa đơn chỉ có 1 gian thì đưa hết vô gian đó, không
+    // chia đôi". File Book5.xlsx xac nhan Luyen KHONG co dong nao cho "FARM
+    // LOTTE NHA TRANG" (= LM NHA TRANG KVC) trong 2 ngay nay -- tuc la toan bo
+    // doanh thu ngan hang lan hoa don ngay do deu thuoc AM TP PHCM. Dua ca
+    // gross cua LM NHA TRANG KVC ve AM TP PHCM (grossAdjustment) va gan het
+    // hoa don ve AM TP PHCM, LM NHA TRANG KVC con lai 0.
+    // - 01/06: sau khi gop, AM TP PHCM = 5.590.000d ngan hang vs 5.540.000d hoa
+    //   don (dung hoa don 4437) -> con Lệch -50.000d, GIU NGUYEN "Lệch" (khong
+    //   ep khop) vi file Book5.xlsx cua Luyen cung ghi rang "Lệch" cho dong
+    //   nay -- day la 1 sai lech that (hoa don thieu 50k so voi tien ngan
+    //   hang), khong phai loi he thong.
+    // - 05/06: sau khi gop, AM TP PHCM = 4.500.000d ngan hang vs 4.480.000d hoa
+    //   don (dung hoa don 4966), con 20.000d Luyen noi "chưa tìm được hóa đơn"
+    //   -- theo yeu cau "để lệch 20k đó cho tân phú đi", CHAP NHAN/HAP THU
+    //   20.000d nay vao AM TP PHCM (amount = 4.500.000d, tuc = gross, coi nhu
+    //   Khop) thay vi tiep tuc bao "Lệch".
+    "2026-06-01|AM TP PHCM": {
+      invoiceNumbers: ["4437"],
+      amount: 5540000,
+      grossAdjustment: 400000,
+      note:
+        'Gop 400.000d doanh thu ngay 01/06 tu "LM NHA TRANG KVC" ve day (hoa don 4437 chi ghi 1 gian "AM TP PHCM", khong chia doi) -- theo file Book5.xlsx Luyen xac nhan 03/08. Con Lệch -50.000d la lech that (hoa don 4437 = 5.540.000d, ngan hang 5.590.000d), khong ep khop.',
+    },
+    "2026-06-01|LM NHA TRANG KVC": {
+      invoiceNumbers: [],
+      amount: 0,
+      grossAdjustment: -400000,
+      note:
+        'Chuyen het 400.000d doanh thu ngay 01/06 ve "AM TP PHCM" (hoa don 4437 chi ghi 1 gian, khong chia doi) -- theo file Book5.xlsx Luyen xac nhan 03/08 (khong co dong "FARM LOTTE NHA TRANG" ngay nay).',
+    },
+    "2026-06-05|AM TP PHCM": {
+      invoiceNumbers: ["4966"],
+      amount: 4500000,
+      grossAdjustment: 100000,
+      note:
+        'Gop 100.000d doanh thu ngay 05/06 tu "LM NHA TRANG KVC" ve day (hoa don 4966 chi ghi 1 gian "AM TP PHCM") -- theo file Book5.xlsx. Con 20.000d Luyen "chưa tìm được hóa đơn" -- theo yeu cau "để lệch 20k đó cho tân phú", hap thu vao day (amount = gross, coi nhu Khop).',
+    },
+    "2026-06-05|LM NHA TRANG KVC": {
+      invoiceNumbers: [],
+      amount: 0,
+      grossAdjustment: -100000,
+      note:
+        'Chuyen het 100.000d doanh thu ngay 05/06 ve "AM TP PHCM" (hoa don 4966 chi ghi 1 gian, khong chia doi) -- theo file Book5.xlsx (khong co dong "FARM LOTTE NHA TRANG" ngay nay).',
+    },
+  },
+  // Luyen, 2026-08-03: "cấn trừ đưa vô 200k cho khớp cho tôi đi số 200k phú
+  // quốc á" -- kenh BIDV7704, ngay 20/06 "Lệch Ngân hàng-Dữ liệu: -200.000đ"
+  // (ngan hang 1.150.000d nhung du lieu QR tai len chi khop duoc 950.000d --
+  // 200.000d tien that KHONG co dong QR nao khop ma tham chieu). Hoa don
+  // 1445+1446 (gop chung cho "SÂN BAY PHÚ QUỐC" ca 2 ngay 20+21/06) tong dung
+  // 1.100.000d = dung tong gross 2 ngay SAU KHI cong 200.000d nay vao ngay 20
+  // (550.000+200.000=750.000d ngay 20, 350.000d ngay 21, cong lai 1.100.000d)
+  // -- xac nhan 200.000d nay THUC SU thuoc ve "SÂN BAY PHÚ QUỐC" (dung y
+  // Luyen). Vi day la hoa don gop 2 NGAY (khong phai gop 2 GIAN), khong dung
+  // duoc co che applyMultiDayGroupConsolidation tu dong (ham do bo qua dong
+  // da co "manualOverride"), nen ghi thang ca 2 ngay o day: gross MOI + tong
+  // tien HD chia lai theo dung gross MOI cua tung ngay (tong ca 2 ngay van
+  // giu dung 1.100.000d = tong 2 hoa don goc, khong doi tong that).
+  bidv7704: {
+    "2026-06-20|SÂN BAY PHÚ QUỐC": {
+      invoiceNumbers: ["1445", "1446"],
+      amount: 750000,
+      grossAdjustment: 200000,
+      note:
+        'Cong 200.000d "Lệch Ngân hàng-Dữ liệu" ngay 20/06 (tien VietQR ve nhung khong co dong du lieu QR tai len khop ma tham chieu) vao "SÂN BAY PHÚ QUỐC" theo yeu cau Luyen 03/08. Hoa don 1445+1446 gop chung 2 ngay 20-21/06 (tong 1.100.000d) chia lai theo dung gross moi: 750.000d ngay nay + 350.000d ngay 21/06.',
+    },
+    "2026-06-21|SÂN BAY PHÚ QUỐC": {
+      invoiceNumbers: ["1445", "1446"],
+      amount: 350000,
+      note:
+        'Hoa don 1445+1446 gop chung 2 ngay 20-21/06 (tong 1.100.000d) -- sau khi cong 200.000d "Lệch Ngân hàng-Dữ liệu" ngay 20/06 vao gross ngay do, chia lai tong tien HD theo dung gross moi: 750.000d ngay 20/06 + 350.000d ngay nay = dung 1.100.000d.',
+    },
   },
 };
 
@@ -1355,8 +1435,25 @@ function buildChannelReconciliation(store, channelKey) {
     });
     const tanPhuTarget = cfg.defaultBlankCode || "AM TP PHCM";
     const autoApplyTanPhu = TAN_PHU_AUTO_APPLY_CHANNELS.has(channelKey);
+    // Luyen, 2026-08-03: "7702 á đối chiếu viet qr á nếu đối chiếu theo mã
+    // tham chiếu đã khớp dư này là do ngân hàng thì đưa vô gian AM TP PHCM
+    // nhá ... số ngân hàng chính xác giúp tôi nhá" (kem anh man hinh cac ngay
+    // 01-24/06/2026, "Lech: Ngan hang <-> Du lieu" nho le -50.000d/-60.000d/
+    // -20.000d... chua duoc gom). Truoc day block nay CHI chay cho ngay >=
+    // cfg.refMatchFrom (22/07) -- xem "if (r.settlementDate < cfg.refMatchFrom)
+    // return;" da bo o day. Bo dieu kien do de ap dung CHO MOI ngay (ke ca
+    // truoc cutover) cho 2 kenh TAN_PHU_AUTO_APPLY_CHANNELS: phan du con lai
+    // giua "Ngan hang" (chuan, xem extractVietQrSettlements) va "Tinh tu du
+    // lieu tai len" duoc tu dong don vao gian mac dinh (AM TP PHCM cho 7702),
+    // dung nhu Luyen yeu cau -- ngan hang luon la so CHINH XAC, dong AM TP
+    // PHCM la noi hung phan du do. An toan cho ngay < refMatchFrom vi
+    // excludedByDate/refUnmatchedBankTx CHI co du lieu tu ngay >= refMatchFrom
+    // (xem bankThuTxs.filter(t => t.date >= cfg.refMatchFrom) o tren) nen
+    // excluded luon = 0 cho cac ngay cu, khong anh huong gi them; ngay nao da
+    // co dieu chinh thu cong (viet_qr_manual_matches) truoc do trong
+    // reconcileVietQr roi thi leftover da <= 1.000d nen khong bi cong them
+    // lan nua.
     reconciled.forEach((r) => {
-      if (r.settlementDate < cfg.refMatchFrom) return;
       const excluded = excludedByDate[r.settlementDate] || 0;
       if (excluded > 0) {
         r.bankAmount -= excluded;

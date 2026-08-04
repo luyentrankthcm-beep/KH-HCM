@@ -1023,6 +1023,284 @@ const SEED_CHT_NOP_TIEN_ROWS = [
   }
   if (dedupeHoaDonDauVaoRows(store)) changed = true;
 
+  // Luyen, 2026-08-03: "sao số dư lại âm 40 mấy triệu vậy trên soa kê số dư
+  // đầu kì là 0 mà" -- phat hien qua vi du that: sao ke BIDV7701 hien so du
+  // am 43.803.988d ngay sau giao dich dau tien cua thang 4, dù bank.opening_
+  // balance = 0. Nguyen nhan: 2 giao dich "chi" (12.808.994d, 34.086.994d)
+  // co ngay "1899-12-30" -- day la Excel epoch/serial 0, DAU HIEU KINH DIEN
+  // cua 1 o ngay KHONG DOC DUOC trong file upload (truoc khi utils/
+  // bankStatementParser.js co them guard isPlausibleYear() chan dieu nay tai
+  // nguon, xem ham parseDateCell) -- khong phai giao dich that, chi la rac
+  // con sot lai TU LAN UPLOAD 2026-07-17 (truoc khi parser duoc sua). Luyen
+  // xac nhan qua sao ke ngan hang that: so du dau ky = 0.00d dung nhu he
+  // thong da hien, KHONG co khoan "nam truoc" nao ca -- an toan xoa het
+  // (khong phai chuyen vao so du dau ky). Quet CA 6 tai khoan bi anh huong
+  // (BIDV7701 x2, BIDV7702 x2, BIDV123456, BIDV7704, BIDV8651), khong rieng
+  // BIDV7701, vi day la loi parser CHUNG anh huong nhieu lan upload khac
+  // nhau, khong phai rieng 1 tai khoan.
+  function removeCorruptEpochDateTransactions(store) {
+    const before = (store.transactions || []).length;
+    store.transactions = (store.transactions || []).filter(
+      (t) => !(t.date && t.date.slice(0, 7) === "1899-12")
+    );
+    const removed = before - store.transactions.length;
+    if (removed > 0) {
+      console.log(
+        `[seed] Da xoa ${removed} giao dich rac (ngay "1899-12-xx", artifact cua loi parser cu truoc khi co guard nam hop le 2000-2100).`
+      );
+    }
+    return removed > 0;
+  }
+  if (removeCorruptEpochDateTransactions(store)) changed = true;
+
+  // Luyen, 2026-08-03: "tôi đang chọn đối soát 7702 sao lại có 7701 tỏng đây
+  // nữa" -- phat hien qua sao ke chi tiet theo ngan hang, tab BIDV7702: nhieu
+  // dong "REM 9901CI..." / "CTNB BIDV701-681" / "THU PHI QLTK ... TK
+  // 8620107701" (8620107701 la SO TAI KHOAN THAT cua BIDV7701, khong phai
+  // 7702) xuat hien CA duoi bank_id=14 (BIDV7702) LAN duoi bank_id=13
+  // (BIDV7701, dung cho). Kiem tra: toan bo 14 dong duoi day o bank_id=14
+  // (batch tai len ngay 2026-07-18) TRUNG KHOP TUYET DOI (cung ngay + cung
+  // loai thu/chi + cung so tien + cung dien giai) voi 1 dong da co san o
+  // bank_id=13 -- xac nhan day la du lieu BIDV7701 bi tai NHAM vao bank_id
+  // cua BIDV7702 trong dot tai 07-18, lam Tong thu/chi cua BIDV7702 bi thoi
+  // phong. Xoa CHINH XAC 14 id nay khoi bank_id=14 (giu nguyen ban goc dung o
+  // bank_id=13). CO Y THUC bo qua 2 giao dich khac cung ngay 07-18 co CUNG so
+  // tham chieu nhung SO TIEN KHAC nhau voi ban ghi o bank_id=13 (id 52451 ref
+  // 9901CI260701000104456: 167.255.571d o bank14 vs 4.352.822d o bank13 cung
+  // ngay 07-01; id 52475 ref 9901CI260715000084343: 3.798.682d o bank14 vs
+  // 199.448.132d o bank13 cung ngay 07-15) -- day la XUNG DOT so lieu (cung so
+  // tham chieu, khac so tien), KHONG PHAI trung lap don gian, can Luyen xac
+  // nhan so nao dung truoc khi sua, nen KHONG dong den 2 giao dich nay.
+  function removeMisfiledBidv7701TransactionsFromBidv7702(store) {
+    const idsToRemove = new Set([
+      52452, 52455, 52456, 52459, 52461, 52462, 52463, 52464, 52466, 52468,
+      52470, 52472, 52473, 52474,
+    ]);
+    const before = (store.transactions || []).length;
+    store.transactions = (store.transactions || []).filter((t) => !idsToRemove.has(t.id));
+    const removed = before - store.transactions.length;
+    if (removed > 0) {
+      console.log(
+        `[seed] Da xoa ${removed} giao dich BIDV7701 bi tai NHAM vao bank_id cua BIDV7702 (batch 2026-07-18, trung khop tuyet doi voi du lieu da co o BIDV7701).`
+      );
+    }
+    return removed > 0;
+  }
+  if (removeMisfiledBidv7701TransactionsFromBidv7702(store)) changed = true;
+
+  // Luyen, 2026-08-03: "bên KH mới mã công trình vũng tàu này đổi lại thành
+  // VUNG TAU PHCM nhá" -- ma cong trinh chuan cua KH Moi cho diem nay VON DA
+  // la "VUNG TAU PHCM" (ten hien thi "POSH LOTTE MART VUNG TAU", xem
+  // store.ma_cong_trinh_master.kh_moi) nhung 2 dong invoice_diem_alias
+  // "VUNG TAU PHCM" / "POSH LOTTE MART VUNG TAU" -> "KVC LOTTE VUNG TAU" (alias
+  // DUNG CHUNG cho Momo/ZVP/VietQR, xem store.invoice_diem_alias) dang CHAY
+  // SAU applyGianRedirectToInvoices trong buildChannelReconciliation
+  // (routes/doisoat-vietqr.js), lam hoa don BIDV7702 vua duoc doi dung thanh
+  // "VUNG TAU PHCM" lai bi doi NGUOC lai thanh "KVC LOTTE VUNG TAU" (ma cua MOT
+  // gian KHAC hoan toan ben KH Cu, xem store.ma_cong_trinh_master.kh_cu) --
+  // day chinh la nguyen nhan file xuat MISA bao "Công trình <KVC LOTTE VUNG
+  // TAU> không có trong danh mục". Xac nhan KHONG co hoa don KH Cu (momo_invoices/
+  // zvp_invoices.zalo) nao dung raw maDiem "VUNG TAU PHCM"/"POSH LOTTE MART VUNG
+  // TAU" ca (chi dung thang "KVC LOTTE VUNG TAU" cua chinh no), nen 2 alias nay
+  // khong phuc vu gi cho KH Cu, chi dang lam hong KH Moi -- xoa han.
+  function fixVungTauPhcmInvoiceDiemAlias(store) {
+    if (!store.invoice_diem_alias) return false;
+    let didFix = false;
+    if (store.invoice_diem_alias["VUNG TAU PHCM"] === "KVC LOTTE VUNG TAU") {
+      delete store.invoice_diem_alias["VUNG TAU PHCM"];
+      didFix = true;
+    }
+    if (store.invoice_diem_alias["POSH LOTTE MART VUNG TAU"] === "KVC LOTTE VUNG TAU") {
+      delete store.invoice_diem_alias["POSH LOTTE MART VUNG TAU"];
+      didFix = true;
+    }
+    if (didFix) {
+      console.log(
+        '[seed] Da xoa alias sai "VUNG TAU PHCM"/"POSH LOTTE MART VUNG TAU" -> "KVC LOTTE VUNG TAU" (dang lam hoa don BIDV7702/KH Moi bi doi nguoc ve ma sai).'
+      );
+    }
+    return didFix;
+  }
+  if (fixVungTauPhcmInvoiceDiemAlias(store)) changed = true;
+
+  // Cung ghi chu tren: rieng PHIA SETTLEMENT (tien ngan hang thuc ve, khong
+  // phai hoa don) cua BIDV7702 con 1 nguon khac doc lap voi invoice_diem_alias
+  // -- store.viet_qr_ten_diem_master.bidv7702 (bang "Ten diem ban" -> "Ma cong
+  // trinh", dung boi resolveGianGrossByBankRef cho giai doan >= refMatchFrom,
+  // xem utils/vietqrReconcile.js) -- key "lotte vung tau" dang tro SAI ve
+  // "KVC LOTTE VUNG TAU" thay vi "VUNG TAU PHCM", khien tien VietQR that ve
+  // van bi gan nham gian nay o ca phia doi soat (khong chi phia hoa don), du
+  // da sua invoice_diem_alias o tren.
+  function fixVungTauPhcmTenDiemMaster(store) {
+    const tdm = store.viet_qr_ten_diem_master && store.viet_qr_ten_diem_master.bidv7702;
+    if (!tdm) return false;
+    let didFix = false;
+    Object.keys(tdm).forEach((k) => {
+      if (tdm[k] === "KVC LOTTE VUNG TAU") {
+        tdm[k] = "VUNG TAU PHCM";
+        didFix = true;
+      }
+    });
+    if (didFix) {
+      console.log(
+        '[seed] Da sua viet_qr_ten_diem_master.bidv7702["lotte vung tau"] tu "KVC LOTTE VUNG TAU" sai thanh "VUNG TAU PHCM" dung (phia doi soat tien ve, khong phai phia hoa don).'
+      );
+    }
+    return didFix;
+  }
+  if (fixVungTauPhcmTenDiemMaster(store)) changed = true;
+
+  // Cung ghi chu tren: 1 hoa don rieng le trong viet_qr_invoices.bidv7702 (so
+  // HD 10031, ngay 2026-07-20) co san mot loi go nham CU THE hon -- raw
+  // maDiem da la "KVC LOTTE VUNG TAU" (khong phai qua alias) trong khi tenDiem
+  // van dung la "POSH LOTTE MART VUNG TAU" giong 12 hoa don cung diem khac --
+  // sua lai maDiem cho khop tenDiem.
+  function fixStrayVungTauInvoiceMaDiem(store) {
+    const invoices = store.viet_qr_invoices && store.viet_qr_invoices.bidv7702;
+    if (!Array.isArray(invoices)) return false;
+    let didFix = false;
+    invoices.forEach((inv) => {
+      if (inv.maDiem === "KVC LOTTE VUNG TAU" && inv.tenDiem === "POSH LOTTE MART VUNG TAU") {
+        inv.maDiem = "POSH LOTTE MART VUNG TAU";
+        didFix = true;
+      }
+    });
+    if (didFix) {
+      console.log('[seed] Da sua 1 hoa don BIDV7702 co maDiem go nham "KVC LOTTE VUNG TAU" ve dung "POSH LOTTE MART VUNG TAU".');
+    }
+    return didFix;
+  }
+  if (fixStrayVungTauInvoiceMaDiem(store)) changed = true;
+
+  // Luyen, 2026-08-03: "xóa cái cấn trừ 7702 đi giờ tôi sẽ check từng gian sai
+  // số lệch nhá" -- hoi lai xac nhan "chỉ tháng 6 thôi" (khong dong den thang
+  // 7). Trang doi soat VietQR co nut "cross-match" tu dong cap gian bi xuat
+  // chung 1 hoa don (vd CON DAO AIRPORT PHCM <-> SB CAN THO PHCM) -- 40 dong
+  // viet_qr_manual_matches.bidv7702 voi key "2026-06-xx|..." deu co created_at
+  // = hom nay (2026-08-03), tuc la vua duoc tao boi 1 lan bam nut cross-match
+  // gan day, con 113 dong con lai (2026-07-xx) tao tu 07-20/07-30 (da duoc
+  // Luyen xac nhan tu truoc) thi GIU NGUYEN dung yeu cau. Xoa CHINH XAC cac
+  // key bat dau "2026-06" de Luyen tu kiem tra lai tung gian thang 6 tu dau
+  // (khong bi so lieu da cap tu dong lam mo).
+  function removeBidv7702JuneCrossMatches(store) {
+    const mm = store.viet_qr_manual_matches && store.viet_qr_manual_matches.bidv7702;
+    if (!mm) return false;
+    let removed = 0;
+    Object.keys(mm).forEach((key) => {
+      if (key.startsWith("2026-06")) {
+        delete mm[key];
+        removed++;
+      }
+    });
+    if (removed > 0) {
+      console.log(
+        `[seed] Da xoa ${removed} dong cap gian tu dong (cross-match) thang 6/2026 cua BIDV7702 theo yeu cau Luyen (giu nguyen thang 7).`
+      );
+    }
+    return removed > 0;
+  }
+  if (removeBidv7702JuneCrossMatches(store)) changed = true;
+
+  // Luyen, 2026-08-03: "hóa đơn ngày 3,4 này nè nếu hk có tách xuất dồn thì
+  // hk cần cộng đâu xuất lẻ như các ngày thông thường á dựa vào ngày xuất
+  // với Dịch vụ thu hộ xem nó xuất ngày mấy" -- doi chieu truc tiep voi file
+  // hoa don goc "MỚi XHD.xlsx" (Luyen goi la chuan) xac nhan: ham
+  // fixBidv7702Day3TaggedAsDay4 (utils/vietqrReconcile.js, chay lai MOI LAN
+  // load()/moi lan vao trang doi soat vietqr) dang CHUYEN NHAM 29 hoa don
+  // thang 6 (soHd 4827-4855, "Ngày HĐ" 05/06, tag goc DUNG la "MTD MN 4" =
+  // doanh thu ngay 4) tu ngay 4 sang ngay 3 -- day chinh la nguyen nhan man
+  // hinh Luyen gui: ngay 03/06 du +18.960.000d "Lệch Dữ liệu↔Hóa đơn", ngay
+  // 04/06 thieu dung -19.320.000d (= tong 29 hoa don nay), tat ca gian ngay 4
+  // hien "Chưa có HĐ". Ham do von chi dung 1 lan cho 1 lo hoa don CU (da xac
+  // nhan boi Chi Nhan 2026-07-30, tong dung 20.000.000d = tien ngan hang
+  // ngay 3) nhung khong gioi han pham vi nen tiep tuc "sua" ca cac hoa don
+  // MOI, dan tag DUNG "MTD MN 4" sau nay (thang 5 va thang 6) -- ham nay da
+  // duoc vo hieu hoa (xem utils/vietqrReconcile.js). O day chi khoi phuc lai
+  // CHINH XAC 29 hoa don thang 6 (theo dung yeu cau "chỉ tháng 6 thôi") ve
+  // dung ngay 4 nhu file hoa don goc; 20 hoa don thang 5 (soHd 1746-1765,
+  // cung loi) CHUA dong den, cho Luyen xac nhan rieng vi ngoai pham vi thang
+  // 6 da yeu cau.
+  const BIDV7702_JUNE_DAY4_SOHD = [
+    4827, 4828, 4829, 4830, 4831, 4832, 4833, 4834, 4835, 4836, 4837, 4838, 4839, 4840, 4841, 4842, 4843, 4844, 4845,
+    4846, 4847, 4848, 4849, 4850, 4851, 4852, 4853, 4854, 4855,
+  ];
+  function restoreBidv7702JuneDay4Invoices(store) {
+    const invoices = store.viet_qr_invoices && store.viet_qr_invoices.bidv7702;
+    if (!Array.isArray(invoices)) return false;
+    let restored = 0;
+    invoices.forEach((inv) => {
+      if (BIDV7702_JUNE_DAY4_SOHD.includes(inv.soHd) && inv.raw === "MTD MN 3") {
+        inv.days = [4];
+        inv.raw = "MTD MN 4";
+        restored++;
+      }
+    });
+    if (restored > 0) {
+      console.log(
+        `[seed] Da khoi phuc ${restored} hoa don thang 6/2026 BIDV7702 tu ngay 3 ve dung ngay 4 (theo file hoa don goc, chi tach bi chuyen nham boi fixBidv7702Day3TaggedAsDay4).`
+      );
+    }
+    return restored > 0;
+  }
+  if (restoreBidv7702JuneDay4Invoices(store)) changed = true;
+
+  // Luyen, 2026-08-03: "7702 á KH mới đổi KUBO BA RIA PHCM thành KUBO GO BA
+  // RIA PHCM nhá" -- man hinh nhap "Thu tiền gửi từ Excel" bao 9 dong "Công
+  // trình <KUBO BA RIA PHCM> không có trong danh mục" vi danh muc MISA cua
+  // Luyen chi co ma "KUBO GO BA RIA PHCM" (dung voi ma_cong_trinh_master.
+  // kh_moi hang stt 106, da dung tu truoc). Con 3 cho khac trong store van
+  // dung nham ma cu (thieu "GO"): gian_mapping (key), invoice_diem_alias (vi
+  // tri "POSH MN KUBO GO BÀ RỊA" tro sai ve ma cu), viet_qr_ten_diem_master.
+  // bidv7702 (key "kubo ba ria" tro sai ve ma cu), va 1 dong viet_qr_manual_
+  // matches.bidv7702 dan theo key cu. Doi tat ca ve dung "KUBO GO BA RIA
+  // PHCM" (khong dong den viet_qr_invoices vi khong co hoa don nao dang dung
+  // dung ma cu -- da la "KUBO GO BA RIA PHCM" hoac ten tho "POSH MN KUBO GO
+  // BÀ RỊA" roi).
+  function renameKuboBaRiaToKuboGoBaRiaPhcm(store) {
+    const OLD_CODE = "KUBO BA RIA PHCM";
+    const NEW_CODE = "KUBO GO BA RIA PHCM";
+    let didFix = false;
+
+    if (store.invoice_diem_alias && store.invoice_diem_alias["POSH MN KUBO GO BÀ RỊA"] === OLD_CODE) {
+      store.invoice_diem_alias["POSH MN KUBO GO BÀ RỊA"] = NEW_CODE;
+      didFix = true;
+    }
+
+    if (store.gian_mapping && Object.prototype.hasOwnProperty.call(store.gian_mapping, OLD_CODE)) {
+      if (!Object.prototype.hasOwnProperty.call(store.gian_mapping, NEW_CODE)) {
+        store.gian_mapping[NEW_CODE] = store.gian_mapping[OLD_CODE];
+      }
+      delete store.gian_mapping[OLD_CODE];
+      didFix = true;
+    }
+
+    const tdm = store.viet_qr_ten_diem_master && store.viet_qr_ten_diem_master.bidv7702;
+    if (tdm && tdm["kubo ba ria"] === OLD_CODE) {
+      tdm["kubo ba ria"] = NEW_CODE;
+      didFix = true;
+    }
+
+    const mm = store.viet_qr_manual_matches && store.viet_qr_manual_matches.bidv7702;
+    if (mm) {
+      Object.keys(mm).forEach((key) => {
+        if (key.endsWith("|" + OLD_CODE)) {
+          const newKey = key.slice(0, -OLD_CODE.length) + NEW_CODE;
+          if (!mm[newKey]) mm[newKey] = mm[key];
+          delete mm[key];
+          didFix = true;
+        }
+      });
+    }
+
+    if (didFix) {
+      console.log(
+        `[seed] Da doi ma cong trinh "${OLD_CODE}" thanh "${NEW_CODE}" cho BIDV7702/KH Moi (gian_mapping, invoice_diem_alias, viet_qr_ten_diem_master, viet_qr_manual_matches).`
+      );
+    }
+    return didFix;
+  }
+  if (renameKuboBaRiaToKuboGoBaRiaPhcm(store)) changed = true;
+
   if (changed) save(store);
 })();
 

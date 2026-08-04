@@ -1,0 +1,55 @@
+<!--
+  Luyen, 2026-08-03: "mỗi lần tôi chỉnh báo cáo hay chỉnh khớp công nợ thì giữ
+  trang nguyên cập nhật thôi chứ cứ đưa lên đầu đẩy tới hiện tại thì nó lại
+  mất thời gian chỉnh bộ lọc nx" -- sau khi bam nut luu/xoa (form POST) tren
+  cac trang doi soat/bao cao/cong no dai, trang load lai va TU DONG CUON VE
+  DAU TRANG, mat vi tri dang xem (vd dang xem chi tiet 1 ngay o giua trang thi
+  bi day nguoc len tren cung). Luu vi tri cuon (scrollY) vao sessionStorage
+  NGAY TRUOC khi submit BAT KY form nao tren trang, roi khoi phuc lai DUNG vi
+  tri do ngay sau khi trang moi load xong -- chi ap dung 1 LAN roi xoa ngay
+  (dung sessionStorage, khong phai localStorage) de nhung lan sau tu vao
+  thang/link khac van cuon ve dau nhu binh thuong, khong bi "ket" vi tri cu.
+  Include 1 lan duy nhat trong nav.ejs (giong panel-toggle.ejs) de ap dung
+  cho MOI trang, khong can sua tung file rieng. Ket hop voi middleware giu
+  lai query string (channel/month...) trong server.js (res.redirect da duoc
+  bao boc) de giai quyet tron ven ca 2 y: bo loc VA vi tri cuon deu giu
+  nguyen sau khi luu/xoa.
+-->
+<script>
+  (function () {
+    if (window.__khbtScrollRestoreInit) return;
+    window.__khbtScrollRestoreInit = true;
+    var KEY = "khbt_scroll_restore:" + location.pathname;
+
+    document.addEventListener(
+      "submit",
+      function (e) {
+        var form = e.target;
+        if (!(form instanceof HTMLFormElement)) return;
+        try {
+          sessionStorage.setItem(KEY, String(window.scrollY));
+        } catch (err) {}
+      },
+      true
+    );
+
+    document.addEventListener("DOMContentLoaded", function () {
+      var saved = null;
+      try {
+        saved = sessionStorage.getItem(KEY);
+      } catch (err) {}
+      if (saved === null) return;
+      try {
+        sessionStorage.removeItem(KEY);
+      } catch (err) {}
+      var y = parseInt(saved, 10);
+      if (isNaN(y)) return;
+      // Cho 1 chut de cac script khac (vd panel-toggle.ejs thu gon khung,
+      // details/summary...) chay xong va lam on dinh chieu cao trang truoc,
+      // roi moi cuon, tranh cuon sai vi khi layout con dang thay doi.
+      setTimeout(function () {
+        window.scrollTo(0, y);
+      }, 50);
+    });
+  })();
+</script>

@@ -12,6 +12,13 @@
   --color-primary-bright: #48cae4;
   --color-primary-deep: #023e8a;
   --color-primary-soft: #caf0f8;
+  /* Luyen, 2026-08-03: "màu nhạt quá tôi còn muốn kh phân biệt rõ á" -- dong
+     "da doi soat" tren /bao-cao/thu-chi-theo-gian (.tx-matched) dung
+     --color-primary-soft qua nhat, kho phan biet voi dong thuong. Rieng 1
+     bien dam hon 1 chut (van cung theme xanh duong, chi rieng cho highlight
+     nay, KHONG doi --color-primary-soft vi bien do con dung o nhieu noi khac
+     -- border/hover cua cac trang khac -- doi chung se anh huong ngoai y muon). */
+  --color-highlight-strong: #90e0ef;
   --color-topbar-bg: linear-gradient(120deg, #023e8a 0%, #0096c7 55%, #48cae4 100%);
   --color-abyss: #012a4a;
   --color-foam: #ade8f4;
@@ -521,7 +528,7 @@ a.report-tile.accent-gian { --report-accent: #1d8a4a; }
    trang, khong dung nth-child zebra o day de mau "da doi soat" luon ro rang
    khong bi zebra lam nhat di). */
 .table tbody tr.tx-matched,
-.table tbody tr.tx-matched:nth-child(even) { background: var(--color-primary-soft); }
+.table tbody tr.tx-matched:nth-child(even) { background: var(--color-highlight-strong); }
 .stmt-tab-panel.is-hidden { display: none; }
 
 /* Chi Nhan, 2026-07-28: "thêm ngắn quá cho tôi đi" -- trang Hóa Đơn Đầu Vào
