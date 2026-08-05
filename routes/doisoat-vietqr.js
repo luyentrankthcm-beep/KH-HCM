@@ -704,6 +704,18 @@ function ensureChannelShape(store) {
   // giu nguyen so lieu goc (gross/invoiceTotal) de xem lai neu can, chi doi
   // cach hien thi/tinh tong "Lech".
   if (!store.viet_qr_lock_date) store.viet_qr_lock_date = {};
+  // Luyen, 2026-08-05: "còn 20k còn dư cái bạn cho hẳn vào Tân phú luôn là
+  // không được nhá bạn nhớ báo tôi nhá ... không cần hiển thị lại cái nào
+  // mới thì thông báo cho tôi chỗ đó thôi" -- giu nguyen co che tu dong gop
+  // phan du Ngan hang-Du lieu vao gian mac dinh (AM TP PHCM/AE HP PHN, xem
+  // TAN_PHU_AUTO_APPLY_CHANNELS o duoi) vi Luyen xac nhan van muon giu (hoi
+  // qua AskUserQuestion 2026-08-05), nhung them 1 co che "da xem" theo tung
+  // (channel, ngay, so tien) de KHONG hien lai canh bao mot khi Luyen da xac
+  // nhan biet roi -- neu sau nay so tien du doi khac (vd tai them file moi
+  // lam giam/tang leftover) se lai la 1 key MOI, tu dong hien lai canh bao
+  // (dung y "cái nào mới thì thông báo"). Xem tanPhuAutoApplied trong
+  // buildChannelReconciliation va route /doi-soat/vietqr/tanphu-ack/:channel.
+  if (!store.viet_qr_tanphu_ack) store.viet_qr_tanphu_ack = {};
   Object.keys(GIAN_MERGE_DEFAULTS).forEach((k) => {
     if (!store.viet_qr_gian_merge[k]) store.viet_qr_gian_merge[k] = GIAN_MERGE_DEFAULTS[k];
   });
@@ -748,6 +760,7 @@ function ensureChannelShape(store) {
     if (!store.viet_qr_nocode_assignments[ch]) store.viet_qr_nocode_assignments[ch] = {};
     if (!store.viet_qr_store_uploads[ch]) store.viet_qr_store_uploads[ch] = [];
     if (!store.viet_qr_ten_diem_master[ch]) store.viet_qr_ten_diem_master[ch] = {};
+    if (!store.viet_qr_tanphu_ack[ch]) store.viet_qr_tanphu_ack[ch] = {};
     // Ghi de KHONG DIEU KIEN (khac GIAN_MERGE_DEFAULTS o tren) -- day la 1 dong
     // da xac nhan SAI can sua han (dang tro toi "SB CAM RANH PHN" cu), khong
     // phai gia tri "dien vao cho trong" -- neu chi fill-if-empty se khong bao
@@ -1428,6 +1441,11 @@ function buildChannelReconciliation(store, channelKey) {
   // "tru giao dich khong phai VietQR" (excludedByDate) van ap dung cho MOI
   // kenh co refMatchFrom nhu cu -- day la loai bo rac, khong phai gan tien
   // that vao gian nao ca, khong nam trong yeu cau gioi han nay.
+  // Luyen, 2026-08-05: danh sach cac lan tu dong gop phan du vao gian mac
+  // dinh (Tan Phu/Hai Phong) NGAY LAN NAY, de lam banner canh bao rieng o
+  // dau trang -- xem ghi chu "tanPhuAutoApplied" o cuoi ham nay va route
+  // /doi-soat/vietqr/tanphu-ack/:channel.
+  const tanPhuAutoAppliedRaw = [];
   if (cfg.refMatchFrom) {
     const excludedByDate = {};
     refUnmatchedBankTx.forEach((tx) => {
@@ -1495,10 +1513,56 @@ function buildChannelReconciliation(store, channelKey) {
           r.diffVsBank = r.totalNetComputed - r.bankAmount;
           r.lines.sort((a, b) => b.gross - a.gross);
           r.tanPhuSuggestion = { amount: leftover, targetCode: tanPhuTarget, applied: true };
+          tanPhuAutoAppliedRaw.push({ date: r.settlementDate, amount: leftover, targetCode: tanPhuTarget });
         }
       }
     });
   }
+  // Luyen, 2026-08-05: "không cần hiển thị lại cái nào cũ, có gì mới thì báo
+  // chỗ đó thôi" -- chi giu lai cac lan gop TAN Phu ma Luyen CHUA bam "Da
+  // xem" (key = ngay|so tien, xem store.viet_qr_tanphu_ack[channel] va route
+  // /doi-soat/vietqr/tanphu-ack/:channel). Neu sau nay so tien du doi khac
+  // (vd nap them file lam leftover thay doi), key moi se tu dong hien lai.
+  const tanPhuAck = store.viet_qr_tanphu_ack[channelKey] || {};
+  const tanPhuAutoApplied = tanPhuAutoAppliedRaw
+    .filter((ev) => !tanPhuAck[`${ev.date}|${ev.amount}`])
+    .sort((a, b) => a.date.localeCompare(b.date));
+
+  // Luyen, 2026-08-05: "hóa đơn đây soa lại kh lưu dc á gán cho tôi luôn đi"
+  // -- BIDV77020, gian "SB CAM RANH PHN" ngay 01/08 hien "Chưa có HĐ" du da
+  // luu "Số HĐ bù" qua form/route manual-match. Tim ra goc re: dong "SB CAM
+  // RANH PHN" hom do KHONG co doanh thu QR THAT nao khop (khong nam trong
+  // gianLines cua reconcileVietQr) -- toan bo 100.000đ hien thi la do block
+  // "cfg.bankExcessDefaultCode" o tren TU TAO MOI dong nay (phan du Ngan
+  // hang-Du lieu ca ngay, dung y "cho vô gian SB CAM RANH PHN"). reconcileVietQr
+  // la noi DUY NHAT doc store.viet_qr_manual_matches truoc gio, nhung no chi
+  // xu ly cac dong DA CO san tu grossData that -- dong do cfg.bankExcessDefaultCode
+  // (hoac tanPhuTarget o tren) tu tao SAU do khong bao gio duoc doi chieu lai
+  // voi manualMatches, nen moi lan Luyen luu deu bi "mat" nhu chua luu gi.
+  // Cung 1 loi tiem an cho ca gian tanPhuTarget (AM TP PHCM/AE HP PHN) khi no
+  // cung phai TU TAO MOI (chua tung co doanh thu that ngay do). Ap dung lai
+  // manualMatches 1 lan CUOI CUNG cho MOI dong -- CHI voi dong nao reconcileVietQr
+  // CHUA xu ly (manualOverride con la false) de khong cong grossAdjustment 2
+  // lan cho dong DA duoc xu ly dung tu dau.
+  reconciled.forEach((r) => {
+    r.lines.forEach((l) => {
+      if (l.manualOverride) return;
+      const mm = manualMatches[`${r.settlementDate}|${l.code}`];
+      if (!mm) return;
+      if (mm.grossAdjustment) {
+        l.gross += mm.grossAdjustment;
+        l.net = l.gross;
+        if (!r.pendingBank) r.totalNetComputed += mm.grossAdjustment;
+      }
+      l.invoiceNumbers = mm.invoiceNumbers || [];
+      l.invoiceTotal = mm.amount != null ? mm.amount : l.gross;
+      l.diff = l.invoiceTotal - l.gross;
+      l.matched = Math.abs(l.diff) < 1;
+      l.manualOverride = true;
+      l.manualNote = mm.note || "";
+    });
+    if (!r.pendingBank) r.diffVsBank = r.totalNetComputed - r.bankAmount;
+  });
 
   // Doi ten hien thi ve dung ten chuan (neu co danh sach chuan cho cong ty
   // nay) -- xem ghi chu tai displayMaCongTrinhFor o tren. Chi doi field hien
@@ -1611,6 +1675,10 @@ function buildChannelReconciliation(store, channelKey) {
     refLateMatches,
     refUnmappedStoreCodes,
     refUnmappedTenDiem,
+    // Luyen, 2026-08-05: cac lan tu dong gop phan du Ngan hang-Du lieu vao
+    // gian mac dinh (Tan Phu/Hai Phong) CHUA duoc Luyen bam "Da xem" -- xem
+    // ghi chu tanPhuAutoAppliedRaw o tren.
+    tanPhuAutoApplied,
   };
 }
 
@@ -1827,6 +1895,15 @@ function renderVietQrPage(req, res, activeKeys, pageTitle, pageSubtitle) {
   allRefUnmappedStoreCodes.sort((a, b) => b.total - a.total);
   allRefUnmappedTenDiem.sort((a, b) => b.total - a.total);
 
+  // Luyen, 2026-08-05: banner canh bao rieng cho cac lan tu dong gop phan du
+  // Ngan hang-Du lieu vao gian mac dinh (Tan Phu/Hai Phong) CHUA duoc bam "Da
+  // xem" -- xem ghi chu tanPhuAutoApplied trong buildChannelReconciliation.
+  const allTanPhuAutoApplied = [];
+  activeKeys.forEach((ch) => {
+    (built[ch].tanPhuAutoApplied || []).forEach((r) => allTanPhuAutoApplied.push({ channel: ch, channelLabel: CHANNELS[ch].label, ...r }));
+  });
+  allTanPhuAutoApplied.sort((a, b) => (a.date || "").localeCompare(b.date || ""));
+
   // Luyen, 2026-07-19: "co nut xoa hay chinh sua cac phan dien" -- liet ke lai
   // cac GD-khong-ma DA gan (truoc gio gan xong la bien mat, khong xem/xoa lai
   // duoc) kem nut Xoa de tra ve dien "chua gan" neu gan nham.
@@ -1895,6 +1972,7 @@ function renderVietQrPage(req, res, activeKeys, pageTitle, pageSubtitle) {
     allRefLateMatches,
     allRefUnmappedStoreCodes,
     allRefUnmappedTenDiem,
+    allTanPhuAutoApplied,
     maCongTrinhOptions: (store.ma_cong_trinh_master && store.ma_cong_trinh_master[activeCompany] && store.ma_cong_trinh_master[activeCompany].rows) || [],
     partnerBankId: store.viet_qr_partner_bank_id || {},
     error: req.query.error || null,
@@ -2353,6 +2431,33 @@ router.post("/doi-soat/vietqr/khoa-so/:channel", requireAdmin, (req, res) => {
 // (giu nguyen tenCuaHang/tenDiemBan cu neu co de con hien thi, chi doi
 // matchText -- dung dung field ma resolveGianGross dung de khop fuzzy) ap
 // dung ngay, khong can tai lai file "store_export"/"Cua hang".
+// ---------- Danh dau "Da xem" 1 lan tu dong gop phan du Ngan hang-Du lieu
+// vao gian mac dinh (Tan Phu/Hai Phong) -- Luyen, 2026-08-05: "cho hẳn vào
+// Tân phú luôn là không được nhá bạn nhớ báo tôi nhá ... không cần hiển thị
+// lại cái nào cũ, có gì mới thì báo tôi chỗ đó thôi". Giu nguyen co che tu
+// dong gop (Luyen xac nhan qua AskUserQuestion la van muon giu, chi can
+// canh bao ro hon), nhung luu lai (ngay|so tien) da xac nhan de KHONG hien
+// lai banner nay nua o lan tai trang sau -- neu leftover ngay do sau nay
+// DOI KHAC (vd tai them file lam thay doi so du), key moi se tu dong hien
+// lai (xem tanPhuAutoApplied trong buildChannelReconciliation).
+router.post("/doi-soat/vietqr/tanphu-ack/:channel", requireDataEntry, (req, res) => {
+  const store = load();
+  ensureChannelShape(store);
+  const channelKey = req.params.channel;
+  try {
+    if (!CHANNELS[channelKey]) throw new Error("Kenh khong hop le.");
+    const { date, amount } = req.body;
+    if (!date || !amount) throw new Error("Thieu ngay hoac so tien de danh dau da xem.");
+    store.viet_qr_tanphu_ack[channelKey][`${date}|${amount}`] = {
+      ackedAt: new Date().toISOString(),
+    };
+    save(store);
+    res.redirect("/doi-soat/vietqr?success=" + encodeURIComponent("Da danh dau da xem, se khong hien lai canh bao nay."));
+  } catch (e) {
+    res.redirect("/doi-soat/vietqr?error=" + encodeURIComponent(e.message));
+  }
+});
+
 router.post("/doi-soat/vietqr/store-map/:channel", requireDataEntry, (req, res) => {
   const store = load();
   ensureChannelShape(store);

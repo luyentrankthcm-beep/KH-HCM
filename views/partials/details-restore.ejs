@@ -1,0 +1,53 @@
+<!--
+  Chi Nhan, 2026-08-05: "cái nào tôi nhấn lưu hay chỉnh sửa á thì giữ nguyên
+  chỗ đó đi soa lại đống rồi nhảy lên đầu trang á phải mở lại mất thời gian"
+  -- cac khung "1c. Bảng tra..." (doi-soat-zvp.ejs va tuong tu) dung the
+  <details>/<summary> NGUYEN BAN cua trinh duyet (khong phai section.panel +
+  h2 nhu panel-toggle.ejs xu ly), nen KHONG duoc nho trang thai mo/dong nhu
+  cac khung .panel khac -- moi lan bam Luu/Sua (form POST -> redirect ve lai
+  trang), TAT CA <details> tu dong dong lai vi la mac dinh cua trinh duyet.
+  Luc do scroll-restore.ejs (chay sau, xem file do) co cuon dung ve so pixel
+  cu, nhung vi trang da NGAN LAI (cac khung dong che het noi dung), pixel do
+  khong con trung voi cho cu nua -- ket qua nhin nhu bi "nhay len dau trang".
+  Nho trang thai open/closed cua TUNG <details> vao localStorage (theo dung
+  URL + noi dung <summary>, giong het quy uoc cua panel-toggle.ejs) NGAY KHI
+  co thay doi (su kien "toggle" cua the <details>, co san tu trinh duyet,
+  khong can code rieng an/hien) va khoi phuc lai TRUOC KHI scroll-restore.ejs
+  cuon trang, de vi tri cuon tinh dung tren layout DA on dinh giong luc truoc
+  khi bam Luu/Sua. Include 1 lan duy nhat trong nav.ejs (truoc scroll-
+  restore) de ap dung cho MOI trang, khong can sua tung file rieng.
+-->
+<script>
+  (function () {
+    if (window.__khbtDetailsRestoreInit) return;
+    window.__khbtDetailsRestoreInit = true;
+    var PREFIX = "khbt_details_open:" + location.pathname + ":";
+
+    function keyFor(el, idx) {
+      var summary = el.querySelector("summary");
+      var label = summary ? summary.textContent.trim() : "";
+      return PREFIX + idx + ":" + label;
+    }
+
+    document.addEventListener("DOMContentLoaded", function () {
+      var list = document.querySelectorAll("details");
+      list.forEach(function (el, idx) {
+        var key = keyFor(el, idx);
+        var saved = null;
+        try {
+          saved = localStorage.getItem(key);
+        } catch (e) {}
+        if (saved === "1") el.open = true;
+        else if (saved === "0") el.open = false;
+        // saved === null (chua bam gi tren khung nay bao gio) -> giu nguyen
+        // mac dinh server render (thuong la dong, tru khi co ghi <details open>).
+
+        el.addEventListener("toggle", function () {
+          try {
+            localStorage.setItem(key, el.open ? "1" : "0");
+          } catch (e) {}
+        });
+      });
+    });
+  })();
+</script>

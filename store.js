@@ -1301,6 +1301,264 @@ const SEED_CHT_NOP_TIEN_ROWS = [
   }
   if (renameKuboBaRiaToKuboGoBaRiaPhcm(store)) changed = true;
 
+  // Chi Nhan, 2026-08-05: "check lại vn pay offline luôn nhá số vẫn lệch nè"
+  // -- TK ACB31268 (tai khoan nhan tien Zalo App/VNPay/Payoo, xem ZVP_BANK_NAME
+  // trong routes/doisoat-zvp.js) nhieu lan bi ghi NHAM 1 vai dong settlement
+  // thanh loai "chi" thay vi "thu" (parser sao ke doc nham cot lam giao dich
+  // "tien ve" bi hieu thanh "tien ra"), khien extractZvpSettlements (chi xet
+  // t.type === "thu") LOAI HOAN TOAN cac dong nay khoi "Ngan hang" cua trang
+  // Doi soat Zalo/VNPay/Payoo -- xac nhan qua 2 lan doi chieu truc tiep voi
+  // sao ke goc (file "12131268_SAOKE_TK_20260729-20260805.xlsx": MOI dong deu
+  // la "(+) tien gui vao", KHONG co dong "rut ra" nao ca, nen dong nao mang
+  // mo ta VNPay/Payoo settlement ma dang ghi "chi" chac chan la sai). Da tung
+  // sua truc tiep 2 lan nhung deu bi MAT lai ngay sau do -- ly do: server
+  // dang chay tren may Chi Nhan (localhost:3000) giu san 1 ban store.json
+  // CU trong bo nho (nap luc no khoi dong, TRUOC khi duoc sua), nen bat ky
+  // luc nao no goi save() (vd luc Chi Nhan tai/dan them sao ke khac) la no
+  // ghi de ban CU do len tren, xoa mat cac cho vua sua truc tiep tren dia --
+  // dung y het co che da giai thich day du tai ZVP_GIAN_LIST_BAD_REDIRECTS
+  // (routes/doisoat-zvp.js). Chuyen han sang seed tu dong CHAY LAI + SUA MOI
+  // LAN load() (giong moi hang so *_DEFAULTS khac) de KHONG BAO GIO bi mat
+  // nua, du server cu co ghi de bao nhieu lan.
+  //
+  // Rieng 2 dong sau la "phantom" -- SAI HOAN TOAN ve so tien (khong phai chi
+  // sai loai thu/chi), sinh ra tu 1 lan doc sao ke bi loi truoc do, da co dong
+  // DUNG thay the roi nen xoa han thay vi sua lai loai:
+  //  - 213.884.659d ngay 03/08 (mo ta "...NGAY 31.07-02.08.26") -- dong dung
+  //    thay the la 138.182.369d/thu (doi chieu dung GD so 3259 tren sao ke goc).
+  //  - 332.537.280d ngay 29/07 (mo ta "...NGAY 28.07.26") -- dong dung da co
+  //    san tu truoc la 19.739.748d/thu (GD so 3245), dong nay thua/sai hoan toan.
+  const ZVP_SETTLEMENT_PHANTOM_ROWS = [
+    { date: "2026-08-03", amount: 213884659, descIncludes: "NGAY 31.07-02.08.26" },
+    { date: "2026-07-29", amount: 332537280, descIncludes: "NGAY 28.07.26" },
+  ];
+  function fixZvpSettlementChiToThu(store) {
+    const bank = store.banks.find((b) => b.name === "ACB31268");
+    if (!bank) return false;
+    let didFix = false;
+
+    const before = store.transactions.length;
+    store.transactions = store.transactions.filter((t) => {
+      if (t.bank_id !== bank.id) return true;
+      const isPhantom = ZVP_SETTLEMENT_PHANTOM_ROWS.some(
+        (p) => t.date === p.date && Number(t.amount) === p.amount && (t.description || "").includes(p.descIncludes)
+      );
+      return !isPhantom;
+    });
+    if (store.transactions.length !== before) didFix = true;
+
+    const SETTLEMENT_PATTERN = /(DV\s+CTT\s+NGAY|DV\s+QR\s+OFFLINE\s+NGAY|PAYOO.*TT\s+TD\s+NGAY)/i;
+    store.transactions.forEach((t) => {
+      if (t.bank_id === bank.id && t.type === "chi" && SETTLEMENT_PATTERN.test(t.description || "")) {
+        t.type = "thu";
+        didFix = true;
+      }
+    });
+
+    return didFix;
+  }
+  if (fixZvpSettlementChiToThu(store)) changed = true;
+
+  // Luyen, 2026-08-05: "ngày 1 với ngày 2 tổng là 70.040 mà sao lại trên wed
+  // có 70.020" -- doi chieu voi sao ke goc BIDV7702 (file
+  // "20260805_SAOKE_8640107702_...xlsx"): CA 2 ngay 01-02/08/2026 chi co dong
+  // "(+) Phat sinh co" (tien vao), KHONG co dong "Phat sinh no" (chi) nao ca
+  // (0d rut ra ca 2 ngay). Nhung tren web dang hien them 1 dong "chi"
+  // 57.700.000d ngay 01/08 (id 188474) -- doi chieu dung mo ta/so tham chieu
+  // ("8681rDcq-8B1J2pmqe") voi dong DAU TIEN cua sao ke goc thi day PHAI la 1
+  // dong "thu" 20.000d (VU DUC ANH, QR VQR26316D494VM8S...), khong phai "chi"
+  // 57.700.000d -- ro rang la loi doc/nhap sao ke (sai CA loai VA so tien,
+  // giong dung kieu loi da gap voi ACB31268 o tren). Sua lai dung theo sao ke
+  // goc; chay lai + tu sua MOI LAN load() (khong sua truc tiep 1 lan) vi cung
+  // co nguy co bi may Luyen ghi de lai neu chi sua file tren dia 1 lan, dung
+  // co che da giai thich day du o fixZvpSettlementChiToThu ngay tren.
+  function fixBidv7702VuDucAnhAmount(store) {
+    const bank = store.banks.find((b) => b.name === "BIDV7702");
+    if (!bank) return false;
+    let didFix = false;
+    const t = store.transactions.find(
+      (t) => t.bank_id === bank.id && t.id === 188474 && t.reference === "8681rDcq-8B1J2pmqe"
+    );
+    if (t && (t.type !== "thu" || Number(t.amount) !== 20000)) {
+      t.type = "thu";
+      t.amount = 20000;
+      didFix = true;
+    }
+    return didFix;
+  }
+  if (fixBidv7702VuDucAnhAmount(store)) changed = true;
+
+  // Luyen, 2026-08-05: "hóa đơn của vũng tàu nè ngày 1 với ngày 2 á" -- hoa
+  // don gan day cua diem Vung Tau ghi "Ma diem" la "POSH LOTTE MART VUNG TAU"
+  // (ten day du tu phan mem ke toan), khac voi ma gian dang dung ben doanh
+  // thu ("VUNG TAU PHCM"), nen TOAN BO hoa don loai nay (khong chi 2 ngay 01-
+  // 02/08, ca cac ngay truoc do) bi hien "Chua co HD" oan du tien ve dung.
+  // Luu qua invoice_diem_alias (co che co san, dung chung Momo/ZVP/VietQR) --
+  // tu sua lai MOI LAN load() vi cung co nguy co bi may Luyen ghi de (da xac
+  // nhan xay ra that voi ban sua truc tiep truoc do), giong het co che
+  // fixZvpSettlementChiToThu o tren.
+  function seedInvoiceDiemAliasVungTau(store) {
+    if (!store.invoice_diem_alias) store.invoice_diem_alias = {};
+    if (store.invoice_diem_alias["POSH LOTTE MART VUNG TAU"] === "VUNG TAU PHCM") return false;
+    store.invoice_diem_alias["POSH LOTTE MART VUNG TAU"] = "VUNG TAU PHCM";
+    return true;
+  }
+  if (seedInvoiceDiemAliasVungTau(store)) changed = true;
+
+  // Luyen, 2026-08-05: "2 hóa đơn của estella zalo app đối soát 1,2 đây nhá"
+  // -- hoa don Zalo App cua Funzone-tau Estella dang di qua zvp_gian_list ve
+  // ma "KVC ESTELLA", nhung doanh thu Online (zvp_online_product_map) cua
+  // dung san pham nay lai dang ve ma "DIY ESTELLA KVC" -- 2 ma khac nhau cho
+  // CUNG 1 diem nen hoa don khong bao gio khop duoc voi doanh thu (700k+
+  // moi ky, xac nhan dung bang 349.000d/hoa don x 2). Doi lai ca 2 huong
+  // (tenDiem "Funzone-tàu Estella" va fallback "KVC ESTELLA") ve thang
+  // "DIY ESTELLA KVC" (ma dang dung ben doanh thu) de khop lai.
+  function seedZvpGianListEstellaFix(store) {
+    if (!store.zvp_gian_list) store.zvp_gian_list = [];
+    let didFix = false;
+    store.zvp_gian_list.forEach((g) => {
+      if (g.tenDiem === "Funzone-tàu Estella" && g.maCongTrinh !== "DIY ESTELLA KVC") {
+        g.maCongTrinh = "DIY ESTELLA KVC";
+        didFix = true;
+      }
+    });
+    const hasFallback = store.zvp_gian_list.some(
+      (g) => g.tenDiem === "KVC ESTELLA" && g.maCongTrinh === "DIY ESTELLA KVC"
+    );
+    if (!hasFallback) {
+      store.zvp_gian_list.push({ tenDiem: "KVC ESTELLA", maCongTrinh: "DIY ESTELLA KVC", isCse: false });
+      didFix = true;
+    }
+    return didFix;
+  }
+  if (seedZvpGianListEstellaFix(store)) changed = true;
+
+  // Luyen, 2026-08-05: "2 hóa đơn estella ngày 1 2 nè thêm vô cho tôi trên
+  // web đi" -- sau khi sua zvp_gian_list o tren, DIY ESTELLA KVC van hien
+  // "Chưa có HĐ" vi co 1 dong invoice_diem_alias CU: "DIY ESTELLA KVC" ->
+  // "KVC ESTELLA" (nguoc chieu, khong dung cho hoa don thuc te nao ca -- da
+  // kiem tra ca 3 kenh zalo/vnpay/payoo, khong co hoa don nao co maDiem =
+  // "DIY ESTELLA KVC" that ca) -- dong alias nay chi bi kich hoat NHU 1 TAC
+  // DUNG PHU khi reconcileZvpChannel doc lai maDiem SAU KHI applyGianRedirectToInvoices
+  // da doi "KVC ESTELLA" -> "DIY ESTELLA KVC" (xem buildReconciliation), roi
+  // dong alias nay lai doi NGUOC VE "KVC ESTELLA", tu xoa sach fix
+  // seedZvpGianListEstellaFix o tren. Xoa han dong alias thua nay.
+  function seedRemoveEstellaBadAlias(store) {
+    if (!store.invoice_diem_alias) return false;
+    if (store.invoice_diem_alias["DIY ESTELLA KVC"] === undefined) return false;
+    delete store.invoice_diem_alias["DIY ESTELLA KVC"];
+    return true;
+  }
+  if (seedRemoveEstellaBadAlias(store)) changed = true;
+
+  // Luyen, 2026-08-05: "sao cái côn đảo ngày 1/08 vẫn có 330k vậy" -- fix
+  // truoc do (them 1 dong QR tho bi thieu, ref "8681rDcq-8B1J2pmqe", 20.000đ,
+  // ma cua hang "6PWLTSTSWP" ngay 2026-08-01) chi ghi THANG vao store.json,
+  // KHONG phai seed function -- da bi may local cua Luyen (dang chay san voi
+  // ban nho cu, chua co dong nay) ghi de mat khi luu bat ky thay doi nao
+  // (dung y het pattern da gap nhieu lan trong session nay). Bien thanh seed
+  // tu vá: kiem tra dong QR tho co ref nay chua, neu chua thi them 1 "upload"
+  // gia (chi 1 dong) chua no -- an toan tuyet doi voi mergeRawRows (de-dup
+  // theo vqrCode+date+amount+raw, dong nay la duy nhat nen khong trung ai).
+  function seedBidv7702ConDaoMissingTx(store) {
+    if (!store.viet_qr_raw_uploads || !store.viet_qr_raw_uploads.bidv7702) return false;
+    const uploads = store.viet_qr_raw_uploads.bidv7702;
+    const targetRef = "8681rDcq-8B1J2pmqe";
+    const already = uploads.some((u) => (u.rows || []).some((r) => r.refCode === targetRef));
+    if (already) return false;
+    uploads.push({
+      id: "seed-condao-fix-1",
+      uploaded_at: "2026-08-05T00:00:00.000Z",
+      file_name: "seed-fix: giao dich thieu SAN BAY CON DAO 20.000d (2026-08-01)",
+      sheetName: "dữ liệu",
+      rows: [
+        {
+          vqrCode: "VQR26317T5AN6NR",
+          maCuaHang: "6PWLTSTSWP",
+          amount: 20000,
+          date: "2026-08-01",
+          raw: "VQR26317T5AN6NR PaymentForOrder",
+          refCode: targetRef,
+        },
+      ],
+    });
+    return true;
+  }
+  if (seedBidv7702ConDaoMissingTx(store)) changed = true;
+
+  // Luyen, 2026-08-05: cung ly do nhu tren -- 2 mapping "Ten diem - Ma cong
+  // trinh" cho gian CGV moi mo (Ly Chinh Thang / Pearl Plaza, BIDV7702) chi
+  // ghi THANG vao store.json, co nguy co bi may local ghi de mat truoc khi
+  // Luyen restart. Bien thanh seed de tu vá lai neu bi mat.
+  function seedBidv7702CgvTenDiemMaster(store) {
+    if (!store.viet_qr_ten_diem_master) return false;
+    if (!store.viet_qr_ten_diem_master.bidv7702) store.viet_qr_ten_diem_master.bidv7702 = {};
+    const map = store.viet_qr_ten_diem_master.bidv7702;
+    let did = false;
+    if (map["cgv ly chinh thang"] !== "POSH MN CGV LÝ CHÍNH THẮNG") {
+      map["cgv ly chinh thang"] = "POSH MN CGV LÝ CHÍNH THẮNG";
+      did = true;
+    }
+    if (map["cgv peal palaza"] !== "POSH MN CGV PEARL PLAZA") {
+      map["cgv peal palaza"] = "POSH MN CGV PEARL PLAZA";
+      did = true;
+    }
+    return did;
+  }
+  if (seedBidv7702CgvTenDiemMaster(store)) changed = true;
+
+  // Luyen, 2026-08-05: "hóa đơn đây soa lại kh lưu dc á gán cho tôi luôn đi"
+  // -- BIDV77020, gian "SB CAM RANH PHN" ngay 2026-08-01, hoa don 2552
+  // (100.000đ). Cung nguy co bi ghi de mat nhu 2 fix tren -- bien thanh seed.
+  function seedBidv77020SbCamRanhManualMatch(store) {
+    if (!store.viet_qr_manual_matches) return false;
+    if (!store.viet_qr_manual_matches.bidv77020) store.viet_qr_manual_matches.bidv77020 = {};
+    const key = "2026-08-01|SB CAM RANH PHN";
+    const cur = store.viet_qr_manual_matches.bidv77020[key];
+    if (cur && Array.isArray(cur.invoiceNumbers) && cur.invoiceNumbers.includes("2552") && cur.amount === 100000) {
+      return false;
+    }
+    store.viet_qr_manual_matches.bidv77020[key] = {
+      invoiceNumbers: ["2552"],
+      amount: 100000,
+      grossAdjustment: 0,
+      note: "",
+      created_at: "2026-08-05T00:00:00.000Z",
+    };
+    return true;
+  }
+  if (seedBidv77020SbCamRanhManualMatch(store)) changed = true;
+
+  // Luyen, 2026-08-05: "đối soát chưa khớp này là của gian SB CAM RANH PHN
+  // này á map cho tôi vô các cửa hàng vô cái SB CAM RANH PHN này luôn á" --
+  // phat hien: file "Ten diem - Ma cong trinh" nguon co dong Cam Ranh voi
+  // GIA TRI COT MA CONG TRINH la chinh chu "Chưa khớp" (chu khong phai de
+  // trong/thieu dong) -- gia tri rac nay bi nhap THANG vao
+  // viet_qr_ten_diem_master lam 3 ten diem ban ("POSH Sân bay Cam ranh", "1
+  // JP SB Cam Ranh.new", "POSH Sân bay Quốc Tế Cam Ranh") deu tro toi 1 "ma
+  // cong trinh" ten la "Chưa khớp" (khong phai "chua map", ma la DA MAP NHUNG
+  // map sai vao 1 chuoi rac) -- hien thanh 1 dong gian ten "Chưa khớp" tren
+  // doi soat, khong bao gio khop hoa don. Anh huong CA 3 kenh dung chung file
+  // nguon nay (bidv77021, mb02865168, bidv8613600999 -- xac nhan qua
+  // seedFromBidv77021). Sua ve dung "SB CAM RANH PHN" nhu Luyen xac nhan; seed
+  // de tu vá lai neu file nguon (van con gia tri rac) duoc tai lai sau nay.
+  function seedFixChuaKhopCamRanhTenDiem(store) {
+    if (!store.viet_qr_ten_diem_master) return false;
+    const badKeys = ["posh san bay cam ranh", "1 jp sb cam ranh.new", "posh san bay quoc te cam ranh"];
+    let did = false;
+    Object.keys(store.viet_qr_ten_diem_master).forEach((ch) => {
+      const master = store.viet_qr_ten_diem_master[ch];
+      badKeys.forEach((k) => {
+        if (master[k] === "Chưa khớp" || master[k] === "Chua khop") {
+          master[k] = "SB CAM RANH PHN";
+          did = true;
+        }
+      });
+    });
+    return did;
+  }
+  if (seedFixChuaKhopCamRanhTenDiem(store)) changed = true;
+
   if (changed) save(store);
 })();
 

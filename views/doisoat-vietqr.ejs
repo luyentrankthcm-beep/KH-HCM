@@ -255,6 +255,22 @@
     </datalist>
     <% } %>
 
+    <!-- Luyen, 2026-08-05: "nhập rồi lưu cx dc hay nhập rồi lọc các gian cx
+    dc lỡ gian mới mở không map dc với tìm nhanh hơn á" -- datalist RIÊNG cho
+    2 form "Gán mã công trình" bên dưới (Mã cửa hàng MỚI / Tên điểm bán chưa
+    có Mã công trình), dùng danh sách công trình CHUẨN (maCongTrinhOptions,
+    co ca ten cong trinh de de tim) thay vi <select> cu dinh -- vua go loc
+    duoc trong danh sach co san, vua go thang ma MOI (gian moi mo, chua kip
+    co trong danh sach chuan) roi luu truc tiep, khong bi ket cung 1 danh
+    sach dinh san nhu <select>. -->
+    <% if (typeof maCongTrinhOptions !== 'undefined' && maCongTrinhOptions.length > 0) { %>
+    <datalist id="dl-ma-cong-trinh-full">
+      <% maCongTrinhOptions.forEach(function(m) { %>
+      <option value="<%= m.maCongTrinh %>"><%= m.maCongTrinh %><%= m.tenCongTrinh ? ' - ' + m.tenCongTrinh : '' %></option>
+      <% }) %>
+    </datalist>
+    <% } %>
+
     <% if (typeof allUnmappedStores !== 'undefined' && allUnmappedStores.length > 0) { %>
     <section class="panel">
       <h2>Mã cửa hàng (tên điểm nội bộ) chưa map được Mã công trình</h2>
@@ -315,6 +331,46 @@
                 <input type="text" name="targetCode" list="dl-ma-cong-trinh" autocomplete="off"
                   placeholder="Gõ để lọc, chọn mã công trình..." style="min-width:240px;" required />
                 <button type="submit" class="btn btn-secondary">Lưu</button>
+              </form>
+            </td>
+          </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </section>
+    <% } %>
+
+    <!-- Luyen, 2026-08-05: "cho hẳn vào Tân phú luôn là không được nhá bạn
+    nhớ báo tôi nhá ... không cần hiển thị lại cái nào cũ, có gì mới thì
+    thông báo cho tôi chỗ đó thôi" -- banner nổi bật riêng cho các lần TỰ
+    ĐỘNG gộp phần dư Ngân hàng-Dữ liệu vào gian mặc định (Tân Phú/Hải Phòng),
+    đặt lên ĐẦU TIÊN trong khu vực cảnh báo cho dễ thấy. Cơ chế gộp tự động
+    vẫn giữ nguyên (Luyến xác nhận muốn giữ), nhưng bấm "Đã xem, không cần
+    báo nữa" thì mục đó biến mất -- lần sau chỉ hiện các khoản MỚI (ngày/số
+    tiền khác) chưa từng xác nhận. -->
+    <% if (typeof allTanPhuAutoApplied !== 'undefined' && allTanPhuAutoApplied.length > 0) { %>
+    <section class="panel" style="border:2px solid #d97706; background:#fffbeb;">
+      <h2>🟠 Đã tự động gộp phần dư Ngân hàng-Dữ liệu vào gian mặc định (<%= allTanPhuAutoApplied.length %>)</h2>
+      <p class="muted">
+        Ngày ngân hàng báo tiền về nhiều hơn dữ liệu QR đã tải (thường do dữ liệu QR chưa kịp cập nhật hết) — phần dư
+        dưới đây đã được tự động cộng vào gian mặc định (Tân Phú/Hải Phòng) để tổng ngày không bị hiện "Lệch". Nếu
+        đây thực chất là tiền của gian khác, hãy tải bổ sung file dữ liệu QR mới nhất rồi kiểm tra lại; nếu đã biết
+        và không cần xem lại, bấm "Đã xem" — lần sau chỉ báo khoản MỚI, không hiện lại khoản này nữa.
+      </p>
+      <table class="table">
+        <thead><tr><th>Ngày</th><th>Kênh</th><th>Số tiền đã gộp</th><th>Gộp vào gian</th><th></th></tr></thead>
+        <tbody>
+          <% allTanPhuAutoApplied.forEach(function(r) { %>
+          <tr>
+            <td><%= r.date %></td>
+            <td><%= r.channelLabel %></td>
+            <td><%= r.amount.toLocaleString('vi-VN') %> đ</td>
+            <td><%= r.targetCode %></td>
+            <td>
+              <form method="POST" action="/doi-soat/vietqr/tanphu-ack/<%= r.channel %>" class="form-inline">
+                <input type="hidden" name="date" value="<%= r.date %>" />
+                <input type="hidden" name="amount" value="<%= r.amount %>" />
+                <button type="submit" class="btn btn-secondary" style="font-size:12px; padding:4px 8px;">Đã xem, không cần báo nữa</button>
               </form>
             </td>
           </tr>
@@ -415,12 +471,8 @@
             <td>
               <form method="POST" action="/doi-soat/vietqr/gan-ma-cua-hang/<%= r.channel %>" class="form-inline" style="gap:4px;">
                 <input type="hidden" name="maCuaHang" value="<%= r.maCuaHang %>" />
-                <select name="maCongTrinh" required style="max-width:220px;">
-                  <option value="">-- Chọn mã công trình --</option>
-                  <% (typeof maCongTrinhOptions !== 'undefined' ? maCongTrinhOptions : []).forEach(function(m) { %>
-                  <option value="<%= m.maCongTrinh %>"><%= m.maCongTrinh %><%= m.tenCongTrinh ? ' - ' + m.tenCongTrinh : '' %></option>
-                  <% }) %>
-                </select>
+                <input type="text" name="maCongTrinh" list="dl-ma-cong-trinh-full" autocomplete="off"
+                  placeholder="Gõ để lọc, chọn mã có sẵn hoặc nhập mã mới..." style="min-width:260px;" required />
                 <button type="submit" class="btn btn-secondary" style="font-size:12px; padding:4px 8px;">Gán</button>
               </form>
             </td>
@@ -452,12 +504,8 @@
               <% if (r.tenDiemBan) { %>
               <form method="POST" action="/doi-soat/vietqr/gan-ten-diem/<%= r.channel %>" class="form-inline" style="gap:4px;">
                 <input type="hidden" name="tenDiemBan" value="<%= r.tenDiemBan %>" />
-                <select name="maCongTrinh" required style="max-width:220px;">
-                  <option value="">-- Chọn mã công trình --</option>
-                  <% (typeof maCongTrinhOptions !== 'undefined' ? maCongTrinhOptions : []).forEach(function(m) { %>
-                  <option value="<%= m.maCongTrinh %>"><%= m.maCongTrinh %><%= m.tenCongTrinh ? ' - ' + m.tenCongTrinh : '' %></option>
-                  <% }) %>
-                </select>
+                <input type="text" name="maCongTrinh" list="dl-ma-cong-trinh-full" autocomplete="off"
+                  placeholder="Gõ để lọc, chọn mã có sẵn hoặc nhập mã mới..." style="min-width:260px;" required />
                 <button type="submit" class="btn btn-secondary" style="font-size:12px; padding:4px 8px;">Gán</button>
               </form>
               <% } else { %>

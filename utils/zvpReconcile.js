@@ -1865,6 +1865,32 @@ function parseFeeReportWorkbook(buffer, orderMap) {
       if (idx.netCol === undefined && s.includes("so tien sau khi tru phi")) idx.netCol = c;
       if (idx.feeCol === undefined && s.includes("so tien phi thu ho")) idx.feeCol = c;
       if (idx.dateCol === undefined && s.includes("ngay hach toan thu ho")) idx.dateCol = c;
+      // Luyen, 2026-08-05: "tính trong file có ngày 1 đó tổng là 46tr646 mà"
+      // -- doi chieu 1 file thuc te (VNPAY OFFLINE.xlsx, 05/08/2026): 672 dong
+      // Offline "Thành công" (tien that, co Chi nhanh/Diem thu ro rang) co cot
+      // "Ngày hạch toán thu hộ" BO TRONG (giao dich con moi, VNPay chua chay
+      // qua dot hach toan/doi soat rieng cua ho) -- code truoc day BO QUA HOAN
+      // TOAN cac dong nay (if (!date) continue), lam mat dung 43.312.000d (31/07-
+      // 02/08) + 5.732.000d (03/08) doanh thu THAT khoi Doanh thu gop, dung
+      // bang 2 khoan "Chenh lech" Luyen bao. Fallback ve "Thời gian GD" (thoi
+      // diem giao dich that, luon co san) khi "Ngày hạch toán thu hộ" trong --
+      // xac nhan lai dung tren toan bo cac dong CO CA 2 cot nay: chua tung
+      // thay 1 dong nao lech ngay giua 2 cot (chi la 1 ben bi bo trong), nen
+      // fallback nay an toan, khong lam sai ngay cua cac dong da co san.
+      if (idx.gdTimeCol === undefined && s.includes("thoi gian gd")) idx.gdTimeCol = c;
+      // Luyen, 2026-08-05: "soa số trên onl lại thay đổi rồi lệch số tè le"
+      // -- ngay sau khi them fallback "Thời gian GD" o tren, phat hien them
+      // ham nay TU TRUOC GIO chua bao gio loc theo "Trạng thái" ca (chi loc
+      // theo co Dien thu + co so tien) -- voi Offline khong sao vi 672 dong
+      // hach toan trong deu la "Thành công" that, nhung ben Online co 57 dong
+      // hach toan trong LAI la "Hết hạn thanh toán"/"Không thành công" (giao
+      // dich KHONG thanh cong, khong phai tien that) -- truoc day vo tinh bi
+      // loai vi khong co ngay (fallback moi lam lo ra), nen fallback tren PHAI
+      // di kem loc trang thai moi dung, neu khong se dem nham ca tien cua giao
+      // dich that bai vao doanh thu. Dung "trang thai" (khop chinh xac, tranh
+      // nham voi "Trạng thái trả góp"/"Trạng thái trả góp SmartPOS" cung co
+      // chua "trang thai").
+      if (idx.statusCol === undefined && s === "trang thai") idx.statusCol = c;
     });
     if (idx.diemThu !== undefined && idx.grossCol !== undefined && idx.dateCol !== undefined) {
       headerRowIdx = r;
@@ -1894,16 +1920,34 @@ function parseFeeReportWorkbook(buffer, orderMap) {
     const row = grid[r] || [];
     const diemThu = cols.diemThu !== undefined ? String(row[cols.diemThu] || "").trim() : "";
     if (!diemThu) continue;
+    // Luyen, 2026-08-05: loai giao dich KHONG thanh cong ("Hết hạn thanh
+    // toán", "Không thành công"...) khoi doanh thu -- xem chu thich day du o
+    // idx.statusCol phia tren. Chi loai khi cot nay doc duoc VA co gia tri ro
+    // rang la khong thanh cong, tranh loai nham neu file khong co cot nay.
+    if (cols.statusCol !== undefined) {
+      const status = row[cols.statusCol];
+      if (status && !/thanh cong|th.nh c.ng/i.test(String(status))) continue;
+    }
     const gross = grossColFeeReport !== undefined ? Number(row[grossColFeeReport]) || 0 : 0;
     if (!gross) continue;
     const netRaw = cols.netCol !== undefined ? row[cols.netCol] : null;
     const fee = cols.feeCol !== undefined ? Number(row[cols.feeCol]) || 0 : 0;
     const net = (netRaw !== null && netRaw !== undefined && netRaw !== "") ? (Number(netRaw) || 0) : (gross - fee);
+    // Chi Nhan, 2026-08-05: "cái thay đổi nãy chỉ có vnpay off thôi đừng đụng
+    // công thức cách lấy của zalo app" -- Luyen xac nhan CHI muon fallback
+    // "Thời gian GD" (o duoi) ap dung rieng cho Offline, giu nguyen y het
+    // cach tinh Online tu truoc gio (kien cac GD Online thieu "Ngày hạch
+    // toán thu hộ" tiep tuc bi bo qua nhu cu, du la tien that) -- xac dinh
+    // Online/Offline TRUOC khi tinh date de fallback chi ap dung dung 1 ben.
+    const isOnlineRow = /^FUNZONE MINI APP$/i.test(diemThu);
     const dateRaw = cols.dateCol !== undefined ? row[cols.dateCol] : null;
-    const date = toIsoDate(dateRaw);
+    let date = toIsoDate(dateRaw);
+    if (!date && !isOnlineRow && cols.gdTimeCol !== undefined) {
+      date = toIsoDate(row[cols.gdTimeCol]);
+    }
     if (!date) continue;
 
-    if (/^FUNZONE MINI APP$/i.test(diemThu)) {
+    if (isOnlineRow) {
       const orderInfo = cols.orderInfo !== undefined ? String(row[cols.orderInfo] || "") : "";
       const mOrder = orderInfo.match(/don\s*hang\s+(\d+)/i);
       const product = mOrder ? orderMap[mOrder[1]] : null;
