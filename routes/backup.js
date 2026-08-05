@@ -63,9 +63,9 @@ router.post("/he-thong/sao-luu/phuc-hoi", requireAdmin, uploadToDisk.single("fil
     // tren Railway Trial 1GB), kiem tra cau truc so bo bang cach chi doc 1KB
     // dau file (du de xac nhan co cac key bat buoc), sau do copy thang file
     // vao DATA_FILE. Khong can giu parsed object trong memory luc restore.
-    const headBuf = Buffer.allocUnsafe(2000);
+    const headBuf = Buffer.allocUnsafe(20000);
     const fd = fs.openSync(tmpPath, "r");
-    const bytesRead = fs.readSync(fd, headBuf, 0, 2000, 0);
+    const bytesRead = fs.readSync(fd, headBuf, 0, 20000, 0);
     fs.closeSync(fd);
     const head = headBuf.slice(0, bytesRead).toString("utf8");
 
