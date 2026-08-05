@@ -298,27 +298,25 @@ router.post("/transactions/:id/sua", requireDataEntry, (req, res) => {
   }
 });
 
+// Chi Nhan, 2026-08-05: "sao tôi chuyển qua lại giữa các trang KH cũ và KH
+// [moi] bị z ta" -- truoc day route nay (va upload-statement/upload-ma-cong-
+// trinh ben duoi) xu ly xong roi res.render() THANG trang "transactions",
+// khien thanh dia chi TRINH DUYET van dung nguyen "/transactions/paste" (URL
+// cua chinh request POST nay). Nut chuyen cong ty tren topbar (POST /chon-
+// cong-ty, xem routes/company.js) lay redirectTo = duong dan dang xem LUC DO
+// de quay lai sau khi doi cong ty -- nen no lay nham "/transactions/paste"
+// (chi co POST, khong co GET) roi redirect toi do bang GET, ra loi 404 "Khong
+// tim thay trang". Sua bang cach LUON res.redirect() ve "/transactions" (GET,
+// co that) sau khi xu ly xong, dung chung co che success/error o query string
+// da co san (xem GET /transactions ben tren) thay vi tu render rieng.
 router.post("/transactions/paste", requireDataEntry, (req, res) => {
   const { bank_id, paste_text } = req.body;
   const store = load();
-  const activeCompany = getCompany(req);
-  const banks = companyBanks(store, activeCompany);
 
   if (!bank_id) {
-    return res.render("transactions", {
-      banks,
-      rows: [],
-      totalThu: 0,
-      totalChi: 0,
-      filters: { bank_id: "", from: "", to: "" },
-      userName: req.session.userName,
-      pasteResult: null,
-      uploadResult: null,
-      maCongTrinhMaster: maCongTrinhMasterFor(store, activeCompany),
-      maCongTrinhResult: null,
-      bankStatementUploads: bankStatementUploadsFor(store, companyBankIds(store, activeCompany)),
-      error: "Vui long chon ngan hang truoc khi dan sao ke.",
-    });
+    return res.redirect(
+      "/transactions?error=" + encodeURIComponent("Vui long chon ngan hang truoc khi dan sao ke.")
+    );
   }
 
   const { rows, errors } = parsePastedTransactions(paste_text);
@@ -337,25 +335,15 @@ router.post("/transactions/paste", requireDataEntry, (req, res) => {
   }
   if (rows.length > 0) save(store);
 
-  const allFilteredAfterPaste = filterTransactionsWithBalance(store, {
-    bank_id,
-    bankIds: companyBankIds(store, activeCompany),
-  });
-  const currentRows = allFilteredAfterPaste.slice(0, 500);
-
-  res.render("transactions", {
-    banks,
-    rows: currentRows,
-    ...computeThuChiTotals(allFilteredAfterPaste),
-    filters: { bank_id, from: "", to: "" },
-    userName: req.session.userName,
-    pasteResult: { inserted: rows.length, errors },
-    uploadResult: null,
-    maCongTrinhMaster: maCongTrinhMasterFor(store, activeCompany),
-    maCongTrinhResult: null,
-    bankStatementUploads: bankStatementUploadsFor(store, companyBankIds(store, activeCompany)),
-    error: null,
-  });
+  let message = `Đã nhập thành công ${rows.length} dòng.`;
+  if (errors.length > 0) {
+    message += ` Có ${errors.length} dòng bị bỏ qua: ${errors.slice(0, 5).join("; ")}${
+      errors.length > 5 ? "…" : ""
+    }`;
+  }
+  res.redirect(
+    "/transactions?bank_id=" + encodeURIComponent(bank_id) + "&success=" + encodeURIComponent(message)
+  );
 });
 
 // Upload a raw statement file exported directly from the bank (.xlsx/.xls).
@@ -374,44 +362,31 @@ router.post("/transactions/paste", requireDataEntry, (req, res) => {
 // back to date+amount+type as before -- description is intentionally still
 // excluded from that fallback key, since different statement exports can
 // render slightly different description text for the same transaction.
+// Chi Nhan, 2026-08-05: doi tu res.render() sang res.redirect() sau khi xu ly
+// xong -- ly do xem comment dai o /transactions/paste ngay phia tren (bug
+// "Khong tim thay trang" luc chuyen KH Cu/KH Moi vi thanh dia chi ket o
+// "/transactions/upload-statement", 1 URL chi co POST khong co GET).
 router.post("/transactions/upload-statement", requireDataEntry, upload.single("file"), (req, res) => {
   const store = load();
-  const activeCompany = getCompany(req);
-  const banks = companyBanks(store, activeCompany);
   const { bank_id } = req.body;
 
-  const renderError = (message) => {
-    const allFilteredForError = filterTransactionsWithBalance(store, {
-      bank_id: bank_id || "",
-      bankIds: companyBankIds(store, activeCompany),
-    });
-    return res.render("transactions", {
-      banks,
-      rows: allFilteredForError.slice(0, 500),
-      ...computeThuChiTotals(allFilteredForError),
-      filters: { bank_id: bank_id || "", from: "", to: "" },
-      userName: req.session.userName,
-      pasteResult: null,
-      uploadResult: null,
-      maCongTrinhMaster: maCongTrinhMasterFor(store, activeCompany),
-      maCongTrinhResult: null,
-      bankStatementUploads: bankStatementUploadsFor(store, companyBankIds(store, activeCompany)),
-      error: message,
-    });
-  };
+  const redirectError = (message) =>
+    res.redirect(
+      "/transactions?bank_id=" + encodeURIComponent(bank_id || "") + "&error=" + encodeURIComponent(message)
+    );
 
-  if (!bank_id) return renderError("Vui long chon ngan hang truoc khi tai file sao ke.");
-  if (!req.file) return renderError("Vui long chon 1 file sao ke de tai len.");
+  if (!bank_id) return redirectError("Vui long chon ngan hang truoc khi tai file sao ke.");
+  if (!req.file) return redirectError("Vui long chon 1 file sao ke de tai len.");
 
   const bankIdNum = Number(bank_id);
   const bank = store.banks.find((b) => b.id === bankIdNum);
-  if (!bank) return renderError("Khong tim thay ngan hang da chon.");
+  if (!bank) return redirectError("Khong tim thay ngan hang da chon.");
 
   let parsed;
   try {
     parsed = parseBankStatement(req.file.buffer);
   } catch (e) {
-    return renderError(e.message);
+    return redirectError(e.message);
   }
 
   const firstDate = parsed.rows[0].date;
@@ -540,31 +515,16 @@ router.post("/transactions/upload-statement", requireDataEntry, upload.single("f
   }
   if (added > 0 || healedRemoved > 0 || backfilledVendor > 0) save(store);
 
-  const allFilteredAfterUpload = filterTransactionsWithBalance(store, {
-    bank_id,
-    bankIds: companyBankIds(store, activeCompany),
-  });
-  const currentRows = allFilteredAfterUpload.slice(0, 500);
-  res.render("transactions", {
-    banks,
-    rows: currentRows,
-    ...computeThuChiTotals(allFilteredAfterUpload),
-    filters: { bank_id, from: "", to: "" },
-    userName: req.session.userName,
-    pasteResult: null,
-    uploadResult: {
-      sheetName: parsed.sheetName,
-      totalRows: parsed.rows.length,
-      added,
-      skipped,
-      healedRemoved,
-      backfilledVendor,
-    },
-    maCongTrinhMaster: maCongTrinhMasterFor(store, activeCompany),
-    maCongTrinhResult: null,
-    bankStatementUploads: bankStatementUploadsFor(store, companyBankIds(store, activeCompany)),
-    error: null,
-  });
+  let message = `Đọc file (sheet "${parsed.sheetName}"): ${parsed.rows.length} dòng giao dịch. Đã thêm mới ${added} dòng, bỏ qua ${skipped} dòng đã có sẵn (trùng).`;
+  if (healedRemoved > 0) {
+    message += ` Đã tự động dọn ${healedRemoved} dòng cũ bị gộp nhầm trước khi nạp lại đầy đủ.`;
+  }
+  if (backfilledVendor > 0) {
+    message += ` Đã điền thêm Tên đối ứng cho ${backfilledVendor} dòng cũ đang trống.`;
+  }
+  res.redirect(
+    "/transactions?bank_id=" + encodeURIComponent(bank_id) + "&success=" + encodeURIComponent(message)
+  );
 });
 
 // Luyen, 2026-08-01: "cần để mốt tôi tải nhầm tôi có thể xóa á" -- xoa nguyen
@@ -680,29 +640,12 @@ router.post("/transactions/xoa-loc", requireAdmin, (req, res) => {
 // gian/cong trinh xuat hien o cac trang khac (vd Chi Phi). Moi lan tai len
 // THAY THE toan bo danh sach cua dung cong ty dang chon (KH Cu / KH Moi
 // khong dung chung 1 danh sach vi la 2 phap nhan khac nhau).
+// Chi Nhan, 2026-08-05: doi tu res.render() sang res.redirect() -- ly do xem
+// comment dai o /transactions/paste ben tren (bug "Khong tim thay trang" luc
+// chuyen KH Cu/KH Moi).
 router.post("/transactions/upload-ma-cong-trinh", requireDataEntry, upload.single("file"), (req, res) => {
   const store = load();
   const activeCompany = getCompany(req);
-  const banks = companyBanks(store, activeCompany);
-  const allFilteredForMaCongTrinh = filterTransactionsWithBalance(store, {
-    bankIds: companyBankIds(store, activeCompany),
-  });
-  const rowsForList = allFilteredForMaCongTrinh.slice(0, 500);
-
-  const renderWith = (maCongTrinhResult, error) =>
-    res.render("transactions", {
-      banks,
-      rows: rowsForList,
-      ...computeThuChiTotals(allFilteredForMaCongTrinh),
-      filters: { bank_id: "", from: "", to: "" },
-      userName: req.session.userName,
-      pasteResult: null,
-      uploadResult: null,
-      maCongTrinhMaster: maCongTrinhMasterFor(store, activeCompany),
-      maCongTrinhResult,
-      bankStatementUploads: bankStatementUploadsFor(store, companyBankIds(store, activeCompany)),
-      error: error || null,
-    });
 
   try {
     if (!req.file) throw new Error("Vui long chon 1 file de tai len.");
@@ -720,9 +663,12 @@ router.post("/transactions/upload-ma-cong-trinh", requireDataEntry, upload.singl
       rows,
     };
     save(store);
-    return renderWith({ sheetName, count: rows.length, fileName: req.file.originalname });
+    return res.redirect(
+      "/transactions?success=" +
+        encodeURIComponent(`Đã nạp "${req.file.originalname}" (sheet "${sheetName}"): ${rows.length} mã công trình.`)
+    );
   } catch (e) {
-    return renderWith(null, e.message);
+    return res.redirect("/transactions?error=" + encodeURIComponent(e.message));
   }
 });
 
