@@ -1562,4 +1562,8 @@ const SEED_CHT_NOP_TIEN_ROWS = [
   if (changed) save(store);
 })();
 
-module.exports = { load, save, nextId, DATA_FILE };
+function resetCache() {
+  cachedStore = null;
+}
+
+module.exports = { load, save, nextId, DATA_FILE, resetCache };

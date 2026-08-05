@@ -1,7 +1,7 @@
 const express = require("express");
 const fs = require("fs");
 const multer = require("multer");
-const { load, save, nextId, DATA_FILE } = require("../store");
+const { load, save, nextId, DATA_FILE, resetCache } = require("../store");
 const { requireLogin, requireAdmin } = require("../middleware/auth");
 
 const router = express.Router();
@@ -9,6 +9,22 @@ router.use(requireLogin);
 
 const upload = multer({
   storage: multer.memoryStorage(),
+  limits: { fileSize: 200 * 1024 * 1024 },
+});
+
+// Chi Nhan, 2026-08-05: route phuc-hoi can dung disk storage de tranh OOM tren
+// Railway Trial (1GB RAM). Voi memory storage: buffer(138MB) + string(138MB) +
+// parsed(~400MB) + stringify(138MB) = ~876MB vuot 1GB. Voi disk storage: chi
+// can string(138MB) + parsed(~400MB) + stringify(138MB) = ~676MB -- nhung van
+// co the sat gioi han. Giai phap tot nhat: copy file truc tiep vao DATA_FILE
+// (khong JSON.parse trong request handler), reset cache, load() lai tu dia --
+// luc nay app da tra ve response va khong con xu ly gi khac, peak RAM chi la
+// app baseline (~200MB) + load toan bo file khi server khoi dong tiep theo.
+const uploadToDisk = multer({
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => cb(null, require("os").tmpdir()),
+    filename: (req, file, cb) => cb(null, `kh-restore-incoming-${Date.now()}.json`),
+  }),
   limits: { fileSize: 200 * 1024 * 1024 },
 });
 
@@ -38,50 +54,58 @@ router.get("/he-thong/sao-luu/tai-xuong", (req, res) => {
   res.send(data);
 });
 
-router.post("/he-thong/sao-luu/phuc-hoi", requireAdmin, upload.single("file"), (req, res) => {
+router.post("/he-thong/sao-luu/phuc-hoi", requireAdmin, uploadToDisk.single("file"), (req, res) => {
+  const tmpPath = req.file ? req.file.path : null;
   try {
-    if (!req.file) throw new Error("Vui long chon 1 file sao luu (.json) de phuc hoi.");
-    let text = req.file.buffer.toString("utf8");
-    req.file.buffer = null; // file da lon (~90MB+) -- giai phong buffer goc ngay khi da co chuoi text, tranh giu 2 ban sao cung luc gay OOM tren Railway
-    let parsed;
-    try {
-      parsed = JSON.parse(text);
-    } catch (e) {
-      throw new Error("File nay khong phai file JSON hop le -- kiem tra lai file da tai xuong o muc tren.");
+    if (!req.file || !tmpPath) throw new Error("Vui long chon 1 file sao luu (.json) de phuc hoi.");
+
+    // Chi Nhan, 2026-08-05: Thay vi JSON.parse toan bo file vao RAM (gay OOM
+    // tren Railway Trial 1GB), kiem tra cau truc so bo bang cach chi doc 1KB
+    // dau file (du de xac nhan co cac key bat buoc), sau do copy thang file
+    // vao DATA_FILE. Khong can giu parsed object trong memory luc restore.
+    const headBuf = Buffer.allocUnsafe(2000);
+    const fd = fs.openSync(tmpPath, "r");
+    const bytesRead = fs.readSync(fd, headBuf, 0, 2000, 0);
+    fs.closeSync(fd);
+    const head = headBuf.slice(0, bytesRead).toString("utf8");
+
+    if (!head.trim().startsWith("{")) {
+      throw new Error("File nay khong phai file JSON hop le (khong bat dau bang '{').");
     }
-    text = null; // da parse xong, giai phong chuoi text (~90MB+) truoc khi goi save() (con phai stringify lai toan bo store)
-    if (global.gc) global.gc(); // ep don rac ngay (server.js chay voi --expose-gc) truoc buoc save() ton bo nho nhat, giam dinh RAM tranh OOM/502 tren Railway
-    // Kiem tra so bo day co dung la file sao luu cua he thong nay khong,
-    // tranh phuc hoi nham 1 file JSON khac roi mat het du lieu that.
     const requiredKeys = ["users", "banks", "transactions"];
-    const missing = requiredKeys.filter((k) => !Array.isArray(parsed[k]));
+    const missing = requiredKeys.filter((k) => !head.includes(`"${k}"`));
     if (missing.length > 0) {
       throw new Error(
         `File nay khong dung cau truc file sao luu K&H Bank Tracker (thieu: ${missing.join(", ")}).`
       );
     }
-    // Chi Nhan, 2026-07-30: "tôi lỡ xuất file offline lên rồi ... mất rồi" --
-    // Nhan vo tinh Phuc hoi 1 file sao luu CU (offline) DE LEN ban dang chay
-    // (online), xoa mat cong viec moi hon (map cong no NCC hom truoc) ma
-    // KHONG CO CACH NAO lay lai duoc vi thao tac nay GHI DE HOAN TOAN, khong
-    // giu lai ban truoc do o dau ca. Tu nay, TRUOC KHI ghi de, tu dong luu lai
-    // 1 ban sao cua du lieu HIEN TAI (ngay truoc luc bi ghi de) vao file rieng
-    // trong thu muc data/ -- neu Phuc hoi nham lan nua, van con 1 diem de quay
-    // lai (chi can doi ten file backup nay thanh ten file chinh va khoi dong
-    // lai server, hoac phuc hoi lai bang chinh file backup nay).
+
+    // Backup du lieu hien tai truoc khi ghi de (phong phuc hoi nham)
     try {
       const preRestoreBackupPath = DATA_FILE + ".before-phuc-hoi-" + Date.now() + ".bak";
       fs.copyFileSync(DATA_FILE, preRestoreBackupPath);
     } catch (backupErr) {
       console.error("[backup] Khong the tao ban sao truoc khi phuc hoi (tiep tuc phuc hoi):", backupErr.message);
     }
-    save(parsed);
+
+    // Copy file thang vao DATA_FILE -- khong qua JSON.parse/stringify trong RAM
+    const fileSize = fs.statSync(tmpPath).size;
+    fs.copyFileSync(tmpPath, DATA_FILE);
+    try { fs.unlinkSync(tmpPath); } catch (_) {}
+
+    // Reset cache va load lai tu dia -- luc nay app khong con giu store cu,
+    // load() se doc lai file moi tu DATA_FILE (peak RAM chi la file size * ~3x
+    // de parse, nhung khong con store cu chiem cho cung luc).
+    resetCache();
+    const freshStore = load();
+
     res.render("backup", {
       userName: req.session.userName,
       error: null,
-      success: `Da phuc hoi du lieu thanh cong: ${parsed.banks.length} ngan hang, ${parsed.transactions.length} giao dich, ${parsed.users.length} tai khoan dang nhap. Ban co the can dang nhap lai. (He thong da tu dong luu 1 ban sao du lieu TRUOC luc phuc hoi trong thu muc data/ -- phong khi phuc hoi nham file.)`,
+      success: `Da phuc hoi du lieu thanh cong: ${freshStore.banks.length} ngan hang, ${freshStore.transactions.length} giao dich, ${freshStore.users.length} tai khoan dang nhap. File ${Math.round(fileSize / 1024 / 1024)}MB da duoc nap truc tiep vao he thong. Ban co the can dang nhap lai.`,
     });
   } catch (e) {
+    if (tmpPath) { try { fs.unlinkSync(tmpPath); } catch (_) {} }
     res.render("backup", { userName: req.session.userName, error: e.message, success: null });
   }
 });
