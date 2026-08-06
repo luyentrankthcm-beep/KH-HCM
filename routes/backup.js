@@ -88,8 +88,14 @@ router.post("/he-thong/sao-luu/phuc-hoi", requireAdmin, uploadToDisk.single("fil
     // QUAN TRONG: Giai phong cache cu TRUOC khi parse file backup.
     // Neu khong: cachedTransactions cu (~300MB) + parse moi (~400MB) = ~700MB+
     // vuot gioi han 1GB Railway Trial -> OOM crash.
-    // Sau resetCache, chi con app overhead ~150MB, parse them ~400MB = ~550MB OK.
     resetCache();
+    // Ep GC chay ngay (server dung --expose-gc) de giai phong bo nho cu
+    // truoc khi parse file 138MB -- khong co buoc nay GC co the chua chay
+    // va RAM van ~560MB truoc khi parse (+400MB = ~960MB -> OOM).
+    if (typeof global.gc === "function") {
+      global.gc();
+      console.log("[backup] Da goi global.gc() truoc khi parse backup.");
+    }
 
     const fileSize = fs.statSync(tmpPath).size;
     const parsed = JSON.parse(fs.readFileSync(tmpPath, "utf8"));
