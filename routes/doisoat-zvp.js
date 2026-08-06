@@ -883,7 +883,11 @@ router.post("/doi-soat/zvp/upload-offline-raw", requireDataEntry, upload.single(
     for (const tx of parsed.transactions) {
       const existing = store.zvp_offline_raw_tx[tx.txKey];
       if (existing) {
-        if (existing.fee === 0 && tx.fee > 0) {
+        // Luyen 2026-08-06: ngoai nang cap phi, con cap nhat khi date thay doi
+        // (vi du: parser doi tu "Ngay hach toan" sang "Thoi gian GD" -- re-upload
+        // se tu dong sua toan bo ngay ma khong can xoa thu cong).
+        const needsUpdate = (existing.fee === 0 && tx.fee > 0) || (existing.date !== tx.date);
+        if (needsUpdate) {
           store.zvp_offline_raw_tx[tx.txKey] = { date: tx.date, chiNhanh: tx.chiNhanh, gross: tx.gross, fee: tx.fee, net: tx.net };
           upgradedCount++;
         } else {
@@ -937,6 +941,13 @@ router.post("/doi-soat/zvp/upload-offline-raw", requireDataEntry, upload.single(
       grossByCode[key] = (grossByCode[key] || 0) + tx.gross;
       netByCode[key] = (netByCode[key] || 0) + tx.net;
     }
+
+    // Xoa cac "[File tho]" cu truoc khi push entry moi. GrossByCode cua entry
+    // moi da duoc tinh lai tu TOAN BO zvp_offline_raw_tx (voi GD-date moi) nen
+    // hoan toan thay the duoc tat ca entry cu. Neu giu ca 2, keys settlement-
+    // date (cu) lan GD-date (moi) se cung duoc cong vao -- double-count.
+    // Upload "combo" (khong phai "[File tho]") van duoc giu nguyen.
+    store.zvp_offline_uploads = store.zvp_offline_uploads.filter(u => !u.file_name.startsWith("[File thô]"));
 
     store.zvp_offline_uploads.push({
       id: nextId(store, "zvp_offline_uploads_seq") || Date.now(),

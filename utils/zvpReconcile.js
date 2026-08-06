@@ -2040,13 +2040,19 @@ function parseVnpayOfflineFeeReport(buffer) {
       if (idx.grossColTruocKM === undefined && s.includes("so tien truoc km")) idx.grossColTruocKM = c;
       if (idx.netCol === undefined && s.includes("so tien sau khi tru phi")) idx.netCol = c;
       if (idx.feeCol === undefined && s.includes("so tien phi thu ho")) idx.feeCol = c;
+      // Luyen, 2026-08-06: Uu tien "Thoi gian GD" (ngay GD thuc te) thay vi
+      // "Ngay hach toan thu ho" (ngay VNPay xu ly noi bo). Ngan hang nhan
+      // mota "DV QR Offline ngay 31.07-02.08" tham chieu ngay GD -- neu dung
+      // ngay hach toan se bi lech ~43tr. Giu "dateCol" lam fallback cho file
+      // cu khong co cot "Thoi gian GD".
+      if (idx.gdDateCol === undefined && s.includes("thoi gian gd")) idx.gdDateCol = c;
       if (idx.dateCol === undefined && s.includes("ngay hach toan thu ho")) idx.dateCol = c;
       // "Trang thai" dung khop CHINH XAC (khong phai substring) de khong bi
       // nham voi "Trang thai tra gop"/cac cot "Trang thai ..." khac dung
       // truoc no trong file thuc te.
       if (idx.statusCol === undefined && s === "trang thai") idx.statusCol = c;
     });
-    if (idx.diemThu !== undefined && idx.grossCol !== undefined && idx.dateCol !== undefined) {
+    if (idx.diemThu !== undefined && idx.grossCol !== undefined && (idx.gdDateCol !== undefined || idx.dateCol !== undefined)) {
       headerRowIdx = r;
       cols = idx;
       break;
@@ -2081,7 +2087,11 @@ function parseVnpayOfflineFeeReport(buffer) {
     const netRaw = cols.netCol !== undefined ? row[cols.netCol] : null;
     const fee = cols.feeCol !== undefined ? Number(row[cols.feeCol]) || 0 : 0;
     const net = (netRaw !== null && netRaw !== undefined && netRaw !== "") ? (Number(netRaw) || 0) : (gross - fee);
-    const dateRaw = cols.dateCol !== undefined ? row[cols.dateCol] : null;
+    // Uu tien cot "Thoi gian GD" (ngay GD thuc te); fallback sang "Ngay hach
+    // toan thu ho" cho file cu khong co cot nay (Luyen, 2026-08-06).
+    const dateRaw = cols.gdDateCol !== undefined
+      ? row[cols.gdDateCol]
+      : (cols.dateCol !== undefined ? row[cols.dateCol] : null);
     const date = toIsoDate(dateRaw);
     if (!date) continue;
     const chiNhanh = cols.chiNhanh !== undefined ? String(row[cols.chiNhanh] || "").trim() : diemThu;
