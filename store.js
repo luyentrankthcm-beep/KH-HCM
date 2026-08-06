@@ -1665,7 +1665,30 @@ const SEED_CHT_NOP_TIEN_ROWS = [
   }
   if (seedFixChuaKhopCamRanhTenDiem(store)) changed = true;
 
-  if (changed) save(store);
+  if (changed) {
+    // Xoa file .bak cu (giu toi da 2 ban moi nhat) truoc khi luu de giai phong Volume.
+    // Moi lan restore tao 1 file .bak 138MB; tich luy nhieu lan co the lam Volume day -> ENOSPC.
+    try {
+      const bakFiles = fs.readdirSync(DATA_DIR)
+        .filter((f) => /\.bak$/.test(f))
+        .map((f) => ({ name: f, mtime: fs.statSync(path.join(DATA_DIR, f)).mtimeMs }))
+        .sort((a, b) => b.mtime - a.mtime) // moi nhat truoc
+        .slice(2) // giu 2 ban moi nhat, xoa phan con lai
+        .map((f) => f.name);
+      if (bakFiles.length > 0) {
+        bakFiles.forEach((f) => { try { fs.unlinkSync(path.join(DATA_DIR, f)); } catch (_) {} });
+        console.log("[seed] Da xoa " + bakFiles.length + " file .bak cu de giai phong Volume.");
+      }
+    } catch (_) {}
+
+    // Bat loi save() (vd ENOSPC) de app khong crash -- du lieu van dung trong bo nho.
+    try {
+      save(store);
+    } catch (e) {
+      console.error("[seed] Khong the luu sau seed (co the Volume day?):", e.message,
+        "-- App tiep tuc chay, du lieu DUNG trong bo nho nhung CHUA duoc ghi len dia.");
+    }
+  }
 })();
 
 function resetCache() {
