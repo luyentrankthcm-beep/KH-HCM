@@ -12,6 +12,10 @@ const bcrypt = require("bcryptjs");
 
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, "data");
 const DATA_FILE = path.join(DATA_DIR, "store.json");
+// Tach 2 mang lon ra file rieng de giam RAM startup: store.json chi chua config
+// (~7MB), transactions.json (~95MB) va viet_qr_raw.json (~36MB) duoc load lazy.
+const TRANSACTIONS_FILE = path.join(DATA_DIR, "transactions.json");
+const VIET_QR_RAW_FILE = path.join(DATA_DIR, "viet_qr_raw.json");
 
 if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
 
@@ -39,6 +43,57 @@ let loadedFromUnrecoverableCorruption = false;
 // chay 1 tien trinh Node.js duy nhat cho 1 file du lieu (khong co tien trinh
 // nao khac cung sua file nay cung luc).
 let cachedStore = null;
+// Cache rieng cho 2 mang lon -- chi load khi co route can den (lazy):
+// - cachedTransactions: mang giao dich (~95MB, 219K dong) doc tu transactions.json
+// - cachedVietQrRaw: du lieu VietQR raw uploads (~36MB) doc tu viet_qr_raw.json
+// Ket qua: baseline RAM khi khoi dong chi ~200MB thay vi ~600MB nhu truoc.
+let cachedTransactions = null;
+let cachedVietQrRaw = null;
+
+// Doc 1 file JSON lon tu dia, tra ve defaultValue neu file chua ton tai hoac loi.
+function loadLargeSection(filePath, defaultValue) {
+  if (!fs.existsSync(filePath)) return defaultValue;
+  try {
+    console.log("[store] Dang load " + path.basename(filePath) + "...");
+    return JSON.parse(fs.readFileSync(filePath, "utf8"));
+  } catch (e) {
+    console.error("[store] Loi doc " + path.basename(filePath) + ":", e.message);
+    return defaultValue;
+  }
+}
+
+// Gan getter lazy-load cho transactions va viet_qr_raw_uploads tren store object.
+// Truy cap store.transactions / store.viet_qr_raw_uploads se tu dong doc file
+// rieng khi can (lan dau), va ghi nho ket qua trong cachedTransactions/cachedVietQrRaw.
+// Setter van hoat dong: store.transactions = newArray ghi de cachedTransactions.
+function addSplitGetters(storeObj) {
+  Object.defineProperty(storeObj, "transactions", {
+    get() {
+      if (cachedTransactions === null) {
+        cachedTransactions = loadLargeSection(TRANSACTIONS_FILE, []);
+      }
+      return cachedTransactions;
+    },
+    set(val) { cachedTransactions = val; },
+    configurable: true,
+    enumerable: true,
+  });
+  Object.defineProperty(storeObj, "viet_qr_raw_uploads", {
+    get() {
+      if (cachedVietQrRaw === null) {
+        cachedVietQrRaw = loadLargeSection(
+          VIET_QR_RAW_FILE,
+          { bidv7704: [], bidv77020: [], mb11521268: [] }
+        );
+      }
+      return cachedVietQrRaw;
+    },
+    set(val) { cachedVietQrRaw = val; },
+    configurable: true,
+    enumerable: true,
+  });
+  return storeObj;
+}
 
 function emptyStore() {
   return {
@@ -207,18 +262,37 @@ function backupCorruptedFile() {
 function load() {
   if (cachedStore) return cachedStore;
   if (!fs.existsSync(DATA_FILE)) {
+    // File chua ton tai (cai dat moi) -- khong ghi file trong, de save() tu seed() ghi sau.
     const fresh = emptyStore();
-    fs.writeFileSync(DATA_FILE, JSON.stringify(fresh));
-    cachedStore = fresh;
+    delete fresh.transactions;
+    delete fresh.viet_qr_raw_uploads;
+    cachedStore = addSplitGetters(fresh);
     return cachedStore;
   }
   const raw = fs.readFileSync(DATA_FILE, "utf8");
   try {
     const parsed = JSON.parse(raw);
     const base = emptyStore();
-    cachedStore = Object.assign({}, base, parsed, {
+    const merged = Object.assign({}, base, parsed, {
       seq: Object.assign({}, base.seq, parsed.seq || {}),
     });
+    // Di tru tu format cu (1 file) sang format moi (3 file):
+    // Neu store.json con nhung transactions/viet_qr_raw_uploads nhung (format cu),
+    // luu vao cache va xoa khoi config object truoc khi gan getter.
+    if (Array.isArray(merged.transactions) && merged.transactions.length > 0) {
+      if (cachedTransactions === null) cachedTransactions = merged.transactions;
+    }
+    if (
+      merged.viet_qr_raw_uploads &&
+      typeof merged.viet_qr_raw_uploads === "object" &&
+      !Array.isArray(merged.viet_qr_raw_uploads) &&
+      Object.values(merged.viet_qr_raw_uploads).some((v) => Array.isArray(v) && v.length > 0)
+    ) {
+      if (cachedVietQrRaw === null) cachedVietQrRaw = merged.viet_qr_raw_uploads;
+    }
+    delete merged.transactions;
+    delete merged.viet_qr_raw_uploads;
+    cachedStore = addSplitGetters(merged);
     return cachedStore;
   } catch (e) {
     console.error("[store] Loi doc file du lieu, thu tu phuc hoi:", e.message);
@@ -230,15 +304,23 @@ function load() {
       const healed = Object.assign({}, base, parsed, {
         seq: Object.assign({}, base.seq, parsed.seq || {}),
       });
-      save(healed); // persist the healed version immediately so it stays fixed
-      cachedStore = healed;
+      if (Array.isArray(healed.transactions) && healed.transactions.length > 0) {
+        if (cachedTransactions === null) cachedTransactions = healed.transactions;
+      }
+      if (
+        healed.viet_qr_raw_uploads &&
+        typeof healed.viet_qr_raw_uploads === "object" &&
+        !Array.isArray(healed.viet_qr_raw_uploads) &&
+        Object.values(healed.viet_qr_raw_uploads).some((v) => Array.isArray(v) && v.length > 0)
+      ) {
+        if (cachedVietQrRaw === null) cachedVietQrRaw = healed.viet_qr_raw_uploads;
+      }
+      delete healed.transactions;
+      delete healed.viet_qr_raw_uploads;
+      cachedStore = addSplitGetters(healed);
+      save(cachedStore); // luu ngay phien ban da sua de on dinh
       return cachedStore;
     } catch (e2) {
-      // CRITICAL: the file exists but we could not recover it. Do NOT return
-      // an empty store silently and let the caller (seed()) persist that
-      // empty store over the real (if corrupted) data on disk. Back up the
-      // unreadable file first, then flag this so seed() below refuses to
-      // auto-save a fresh/empty store on top of it.
       console.error("[store] KHONG THE tu phuc hoi du lieu:", e2.message);
       backupCorruptedFile();
       console.error(
@@ -247,7 +329,10 @@ function load() {
           "Kiem tra file .corrupted-*.bak trong thu muc data/."
       );
       loadedFromUnrecoverableCorruption = true;
-      return emptyStore();
+      const emptyS = emptyStore();
+      delete emptyS.transactions;
+      delete emptyS.viet_qr_raw_uploads;
+      return addSplitGetters(emptyS);
     }
   }
 }
@@ -270,58 +355,79 @@ function writeFileDurable(filePath, data) {
 }
 
 function save(store) {
-  // IMPORTANT: on some mounted filesystems, overwriting store.json in place
-  // can leave stale trailing bytes from the previous (longer) version of
-  // the file if the new content is shorter, or even silently truncate a
-  // large write -- corrupting the JSON. To guard against this we (1) write
-  // to a temp file (via writeFileDurable, which loops until fully written
-  // and fsyncs), (2) rename it into place (atomic at the filesystem level --
-  // the old file is fully replaced, not overwritten byte-by-byte), then
-  // (3) verify the write landed fully before declaring success, retrying a
-  // few times if not.
-  // Chi Nhan, 2026-07-22: bo indent (null, 2) -- file da lon (30-40MB+), indent
-  // lam file to hon dang ke va JSON.stringify cham hon (van la JSON hop le,
-  // doc/phuc hoi lai binh thuong), gop voi cache o load() de giam toi da thoi
-  // gian chan luong Node.js gay 502.
-  // Chi Nhan, 2026-07-30: file da qua lon (~90MB+, se con lon them) -- buoc (3)
-  // truoc day doc lai TOAN BO file roi JSON.parse lai de "kiem tra", tao ra 1
-  // BAN SAO du lieu THU HAI trong bo nho cung luc voi `store` dang giu +
-  // chuoi `data` vua stringify -- do la nguyen nhan chinh gay HET BO NHO khi
-  // phuc hoi file sao luu tren Railway (do luong: ~930MB dinh RAM cho 1 file
-  // 92MB, trong khi goi Railway chi co vai tram MB) -- day chinh la nguyen
-  // nhan loi "502 Application failed to respond" khi bam Phuc hoi sao luu.
-  // writeFileDurable() da fsync + dung writeFileSync (tu lap toi khi ghi HET
-  // buffer, khong con rui ro "ghi thieu byte") nen chi can kiem tra NHE: so
-  // sanh dung so byte da ghi thuc te tren dia voi so byte du kien, khong can
-  // doc lai + parse lai toan bo noi dung.
-  const data = JSON.stringify(store);
-  const expectedBytes = Buffer.byteLength(data, "utf8");
-  let lastErr = null;
-  for (let attempt = 1; attempt <= 3; attempt++) {
-    const tmpFile = DATA_FILE + ".tmp-" + process.pid + "-" + Date.now() + "-" + Math.random().toString(36).slice(2);
-    try {
-      writeFileDurable(tmpFile, data);
-      fs.renameSync(tmpFile, DATA_FILE);
-      const actualBytes = fs.statSync(DATA_FILE).size;
-      if (actualBytes !== expectedBytes) {
-        throw new Error(`Ghi file khong du so byte (mong doi ${expectedBytes}, thuc te ${actualBytes})`);
-      }
-      cachedStore = store; // cache updated only after a verified-successful write
-      return; // success
-    } catch (e) {
-      lastErr = e;
-      console.error("[store] save() attempt " + attempt + " failed/khong hop le:", e.message);
+  // Chi Nhan, 2026-08-06: tach store thanh 3 file de giam RAM startup:
+  // - store.json: chi chua config (banks, users, momo, zvp, viet_qr_store_names...) ~7MB
+  // - transactions.json: mang giao dich ~95MB
+  // - viet_qr_raw.json: du lieu VietQR raw ~36MB
+  // Moi file duoc ghi qua pattern tmp+rename+verify nhu truoc (dam bao toan ven).
+  // Luu y: KHONG dung store.transactions hoac store.viet_qr_raw_uploads o day
+  // (se kich hoat getter, doc file tu dia), thay vao do dung truc tiep
+  // cachedTransactions/cachedVietQrRaw (du lieu dang o trong bo nho).
+
+  // Xay dung config object (tat ca key tru transactions va viet_qr_raw_uploads).
+  const configObj = {};
+  for (const key of Object.keys(store)) {
+    if (key === "transactions" || key === "viet_qr_raw_uploads") continue;
+    configObj[key] = store[key];
+  }
+  const mainData = JSON.stringify(configObj);
+  const txData = JSON.stringify(
+    cachedTransactions !== null ? cachedTransactions : []
+  );
+  const vqrData = JSON.stringify(
+    cachedVietQrRaw !== null
+      ? cachedVietQrRaw
+      : { bidv7704: [], bidv77020: [], mb11521268: [] }
+  );
+
+  function writeDurableWithRetry(filePath, data) {
+    const expectedBytes = Buffer.byteLength(data, "utf8");
+    let lastErr = null;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      const tmpFile =
+        filePath +
+        ".tmp-" +
+        process.pid +
+        "-" +
+        Date.now() +
+        "-" +
+        Math.random().toString(36).slice(2);
       try {
-        fs.unlinkSync(tmpFile);
-      } catch (_) {
-        /* ignore cleanup error */
+        writeFileDurable(tmpFile, data);
+        fs.renameSync(tmpFile, filePath);
+        const actualBytes = fs.statSync(filePath).size;
+        if (actualBytes !== expectedBytes) {
+          throw new Error(
+            "Ghi file khong du so byte (mong doi " +
+              expectedBytes +
+              ", thuc te " +
+              actualBytes +
+              ")"
+          );
+        }
+        return; // thanh cong
+      } catch (e) {
+        lastErr = e;
+        console.error(
+          "[store] save() " + path.basename(filePath) + " attempt " + attempt + " that bai:",
+          e.message
+        );
+        try { fs.unlinkSync(tmpFile); } catch (_) { /* bo qua */ }
       }
     }
+    throw new Error(
+      "Khong the luu " +
+        path.basename(filePath) +
+        " an toan sau nhieu lan thu: " +
+        (lastErr && lastErr.message)
+    );
   }
-  throw new Error(
-    "Khong the luu du lieu an toan sau nhieu lan thu (store.save that bai): " +
-      (lastErr && lastErr.message)
-  );
+
+  writeDurableWithRetry(DATA_FILE, mainData);
+  writeDurableWithRetry(TRANSACTIONS_FILE, txData);
+  writeDurableWithRetry(VIET_QR_RAW_FILE, vqrData);
+
+  cachedStore = store; // cap nhat cache sau khi ghi thanh cong
 }
 
 function nextId(store, collection) {
@@ -1564,6 +1670,8 @@ const SEED_CHT_NOP_TIEN_ROWS = [
 
 function resetCache() {
   cachedStore = null;
+  cachedTransactions = null;
+  cachedVietQrRaw = null;
 }
 
-module.exports = { load, save, nextId, DATA_FILE, resetCache };
+module.exports = { load, save, nextId, DATA_FILE, TRANSACTIONS_FILE, VIET_QR_RAW_FILE, resetCache };

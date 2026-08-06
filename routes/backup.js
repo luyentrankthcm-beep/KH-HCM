@@ -1,7 +1,7 @@
 const express = require("express");
 const fs = require("fs");
 const multer = require("multer");
-const { load, save, nextId, DATA_FILE, resetCache } = require("../store");
+const { load, save, nextId, DATA_FILE, TRANSACTIONS_FILE, VIET_QR_RAW_FILE, resetCache } = require("../store");
 const { requireLogin, requireAdmin } = require("../middleware/auth");
 
 const router = express.Router();
@@ -59,10 +59,7 @@ router.post("/he-thong/sao-luu/phuc-hoi", requireAdmin, uploadToDisk.single("fil
   try {
     if (!req.file || !tmpPath) throw new Error("Vui long chon 1 file sao luu (.json) de phuc hoi.");
 
-    // Chi Nhan, 2026-08-05: Thay vi JSON.parse toan bo file vao RAM (gay OOM
-    // tren Railway Trial 1GB), kiem tra cau truc so bo bang cach chi doc 1KB
-    // dau file (du de xac nhan co cac key bat buoc), sau do copy thang file
-    // vao DATA_FILE. Khong can giu parsed object trong memory luc restore.
+    // Kiem tra cau truc so bo bang cach chi doc 20KB dau file
     const headBuf = Buffer.allocUnsafe(20000);
     const fd = fs.openSync(tmpPath, "r");
     const bytesRead = fs.readSync(fd, headBuf, 0, 20000, 0);
@@ -83,26 +80,60 @@ router.post("/he-thong/sao-luu/phuc-hoi", requireAdmin, uploadToDisk.single("fil
     // Backup du lieu hien tai truoc khi ghi de (phong phuc hoi nham)
     try {
       const preRestoreBackupPath = DATA_FILE + ".before-phuc-hoi-" + Date.now() + ".bak";
-      fs.copyFileSync(DATA_FILE, preRestoreBackupPath);
+      if (fs.existsSync(DATA_FILE)) fs.copyFileSync(DATA_FILE, preRestoreBackupPath);
     } catch (backupErr) {
-      console.error("[backup] Khong the tao ban sao truoc khi phuc hoi (tiep tuc phuc hoi):", backupErr.message);
+      console.error("[backup] Khong the tao ban sao truoc khi phuc hoi:", backupErr.message);
     }
 
-    // Copy file thang vao DATA_FILE -- khong qua JSON.parse/stringify trong RAM
+    // Chi Nhan, 2026-08-06: Thay vi copy 1 file 138MB vao DATA_FILE roi goi
+    // load() (peak RAM: 200MB baseline + 400MB parse = 600MB; sau do khi
+    // transactions.json chua co, load lan dau se phai parse lai toan bo 138MB
+    // monolithic file moi lan restart), ta TACH ngay khi phuc hoi:
+    // 1) Parse file backup (peak: ~200MB + ~400MB = ~600MB -- duoi 1GB OK)
+    // 2) Tach config / transactions / viet_qr_raw -> ghi 3 file rieng
+    // 3) Reset cache + load() chi doc file config nho (~7MB) -> ~220MB sau restore
     const fileSize = fs.statSync(tmpPath).size;
-    fs.copyFileSync(tmpPath, DATA_FILE);
-    try { fs.unlinkSync(tmpPath); } catch (_) {}
+    const parsed = JSON.parse(fs.readFileSync(tmpPath, "utf8"));
+    try { fs.unlinkSync(tmpPath); } catch (_) {} // xoa file tam ngay sau khi parse xong
 
-    // Reset cache va load lai tu dia -- luc nay app khong con giu store cu,
-    // load() se doc lai file moi tu DATA_FILE (peak RAM chi la file size * ~3x
-    // de parse, nhung khong con store cu chiem cho cung luc).
+    if (!Array.isArray(parsed.users) || !Array.isArray(parsed.banks) || !Array.isArray(parsed.transactions)) {
+      throw new Error("File sao luu khong hop le (thieu users/banks/transactions array).");
+    }
+
+    // Tach config (khong co 2 mang lon) va cac mang lon ra rieng
+    const configObj = {};
+    for (const key of Object.keys(parsed)) {
+      if (key === "transactions" || key === "viet_qr_raw_uploads") continue;
+      configObj[key] = parsed[key];
+    }
+    const txArr = parsed.transactions; // khong copy -- chi tham chieu
+    const vqrObj =
+      parsed.viet_qr_raw_uploads && typeof parsed.viet_qr_raw_uploads === "object" && !Array.isArray(parsed.viet_qr_raw_uploads)
+        ? parsed.viet_qr_raw_uploads
+        : { bidv7704: [], bidv77020: [], mb11521268: [] };
+
+    // Ghi 3 file rieng (moi file de dat hon 95MB, tranh ENOSPC)
+    function writeDurableSimple(filePath, data) {
+      const tmpF = filePath + ".tmp-restore-" + Date.now();
+      fs.writeFileSync(tmpF, data);
+      fs.renameSync(tmpF, filePath);
+    }
+    writeDurableSimple(DATA_FILE, JSON.stringify(configObj));
+    writeDurableSimple(TRANSACTIONS_FILE, JSON.stringify(txArr));
+    writeDurableSimple(VIET_QR_RAW_FILE, JSON.stringify(vqrObj));
+
+    // Reset cache va load lai tu file config nho -- baseline RAM sau restore: ~220MB
     resetCache();
     const freshStore = load();
 
     res.render("backup", {
       userName: req.session.userName,
       error: null,
-      success: `Da phuc hoi du lieu thanh cong: ${freshStore.banks.length} ngan hang, ${freshStore.transactions.length} giao dich, ${freshStore.users.length} tai khoan dang nhap. File ${Math.round(fileSize / 1024 / 1024)}MB da duoc nap truc tiep vao he thong. Ban co the can dang nhap lai.`,
+      success:
+        `Da phuc hoi du lieu thanh cong: ${freshStore.banks.length} ngan hang, ` +
+        `${txArr.length} giao dich, ${freshStore.users.length} tai khoan dang nhap. ` +
+        `File ${Math.round(fileSize / 1024 / 1024)}MB da duoc tach thanh 3 file nho ` +
+        `(config/transactions/viet_qr_raw) de giam RAM khi khoi dong. Ban co the can dang nhap lai.`,
     });
   } catch (e) {
     if (tmpPath) { try { fs.unlinkSync(tmpPath); } catch (_) {} }
