@@ -165,7 +165,15 @@ function parseMonthSheet(ws, month, year) {
     const colD = row[3]; // dien giai
     const colF = row[5]; // so tien
     const colG = row[6]; // ncc
-    const colJ = row[9]; // cong ty
+    // Cot ghi chu "KH Cu/Moi" -- thuong o col J (index 9), nhung mot so sheet
+    // T8+ co them cot moi chen vao truoc col J, day note sang col K/L. Scan
+    // tu index 9 den 12 de nhan biet ca hai truong hop, lay gia tri dau tien
+    // ma normCongTy nhan ra (Luyen, 2026-08-06: "kh moi kh cap nhat dc").
+    let congTyNote = null;
+    for (let ci = 9; ci <= 12; ci++) {
+      const v = normCongTy(row[ci]);
+      if (v) { congTyNote = v; break; }
+    }
 
     // Bo qua dong khong co so tien hop le (dong trong/dong tieu de phu).
     if (typeof colF !== "number" || colF === 0) continue;
@@ -192,7 +200,7 @@ function parseMonthSheet(ws, month, year) {
       ncc: cellText(colG),
       dienGiai: cellText(colD),
       soTien: colF,
-      congTy: normCongTy(colJ) || "kh_cu",
+      congTy: congTyNote || "kh_cu",
       soHoaDon: extractSoHoaDon(colD),
     });
   }

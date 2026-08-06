@@ -969,6 +969,104 @@ router.post("/doi-soat/zvp/upload-offline-raw", requireDataEntry, upload.single(
   }
 });
 
+// ---------- Tra cuu nhanh VNPay Offline raw theo gian + khoang ngay ----------
+// Luyen, 2026-08-06: "chon cac gian vnpay offline roi chon ngay la ra dung so
+// dung bỏ qua cai gi do nhu cua onl tach rieng 2 kieu lay du lieu" -- cong cu
+// tra cuu truc tiep tu zvp_offline_raw_tx (khong qua reconcileZvp), loc theo
+// khoang ngay hach toan + tuy chon theo gian, tra ve JSON tong gross/net theo
+// ma cong trinh de hien thi tren trang ma khong reload toan bo.
+router.get("/doi-soat/zvp/offline-raw-detail", requireLogin, (req, res) => {
+  const store = load();
+  const rawTx = store.zvp_offline_raw_tx || {};
+  const diemMap = store.zvp_offline_diem_map || {};
+  const gianList = store.zvp_gian_list || [];
+
+  const tu = req.query.tu || "";
+  const den = req.query.den || "";
+  const giansFilter = req.query.gians ? req.query.gians.split(",").map((s) => s.trim()).filter(Boolean) : [];
+
+  // Build normalized diem index (for case/diacritics-insensitive lookup)
+  function normT(s) { return String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim(); }
+  const normalizedDiemIndex = new Map();
+  Object.keys(diemMap).forEach((k) => {
+    const nk = normT(k);
+    if (!normalizedDiemIndex.has(nk)) normalizedDiemIndex.set(nk, k);
+  });
+
+  // Build gian_list redirect map (same as applyGianRedirectToResolvedGross)
+  const gianRedirect = {};
+  (gianList || []).forEach((g) => {
+    if (g.tenDiem && g.maCongTrinh) gianRedirect[g.tenDiem] = g.maCongTrinh;
+  });
+  function resolveCode(code) {
+    let c = code;
+    const visited = new Set();
+    while (c && gianRedirect[c] && gianRedirect[c] !== c && !visited.has(c)) {
+      visited.add(c);
+      c = gianRedirect[c];
+    }
+    return c || code;
+  }
+
+  const byCode = {};
+  const byCodeDate = {}; // for per-date breakdown
+
+  for (const tx of Object.values(rawTx)) {
+    const date = tx.date || "";
+    if (tu && date < tu) continue;
+    if (den && date > den) continue;
+
+    let mapped = diemMap[tx.chiNhanh];
+    if (!mapped) {
+      const origKey = normalizedDiemIndex.get(normT(tx.chiNhanh));
+      if (origKey) mapped = diemMap[origKey];
+    }
+    if (!mapped) continue;
+    const code = resolveCode(mapped.maCongTrinh);
+
+    if (giansFilter.length > 0 && !giansFilter.includes(code)) continue;
+
+    if (!byCode[code]) byCode[code] = { code, chiNhanh: tx.chiNhanh, gross: 0, net: 0, count: 0 };
+    byCode[code].gross += tx.gross;
+    byCode[code].net += tx.net;
+    byCode[code].count++;
+
+    const dk = `${date}|${code}`;
+    if (!byCodeDate[dk]) byCodeDate[dk] = { date, code, gross: 0, net: 0, count: 0 };
+    byCodeDate[dk].gross += tx.gross;
+    byCodeDate[dk].net += tx.net;
+    byCodeDate[dk].count++;
+  }
+
+  const rows = Object.values(byCode).sort((a, b) => b.gross - a.gross);
+  const rowsByDate = Object.values(byCodeDate).sort((a, b) => a.date.localeCompare(b.date) || b.gross - a.gross);
+
+  // List of all available gian (for the filter dropdown)
+  const allGians = [];
+  const seenGian = new Set();
+  for (const tx of Object.values(rawTx)) {
+    let mapped = diemMap[tx.chiNhanh];
+    if (!mapped) {
+      const origKey = normalizedDiemIndex.get(normT(tx.chiNhanh));
+      if (origKey) mapped = diemMap[origKey];
+    }
+    if (!mapped) continue;
+    const code = resolveCode(mapped.maCongTrinh);
+    if (!seenGian.has(code)) { seenGian.add(code); allGians.push(code); }
+  }
+  allGians.sort();
+
+  res.json({
+    tu, den,
+    totalGross: rows.reduce((s, r) => s + r.gross, 0),
+    totalNet: rows.reduce((s, r) => s + r.net, 0),
+    totalCount: rows.reduce((s, r) => s + r.count, 0),
+    rows,
+    rowsByDate,
+    allGians,
+  });
+});
+
 // ---------- Upload: file Payoo ("Du lieu Payoo co so KHxxx" + "Danh muc ten diem") ----------
 router.post("/doi-soat/zvp/upload-payoo", requireDataEntry, upload.single("file"), (req, res) => {
   const store = load();

@@ -340,6 +340,81 @@
       </details>
     </section>
 
+    <section class="panel" id="offline-lookup-panel">
+      <details>
+        <summary style="font-weight:700;color:#111;cursor:pointer;">2d. Tra cứu nhanh doanh thu VNPay Offline theo gian + ngày</summary>
+        <div style="margin-top:12px;">
+          <p class="muted">
+            Lọc trực tiếp từ dữ liệu giao dịch VNPay Offline đã tải lên (mục 2c) theo khoảng ngày hạch toán và/hoặc
+            chọn gian cụ thể. Dữ liệu hoàn toàn tách riêng khỏi Zalo App Online.
+          </p>
+          <div class="form-inline" style="flex-wrap:wrap;gap:10px;margin-bottom:10px;">
+            <label style="margin:0;">Từ ngày:</label>
+            <input type="date" id="ol-tu" style="width:150px;" />
+            <label style="margin:0;">Đến ngày:</label>
+            <input type="date" id="ol-den" style="width:150px;" />
+            <label style="margin:0;">Gian (để trống = tất cả):</label>
+            <select id="ol-gians" multiple style="width:260px;height:90px;font-size:13px;"></select>
+            <button class="btn btn-primary" onclick="offlineLookup()">Tra cứu</button>
+          </div>
+          <div id="ol-result" style="margin-top:12px;"></div>
+        </div>
+      </details>
+    </section>
+    <script>
+    (function() {
+      // Populate gian list on page load
+      fetch('/doi-soat/zvp/offline-raw-detail?tu=&den=')
+        .then(function(r){ return r.json(); })
+        .then(function(d){
+          var sel = document.getElementById('ol-gians');
+          if (!sel) return;
+          (d.allGians || []).forEach(function(g){
+            var opt = document.createElement('option');
+            opt.value = g; opt.textContent = g;
+            sel.appendChild(opt);
+          });
+        }).catch(function(){});
+    })();
+
+    function offlineLookup() {
+      var tu = document.getElementById('ol-tu').value;
+      var den = document.getElementById('ol-den').value;
+      var sel = document.getElementById('ol-gians');
+      var selectedGians = Array.from(sel.selectedOptions).map(function(o){ return o.value; });
+      var url = '/doi-soat/zvp/offline-raw-detail?tu=' + encodeURIComponent(tu) + '&den=' + encodeURIComponent(den);
+      if (selectedGians.length > 0) url += '&gians=' + encodeURIComponent(selectedGians.join(','));
+      var res = document.getElementById('ol-result');
+      res.innerHTML = '<span class="muted">Đang tải...</span>';
+      fetch(url).then(function(r){ return r.json(); }).then(function(d) {
+        if (!d.rows || d.rows.length === 0) {
+          res.innerHTML = '<span class="muted">Không có dữ liệu cho khoảng thời gian này.</span>';
+          return;
+        }
+        function fmt(n){ return Math.round(n).toLocaleString('vi-VN') + 'đ'; }
+        var html = '<p style="margin:0 0 8px;"><strong>Tổng: ' + fmt(d.totalGross) + ' (gross) / ' + fmt(d.totalNet) + ' (NET) — ' + d.totalCount + ' GD</strong></p>';
+        html += '<div style="overflow-x:auto;"><table class="table" style="margin:0;">';
+        html += '<thead><tr><th>Mã công trình</th><th style="text-align:right">Gross</th><th style="text-align:right">NET (sau phí)</th><th style="text-align:right">Số GD</th></tr></thead><tbody>';
+        d.rows.forEach(function(r){
+          html += '<tr><td>' + r.code + '</td><td style="text-align:right">' + fmt(r.gross) + '</td><td style="text-align:right">' + fmt(r.net) + '</td><td style="text-align:right">' + r.count + '</td></tr>';
+        });
+        html += '</tbody></table></div>';
+
+        // Per-date breakdown toggle
+        html += '<details style="margin-top:10px;"><summary class="muted" style="cursor:pointer;">Xem theo từng ngày hạch toán</summary>';
+        html += '<div style="overflow-x:auto;margin-top:8px;"><table class="table" style="margin:0;">';
+        html += '<thead><tr><th>Ngày hạch toán</th><th>Mã công trình</th><th style="text-align:right">Gross</th><th style="text-align:right">NET</th><th style="text-align:right">Số GD</th></tr></thead><tbody>';
+        d.rowsByDate.forEach(function(r){
+          html += '<tr><td>' + r.date + '</td><td>' + r.code + '</td><td style="text-align:right">' + fmt(r.gross) + '</td><td style="text-align:right">' + fmt(r.net) + '</td><td style="text-align:right">' + r.count + '</td></tr>';
+        });
+        html += '</tbody></table></div></details>';
+        res.innerHTML = html;
+      }).catch(function(e){
+        res.innerHTML = '<span class="muted" style="color:red;">Lỗi: ' + e.message + '</span>';
+      });
+    }
+    </script>
+
     <section class="panel">
       <details>
         <summary style="font-weight:700;color:#111;cursor:pointer;">3. Tải file "Payoo thu hộ" (sheet "Dữ liệu Payoo cơ sở" + "Danh mục tên điểm")</summary>
