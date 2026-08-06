@@ -1665,11 +1665,22 @@ const SEED_CHT_NOP_TIEN_ROWS = [
   }
   if (seedFixChuaKhopCamRanhTenDiem(store)) changed = true;
 
-  // Xoa file .bak cu MOI LAN KHOI DONG (khong chi khi changed=true) de giai
-  // phong Volume -- moi lan restore tao 1 file .bak 138MB, tich luy nhieu
-  // lan lam Volume day -> ENOSPC -> save() throw -> 500 o moi route co save().
+  // Xoa file rac MOI LAN KHOI DONG de giai phong Volume:
+  // 1. .bak files: moi lan restore tao 1 file .bak 138MB, giu toi da 2 ban moi nhat.
+  // 2. .tmp-* files: cac lan restore/save bi crash (OOM/ENOSPC) de lai file
+  //    .tmp-PID-timestamp-... chua duoc xoa -- moi file co the nang 95-138MB.
   try {
-    const bakFiles = fs.readdirSync(DATA_DIR)
+    const allFiles = fs.readdirSync(DATA_DIR);
+
+    // Xoa tat ca .tmp-* files (phat sinh khi process crash giua chung write)
+    const tmpFiles = allFiles.filter((f) => /\.tmp[-.]/i.test(f));
+    if (tmpFiles.length > 0) {
+      tmpFiles.forEach((f) => { try { fs.unlinkSync(path.join(DATA_DIR, f)); } catch (_) {} });
+      console.log("[seed] Da xoa " + tmpFiles.length + " file .tmp rac de giai phong Volume.");
+    }
+
+    // Xoa .bak files cu, giu 2 ban moi nhat
+    const bakFiles = allFiles
       .filter((f) => /\.bak$/.test(f))
       .map((f) => ({ name: f, mtime: fs.statSync(path.join(DATA_DIR, f)).mtimeMs }))
       .sort((a, b) => b.mtime - a.mtime) // moi nhat truoc
