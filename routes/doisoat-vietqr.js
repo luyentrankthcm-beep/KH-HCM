@@ -2621,6 +2621,35 @@ router.post("/doi-soat/vietqr/invoices/clear", requireAdmin, (req, res) => {
   res.redirect("/doi-soat/vietqr?success=" + encodeURIComponent("Da xoa toan bo hoa don Viet QR da nap (ca 3 kenh)."));
 });
 
+// ---------- Xoa hoa don theo ngay + soHd range (de go trung lap khi upload 2 file cung 1 ngay) ----------
+// Body: { ngayHd: "2026-08-03", soHdMin: "12000" }  (soHdMin optional, chi xoa so HD >= gia tri nay)
+router.post("/doi-soat/vietqr/invoices/remove-by-date", requireAdmin, (req, res) => {
+  const store = load();
+  ensureChannelShape(store);
+  try {
+    const { ngayHd, soHdMin } = req.body || {};
+    if (!ngayHd) throw new Error("Thieu ngayHd (vd: 2026-08-03).");
+    const minNum = soHdMin ? parseInt(soHdMin, 10) : null;
+    let removedTotal = 0;
+    for (const ch of CHANNEL_KEYS) {
+      const before = store.viet_qr_invoices[ch].length;
+      store.viet_qr_invoices[ch] = store.viet_qr_invoices[ch].filter((inv) => {
+        if (inv.ngayHd !== ngayHd) return true;           // khac ngay -> giu lai
+        if (minNum !== null && parseInt(inv.soHd, 10) < minNum) return true; // so HD nho hon nguong -> giu lai
+        return false; // xoa
+      });
+      removedTotal += before - store.viet_qr_invoices[ch].length;
+    }
+    save(store);
+    res.redirect(
+      "/doi-soat/vietqr?success=" +
+        encodeURIComponent(`Da xoa ${removedTotal} hoa don ngay ${ngayHd}${minNum ? ` co so HD >= ${minNum}` : ""} (tat ca kenh).`)
+    );
+  } catch (e) {
+    res.redirect("/doi-soat/vietqr?error=" + encodeURIComponent(e.message));
+  }
+});
+
 // ---------- Manual match: dong "Chua co HD" da xac nhan la co HD bu ----------
 router.post("/doi-soat/vietqr/manual-match", requireDataEntry, (req, res) => {
   const store = load();
