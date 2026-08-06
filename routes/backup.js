@@ -85,13 +85,12 @@ router.post("/he-thong/sao-luu/phuc-hoi", requireAdmin, uploadToDisk.single("fil
       console.error("[backup] Khong the tao ban sao truoc khi phuc hoi:", backupErr.message);
     }
 
-    // Chi Nhan, 2026-08-06: Thay vi copy 1 file 138MB vao DATA_FILE roi goi
-    // load() (peak RAM: 200MB baseline + 400MB parse = 600MB; sau do khi
-    // transactions.json chua co, load lan dau se phai parse lai toan bo 138MB
-    // monolithic file moi lan restart), ta TACH ngay khi phuc hoi:
-    // 1) Parse file backup (peak: ~200MB + ~400MB = ~600MB -- duoi 1GB OK)
-    // 2) Tach config / transactions / viet_qr_raw -> ghi 3 file rieng
-    // 3) Reset cache + load() chi doc file config nho (~7MB) -> ~220MB sau restore
+    // QUAN TRONG: Giai phong cache cu TRUOC khi parse file backup.
+    // Neu khong: cachedTransactions cu (~300MB) + parse moi (~400MB) = ~700MB+
+    // vuot gioi han 1GB Railway Trial -> OOM crash.
+    // Sau resetCache, chi con app overhead ~150MB, parse them ~400MB = ~550MB OK.
+    resetCache();
+
     const fileSize = fs.statSync(tmpPath).size;
     const parsed = JSON.parse(fs.readFileSync(tmpPath, "utf8"));
     try { fs.unlinkSync(tmpPath); } catch (_) {} // xoa file tam ngay sau khi parse xong
