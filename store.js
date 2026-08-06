@@ -1665,22 +1665,23 @@ const SEED_CHT_NOP_TIEN_ROWS = [
   }
   if (seedFixChuaKhopCamRanhTenDiem(store)) changed = true;
 
-  if (changed) {
-    // Xoa file .bak cu (giu toi da 2 ban moi nhat) truoc khi luu de giai phong Volume.
-    // Moi lan restore tao 1 file .bak 138MB; tich luy nhieu lan co the lam Volume day -> ENOSPC.
-    try {
-      const bakFiles = fs.readdirSync(DATA_DIR)
-        .filter((f) => /\.bak$/.test(f))
-        .map((f) => ({ name: f, mtime: fs.statSync(path.join(DATA_DIR, f)).mtimeMs }))
-        .sort((a, b) => b.mtime - a.mtime) // moi nhat truoc
-        .slice(2) // giu 2 ban moi nhat, xoa phan con lai
-        .map((f) => f.name);
-      if (bakFiles.length > 0) {
-        bakFiles.forEach((f) => { try { fs.unlinkSync(path.join(DATA_DIR, f)); } catch (_) {} });
-        console.log("[seed] Da xoa " + bakFiles.length + " file .bak cu de giai phong Volume.");
-      }
-    } catch (_) {}
+  // Xoa file .bak cu MOI LAN KHOI DONG (khong chi khi changed=true) de giai
+  // phong Volume -- moi lan restore tao 1 file .bak 138MB, tich luy nhieu
+  // lan lam Volume day -> ENOSPC -> save() throw -> 500 o moi route co save().
+  try {
+    const bakFiles = fs.readdirSync(DATA_DIR)
+      .filter((f) => /\.bak$/.test(f))
+      .map((f) => ({ name: f, mtime: fs.statSync(path.join(DATA_DIR, f)).mtimeMs }))
+      .sort((a, b) => b.mtime - a.mtime) // moi nhat truoc
+      .slice(2) // giu 2 ban moi nhat, xoa phan con lai
+      .map((f) => f.name);
+    if (bakFiles.length > 0) {
+      bakFiles.forEach((f) => { try { fs.unlinkSync(path.join(DATA_DIR, f)); } catch (_) {} });
+      console.log("[seed] Da xoa " + bakFiles.length + " file .bak cu de giai phong Volume.");
+    }
+  } catch (_) {}
 
+  if (changed) {
     // Bat loi save() (vd ENOSPC) de app khong crash -- du lieu van dung trong bo nho.
     try {
       save(store);

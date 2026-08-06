@@ -332,11 +332,20 @@ function stripZvpGianListBadRedirects(store) {
 }
 
 function buildReconciliation(store) {
-  if (ensureNo1388(store)) save(store);
-  if (stripZvpGianListBadRedirects(store)) save(store);
-  if (seedZvpInvoiceDiemAliasDefaults(store)) save(store);
-  if (seedZvpGianCodeRenames(store)) save(store);
-  if (removeDuplicateOfflineTx20260716(store)) save(store);
+  // Cac save() nay la "housekeeping" (tu dong don dep du lieu), khong phai
+  // do user yeu cau -- neu Volume day (ENOSPC) save() co the throw, lam crash
+  // trang. Wrap trong try-catch de app tiep tuc hien thi du lieu (trong bo nho
+  // van dung) ngay ca khi chua ghi duoc ra dia.
+  function trySave() {
+    try { save(store); } catch (e) {
+      console.error("[zvp] housekeeping save() that bai (co the Volume day):", e.message);
+    }
+  }
+  if (ensureNo1388(store)) trySave();
+  if (stripZvpGianListBadRedirects(store)) trySave();
+  if (seedZvpInvoiceDiemAliasDefaults(store)) trySave();
+  if (seedZvpGianCodeRenames(store)) trySave();
+  if (removeDuplicateOfflineTx20260716(store)) trySave();
   // Chi Nhan, 2026-07-29: xem ghi chu day du tai VNPAY_KHMOI_INVOICE_MADIEM_MAP
   // trong utils/vietqrReconcile.js -- hoa don KVC AE HUE/KVC TIMES/KVC ROYAL/
   // SAVICO PHN thuc ra la doanh thu VNPay KH Moi (02865168), khong phai KH
@@ -344,7 +353,7 @@ function buildReconciliation(store) {
   // trang VietQR, xem doisoat-vietqr.js) -- tu "don" ca hoa don MOI van tiep
   // tuc duoc tai len qua nut "Tai len combo" o trang nay (van gan tag "Vnpay
   // CS MB"/... nhu cu).
-  if (migrateVnpayKhMoiInvoices(store)) save(store);
+  if (migrateVnpayKhMoiInvoices(store)) trySave();
   const bank = store.banks.find((b) => b.name === ZVP_BANK_NAME);
   if (!bank) {
     return { error: `Chua co ngan hang "${ZVP_BANK_NAME}" (TK ${ZVP_BANK_ACCOUNT}) trong he thong.` };
