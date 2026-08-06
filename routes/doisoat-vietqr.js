@@ -2996,11 +2996,19 @@ router.get("/doi-soat/vietqr/debug/:channel", requireAdmin, (req, res) => {
     entryCount: Object.keys(u.map || {}).length,
   }));
   const invoices = store.viet_qr_invoices[channelKey] || [];
+  // Sample a few recent invoices (last 5) to inspect ngayHd/soHd format
+  const sampleInvoices = invoices.slice(-5).map((i) => ({
+    soHd: i.soHd,
+    soHdType: typeof i.soHd,
+    ngayHd: i.ngayHd,
+    maDiem: i.maDiem,
+  }));
   res.json({
     channel: channelKey,
     rawUploads: raw,
     storeUploads: storeUps,
     invoiceCount: invoices.length,
+    sampleInvoices,
     storeNamesCount: Object.keys(store.viet_qr_store_names[channelKey] || {}).length,
   });
 });
