@@ -2621,21 +2621,28 @@ router.post("/doi-soat/vietqr/invoices/clear", requireAdmin, (req, res) => {
   res.redirect("/doi-soat/vietqr?success=" + encodeURIComponent("Da xoa toan bo hoa don Viet QR da nap (ca 3 kenh)."));
 });
 
-// ---------- Xoa hoa don theo ngay + soHd range (de go trung lap khi upload 2 file cung 1 ngay) ----------
-// Body: { ngayHd: "2026-08-03", soHdMin: "12000" }  (soHdMin optional, chi xoa so HD >= gia tri nay)
+// ---------- Xoa hoa don theo so ngay (trong dayList) + soHd range ----------
+// Dung de go trung lap khi 2 file invoice cung co giao dich day X nhung soHD khac nhau.
+// VietQR invoice matching dua vao dayList (so ngay trich tu cot DichVuThuHo), KHONG phai ngayHd.
+// Body: { dayNum: "3", soHdMin: "12000" }  (soHdMin optional)
+// Xoa tat ca invoice co dayList.includes(dayNum) AND soHd >= soHdMin (neu co) tren tat ca CHANNEL_KEYS.
 router.post("/doi-soat/vietqr/invoices/remove-by-date", requireAdmin, (req, res) => {
   const store = load();
   ensureChannelShape(store);
   try {
-    const { ngayHd, soHdMin } = req.body || {};
-    if (!ngayHd) throw new Error("Thieu ngayHd (vd: 2026-08-03).");
+    const { dayNum, soHdMin } = req.body || {};
+    if (!dayNum) throw new Error("Thieu dayNum (so ngay, vd: 3).");
+    const day = parseInt(dayNum, 10);
+    if (isNaN(day)) throw new Error("dayNum khong hop le.");
     const minNum = soHdMin ? parseInt(soHdMin, 10) : null;
     let removedTotal = 0;
     for (const ch of CHANNEL_KEYS) {
       const before = store.viet_qr_invoices[ch].length;
       store.viet_qr_invoices[ch] = store.viet_qr_invoices[ch].filter((inv) => {
-        if (inv.ngayHd !== ngayHd) return true;           // khac ngay -> giu lai
-        if (minNum !== null && parseInt(inv.soHd, 10) < minNum) return true; // so HD nho hon nguong -> giu lai
+        // Giu lai neu invoice nay khong co ngay day trong dayList
+        if (!Array.isArray(inv.days) || !inv.days.includes(day)) return true;
+        // Giu lai neu soHd < nguong (de chi xoa series moi hon)
+        if (minNum !== null && parseInt(inv.soHd, 10) < minNum) return true;
         return false; // xoa
       });
       removedTotal += before - store.viet_qr_invoices[ch].length;
@@ -2643,7 +2650,9 @@ router.post("/doi-soat/vietqr/invoices/remove-by-date", requireAdmin, (req, res)
     save(store);
     res.redirect(
       "/doi-soat/vietqr?success=" +
-        encodeURIComponent(`Da xoa ${removedTotal} hoa don ngay ${ngayHd}${minNum ? ` co so HD >= ${minNum}` : ""} (tat ca kenh).`)
+        encodeURIComponent(
+          `Da xoa ${removedTotal} hoa don ngay ${day}${minNum ? ` co so HD >= ${minNum}` : ""} (tat ca kenh).`
+        )
     );
   } catch (e) {
     res.redirect("/doi-soat/vietqr?error=" + encodeURIComponent(e.message));
