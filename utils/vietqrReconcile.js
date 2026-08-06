@@ -584,17 +584,24 @@ function fixBidv8613600999Day3TaggedAsDay4(store) {
 // "VietQR POSH MB 4,5") thuc ra la doanh thu ngay 3 -- xac nhan tong 85 hoa
 // don loai nay = dung 57.260.000d = tong tien ngan hang ngay 3 cua CA kenh;
 // hoa don "VietQR POSH MB 4,5" (gop dung ngay 4-5) van dung, khong dung toi.
+//
+// Nhan, 2026-08-06: doi chieu voi file hoa don thang 8 ("hóa đơn 77021 á nó
+// co day ne, no co 1 hoa don thoi ma sao lai lay 2 cai hoa don nay khac
+// nhau a 1 cai cua ngay 3 1 cai cua ngay 4") xac nhan ham nay dang mac DUNG
+// LOI ma fixBidv7702Day3TaggedAsDay4 o tren tung mac va da duoc vo hieu hoa
+// ngay 2026-08-03: dieu kien blanket "bat ky hoa don nao raw ===
+// 'VietQR POSH MB 4' deu la ngay 3" khong phan biet duoc lo hoa don CU
+// (thang 6/7, da duoc sua va luu vao store.json tu lau -- raw cua chung DA
+// doi thanh "VietQR POSH MB 3" nen khong con khop dieu kien nay nua, khong
+// can sua lai) voi hoa don MOI thang 8 (soHd 12032-12124, 93 hoa don, dung
+// 46.320.000d = dung doanh thu ngay 4 cua ngan hang) -- ham nay dang CHUYEN
+// NHAM ca 93 hoa don ngay-4-thuc-su nay ve ngay 3, gay "du" ngay 3 + "thieu"
+// ngay 4 dung so tien do. VO HIEU HOA hoan toan (tra ve false, khong chuyen
+// doi gi nua) giong fixBidv7702Day3TaggedAsDay4, vi 85 hoa don thang 6/7 CU
+// da duoc sua vinh vien trong store.json roi (function nay idempotent, chi
+// tac dong 1 lan, khong can chay lai).
 function fixBidv77021Day3TaggedAsDay4(store) {
-  if (!store.viet_qr_invoices || !store.viet_qr_invoices.bidv77021) return false;
-  let changed = false;
-  store.viet_qr_invoices.bidv77021.forEach((inv) => {
-    if (inv.raw === "VietQR POSH MB 4") {
-      inv.days = [3];
-      inv.raw = "VietQR POSH MB 3";
-      changed = true;
-    }
-  });
-  return changed;
+    return false;
 }
 
 // ---------- Store catalog ("Cua hang" / "Cua Hang") ----------
