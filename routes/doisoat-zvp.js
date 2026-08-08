@@ -403,6 +403,20 @@ function buildReconciliation(store) {
   const vnpayInvoicesRedirected = applyGianRedirectToInvoices(store.zvp_invoices.vnpay, store.zvp_gian_list);
   const payooInvoicesRedirected = applyGianRedirectToInvoices(store.zvp_invoices.payoo, store.zvp_gian_list);
 
+  // Nhan, 2026-08-06: "zalo app vũng tàu nè map cho tôi đi KVC LOTTE VUNG
+  // TAU" -- hoa don maDiem "KVC LOTTE VUNG TAU" (Zalo Online, hoa don 2558)
+  // hien "Chưa có HĐ" du zvp_gian_list/zvp_gian_mapping da co san dung ma nay
+  // -- nguyen nhan giong het vu "PINBALL VÀ GHẾ LOTTE BAC GIANG": store.
+  // invoice_diem_alias la bang GLOBAL dung chung voi kenh VietQR bidv7702
+  // (o do "KVC LOTTE VUNG TAU"/"POSH LOTTE MART VUNG TAU" duoc tro ve "VUNG
+  // TAU PHCM", xem routes/doisoat-vietqr.js) -- truyen thang alias global vao
+  // day khien hoa don Zalo bi doi maDiem nham truoc khi so voi gross cua
+  // CHINH kenh nay (dang dung dung ten "KVC LOTTE VUNG TAU"). Loai 2 key nay
+  // khoi alias truyen vao reconcileZvp (giu nguyen cho VietQR).
+  const zvpScopedAlias = Object.assign({}, store.invoice_diem_alias);
+  delete zvpScopedAlias["KVC LOTTE VUNG TAU"];
+  delete zvpScopedAlias["POSH LOTTE MART VUNG TAU"];
+
   const reconciled = reconcileZvp(
     settlements,
     { online: onlineMerged, offline: offlineMerged, payoo: payooMerged },
@@ -413,7 +427,7 @@ function buildReconciliation(store) {
     },
     store.zvp_gian_mapping,
     manualMatches,
-    store.invoice_diem_alias,
+    zvpScopedAlias,
     cseOverrideCodes
   );
 

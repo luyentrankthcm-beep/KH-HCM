@@ -363,6 +363,19 @@ const VNPAY_KHMOI_INVOICE_MADIEM_MAP = {
   "KVC TIMES": "KVC TIMES",
   "KVC ROYAL": "KVC ROYAL",
   "SAVICO PHN": "SAVICO KVCN",
+  // Nhan, 2026-08-06: "payoo kh mới từ ngày 1 không còn có 1 điểm nữa mà có
+  // rất nhiều điểm" -- them "FARM LOTTE BAC GIANG" (gian Payoo moi tu 01/08,
+  // xem PAYOO_STORE_TO_MA_CONG_TRINH trong routes/doisoat-vnpay-khmoi.js) vao
+  // day de hoa don cua gian nay cung duoc chuyen ra khoi pool ZVP (KH Cu) va
+  // gop vao store.viet_qr_invoices.vnpayKhMoi giong 3 gian cu, neu khong hoa
+  // don se ket ket qua trong pool KH Cu, khong bao gio khop duoc voi doanh
+  // thu Payoo KH Moi cua gian nay.
+  "FARM LOTTE BAC GIANG": "FARM LOTTE BAC GIANG",
+  // Nhan, 2026-08-06: chi nhanh "FARM SAVICO" (VNPay offline) thuc ra la
+  // "Pinball và ghế LOTTE BAC GIANG" (xem TEN_DIEM_TO_MA_CONG_TRINH trong
+  // routes/doisoat-vnpay-khmoi.js) -- them de hoa don cung ten duoc chuyen ra
+  // khoi pool ZVP (KH Cu) va gop vao store.viet_qr_invoices.vnpayKhMoi.
+  "PINBALL VÀ GHẾ LOTTE BAC GIANG": "PINBALL VÀ GHẾ LOTTE BAC GIANG",
 };
 
 // Tu dong chuyen (KHONG chi loc-khi-doc) cac hoa don co maDiem nam trong
@@ -390,6 +403,21 @@ const VNPAY_KHMOI_INVOICE_MADIEM_MAP = {
 // trung ten voi 1 gian VNPay KH Moi khac.
 const ZALO_MAI_TAG_PATTERN = /zalo/i;
 
+// Nhan, 2026-08-06: "hóa đơn ngày 4 5 của kvc hue đây á" -- hoa don maDiem
+// "KVC AE HUE" cua Payoo van hien "Chưa có HĐ" du gross Payoo da khop dung
+// (FARM LOTTE BAC GIANG/KVC TIMES/KVC ROYAL deu khop). Nguyen nhan:
+// VNPAY_KHMOI_INVOICE_MADIEM_MAP map "KVC AE HUE" -> "AE HUE KVCN" (dung cho
+// kenh VNPay OFFLINE cu, ma gross that cua kenh do la "AE HUE KVCN" theo
+// TEN_DIEM_TO_MA_CONG_TRINH ben routes/doisoat-vnpay-khmoi.js), nhung Payoo
+// (gian moi tu 01/08) lai dung THANG ten "KVC AE HUE" ben gross (xem
+// PAYOO_STORE_TO_MA_CONG_TRINH) -- CUNG 1 maDiem hoa don "KVC AE HUE" can ra
+// 2 ma DICH KHAC NHAU tuy thuoc hoa don do la Payoo hay Vnpay offline (phan
+// biet qua tag "raw"). Rieng cho pool "payoo", GIU NGUYEN "KVC AE HUE" (khong
+// doi qua "AE HUE KVCN").
+const VNPAY_KHMOI_INVOICE_MADIEM_MAP_PAYOO_OVERRIDE = {
+  "KVC AE HUE": "KVC AE HUE",
+};
+
 function migrateVnpayKhMoiInvoices(store) {
   if (!store.zvp_invoices) return false;
   if (!store.viet_qr_invoices) store.viet_qr_invoices = {};
@@ -399,9 +427,13 @@ function migrateVnpayKhMoiInvoices(store) {
   const existingKeys = new Set(target.map((i) => `${i.soHd}|${i.ngayHd}|${i.maDiem}`));
   ["vnpay", "payoo"].forEach((key) => {
     if (!store.zvp_invoices[key]) return;
+    const mapForKey =
+      key === "payoo"
+        ? Object.assign({}, VNPAY_KHMOI_INVOICE_MADIEM_MAP, VNPAY_KHMOI_INVOICE_MADIEM_MAP_PAYOO_OVERRIDE)
+        : VNPAY_KHMOI_INVOICE_MADIEM_MAP;
     const kept = [];
     store.zvp_invoices[key].forEach((inv) => {
-      const mapped = VNPAY_KHMOI_INVOICE_MADIEM_MAP[inv.maDiem];
+      const mapped = mapForKey[inv.maDiem];
       if (!mapped) {
         kept.push(inv);
         return;
@@ -584,17 +616,17 @@ function fixBidv8613600999Day3TaggedAsDay4(store) {
 // "VietQR POSH MB 4,5") thuc ra la doanh thu ngay 3 -- xac nhan tong 85 hoa
 // don loai nay = dung 57.260.000d = tong tien ngan hang ngay 3 cua CA kenh;
 // hoa don "VietQR POSH MB 4,5" (gop dung ngay 4-5) van dung, khong dung toi.
+// Nhan, 2026-08-06: ham nay (blanket "bat ky hoa don nao raw === 'VietQR POSH
+// MB 4' deu la ngay 3") dang CHUYEN NHAM 93 hoa don thang 8 (ngayHd 2026-08-05,
+// tong 46.320.000d) dan tag DUNG la ngay 4 -- khong lien quan gi den lo hoa
+// don CU (85 hoa don, 57.260.000d, Chi Nhan xac nhan 2026-07-30) ma ham nay
+// duoc tao ra de sua. Kiem tra lai: du lieu hien tai KHONG CON hoa don nao dan
+// tag "VietQR POSH MB 4" thuoc lo cu (da duoc sua permanent thanh ngay 3 tu
+// truoc, xem lich su); ham nay gio chi con bat nham cac hoa don MOI. Giong het
+// fixBidv7702Day3TaggedAsDay4 o tren -- VO HIEU HOA hoan toan de khong tiep
+// tuc lam hong du lieu hoa don moi.
 function fixBidv77021Day3TaggedAsDay4(store) {
-  if (!store.viet_qr_invoices || !store.viet_qr_invoices.bidv77021) return false;
-  let changed = false;
-  store.viet_qr_invoices.bidv77021.forEach((inv) => {
-    if (inv.raw === "VietQR POSH MB 4") {
-      inv.days = [3];
-      inv.raw = "VietQR POSH MB 3";
-      changed = true;
-    }
-  });
-  return changed;
+  return false;
 }
 
 // ---------- Store catalog ("Cua hang" / "Cua Hang") ----------
