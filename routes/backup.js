@@ -69,7 +69,10 @@ router.post("/he-thong/sao-luu/phuc-hoi", requireAdmin, uploadToDisk.single("fil
     if (!head.trim().startsWith("{")) {
       throw new Error("File nay khong phai file JSON hop le (khong bat dau bang '{').");
     }
-    const requiredKeys = ["users", "banks", "transactions"];
+    // Chi Nhan, 2026-08-08: "transactions" nam gan cuoi file (sau ~14MB config)
+    // nen 20KB dau KHONG BAO GIO chua tu khoa nay -- chi kiem tra "users"/"banks"
+    // trong head; "transactions" duoc kiem tra sau khi parse toan bo file (dong 104).
+    const requiredKeys = ["users", "banks"];
     const missing = requiredKeys.filter((k) => !head.includes(`"${k}"`));
     if (missing.length > 0) {
       throw new Error(
