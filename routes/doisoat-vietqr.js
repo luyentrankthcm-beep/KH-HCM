@@ -512,6 +512,17 @@ const INVOICE_DIEM_ALIAS_DEFAULTS = {
   // thang voi "VUNG TAU PHCM" nen tu truoc gio khong lien ket duoc.
   "POSH LOTTE MART VUNG TAU": "VUNG TAU PHCM",
   "KVC LOTTE VUNG TAU": "VUNG TAU PHCM",
+  // Luyen, 2026-08-08: hoa don bidv7702 ghi maDiem "POSH MN CGV COOP BÌNH
+  // DƯƠNG SQUARE" (co chu "COOP" va "SQUARE") nhung ma gross/QR resolve thanh
+  // "POSH MN CGV BÌNH DƯƠNG SQUARE" (khong co "COOP") -- alias cu chi co key
+  // "POSH MN CGV COOP BÌNH DƯƠNG" (thieu "SQUARE") nen hoa don co du "SQUARE"
+  // van khong khop. Them alias day du de fix.
+  "POSH MN CGV COOP BÌNH DƯƠNG SQUARE": "POSH MN CGV BÌNH DƯƠNG SQUARE",
+  // Luyen, 2026-08-08: bidv8613600999 gian "TĐBS PHN" -- hoa don ghi maDiem
+  // "TDBS PF" (khong co dau Đ, vi file MTT dung ky tu ASCII). Alias cu "TĐBS
+  // PF" (co dau Đ) da co nhung KHONG bao gio match vi maDiem trong file la
+  // "TDBS PF" (khong dau). Them alias ASCII de fix.
+  "TDBS PF": "TĐBS PHN",
 };
 
 // Chi Nhan, 2026-07-30: "Số hóa đơn á có 20k xem nó đưa vô gian nào á bạn đưa
