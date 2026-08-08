@@ -898,4 +898,47 @@ router.post(
   }
 );
 
+// One-time migration: rename KVC ROYAL -> PINBALL DA NANG in vnpay_khmoi
+// uploads for dates >= 2026-07-31 (Luyen, 2026-08-08).
+// Idempotent -- safe to call multiple times.
+router.post("/transactions/migrate-kvc-royal-to-pinball", requireAdmin, (req, res) => {
+  const store = load();
+  const OLD = "KVC ROYAL";
+  const NEW = "PINBALL DA NANG";
+  const CUTOFF = "2026-07-31";
+
+  function migrateUploads(uploads) {
+    let count = 0;
+    for (const u of uploads || []) {
+      const gb = u.grossByCode || {};
+      const toRename = Object.keys(gb).filter(
+        (k) => k.includes("|" + OLD) && k.slice(0, 10) >= CUTOFF
+      );
+      for (const oldKey of toRename) {
+        const newKey = oldKey.replace("|" + OLD, "|" + NEW);
+        gb[newKey] = gb[oldKey];
+        delete gb[oldKey];
+        count++;
+      }
+      if (u.codes) {
+        const hasOld = Object.keys(gb).some((k) => k.includes("|" + OLD));
+        if (!hasOld && u.codes.includes(OLD)) {
+          u.codes = u.codes.map((c) => (c === OLD ? NEW : c));
+        } else if (!u.codes.includes(NEW) && Object.keys(gb).some((k) => k.includes("|" + NEW))) {
+          u.codes.push(NEW);
+        }
+      }
+    }
+    return count;
+  }
+
+  let total = 0;
+  total += migrateUploads(store.vnpay_khmoi_uploads);
+  total += migrateUploads(store.vnpay_khmoi_payoo_uploads);
+  store.gian_mapping["PINBALL DA NANG"] = "131";
+  save(store);
+
+  res.json({ ok: true, renamedKeys: total, message: `Migration done: ${total} grossByCode keys renamed.` });
+});
+
 module.exports = router;
