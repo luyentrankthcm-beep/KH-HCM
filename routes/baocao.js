@@ -65,10 +65,15 @@ function companyOfBankRow(b) {
 // giao dich nao da duoc dua vao 1 kenh doi soat (matchedTxIdsForBank).
 function buildBankStatementTabs(store) {
   const tabs = [];
+  // Perf fix: group by bank_id once (O(n)) instead of filter per bank (O(n*banks))
+  const txsByBankId = {};
+  for (const t of store.transactions) {
+    if (!txsByBankId[t.bank_id]) txsByBankId[t.bank_id] = [];
+    txsByBankId[t.bank_id].push(t);
+  }
   const banksSorted = [...store.banks].sort((a, b) => a.name.localeCompare(b.name));
   for (const bank of banksSorted) {
-    const txs = store.transactions
-      .filter((t) => t.bank_id === bank.id)
+    const txs = (txsByBankId[bank.id] || [])
       .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : a.id - b.id));
     if (txs.length === 0) continue;
     const matchedIds = matchedTxIdsForBank(bank, txs);
@@ -411,18 +416,12 @@ function buildThuChiTheoGianRows(store) {
 
 router.get("/bao-cao/thu-chi-theo-gian", (req, res) => {
   const store = load();
-  const allRows = buildThuChiTheoGianRows(store);
   const bankFilter = req.query.bank || "";
-
-  // Chon theo thang: mac dinh thang gan nhat de bang khong bi qua dai
-  // ("nhieu roi qua" -- Luyen), van chon "Tat ca" duoc qua dropdown.
-  const monthSet = new Set(allRows.map((r) => r.settlementDate.slice(0, 7)));
-  const months = Array.from(monthSet).sort().reverse();
-  const selectedMonth = req.query.month !== undefined ? req.query.month : months[0] || "";
-
-  const banks = Array.from(new Set(allRows.map((r) => r.bankName)));
-  let filtered = bankFilter ? allRows.filter((r) => r.bankName === bankFilter) : allRows;
-  if (selectedMonth) filtered = filtered.filter((r) => r.settlementDate.slice(0, 7) === selectedMonth);
+  // Luyen, 2026-08-08: bo section "Tong hop theo gian" -- khong can tinh nua
+  const banks = store.banks.map((b) => b.name).sort();
+  const months = [];
+  const selectedMonth = "";
+  const filtered = [];
 
   // Sao ke chi tiet tung giao dich, tach tab theo ngan hang -- xem
   // buildBankStatementTabs() o tren. Loc theo cung "thang" da chon o bang tren
