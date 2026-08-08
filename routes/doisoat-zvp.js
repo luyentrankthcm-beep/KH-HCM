@@ -183,6 +183,27 @@ function isDuplicateRecentUpload(uploadsList, fileName, grossByCode) {
 // restart server 1 lan de nap code moi la vinh vien khong con bug nay.
 const ZVP_GIAN_LIST_BAD_REDIRECTS = [{ tenDiem: "KVC AE HUE", maCongTrinh: "AE HUE KVCN" }];
 
+// Luyen, 2026-08-08: file Payoo KH Cu "PY-GiaoDichBanHangPayoo-..." chi chua 2
+// ma cua hang: DVGIAITRIKH_FZ_IPH (da co) va DVGIAITRIKH_FARM_VCTIMECITY (moi).
+// Seed o day de Railway tu dong co entry khi server restart, khong can tai lai
+// file "Payoo thu ho" chu? de cap nhat.
+const PAYOO_DIEM_MAP_DEFAULTS = {
+  "DVGIAITRIKH_FZ_IPH": { maCongTrinh: "FUNZONE IPH KVCN", isCse: false },
+  "DVGIAITRIKH_FARM_VCTIMECITY": { maCongTrinh: "Farm Times City", isCse: false },
+};
+
+function seedPayooDiemMapDefaults(store) {
+  if (!store.zvp_payoo_diem_map) store.zvp_payoo_diem_map = {};
+  let changed = false;
+  Object.entries(PAYOO_DIEM_MAP_DEFAULTS).forEach(([chiNhanh, val]) => {
+    if (!store.zvp_payoo_diem_map[chiNhanh]) {
+      store.zvp_payoo_diem_map[chiNhanh] = val;
+      changed = true;
+    }
+  });
+  return changed;
+}
+
 // Chi Nhan, 2026-07-30: "là hóa đơn này nè đổi tên á bạn coi lại nha lần sao
 // nó note z á" -- hoa don 2458 (450.000d, ngay 29/7, gian KVC TIMES that)
 // dan Ma diem "VC TC DIY KVCN" (doi ten tu "GHOST BRIDE" cu, gach bo ngay
@@ -342,6 +363,7 @@ function buildReconciliation(store) {
     }
   }
   if (ensureNo1388(store)) trySave();
+  if (seedPayooDiemMapDefaults(store)) trySave();
   if (stripZvpGianListBadRedirects(store)) trySave();
   if (seedZvpInvoiceDiemAliasDefaults(store)) trySave();
   if (seedZvpGianCodeRenames(store)) trySave();
