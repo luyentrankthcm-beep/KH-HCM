@@ -76,7 +76,9 @@ function buildBankStatementTabs(store) {
     const txs = (txsByBankId[bank.id] || [])
       .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : a.id - b.id));
     if (txs.length === 0) continue;
-    const matchedIds = matchedTxIdsForBank(bank, txs);
+    // Luyen, 2026-08-08: bo tinh matched (to mau xanh) vi goi full reconcile
+    // cho moi ngan hang -> qua cham. Trang chi dung de xem sao ke tong.
+    const matchedIds = new Set();
     let bal = bank.opening_balance || 0;
     const rows = txs.map((t) => {
       bal += t.type === "thu" ? t.amount : -t.amount;
