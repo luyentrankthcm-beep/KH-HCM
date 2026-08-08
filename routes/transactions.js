@@ -972,15 +972,26 @@ router.post("/transactions/migrate-payoo-pinball-to-kvcroyal", requireAdmin, (re
   res.json({ ok: true, renamedKeys: count, message: `Payoo revert done: ${count} grossByCode keys renamed PINBALL -> KVC ROYAL.` });
 });
 
-// Temp debug: return maDiem for specific soHD values in vnpayKhMoi invoices
+// Temp debug: find invoices by soHd across zvp_invoices pools + vnpayKhMoi
 router.get("/transactions/debug-invoice-madiem", requireAdmin, (req, res) => {
   const store = load();
   const soHDs = (req.query.soHD || "").split(",").map((s) => s.trim()).filter(Boolean);
-  const invoices = store.viet_qr_invoices?.vnpayKhMoi || [];
-  const found = soHDs.length > 0
-    ? invoices.filter((i) => soHDs.includes(String(i.soHD)))
-    : invoices.slice(-20);
-  res.json(found.map((i) => ({ soHD: i.soHD, maDiem: i.maDiem, tenDiem: i.tenDiem, ngay: i.ngay, soTien: i.soTien })));
+  const results = [];
+  const pools = {
+    "viet_qr_invoices.vnpayKhMoi": store.viet_qr_invoices?.vnpayKhMoi || [],
+    "zvp_invoices.vnpay": store.zvp_invoices?.vnpay || [],
+    "zvp_invoices.payoo": store.zvp_invoices?.payoo || [],
+    "zvp_invoices.zalo": store.zvp_invoices?.zalo || [],
+  };
+  for (const [poolName, invoices] of Object.entries(pools)) {
+    const items = soHDs.length > 0
+      ? invoices.filter((i) => soHDs.includes(String(i.soHd)) || soHDs.includes(String(i.soHD)))
+      : invoices.slice(-5);
+    for (const i of items) {
+      results.push({ pool: poolName, soHd: i.soHd ?? i.soHD, ngayHd: i.ngayHd ?? i.ngay, maDiem: i.maDiem, tenDiem: i.tenDiem, soTien: i.soTien, raw: i.raw });
+    }
+  }
+  res.json(results);
 });
 
 module.exports = router;
