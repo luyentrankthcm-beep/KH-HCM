@@ -972,4 +972,15 @@ router.post("/transactions/migrate-payoo-pinball-to-kvcroyal", requireAdmin, (re
   res.json({ ok: true, renamedKeys: count, message: `Payoo revert done: ${count} grossByCode keys renamed PINBALL -> KVC ROYAL.` });
 });
 
+// Temp debug: return maDiem for specific soHD values in vnpayKhMoi invoices
+router.get("/transactions/debug-invoice-madiem", requireAdmin, (req, res) => {
+  const store = load();
+  const soHDs = (req.query.soHD || "").split(",").map((s) => s.trim()).filter(Boolean);
+  const invoices = store.viet_qr_invoices?.vnpayKhMoi || [];
+  const found = soHDs.length > 0
+    ? invoices.filter((i) => soHDs.includes(String(i.soHD)))
+    : invoices.slice(-20);
+  res.json(found.map((i) => ({ soHD: i.soHD, maDiem: i.maDiem, tenDiem: i.tenDiem, ngay: i.ngay, soTien: i.soTien })));
+});
+
 module.exports = router;
