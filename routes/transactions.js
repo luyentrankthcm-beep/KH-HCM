@@ -711,4 +711,191 @@ router.get("/export.xlsx", (req, res) => {
   res.send(buf);
 });
 
+// ---------- MISA So Tien Gui import → backfill tenDoiUng ----------
+//
+// Luyen, 2026-08-08: "tk VP 8888 với 9777 không có bên đối tác nhưng tôi đã
+// hạch toán trên misa rồi bạn dựa vào đó bạn gắn lên báo cáo thu chi gian
+// thêm vô cho tôi bên đối tác nhá" -- upload file "Sổ tiền gửi ngân hàng"
+// xuất từ MISA để điền tên đối ứng (benChoThue / tenDoiTuong) vào giao dịch
+// ngân hàng còn đang trống trường này.
+//
+// Hỗ trợ 2 định dạng:
+//   VP9997 (KH Cũ): header row 3, cols [NgayCT, SoUNC, MaDT_chung,
+//     TenDT_chung, DienGiai, TKDuU, Thu, Chi, Ton, MaDT, MaCT, TenCT]
+//     → tenDoiUng = TenDT_chung (col 3)
+//   VP58888 (KH Mới): header row 3, cols [NgayHT, NgayCT, SoUNC, DienGiai,
+//     TKDuU, Thu, Chi, Ton, MaCT]  -- không có cột TenDT
+//     → chi TK 331 với MaCT: tenDoiUng = benChoThue từ hop_dong_thue (nếu
+//       có), ngược lại "Mã công trình: {MaCT}"
+//     → thu TK 131: trích đầu DienGiai làm tenDoiUng
+function excelSerialToISO(serial) {
+  if (typeof serial !== "number") return null;
+  const d = new Date(new Date(1899, 11, 30).getTime() + serial * 86400000);
+  const yy = d.getFullYear();
+  if (yy < 2000 || yy > 2100) return null;
+  return d.toISOString().slice(0, 10);
+}
+
+function parseMisaSoTienGui997(sheetRows) {
+  // cols: [NgayCT(0), SoUNC(1), MaDT_chung(2), TenDT_chung(3), DienGiai(4),
+  //        TKDuU(5), Thu(6), Chi(7), Ton(8), MaDT(9), MaCT(10), TenCT(11)]
+  const result = [];
+  for (let i = 5; i < sheetRows.length; i++) {
+    const r = sheetRows[i];
+    if (!r || typeof r[0] !== "number") continue;
+    const date = excelSerialToISO(r[0]);
+    if (!date) continue;
+    const tenDT = r[3] ? String(r[3]).trim() : "";
+    const maDT = r[9] ? String(r[9]).trim() : r[2] ? String(r[2]).trim() : "";
+    const maCT = r[10] ? String(r[10]).trim() : "";
+    const tenCT = r[11] ? String(r[11]).trim() : "";
+    const thu = typeof r[6] === "number" && r[6] > 0 ? r[6] : 0;
+    const chi = typeof r[7] === "number" && r[7] > 0 ? r[7] : 0;
+    if (!tenDT) continue;
+    if (thu) result.push({ date, amount: thu, type: "thu", tenDoiUng: tenDT, maDT, maCT, tenCT });
+    if (chi) result.push({ date, amount: chi, type: "chi", tenDoiUng: tenDT, maDT, maCT, tenCT });
+  }
+  return result;
+}
+
+function parseMisaSoTienGui888(sheetRows, ctToNCC) {
+  // cols: [NgayHT(0), NgayCT(1), SoUNC(2), DienGiai(3), TKDuU(4),
+  //        Thu(5), Chi(6), Ton(7), MaCT(8)]
+  const result = [];
+  for (let i = 5; i < sheetRows.length; i++) {
+    const r = sheetRows[i];
+    if (!r || typeof r[0] !== "number") continue;
+    const dateSerial = typeof r[1] === "number" ? r[1] : r[0];
+    const date = excelSerialToISO(dateSerial);
+    if (!date) continue;
+    const dienGiai = r[3] ? String(r[3]).trim() : "";
+    const tkDuU = r[4] ? String(r[4]).trim() : "";
+    const maCT = r[8] ? String(r[8]).trim() : "";
+    const thu = typeof r[5] === "number" && r[5] > 0 ? r[5] : 0;
+    const chi = typeof r[6] === "number" && r[6] > 0 ? r[6] : 0;
+    if (!thu && !chi) continue;
+
+    let tenDoiUng = "";
+    if (tkDuU === "131" || tkDuU === "1311") {
+      // Thu từ đối tác: tên công ty nằm đầu diễn giải
+      tenDoiUng = dienGiai
+        .replace(/\s+(SAL|HD|HĐ|THÁNG|T\d|t\d|\d{8,}|EV\d+).*/i, "")
+        .trim()
+        .substring(0, 80);
+    } else if (tkDuU === "331" || tkDuU === "3311") {
+      if (maCT) {
+        tenDoiUng = ctToNCC[maCT] ? ctToNCC[maCT] : `Mã công trình: ${maCT}`;
+      }
+    }
+    if (!tenDoiUng) continue;
+    if (thu) result.push({ date, amount: thu, type: "thu", tenDoiUng, maCT });
+    if (chi) result.push({ date, amount: chi, type: "chi", tenDoiUng, maCT });
+  }
+  return result;
+}
+
+router.post(
+  "/transactions/import-misa-so-tien-gui",
+  requireAdmin,
+  upload.single("file"),
+  (req, res) => {
+    if (!req.file)
+      return res.status(400).json({ error: "Thiếu file" });
+    const bankId = parseInt(req.body.bank_id || "0", 10);
+    if (!bankId)
+      return res.status(400).json({ error: "Thiếu bank_id" });
+
+    const store = load();
+    const bank = store.banks.find((b) => b.id === bankId);
+    if (!bank)
+      return res.status(400).json({ error: `Không tìm thấy ngân hàng id=${bankId}` });
+
+    // Build maCongTrinh → benChoThue lookup from hop_dong_thue
+    const hdThue = store.phap_danh_hop_dong_thue || {};
+    const ctToNCC = {};
+    Object.values(hdThue).forEach((hd) => {
+      const mct = (hd.maCongTrinh || "").trim();
+      const ben = (hd.benChoThue || "").trim();
+      if (mct && ben && !ctToNCC[mct]) ctToNCC[mct] = ben;
+    });
+
+    // Parse XLSX
+    const wb = XLSX.read(req.file.buffer, { type: "buffer" });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null });
+
+    // Auto-detect format: 997 has 12 cols at header row, 888 has 9 cols
+    const headerRow = rows[3] || [];
+    const ncols = headerRow.filter((c) => c !== null).length;
+    const is997Format = ncols >= 10;
+
+    let misaRows;
+    if (is997Format) {
+      misaRows = parseMisaSoTienGui997(rows);
+    } else {
+      misaRows = parseMisaSoTienGui888(rows, ctToNCC);
+    }
+
+    // Build lookup: date|amount|type → tenDoiUng (first match wins)
+    const lookup = new Map();
+    for (const r of misaRows) {
+      const key = `${r.date}|${r.amount}|${r.type}`;
+      if (!lookup.has(key)) lookup.set(key, r.tenDoiUng);
+    }
+
+    // Backfill transactions
+    const bankTxs = store.transactions.filter((t) => t.bank_id === bankId);
+    let backfilled = 0;
+    let upgraded = 0;
+    for (const tx of bankTxs) {
+      const key = `${tx.date}|${tx.amount}|${tx.type}`;
+      const val = lookup.get(key);
+      if (!tx.tenDoiUng && val) {
+        tx.tenDoiUng = val;
+        backfilled++;
+      } else if (tx.tenDoiUng && tx.tenDoiUng.startsWith("Mã công trình: ")) {
+        // Try to upgrade Mã công trình → real NCC name
+        const mct = tx.tenDoiUng.replace("Mã công trình: ", "").trim();
+        if (ctToNCC[mct]) {
+          tx.tenDoiUng = ctToNCC[mct];
+          upgraded++;
+        }
+      }
+    }
+
+    // Update ncc_doi_tuong_master from 997 format rows
+    let masterAdded = 0;
+    if (is997Format) {
+      if (!store.ncc_doi_tuong_master) store.ncc_doi_tuong_master = {};
+      const srcLabel = `So_tien_gui_ngan_hang ${bank.name} (upload ${new Date().toISOString().slice(0, 10)})`;
+      for (const r of misaRows) {
+        if (!r.maDT || !r.tenDoiUng) continue;
+        if (!store.ncc_doi_tuong_master[r.maDT]) {
+          store.ncc_doi_tuong_master[r.maDT] = {
+            tenDoiTuong: r.tenDoiUng,
+            maCongTrinh: r.maCT || "",
+            tenCongTrinh: r.tenCT || "",
+            nguon: srcLabel,
+            updated_at: new Date().toISOString(),
+          };
+          masterAdded++;
+        }
+      }
+    }
+
+    save(store);
+
+    res.json({
+      ok: true,
+      bank: bank.name,
+      format: is997Format ? "VP9997 (12 cột)" : "VP58888 (9 cột)",
+      misaRows: misaRows.length,
+      backfilled,
+      upgraded,
+      masterAdded,
+      message: `Đã điền bên đối tác: +${backfilled} mới, +${upgraded} nâng cấp từ "Mã công trình". NCC master: +${masterAdded} mục mới.`,
+    });
+  }
+);
+
 module.exports = router;

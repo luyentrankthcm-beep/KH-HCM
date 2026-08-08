@@ -117,6 +117,66 @@
     </section>
 
     <section class="panel">
+      <h2>Import MISA Sổ tiền gửi → Điền Bên đối tác</h2>
+      <p class="muted">
+        Upload file "Sổ tiền gửi ngân hàng" xuất từ MISA (dành riêng cho <strong>VPBANK9997</strong> và
+        <strong>VP58888</strong>) để tự động điền cột <em>Bên đối tác / Tên đối ứng</em> vào
+        các giao dịch đang để trống. Hỗ trợ 2 định dạng: file 12 cột (KH Cũ/9997, lấy "Tên đối tượng" trực tiếp)
+        và file 9 cột (KH Mới/888, dùng "Mã công trình" tra ra tên chủ cho thuê từ Pháp danh).
+      </p>
+      <form id="misaImportForm" method="POST" action="/transactions/import-misa-so-tien-gui"
+            enctype="multipart/form-data" class="form-inline">
+        <select name="bank_id" required>
+          <option value="">-- Chọn ngân hàng --</option>
+          <% banks.filter(b => b.name === 'VPBANK9997' || b.name === 'VP58888').forEach(function(b) { %>
+          <option value="<%= b.id %>"><%= b.name %></option>
+          <% }) %>
+          <%/* Fallback: show all banks if VPBANK9997/VP58888 not found above */%>
+          <% if (!banks.some(b => b.name === 'VPBANK9997' || b.name === 'VP58888')) { %>
+            <% banks.forEach(function(b) { %>
+            <option value="<%= b.id %>"><%= b.name %></option>
+            <% }) %>
+          <% } %>
+        </select>
+        <input type="file" name="file" accept=".xlsx,.xls" required />
+        <button type="submit" class="btn btn-secondary">Import MISA</button>
+      </form>
+      <div id="misaImportResult" style="display:none; margin-top:10px;"></div>
+      <script>
+      document.getElementById('misaImportForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        var btn = this.querySelector('button[type="submit"]');
+        btn.disabled = true; btn.textContent = 'Đang xử lý...';
+        var fd = new FormData(this);
+        fetch('/transactions/import-misa-so-tien-gui', { method: 'POST', body: fd })
+          .then(r => r.json())
+          .then(data => {
+            var el = document.getElementById('misaImportResult');
+            el.style.display = '';
+            if (data.ok) {
+              el.className = 'alert alert-success';
+              el.innerHTML = '<strong>' + data.bank + '</strong> (' + data.format + '): '
+                + 'đọc ' + data.misaRows + ' dòng MISA. '
+                + 'Điền bên đối tác: <strong>+' + data.backfilled + '</strong> mới, '
+                + '<strong>+' + data.upgraded + '</strong> nâng từ "Mã công trình" → tên NCC. '
+                + (data.masterAdded ? 'NCC master: +' + data.masterAdded + ' mục mới. ' : '');
+            } else {
+              el.className = 'alert alert-error';
+              el.textContent = data.error || 'Lỗi không xác định.';
+            }
+            btn.disabled = false; btn.textContent = 'Import MISA';
+          })
+          .catch(err => {
+            document.getElementById('misaImportResult').style.display = '';
+            document.getElementById('misaImportResult').className = 'alert alert-error';
+            document.getElementById('misaImportResult').textContent = 'Lỗi kết nối: ' + err;
+            btn.disabled = false; btn.textContent = 'Import MISA';
+          });
+      });
+      </script>
+    </section>
+
+    <section class="panel">
       <h2>Dán sao kê ngân hàng (nhiều dòng)</h2>
       <p class="muted">
         Mỗi dòng: <strong>Ngày</strong>&nbsp;&nbsp;<strong>Diễn giải</strong>&nbsp;&nbsp;<strong>Số tiền</strong>&nbsp;&nbsp;<strong>Thu/Chi (tuỳ chọn)</strong> —
