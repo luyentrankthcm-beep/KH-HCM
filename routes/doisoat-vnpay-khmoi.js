@@ -54,13 +54,14 @@ const TEN_DIEM_TO_MA_CONG_TRINH = {
   "tutu train am hue": "AE HUE KVCN",
   "tutu train vc time": "KVC TIMES",
   "tutu train vc times": "KVC TIMES",
-  "tutu train vc royal": "KVC ROYAL",
-  "nha tuyet vc royal": "KVC ROYAL",
-  // Nhan, 2026-08-06: file "Dữ liệu báo cáo phí" ngày 06/08 ghi day du "NHÀ
-  // TUYẾT VINCOM ROYAL CITY" (khac voi bien the tat "NHA TUYET VC ROYAL" da
-  // co) -- 22 giao dich, 1.790.000d, chua map duoc lam thieu net chinh xac
-  // cua KVC ROYAL trong file phi nay.
-  "nha tuyet vincom royal city": "KVC ROYAL",
+  // Luyen, 2026-08-08: "tu 31.07 doi soat cua vn pay kh moi KVC ROYAL doi qua
+  // PINBALL DA NANG va cac hoa don la PINBALL DA NANG" -- doi ma cong trinh
+  // tu "KVC ROYAL" sang "PINBALL DA NANG" cho moi mapping tu day. Du lieu cu
+  // truoc 31/07 da duoc migrate trong store (xem grossByCode migration).
+  "tutu train vc royal": "PINBALL DA NANG",
+  "nha tuyet vc royal": "PINBALL DA NANG",
+  // file "Du lieu bao cao phi" co bien the dai hon (xac nhan 2026-08-06)
+  "nha tuyet vincom royal city": "PINBALL DA NANG",
   // Nhan, 2026-08-06: "cái mã công trình SAVICO KVCN này là của Pinball và
   // ghế LOTTE BAC GIANG á" -- chi nhanh "FARM SAVICO" tren cong VNPay KHONG
   // phai doanh thu Savico (hang xe, khong lien quan) nhu ten goi nham tuong,
@@ -89,7 +90,7 @@ const PAYOO_FIXED_CODE = "KVC ROYAL";
 // PAYOO_FIXED_CODE -- gio tra ve dung mapping nhu VNPay (TEN_DIEM_TO_MA_CONG_TRINH
 // o tren) thay vi ep 1 ma.
 const PAYOO_STORE_TO_MA_CONG_TRINH = {
-  giaitrikh_tutuvr_vcroyalcity: "KVC ROYAL",
+  giaitrikh_tutuvr_vcroyalcity: "PINBALL DA NANG", // renamed from KVC ROYAL 2026-08-08
   giaitrikh_farm_ltbacgiang: "FARM LOTTE BAC GIANG",
   giaitrikh_tutu_vctimecity: "KVC TIMES",
   giaitrikh_tutu_amhue: "KVC AE HUE",
