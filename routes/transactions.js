@@ -941,4 +941,35 @@ router.post("/transactions/migrate-kvc-royal-to-pinball", requireAdmin, (req, re
   res.json({ ok: true, renamedKeys: total, message: `Migration done: ${total} grossByCode keys renamed.` });
 });
 
+// One-time migration: revert Payoo KVC ROYAL -> PINBALL DA NANG back to KVC ROYAL
+// for dates >= 2026-07-31 (Luyen, 2026-08-08: Payoo invoices still say "KVC ROYAL",
+// so Payoo gross must stay "KVC ROYAL". Only VNPay offline was renamed to PINBALL).
+// Idempotent -- safe to call multiple times.
+router.post("/transactions/migrate-payoo-pinball-to-kvcroyal", requireAdmin, (req, res) => {
+  const store = load();
+  const OLD = "PINBALL DA NANG";
+  const NEW = "KVC ROYAL";
+  const CUTOFF = "2026-07-31";
+
+  let count = 0;
+  for (const u of store.vnpay_khmoi_payoo_uploads || []) {
+    const gb = u.grossByCode || {};
+    const toRename = Object.keys(gb).filter(
+      (k) => k.includes("|" + OLD) && k.slice(0, 10) >= CUTOFF
+    );
+    for (const oldKey of toRename) {
+      const newKey = oldKey.replace("|" + OLD, "|" + NEW);
+      gb[newKey] = gb[oldKey];
+      delete gb[oldKey];
+      count++;
+    }
+    if (u.codes) {
+      u.codes = u.codes.map((c) => (c === OLD ? NEW : c));
+    }
+  }
+  save(store);
+
+  res.json({ ok: true, renamedKeys: count, message: `Payoo revert done: ${count} grossByCode keys renamed PINBALL -> KVC ROYAL.` });
+});
+
 module.exports = router;

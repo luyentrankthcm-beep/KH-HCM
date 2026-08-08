@@ -90,7 +90,9 @@ const PAYOO_FIXED_CODE = "KVC ROYAL";
 // PAYOO_FIXED_CODE -- gio tra ve dung mapping nhu VNPay (TEN_DIEM_TO_MA_CONG_TRINH
 // o tren) thay vi ep 1 ma.
 const PAYOO_STORE_TO_MA_CONG_TRINH = {
-  giaitrikh_tutuvr_vcroyalcity: "PINBALL DA NANG", // renamed from KVC ROYAL 2026-08-08
+  // Luyen, 2026-08-08: Payoo giu nguyen "KVC ROYAL" (hoa don Payoo van ghi
+  // "KVC ROYAL"). Chi VNPay offline doi sang "PINBALL DA NANG".
+  giaitrikh_tutuvr_vcroyalcity: "KVC ROYAL",
   giaitrikh_farm_ltbacgiang: "FARM LOTTE BAC GIANG",
   giaitrikh_tutu_vctimecity: "KVC TIMES",
   giaitrikh_tutu_amhue: "KVC AE HUE",
@@ -337,12 +339,20 @@ function buildReconciliation(store) {
   const vnpayKhMoiScopedAlias = Object.assign({}, store.invoice_diem_alias);
   delete vnpayKhMoiScopedAlias["PINBALL VÀ GHẾ LOTTE BAC GIANG"];
 
+  // Luyen, 2026-08-08: VNPay offline doi ten tu "KVC ROYAL" sang "PINBALL DA
+  // NANG" tu 31/07, nhung hoa don trong store van ghi "KVC ROYAL" (chua upload
+  // lai) -- them alias "KVC ROYAL" -> "PINBALL DA NANG" CHI cho kenh offline,
+  // KHONG cho Payoo (Payoo giu nguyen "KVC ROYAL" ca gross lan hoa don).
+  const vnpayOfflineAlias = Object.assign({}, vnpayKhMoiScopedAlias, {
+    "KVC ROYAL": "PINBALL DA NANG",
+  });
+
   const reconciled = {
     // Doanh thu VNPay (Offline-style QR tai co so) tu file "DanhSachGiaoDich"
     // tai o muc 1 duoi day.
-    offline: reconcileZvpChannel(settlements.offline, grossMerged, vnpayInvoiceData, store.gian_mapping, manualMatches.offline, vnpayKhMoiScopedAlias, new Set()),
+    offline: reconcileZvpChannel(settlements.offline, grossMerged, vnpayInvoiceData, store.gian_mapping, manualMatches.offline, vnpayOfflineAlias, new Set()),
     // Payoo: doanh thu tu file "Payoo thu hộ..."/"PY-GiaoDichBanHangPayoo..."
-    // (muc 2 ben duoi), gan het ve 1 gian "KVC ROYAL" duy nhat.
+    // Giu nguyen "KVC ROYAL" cho Payoo, khong ap dung alias doi ten.
     payoo: reconcileZvpChannel(settlements.payoo, payooGrossMerged, payooInvoiceData, store.gian_mapping, manualMatches.payoo, vnpayKhMoiScopedAlias, new Set()),
   };
   applyProportionalNetFallback(reconciled.offline);
