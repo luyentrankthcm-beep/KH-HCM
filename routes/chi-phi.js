@@ -153,9 +153,9 @@ router.get("/chi-phi/:mien(mien-nam|mien-bac)", (req, res) => {
   const monthSet = new Set();
   rows.forEach((r) => { const m = (r.ngay || "").slice(0, 7); if (m) monthSet.add(m); });
   const availableMonths = [...monthSet].sort().reverse();
-  // Mac dinh loc thang 7/2026 truoc ("loc trước tháng 7 cho tôi trước nhá"),
-  // neu thang do khong co du lieu cho cong ty dang chon thi hien tat ca.
-  const defaultMonth = availableMonths.includes("2026-07") ? "2026-07" : "";
+  // Luyen, 2026-08-08: doi default tu "2026-07" cung (da het hieu luc tu T8)
+  // sang thang moi nhat co du lieu (availableMonths da sap xep giam dan).
+  const defaultMonth = availableMonths[0] || "";
   const thangFilter = req.query.thang !== undefined ? req.query.thang : defaultMonth;
 
   if (hachToanFilter === "1") rows = rows.filter((r) => r.daHachToan);
