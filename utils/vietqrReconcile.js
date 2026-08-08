@@ -376,6 +376,10 @@ const VNPAY_KHMOI_INVOICE_MADIEM_MAP = {
   // routes/doisoat-vnpay-khmoi.js) -- them de hoa don cung ten duoc chuyen ra
   // khoi pool ZVP (KH Cu) va gop vao store.viet_qr_invoices.vnpayKhMoi.
   "PINBALL VÀ GHẾ LOTTE BAC GIANG": "PINBALL VÀ GHẾ LOTTE BAC GIANG",
+  // Luyen, 2026-08-08: gian "KVC ROYAL" doi ten thanh "PINBALL DA NANG" tu
+  // 31/07 -- hoa don moi se ghi maDiem "PINBALL DA NANG" (khac "KVC ROYAL" cu),
+  // can them vao day de migrate sang vnpayKhMoi pool dung.
+  "PINBALL DA NANG": "PINBALL DA NANG",
 };
 
 // Tu dong chuyen (KHONG chi loc-khi-doc) cac hoa don co maDiem nam trong
