@@ -12,77 +12,25 @@
       không cần vào từng trang đối soát riêng để xem.
     </p>
     <section class="panel">
-      <!-- Luyen, 2026-08-03: "thêm cho tôi nút ẩn chỗ nhá" -- nut Ẩn/Hiện
-           (views/partials/panel-toggle.ejs, include chung o nav.ejs) chi tu
-           dong gan vao section.panel nao co <h2> la CON TRUC TIEP dau tien;
-           truoc do khung nay bat dau bang <form> (khong co h2 rieng) nen
-           khong duoc gan nut. Them 1 h2 rieng cho khung nay (giong dung mau
-           section "4. Kết quả đối soát..." o doisoat-momo.ejs). -->
-      <h2>Tổng hợp theo gian</h2>
-      <form method="GET" action="/bao-cao/thu-chi-theo-gian" class="form-inline" style="margin-bottom:12px;">
-        <label style="margin:0;">Lọc theo ngân hàng:</label>
+      <h2>Sao kê chi tiết theo ngân hàng (từng giao dịch)</h2>
+      <form method="GET" action="/bao-cao/thu-chi-theo-gian" class="form-inline-tight" style="margin-bottom:10px;">
+        <label style="margin:0;">Ngân hàng:</label>
         <select name="bank" onchange="this.form.submit()">
           <option value="">-- Tất cả --</option>
           <% banks.forEach(function(b) { %>
           <option value="<%= b %>" <%= bankFilter === b ? 'selected' : '' %>><%= b %></option>
           <% }) %>
         </select>
-        <% if (months.length > 0) { %>
-        <label style="margin:0;">Chọn tháng:</label>
-        <select name="month" onchange="this.form.submit()">
-          <option value="" <%= selectedMonth === '' ? 'selected' : '' %>>-- Tất cả --</option>
-          <% months.forEach(function(m) { %>
-          <option value="<%= m %>" <%= selectedMonth === m ? 'selected' : '' %>><%= m %></option>
-          <% }) %>
-        </select>
-        <% } %>
-      </form>
-      <a class="btn btn-secondary" href="/bao-cao/thu-chi-theo-gian/export.xlsx?bank=<%= encodeURIComponent(bankFilter) %>&month=<%= encodeURIComponent(selectedMonth) %>">Xuất Excel (theo bộ lọc đang chọn)</a>
-      <table class="table" style="margin-top:12px;">
-        <thead>
-          <tr><th>Ngân hàng</th><th>Kênh</th><th>Ngày về NH</th><th>Mã công trình (gian)</th><th>TK Có</th><th>Doanh thu gộp</th><th>Tiền về NH (net)</th><th>Số HĐ khớp</th><th>Trạng thái</th></tr>
-        </thead>
-        <tbody>
-          <% rows.forEach(function(r) { %>
-          <tr>
-            <td><%= r.bankName %></td>
-            <td><%= r.channel %></td>
-            <td><%= r.settlementDate %></td>
-            <td><%= r.maCongTrinh %></td>
-            <td><%= r.tkCo === 'SKIP' ? '—' : r.tkCo %></td>
-            <td><%= r.gross.toLocaleString('vi-VN') %> đ</td>
-            <td><%= r.net.toLocaleString('vi-VN') %> đ</td>
-            <td><%= r.invoiceNumbers || '-' %></td>
-            <td><%= r.trangThai %></td>
-          </tr>
-          <% }) %>
-          <% if (rows.length === 0) { %>
-          <tr><td colspan="9" class="muted">Chưa có dữ liệu.</td></tr>
-          <% } %>
-        </tbody>
-      </table>
-    </section>
-
-    <section class="panel">
-      <!-- Luyen, 2026-08-03: "thêm cho tôi nút ẩn chỗ nhá" -- h2 phai la CON
-           TRUC TIEP dau tien cua section.panel de nut Ẩn/Hiện tu dong (xem
-           partials/panel-toggle.ejs) nhan ra duoc; truoc do h2 nam long trong
-           <div class="panel-head"> nen bi bo qua. Bo div do, dua form chon
-           thang xuong dong rieng ben duoi h2 (giong mau section "4. Kết quả
-           đối soát..." o doisoat-momo.ejs). -->
-      <h2>Sao kê chi tiết theo ngân hàng (từng giao dịch)</h2>
-      <% if (stmtMonths.length > 0) { %>
-      <form method="GET" action="/bao-cao/thu-chi-theo-gian" class="form-inline-tight" style="margin-bottom:10px;">
-        <input type="hidden" name="bank" value="<%= bankFilter %>">
-        <input type="hidden" name="month" value="<%= selectedMonth %>">
+        <% if (stmtMonths.length > 0) { %>
+        <label style="margin:0;">Tháng:</label>
         <select name="stmtMonth" onchange="this.form.submit()">
           <option value="" <%= stmtMonth === '' ? 'selected' : '' %>>-- Tất cả --</option>
           <% stmtMonths.forEach(function(m) { %>
           <option value="<%= m %>" <%= stmtMonth === m ? 'selected' : '' %>><%= m %></option>
           <% }) %>
         </select>
+        <% } %>
       </form>
-      <% } %>
       <p class="muted">
         Toàn bộ giao dịch lấy trực tiếp từ sao kê ngân hàng (không qua đối soát), sắp xếp theo ngày tăng dần, mỗi
         ngân hàng 1 tab. Dòng tô <span style="background:var(--color-highlight-strong); padding:1px 6px; border-radius:4px;">xanh</span>
