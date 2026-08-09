@@ -911,13 +911,25 @@ router.get("/doi-soat/chi-phi-saoke", (req, res) => {
     let cp = chiPhiByBankTxId[t.id] || null;
     let matchType = cp ? "exact" : "";
 
-    // Fuzzy match: so tien +-1000 + ngay +-7d
+    // Fuzzy match: so tien +-1000 + ngay +-7d + NCC phai co tu nao khop tenDoiUng
+    // Them dieu kien NCC de tranh ghep nham GD trung so tien nhung khac doi
+    // tuong hoan toan (vd tien nop kho bac trung so tien voi hoa don do dau xe).
     if (!cp) {
       const tMs = dateMs(t.date);
+      const tSearchText = normText((t.tenDoiUng || "") + " " + (t.description || ""));
       cp = chiPhiCompany.find((r) => {
         if (!r.ngay || !r.soTien) return false;
         if (Math.abs((r.soTien || 0) - t.amount) > AMOUNT_TOL) return false;
-        return Math.abs(dateMs(r.ngay) - tMs) <= DATE_WIN_MS;
+        if (Math.abs(dateMs(r.ngay) - tMs) > DATE_WIN_MS) return false;
+        // Neu chi phi co NCC va GD co noi dung, yeu cau NCC phai co it nhat
+        // 1 tu >= 5 ky tu (bo cac tu qua ngan/pho bien) khop voi tenDoiUng
+        // hoac dien giai cua GD ngan hang. Neu NCC khong co tu nao du dai,
+        // tha loi dieu kien nay (fallback ve so tien + ngay nhu cu).
+        if (r.ncc && (t.tenDoiUng || t.description)) {
+          const nccWords = normText(r.ncc).split(/\s+/).filter((w) => w.length >= 5);
+          if (nccWords.length > 0 && !nccWords.some((w) => tSearchText.includes(w))) return false;
+        }
+        return true;
       }) || null;
       if (cp) matchType = "fuzzy";
     }
