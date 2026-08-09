@@ -61,9 +61,12 @@ function companyOfBankRow(b) {
 }
 
 // Sao ke chi tiet tung giao dich, gop tat ca ngan hang, tach tab theo tung
-// ngan hang (giong cac sheet rieng trong file Excel Luyen gui). Danh dau
-// giao dich nao da duoc dua vao 1 kenh doi soat (matchedTxIdsForBank).
-function buildBankStatementTabs(store) {
+// ngan hang (giong cac sheet rieng trong file Excel Luyen gui).
+// monthFilter (vd "2026-07"): neu truyen vao, CHI build rows cho thang do --
+// quet truoc de tinh so du dau ky, sau do chi tao row object cho giao dich
+// trong thang. Giam tu 222K row objects (toan bo lich su) xuong ~200-500
+// (1 thang), EJS render nhanh hon nhieu.
+function buildBankStatementTabs(store, monthFilter) {
   const tabs = [];
   // Perf fix: group by bank_id once (O(n)) instead of filter per bank (O(n*banks))
   const txsByBankId = {};
@@ -80,27 +83,68 @@ function buildBankStatementTabs(store) {
     // cho moi ngan hang -> qua cham. Trang chi dung de xem sao ke tong.
     const matchedIds = new Set();
     let bal = bank.opening_balance || 0;
-    const rows = txs.map((t) => {
-      bal += t.type === "thu" ? t.amount : -t.amount;
-      return {
-        date: t.date,
-        type: t.type,
-        amount: t.amount,
-        description: t.description || "",
-        tenDoiUng: t.tenDoiUng || "",
-        balance: bal,
-        matched: matchedIds.has(t.id),
-      };
-    });
-    tabs.push({
-      bankId: bank.id,
-      bankName: bank.name,
-      company: companyOfBankRow(bank),
-      openingBalance: bank.opening_balance || 0,
-      rows,
-      totalThu: rows.reduce((s, r) => (r.type === "thu" ? s + r.amount : s), 0),
-      totalChi: rows.reduce((s, r) => (r.type === "chi" ? s + r.amount : s), 0),
-    });
+    let openingBalance = bal;
+
+    if (monthFilter) {
+      // Perf fix (2026-08-09): khi co filter thang, scan truoc de tinh so du
+      // dau thang (khong luu row), sau do chi build row objects cho thang do.
+      const firstDayOfMonth = monthFilter + "-01";
+      for (const t of txs) {
+        if (t.date >= firstDayOfMonth) break;
+        bal += t.type === "thu" ? t.amount : -t.amount;
+      }
+      openingBalance = bal;
+      const rows = [];
+      for (const t of txs) {
+        if (t.date.slice(0, 7) !== monthFilter) {
+          if (t.date > monthFilter + "-31") break; // da qua thang, bo qua nhanh
+          continue;
+        }
+        bal += t.type === "thu" ? t.amount : -t.amount;
+        rows.push({
+          date: t.date,
+          type: t.type,
+          amount: t.amount,
+          description: t.description || "",
+          tenDoiUng: t.tenDoiUng || "",
+          balance: bal,
+          matched: false,
+        });
+      }
+      if (rows.length === 0) continue;
+      tabs.push({
+        bankId: bank.id,
+        bankName: bank.name,
+        company: companyOfBankRow(bank),
+        openingBalance,
+        rows,
+        totalThu: rows.reduce((s, r) => (r.type === "thu" ? s + r.amount : s), 0),
+        totalChi: rows.reduce((s, r) => (r.type === "chi" ? s + r.amount : s), 0),
+      });
+    } else {
+      // Khong co filter: build tat ca rows nhu cu (dung cho "Tat ca thang")
+      const rows = txs.map((t) => {
+        bal += t.type === "thu" ? t.amount : -t.amount;
+        return {
+          date: t.date,
+          type: t.type,
+          amount: t.amount,
+          description: t.description || "",
+          tenDoiUng: t.tenDoiUng || "",
+          balance: bal,
+          matched: matchedIds.has(t.id),
+        };
+      });
+      tabs.push({
+        bankId: bank.id,
+        bankName: bank.name,
+        company: companyOfBankRow(bank),
+        openingBalance,
+        rows,
+        totalThu: rows.reduce((s, r) => (r.type === "thu" ? s + r.amount : s), 0),
+        totalChi: rows.reduce((s, r) => (r.type === "chi" ? s + r.amount : s), 0),
+      });
+    }
   }
   return tabs;
 }
@@ -430,47 +474,21 @@ router.get("/bao-cao/thu-chi-theo-gian", (req, res) => {
   // (neu co) de 2 bang khop nhau; rieng bo loc thang cua bang sao ke van co
   // dropdown tach doc lap (stmtMonth) phong khi Luyen muon xem thang khac voi
   // bang doi soat theo gian o tren.
-  const stmtTabsAll = buildBankStatementTabs(store);
+  // Perf fix (2026-08-09): lay danh sach thang co san tu cac giao dich (O(n)
+  // scan 1 lan, khong build row objects) truoc khi biet stmtMonth.
   const stmtMonthSet = new Set();
-  stmtTabsAll.forEach((tab) => tab.rows.forEach((r) => stmtMonthSet.add(r.date.slice(0, 7))));
+  for (const t of store.transactions) {
+    if (t.date && t.date.length >= 7) stmtMonthSet.add(t.date.slice(0, 7));
+  }
   const stmtMonths = Array.from(stmtMonthSet).sort().reverse();
-  // Chi dung selectedMonth (thang cua bang doi soat theo gian o tren) lam mac
-  // dinh NEU thang do thuc su co giao dich sao ke -- tranh truong hop bang
-  // doi soat co dong ngay trong tuong lai (vd khoan ve du kien) nhung sao ke
-  // ngan hang thuc te chua toi ngay do, se lam bang sao ke moi trong rong.
   const stmtMonth =
     req.query.stmtMonth !== undefined
       ? req.query.stmtMonth
-      : stmtMonths.includes(selectedMonth)
-      ? selectedMonth
       : stmtMonths[0] || "";
-  const stmtTabsAllWithRows = stmtTabsAll
-    .map((tab) => {
-      const rows = stmtMonth ? tab.rows.filter((r) => r.date.slice(0, 7) === stmtMonth) : tab.rows;
-      // Luyen, 2026-08-03: khi loc theo 1 thang cu the (khong phai "Tat ca"),
-      // "So du dau ky" phai la so du THUC KE THUA tu cac giao dich truoc do
-      // (de doi chieu voi sao ke ngan hang that), KHONG phai luon la
-      // bank.opening_balance tinh cua ca tai khoan (chi dung cho thang dau
-      // tien). Tim dong cuoi cung TRONG TOAN BO lich su (tab.rows, chua loc)
-      // co ngay truoc ngay dau tien cua thang dang xem -- so du cua dong do
-      // chinh la so du dau ky thuc su cua thang nay.
-      let openingBalance = tab.openingBalance;
-      if (stmtMonth && rows.length > 0) {
-        const firstDate = rows[0].date;
-        const priorRows = tab.rows.filter((r) => r.date < firstDate);
-        if (priorRows.length > 0) {
-          openingBalance = priorRows[priorRows.length - 1].balance;
-        }
-      }
-      return {
-        ...tab,
-        rows,
-        openingBalance,
-        totalThu: rows.reduce((s, r) => (r.type === "thu" ? s + r.amount : s), 0),
-        totalChi: rows.reduce((s, r) => (r.type === "chi" ? s + r.amount : s), 0),
-      };
-    })
-    .filter((tab) => tab.rows.length > 0);
+
+  // Truyen stmtMonth vao de ham chi build rows cho thang do thay vi toan bo
+  // lich su -- giam tu ~222K row objects xuong ~200-500, EJS render nhanh.
+  const stmtTabsAllWithRows = buildBankStatementTabs(store, stmtMonth || undefined);
 
   // Tong theo cong ty tinh tren CA 2 cong ty (khong phu thuoc dang xem cong
   // ty nao) de van doi chieu duoc nhanh giua KH Cu / KH Moi cung luc.
