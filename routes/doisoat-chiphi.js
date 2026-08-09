@@ -942,6 +942,8 @@ router.get("/doi-soat/chi-phi-saoke", (req, res) => {
   const viewData = {
     COMPANIES,
     activeCompany,
+    userName: req.session.userName,
+    isAdmin: req.session.isAdmin,
     months,
     selectedMonth,
     selectedBankName,
