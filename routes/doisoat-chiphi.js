@@ -955,17 +955,10 @@ router.get("/doi-soat/chi-phi-saoke", (req, res) => {
     successMsg: req.query.success || "",
     errorMsg: req.query.error || "",
   };
-  res.render("doisoat-chiphi-saoke", viewData, function(renderErr, html) {
-    if (renderErr) {
-      console.error("[doi-soat/chi-phi-saoke] RENDER ERROR:", renderErr.message, renderErr.stack);
-      res.status(500).send("Loi render trang: " + renderErr.message + "<br><pre>" + (renderErr.stack||'') + "</pre>");
-    } else {
-      res.send(html);
-    }
-  });
+  res.render("doisoat-chiphi-saoke", viewData);
   } catch (e) {
-    console.error("[doi-soat/chi-phi-saoke] JS ERROR:", e.message, e.stack);
-    res.status(500).send("Loi JS: " + e.message + "<br><pre>" + (e.stack||'') + "</pre>");
+    console.error("[doi-soat/chi-phi-saoke] ERROR:", e.message);
+    res.status(500).send("Lỗi: " + e.message);
   }
 });
 
