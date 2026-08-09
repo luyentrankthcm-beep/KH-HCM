@@ -838,6 +838,122 @@ router.get("/doi-soat/chi-phi/export.xlsx", (req, res) => {
   res.send(buf);
 });
 
+// Luyen, 2026-08-09: "cho tôi thêm 1 cái nữa là đối chiếu tài khoản chi dưới
+// cái tài khoản chi nhá trong đó sẽ chia ra làm 2 ngân hàng dựa vào sao kê á
+// lấy ra 2 ngân hàng đó cho tôi và đối ứng chi của ngân hàng đó với lại dựa
+// vào chi phí hay hóa đơn đầu vào hay diễn giải á để lấy ra cho tôi số hóa
+// đơn với gian đó dựa vào chi phí á số tiền tên đối tác diễn giải"
+// Trang nay: doc truc tiep tu store.transactions (sao ke song), lay tat ca GD
+// type="chi" cua 2 tai khoan chi cua cong ty dang xem, cross-ref voi
+// store.chi_phi (uu tien bankTxId chinh xac, fallback so tien +-1000 + ngay
+// +-7d) de lay soHoaDon / gian / ncc / daHachToan. Khac trang "Tai khoan Chi"
+// hien co (upload file raw, xuat MISA) -- trang nay de xem nhanh tung giao
+// dich va doi chieu chi phi da nhap.
+router.get("/doi-soat/chi-phi-saoke", (req, res) => {
+  const store = load();
+  ensureShape(store);
+  const activeCompany = getCompany(req);
+
+  // Tai khoan chi cua cong ty dang xem
+  const companyChannelKeys = CHANNEL_KEYS.filter((k) => CHANNELS[k].company === activeCompany);
+  const chiBankNameSet = new Set(companyChannelKeys.map((k) => CHANNELS[k].bankName));
+
+  const banksById = {};
+  (store.banks || []).forEach((b) => { banksById[b.id] = b; });
+
+  const chiBankIds = new Set(
+    (store.banks || []).filter((b) => chiBankNameSet.has(b.name)).map((b) => b.id)
+  );
+
+  // Danh sach thang co GD chi tren 2 tai khoan nay
+  const monthSet = new Set();
+  (store.transactions || []).forEach((t) => {
+    if (t.type !== "chi" || !chiBankIds.has(t.bank_id)) return;
+    const m = (t.date || "").slice(0, 7);
+    if (m) monthSet.add(m);
+  });
+  const months = [...monthSet].sort().reverse();
+
+  const selectedMonth = req.query.thang || months[0] || "";
+  const selectedBankName = req.query.nganHang || "";
+
+  // Chi phi index: exact by bankTxId
+  const chiPhiByBankTxId = {};
+  // Also fuzzy list for this company (so tien + ngay)
+  const chiPhiCompany = [];
+  (store.chi_phi || []).forEach((r) => {
+    if ((r.congTy || "kh_cu") !== activeCompany) return;
+    if (r.bankTxId) chiPhiByBankTxId[r.bankTxId] = r;
+    chiPhiCompany.push(r);
+  });
+
+  const AMOUNT_TOL = 1000;
+  const DATE_WIN_MS = 7 * 86400000;
+  function dateMs(d) { return new Date(d + "T00:00:00").getTime(); }
+
+  // Loc GD chi
+  const chiTxs = (store.transactions || []).filter((t) => {
+    if (t.type !== "chi" || !chiBankIds.has(t.bank_id)) return false;
+    if (selectedMonth && (t.date || "").slice(0, 7) !== selectedMonth) return false;
+    const bankName = (banksById[t.bank_id] || {}).name || "";
+    if (selectedBankName && bankName !== selectedBankName) return false;
+    return true;
+  });
+
+  const rows = chiTxs.map((t) => {
+    const bank = banksById[t.bank_id] || {};
+    const bankName = bank.name || "";
+    const channelKey = companyChannelKeys.find((k) => CHANNELS[k].bankName === bankName);
+    const bankLabel = channelKey ? CHANNELS[channelKey].label : bankName;
+
+    // Exact match by bankTxId
+    let cp = chiPhiByBankTxId[t.id] || null;
+    let matchType = cp ? "exact" : "";
+
+    // Fuzzy match: so tien +-1000 + ngay +-7d
+    if (!cp) {
+      const tMs = dateMs(t.date);
+      cp = chiPhiCompany.find((r) => {
+        if (!r.ngay || !r.soTien) return false;
+        if (Math.abs((r.soTien || 0) - t.amount) > AMOUNT_TOL) return false;
+        return Math.abs(dateMs(r.ngay) - tMs) <= DATE_WIN_MS;
+      }) || null;
+      if (cp) matchType = "fuzzy";
+    }
+
+    return {
+      id: t.id,
+      date: t.date,
+      bankName,
+      bankLabel,
+      tenDoiUng: t.tenDoiUng || "",
+      description: t.description || "",
+      amount: t.amount,
+      soHoaDon: (cp && cp.soHoaDon) || "",
+      gian: (cp && cp.gian) || "",
+      ncc: (cp && cp.ncc) || "",
+      daHachToan: cp ? !!cp.daHachToan : false,
+      matchType,
+    };
+  }).sort((a, b) => a.date.localeCompare(b.date));
+
+  const { COMPANIES } = require("../utils/companies");
+  res.render("doisoat-chiphi-saoke", {
+    COMPANIES,
+    activeCompany,
+    months,
+    selectedMonth,
+    selectedBankName,
+    chiBankNames: [...chiBankNameSet],
+    rows,
+    totalRows: rows.length,
+    totalAmount: rows.reduce((s, r) => s + r.amount, 0),
+    matchedCount: rows.filter((r) => r.matchType).length,
+    successMsg: req.query.success || "",
+    errorMsg: req.query.error || "",
+  });
+});
+
 module.exports = router;
 // Luyen, 2026-07-19: xuat them vai ham/hang so noi bo (khong doi router
 // chinh) de trang moi "Cong No NCC" (routes/congno-ncc.js) tai su dung DUNG

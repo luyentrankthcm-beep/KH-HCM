@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <%- include('partials/head') %>
+</head>
+<body>
+  <%- include('partials/nav') %>
+  <main class="container">
+    <h1>Đối chiếu Chi từ Sao kê — <%= COMPANIES[activeCompany].label %></h1>
+    <p class="muted" style="margin-top:-10px;margin-bottom:20px;">
+      Tất cả giao dịch <strong>Chi</strong> từ sao kê ngân hàng trực tiếp (<%= chiBankNames.join(', ') %>),
+      đối chiếu với danh sách Chi phí đã nhập để lấy Số hóa đơn, Gian và NCC.
+      Khớp <strong>chính xác</strong> nếu giao dịch có bankTxId; <strong>tương đối</strong> nếu khớp số tiền ±1.000đ và ngày ±7 ngày.
+    </p>
+
+    <% if (successMsg) { %>
+    <div class="alert alert-success" id="successBanner"><%= successMsg %></div>
+    <% } %>
+    <% if (errorMsg) { %>
+    <div class="alert alert-error" id="autohide-error"><%= errorMsg %></div>
+    <% } %>
+
+    <script>
+      (function () {
+        ["successBanner", "autohide-error"].forEach(function (id) {
+          var el = document.getElementById(id);
+          if (!el) return;
+          setTimeout(function () {
+            el.style.transition = "opacity 0.6s ease, max-height 0.6s ease, margin 0.6s ease, padding 0.6s ease";
+            el.style.opacity = "0"; el.style.maxHeight = "0"; el.style.overflow = "hidden";
+            el.style.marginTop = "0"; el.style.marginBottom = "0";
+            el.style.paddingTop = "0"; el.style.paddingBottom = "0";
+          }, 4000);
+        });
+      })();
+    </script>
+
+    <!-- Bộ lọc -->
+    <section class="panel" style="margin-bottom:18px;">
+      <form method="GET" action="/doi-soat/chi-phi-saoke" style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;">
+        <label style="display:flex;flex-direction:column;gap:4px;font-size:13px;">
+          Tháng
+          <select name="thang" onchange="this.form.submit()" style="min-width:120px;">
+            <option value="">Tất cả</option>
+            <% months.forEach(function(m) { %>
+            <option value="<%= m %>" <%= selectedMonth === m ? 'selected' : '' %>><%= m %></option>
+            <% }) %>
+          </select>
+        </label>
+        <label style="display:flex;flex-direction:column;gap:4px;font-size:13px;">
+          Ngân hàng
+          <select name="nganHang" onchange="this.form.submit()" style="min-width:150px;">
+            <option value="">Tất cả (<%= chiBankNames.join(' + ') %>)</option>
+            <% chiBankNames.forEach(function(b) { %>
+            <option value="<%= b %>" <%= selectedBankName === b ? 'selected' : '' %>><%= b %></option>
+            <% }) %>
+          </select>
+        </label>
+      </form>
+    </section>
+
+    <!-- Tổng kết -->
+    <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:18px;">
+      <div class="stat-card" style="flex:1;min-width:140px;">
+        <div class="stat-label">Tổng giao dịch Chi</div>
+        <div class="stat-value"><%= totalRows.toLocaleString('vi-VN') %></div>
+      </div>
+      <div class="stat-card" style="flex:1;min-width:140px;">
+        <div class="stat-label">Tổng số tiền Chi</div>
+        <div class="stat-value"><%= totalAmount.toLocaleString('vi-VN') %>đ</div>
+      </div>
+      <div class="stat-card" style="flex:1;min-width:140px;border-color:var(--color-success, #2d9e5f);">
+        <div class="stat-label">Đã khớp Chi phí</div>
+        <div class="stat-value" style="color:var(--color-success,#2d9e5f);"><%= matchedCount %> / <%= totalRows %></div>
+      </div>
+      <div class="stat-card" style="flex:1;min-width:140px;border-color:var(--color-warn, #c67b00);">
+        <div class="stat-label">Chưa khớp</div>
+        <div class="stat-value" style="color:var(--color-warn,#c67b00);"><%= totalRows - matchedCount %></div>
+      </div>
+    </div>
+
+    <!-- Bảng chi tiết -->
+    <section class="panel">
+      <% if (rows.length === 0) { %>
+      <p class="muted">Không có giao dịch Chi nào<% if (selectedMonth) { %> trong tháng <%= selectedMonth %><% } %>
+        <% if (selectedBankName) { %> (ngân hàng <%= selectedBankName %>)<% } %>.
+        <br>Kiểm tra lại: tài khoản ngân hàng đã được tạo với tên đúng (<%= chiBankNames.join(', ') %>)?
+      </p>
+      <% } else { %>
+      <div style="overflow-x:auto;">
+        <table class="data-table" style="font-size:13px;">
+          <thead>
+            <tr>
+              <th>Ngày</th>
+              <th>Ngân hàng</th>
+              <th>Tên đối tác (sao kê)</th>
+              <th>Diễn giải</th>
+              <th style="text-align:right;">Số tiền</th>
+              <th>Số HĐ</th>
+              <th>Gian</th>
+              <th>NCC</th>
+              <th>Đã chi</th>
+              <th>Khớp</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% rows.forEach(function(r) { %>
+            <tr class="<%= r.matchType === 'exact' ? 'row-matched-exact' : r.matchType === 'fuzzy' ? 'row-matched-fuzzy' : 'row-unmatched' %>">
+              <td><%= r.date %></td>
+              <td><span class="badge badge-neutral" style="font-size:11px;"><%= r.bankLabel || r.bankName %></span></td>
+              <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="<%= r.tenDoiUng %>"><%= r.tenDoiUng || '—' %></td>
+              <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="<%= r.description %>"><%= r.description || '—' %></td>
+              <td style="text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;">
+                <%= r.amount.toLocaleString('vi-VN') %>đ
+              </td>
+              <td><%= r.soHoaDon || '' %></td>
+              <td style="max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="<%= r.gian %>"><%= r.gian || '' %></td>
+              <td style="max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="<%= r.ncc %>"><%= r.ncc || '' %></td>
+              <td style="text-align:center;">
+                <% if (r.daHachToan) { %><span style="color:var(--color-success,#2d9e5f);">✓</span><% } else { %><span class="muted">—</span><% } %>
+              </td>
+              <td>
+                <% if (r.matchType === 'exact') { %>
+                  <span class="badge badge-success" style="font-size:11px;" title="Khớp chính xác qua mã GD ngân hàng">Chính xác</span>
+                <% } else if (r.matchType === 'fuzzy') { %>
+                  <span class="badge badge-warn" style="font-size:11px;" title="Khớp tương đối: số tiền ±1.000đ + ngày ±7 ngày">Tương đối</span>
+                <% } else { %>
+                  <span class="badge badge-error" style="font-size:11px;">Chưa khớp</span>
+                <% } %>
+              </td>
+            </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+      <% } %>
+    </section>
+  </main>
+
+  <style>
+    .row-matched-exact { background: rgba(45,158,95,0.05); }
+    .row-matched-fuzzy { background: rgba(198,123,0,0.07); }
+    .row-unmatched {}
+    .stat-card {
+      background: var(--color-surface, #fff);
+      border: 1.5px solid var(--color-hairline, #e0e0e0);
+      border-radius: 10px;
+      padding: 14px 18px;
+    }
+    .stat-label { font-size: 12px; color: var(--color-muted, #888); margin-bottom: 4px; }
+    .stat-value { font-size: 22px; font-weight: 700; }
+    .badge-neutral { background: #eee; color: #555; border-radius: 4px; padding: 2px 6px; font-size: 11px; }
+    .badge-warn { background: #fff3cd; color: #856404; border-radius: 4px; padding: 2px 6px; }
+  </style>
+  <%- include('partials/scroll-restore') %>
+  <%- include('partials/details-restore') %>
+</body>
+</html>
