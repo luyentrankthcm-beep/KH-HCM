@@ -869,7 +869,9 @@ router.post("/chi-phi/:mien(mien-nam|mien-bac)/quet-ngan-hang", requireDataEntry
         trangThaiHoaDon: suspicious
           ? `CẢNH BÁO: số tiền ${t.amount.toLocaleString("vi-VN")}đ bất thường so với các tháng trước -- chị kiểm tra lại sao kê gốc.`
           : "",
-        daHachToan: false,
+        // Luyen, 2026-08-09: tien da chay qua ngan hang roi nen danh dau ngay
+        // la da chi (khong can cho Luyen tick tay nua).
+        daHachToan: true,
         nguon: `Ngân hàng ${bank.name}`,
         ghiChu: `Tự động liên kết từ giao dịch ngân hàng "${bank.name}" ngày ${t.date} (mã GD #${t.id}), khớp gian qua diễn giải "${gianText}".`,
         createdAt: new Date().toISOString(),
@@ -988,6 +990,108 @@ router.post("/chi-phi/:mien(mien-nam|mien-bac)/tim-hoa-don-gmail", requireDataEn
     if (req.body.hachToan) qs.push("hachToan=" + encodeURIComponent(req.body.hachToan));
     if (req.body.thang !== undefined) qs.push("thang=" + encodeURIComponent(req.body.thang));
     if (req.body.hoaDon) qs.push("hoaDon=" + encodeURIComponent(req.body.hoaDon));
+    qs.push("success=" + encodeURIComponent(msg));
+    res.redirect("/chi-phi/" + mienSeg(mien) + "?" + qs.join("&"));
+  } catch (e) {
+    res.redirect("/chi-phi/" + mienSeg(mien) + "?error=" + encodeURIComponent(e.message));
+  }
+});
+
+// Luyen, 2026-08-09: "cập nhật thêm chỗ chi phí á laf đã chi chưa á dựa vào
+// ngân hàng chi nhá của kh cũ và kh mới luôn với lại của chi phí miền nam và
+// chi phí miền bắc ln nhá" + chon "Ca hai":
+//   (1) quet-ngan-hang da set daHachToan: true ngay khi tao (da sua o tren).
+//   (2) Nut nay: retroactively tick "Đã chi" cho cac dong da co bankTxId
+//       (tao boi quet-ngan-hang cu -- da chay ngan hang nhung chua co flag)
+//       VA dong nhap tay co the khop voi giao dich ngan hang:
+//       - so tien khop trong nguong ±1 000đ (lam tron)
+//       - ngay chi phi nam trong ±7 ngay so voi ngay giao dich ngan hang
+//       - cung cong ty (bank.company === r.congTy)
+//       Ghi lai bankTxId tren dong nhap tay neu chua co.
+//       Pham vi: tat ca cac mien (nam + bac), tat ca cong ty (kh_cu + kh_moi)
+//       -- Luyen da xac nhan "Ca hai" qua AskUserQuestion.
+router.post("/chi-phi/:mien(mien-nam|mien-bac)/cap-nhat-da-chi-ngan-hang", requireDataEntry, (req, res) => {
+  const store = load();
+  ensureShape(store);
+  const mien = mienFromSeg(req.params.mien);
+  try {
+    const banksById = {};
+    (store.banks || []).forEach((b) => { banksById[b.id] = b; });
+
+    // Build lookup: bank chi txs indexed by congTy -> sorted by date
+    // Use ALL banks (both companies), filter by congTy when matching
+    const chiTxsByCompany = {}; // { kh_cu: [...], kh_moi: [...] }
+    (store.transactions || []).forEach((t) => {
+      if (t.type !== "chi") return;
+      const bank = banksById[t.bank_id];
+      if (!bank) return;
+      const company = bank.company || "kh_cu";
+      if (!chiTxsByCompany[company]) chiTxsByCompany[company] = [];
+      chiTxsByCompany[company].push(t);
+    });
+
+    // Sort by date once
+    Object.values(chiTxsByCompany).forEach((arr) => arr.sort((a, b) => a.date.localeCompare(b.date)));
+
+    const AMOUNT_TOLERANCE = 1000; // dong
+    const DATE_WINDOW_DAYS = 7;
+
+    function dateToMs(d) { return new Date(d + "T00:00:00").getTime(); }
+
+    let retroFixed = 0;   // had bankTxId but daHachToan was false
+    let matched = 0;      // manually entered, now matched to a bank tx
+    let alreadyDone = 0;  // already daHachToan = true
+
+    for (const r of store.chi_phi) {
+      if ((r.mien || "nam") !== mien) continue;
+      if (r.daHachToan) { alreadyDone++; continue; }
+
+      // Case 1: already has bankTxId (created by old quet-ngan-hang before
+      // the daHachToan:true fix) -- just flip the flag.
+      if (r.bankTxId) {
+        r.daHachToan = true;
+        retroFixed++;
+        continue;
+      }
+
+      // Case 2: manually entered -- try to find a matching bank chi tx.
+      const company = r.congTy || "kh_cu";
+      const txPool = chiTxsByCompany[company] || [];
+      if (!txPool.length || !r.ngay || !r.soTien) continue;
+
+      const rDateMs = dateToMs(r.ngay);
+      const windowMs = DATE_WINDOW_DAYS * 86400000;
+
+      // Binary search to find start of date window
+      const windowStart = new Date(rDateMs - windowMs).toISOString().slice(0, 10);
+      const windowEnd   = new Date(rDateMs + windowMs).toISOString().slice(0, 10);
+
+      let found = null;
+      for (const t of txPool) {
+        if (t.date < windowStart) continue;
+        if (t.date > windowEnd) break;
+        if (Math.abs(t.amount - r.soTien) <= AMOUNT_TOLERANCE) {
+          found = t;
+          break;
+        }
+      }
+      if (found) {
+        r.daHachToan = true;
+        r.bankTxId = found.id;
+        matched++;
+      }
+    }
+
+    save(store);
+
+    let msg = `Đã cập nhật "Đã chi" từ ngân hàng (${mien === "bac" ? "Miền Bắc" : "Miền Nam"}): `;
+    msg += `${retroFixed} dòng tự động cũ (có mã GD, chưa tick), ${matched} dòng nhập tay khớp ngân hàng. `;
+    if (alreadyDone > 0) msg += `(${alreadyDone} dòng đã tick trước đó, bỏ qua.)`;
+    if (retroFixed + matched === 0) msg = "Không tìm thêm được dòng nào để tick Đã chi -- tất cả đã xử lý hoặc không khớp ngân hàng.";
+
+    const qs = [];
+    if (req.body.hachToan) qs.push("hachToan=" + encodeURIComponent(req.body.hachToan));
+    if (req.body.thang !== undefined) qs.push("thang=" + encodeURIComponent(req.body.thang));
     qs.push("success=" + encodeURIComponent(msg));
     res.redirect("/chi-phi/" + mienSeg(mien) + "?" + qs.join("&"));
   } catch (e) {

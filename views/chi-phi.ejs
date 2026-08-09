@@ -45,7 +45,15 @@
           <span class="icon-upload-btn-label">Quét ngân hàng</span>
         </button>
       </form>
-      <a
+      <form method="POST" action="/chi-phi/mien-<%= mien %>/cap-nhat-da-chi-ngan-hang" style="display:inline-block;">
+        <input type="hidden" name="hachToan" value="<%= hachToanFilter %>" />
+        <input type="hidden" name="thang" value="<%= thangFilter %>" />
+        <button type="submit" class="icon-upload-btn" style="border:1px solid var(--color-hairline);" title="Tự động tick 'Đã chi' cho các dòng chưa tick: (1) các dòng do Quét ngân hàng tạo trước đây (đã có mã GD ngân hàng, chưa tick); (2) các dòng nhập tay có thể khớp với giao dịch Chi trên ngân hàng (KH Cũ + KH Mới) -- khớp theo số tiền ±1000đ và ngày ±7 ngày.">
+          <span class="icon-upload-btn-icon">✅</span>
+          <span class="icon-upload-btn-label">Cập nhật Đã chi</span>
+        </button>
+      </form>
+      <
         href="/chi-phi/mien-<%= mien %>/export.xlsx?hachToan=<%= encodeURIComponent(hachToanFilter) %>&thang=<%= encodeURIComponent(thangFilter) %>&hoaDon=<%= encodeURIComponent(hoaDonFilter) %>"
         class="icon-upload-btn"
         style="border:1px solid var(--color-hairline); text-decoration:none; color:inherit;"
