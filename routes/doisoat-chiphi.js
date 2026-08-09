@@ -850,6 +850,7 @@ router.get("/doi-soat/chi-phi/export.xlsx", (req, res) => {
 // hien co (upload file raw, xuat MISA) -- trang nay de xem nhanh tung giao
 // dich va doi chieu chi phi da nhap.
 router.get("/doi-soat/chi-phi-saoke", (req, res) => {
+  try {
   const store = load();
   ensureShape(store);
   const activeCompany = getCompany(req);
@@ -952,6 +953,11 @@ router.get("/doi-soat/chi-phi-saoke", (req, res) => {
     successMsg: req.query.success || "",
     errorMsg: req.query.error || "",
   });
+  } catch (e) {
+    // Surface loi ro rang thay vi ISE de co the debug
+    console.error("[doi-soat/chi-phi-saoke] ERROR:", e.message, e.stack);
+    res.status(500).send("Loi trang Doi chieu Chi (Sao ke): " + e.message + "<br><pre>" + e.stack + "</pre>");
+  }
 });
 
 module.exports = router;
