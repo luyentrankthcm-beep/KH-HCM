@@ -939,7 +939,7 @@ router.get("/doi-soat/chi-phi-saoke", (req, res) => {
   }).sort((a, b) => a.date.localeCompare(b.date));
 
   const { COMPANIES } = require("../utils/companies");
-  res.render("doisoat-chiphi-saoke", {
+  const viewData = {
     COMPANIES,
     activeCompany,
     months,
@@ -952,11 +952,18 @@ router.get("/doi-soat/chi-phi-saoke", (req, res) => {
     matchedCount: rows.filter((r) => r.matchType).length,
     successMsg: req.query.success || "",
     errorMsg: req.query.error || "",
+  };
+  res.render("doisoat-chiphi-saoke", viewData, function(renderErr, html) {
+    if (renderErr) {
+      console.error("[doi-soat/chi-phi-saoke] RENDER ERROR:", renderErr.message, renderErr.stack);
+      res.status(500).send("Loi render trang: " + renderErr.message + "<br><pre>" + (renderErr.stack||'') + "</pre>");
+    } else {
+      res.send(html);
+    }
   });
   } catch (e) {
-    // Surface loi ro rang thay vi ISE de co the debug
-    console.error("[doi-soat/chi-phi-saoke] ERROR:", e.message, e.stack);
-    res.status(500).send("Loi trang Doi chieu Chi (Sao ke): " + e.message + "<br><pre>" + e.stack + "</pre>");
+    console.error("[doi-soat/chi-phi-saoke] JS ERROR:", e.message, e.stack);
+    res.status(500).send("Loi JS: " + e.message + "<br><pre>" + (e.stack||'') + "</pre>");
   }
 });
 
