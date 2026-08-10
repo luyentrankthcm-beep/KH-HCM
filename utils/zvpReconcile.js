@@ -1306,6 +1306,14 @@ function resolveDiemGross(parsed, diemMap) {
     }
     // Chi Nhan (2026-07-27): khong con tach CSE/khong-CSE thanh 2 dong rieng.
     const code = mapped.maCongTrinh;
+    // Luyen, 2026-08-10: neu diem trong bang map nhung maCongTrinh de TRONG
+    // (blank hoac whitespace) -- cung coi nhu chua map, them vao unmapped de
+    // hien canh bao thay vi luu vao grossByCode voi key "ngay|" (blank code)
+    // gay ra dong blank tren trang doi soat.
+    if (!code || !String(code).trim()) {
+      unmapped.add(diemRaw);
+      continue;
+    }
     codes.add(code);
     const newKey = `${date}|${code}`;
     grossByCode[newKey] = (grossByCode[newKey] || 0) + parsed.grossByCode[key];
