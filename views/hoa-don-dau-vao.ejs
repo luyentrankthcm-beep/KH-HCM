@@ -166,6 +166,12 @@
             <option value="0" <%= daChiFilter === '0' ? 'selected' : '' %>>Chưa chi</option>
           </select>
         </label>
+        <!-- Luyen, 2026-08-10: "thêm cái lọc theo hóa đơn tìm nhanh" -->
+        <label class="form-inline-tight" style="gap:6px;">Số HĐ
+          <input type="text" name="soHd" value="<%= soHdFilter %>" placeholder="Tìm số HĐ..." style="width:120px;" />
+          <button type="submit" class="btn btn-sm">Tìm</button>
+          <% if (soHdFilter) { %><a href="?<%= baseQs.replace(/&?soHd=[^&]*/g,'') %>" class="btn btn-sm" style="background:#e0e0e0;color:#333;">✕</a><% } %>
+        </label>
       </form>
       <div style="margin-bottom:10px;">
         <a class="btn" href="/hoa-don-dau-vao/export.xlsx?thang=<%= encodeURIComponent(thangFilter) %>&hachToan=<%= encodeURIComponent(hachToanFilter) %>">⬇ Xuất Excel (mỗi mặt hàng 1 dòng)</a>
@@ -208,6 +214,7 @@
                   <input type="hidden" name="tkNo" value="<%= tkNoFilter %>" />
                   <input type="hidden" name="gian" value="<%= gianFilter %>" />
                   <input type="hidden" name="daChi" value="<%= daChiFilter %>" />
+                  <input type="hidden" name="soHd" value="<%= soHdFilter %>" />
                   <input type="hidden" name="page" value="<%= currentPage %>" />
                   <input type="hidden" name="daChiTien" value="<%= r.daChiTien ? '0' : '1' %>" />
                   <button type="submit" class="link-btn">
@@ -223,6 +230,7 @@
                   <input type="hidden" name="tkNo" value="<%= tkNoFilter %>" />
                   <input type="hidden" name="gian" value="<%= gianFilter %>" />
                   <input type="hidden" name="daChi" value="<%= daChiFilter %>" />
+                  <input type="hidden" name="soHd" value="<%= soHdFilter %>" />
                   <input type="hidden" name="page" value="<%= currentPage %>" />
                   <input type="hidden" name="daHachToan" value="<%= r.daHachToan ? '0' : '1' %>" />
                   <button type="submit" class="link-btn">

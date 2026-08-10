@@ -285,6 +285,9 @@ router.get("/hoa-don-dau-vao", (req, res) => {
   // loc Da chi (Tat ca / Da chi / Chua chi), giup tim nhanh hoa don con chua
   // thanh toan thay vi phai doc het danh sach.
   const daChiFilter = req.query.daChi || ""; // "" = tat ca, "1" = da chi, "0" = chua chi
+  // Luyen, 2026-08-10: "thêm cái lọc theo hóa đơn tìm nhanh" -- o text search
+  // theo So Hoa Don, khop partial (contains), khong phan biet hoa thuong.
+  const soHdFilter = (req.query.soHd || "").trim();
   const page = Math.max(1, parseInt(req.query.page, 10) || 1);
   const PAGE_SIZE = 30;
 
@@ -312,6 +315,7 @@ router.get("/hoa-don-dau-vao", (req, res) => {
   else if (gianFilter === "0") groupedRows = groupedRows.filter((r) => !(r.gianHang || "").trim());
   if (daChiFilter === "1") groupedRows = groupedRows.filter((r) => r.daChiTien);
   else if (daChiFilter === "0") groupedRows = groupedRows.filter((r) => !r.daChiTien);
+  if (soHdFilter) groupedRows = groupedRows.filter((r) => String(r.soHoaDon || "").toLowerCase().includes(soHdFilter.toLowerCase()));
   groupedRows.sort((a, b) => (a.ngayHD < b.ngayHD ? 1 : -1));
   const tongTien = groupedRows.reduce((s, r) => s + (r.soTien || 0), 0);
   const daChiCount = groupedRows.filter((r) => r.daChiTien).length;
@@ -328,6 +332,7 @@ router.get("/hoa-don-dau-vao", (req, res) => {
   if (tkNoFilter) qs.push("tkNo=" + encodeURIComponent(tkNoFilter));
   if (gianFilter) qs.push("gian=" + encodeURIComponent(gianFilter));
   if (daChiFilter) qs.push("daChi=" + encodeURIComponent(daChiFilter));
+  if (soHdFilter) qs.push("soHd=" + encodeURIComponent(soHdFilter));
   const baseQs = qs.join("&");
 
   const nccMeta = store.hoa_don_dau_vao_ncc_meta;
@@ -346,6 +351,7 @@ router.get("/hoa-don-dau-vao", (req, res) => {
     tkNoFilter,
     gianFilter,
     daChiFilter,
+    soHdFilter,
     availableMonths,
     availableTkNo,
     tongTien,
