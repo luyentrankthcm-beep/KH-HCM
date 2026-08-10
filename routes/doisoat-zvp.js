@@ -217,6 +217,28 @@ const ZVP_INVOICE_DIEM_ALIAS_DEFAULTS = {
   "VC TC DIY KVCN": "KVC TIMES",
 };
 
+// Luyen, 2026-08-10: san pham moi tu combo upload OrderDetails 10/08/2026 --
+// tu dong them vao zvp_online_product_map voi maCongTrinh dung nen khong con
+// hien dong trong/blank row tren trang doi soat ZVP nua.
+const ZVP_ONLINE_PRODUCT_MAP_EXTRA_DEFAULTS = {
+  "❄️ BÌNH DƯƠNG - SALE 20% (chưa bao gồm tất) - SNOW FUN ❄️": { maCongTrinh: "AM BD KVCM", isCse: false },
+};
+
+function seedOnlineProductMapDefaults(store) {
+  if (!store.zvp_online_product_map) store.zvp_online_product_map = {};
+  let changed = false;
+  Object.keys(ZVP_ONLINE_PRODUCT_MAP_EXTRA_DEFAULTS).forEach((k) => {
+    const def = ZVP_ONLINE_PRODUCT_MAP_EXTRA_DEFAULTS[k];
+    // Chi seed neu entry chua co HOAC co nhung maCongTrinh dang de trong
+    const existing = store.zvp_online_product_map[k];
+    if (!existing || !(existing.maCongTrinh || "").trim()) {
+      store.zvp_online_product_map[k] = def;
+      changed = true;
+    }
+  });
+  return changed;
+}
+
 function seedZvpInvoiceDiemAliasDefaults(store) {
   if (!store.invoice_diem_alias) store.invoice_diem_alias = {};
   let changed = false;
@@ -365,6 +387,7 @@ function buildReconciliation(store) {
   if (ensureNo1388(store)) trySave();
   if (seedPayooDiemMapDefaults(store)) trySave();
   if (stripZvpGianListBadRedirects(store)) trySave();
+  if (seedOnlineProductMapDefaults(store)) trySave();
   if (seedZvpInvoiceDiemAliasDefaults(store)) trySave();
   if (seedZvpGianCodeRenames(store)) trySave();
   if (removeDuplicateOfflineTx20260716(store)) trySave();
