@@ -221,7 +221,15 @@ const ZVP_INVOICE_DIEM_ALIAS_DEFAULTS = {
 // tu dong them vao zvp_online_product_map voi maCongTrinh dung nen khong con
 // hien dong trong/blank row tren trang doi soat ZVP nua.
 const ZVP_ONLINE_PRODUCT_MAP_EXTRA_DEFAULTS = {
+  // Luyen, 2026-08-10: combo upload OrderDetails 10/08/2026
   "❄️ BÌNH DƯƠNG - SALE 20% (chưa bao gồm tất) - SNOW FUN ❄️": { maCongTrinh: "AM BD KVCM", isCse: false },
+  // Luyen, 2026-08-10: xac nhan tu doi soat Zalo App KH Cu 08-08 + 09-08
+  "AEON BÌNH DƯƠNG - SALE 20% VÉ NHÀ MA ÂM PHỦ":              { maCongTrinh: "AM BD KVCM", isCse: false },
+  "❄️HUẾ - COMBO 3 VÉ TẶNG 2 VÉ - SNOW FUN❄️":               { maCongTrinh: "AE HUE KVCN", isCse: false },
+  "🌸 SC VivoCity -  Combo 10 vé - Funzone Adventure 🌸":      { maCongTrinh: "SC VIVO KVCM", isCse: false },
+  "🌸 SC VivoCity -  Combo 5 vé - Funzone Adventure 🌸":       { maCongTrinh: "SC VIVO KVCM", isCse: false },
+  "🔥 THE LOOP (IPH) - FUNZONE - COMBO 05 VÉ 🔥":             { maCongTrinh: "FUNZONE IPH KVCN", isCse: false },
+  "LOTTE NHA TRANG - COMBO 10 VÉ - ECOKIDS FARM":              { maCongTrinh: "LM NHA TRANG KVC", isCse: false },
 };
 
 function seedOnlineProductMapDefaults(store) {
