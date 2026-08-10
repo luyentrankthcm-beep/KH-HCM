@@ -451,17 +451,9 @@ function buildMomoReconciliation(store, companyKey) {
   const sourceCfg = momoSourceCfg(companyKey, store);
   const usesSharedSource = sourceCfg !== cfg;
   const grossUploads = store[sourceCfg.grossKey] || [];
-  // Luyen, 2026-08-08: KVC LOTTE VUNG TAU dung chung 1 hoa don cho ca Momo va
-  // Zalo/ZVP -- trong MTT file, hoa don duoc tag "ZALO MINI APP" nen parseMttFile
-  // luu vao store.zvp_invoices.zalo (KHONG vao momo_moi_invoices). Nhung Momo
-  // van phai doi soat theo HĐ nay, nen them ZVP Zalo invoices cua cac gian
-  // "dung chung HĐ" vao pool truoc khi truyen vao reconcileMomo.
-  const MOMO_SHARED_ZVP_GIANS = new Set(["KVC LOTTE VUNG TAU"]);
-  const zvpZaloInvoices = (store.zvp_invoices && store.zvp_invoices.zalo) || [];
-  const sharedZvpInvoices = zvpZaloInvoices.filter((i) =>
-    MOMO_SHARED_ZVP_GIANS.has(i.maDiem)
-  );
-  const invoices = [...(store[cfg.invoicesKey] || []), ...sharedZvpInvoices];
+  // Luyen, 2026-08-10: Momo va Zalo App la 2 kenh RIENG BIET, xuat hoa don rieng.
+  // Khong duoc tron HĐ Zalo vao pool Momo. Chi dung dung invoicesKey cua tung kenh.
+  const invoices = store[cfg.invoicesKey] || [];
   // Luyen, 2026-07-21: "check so ngan hang 7701" -- BIDV7701 (TK rieng cua
   // KH Moi) gio DA co giao dich REM Momo that (tu 01/07/2026 den nay, xem
   // REM 9901CI2607... "MoMo TT GIAI TRI KvaH"), khac voi luc 07-16/17 khi TK
