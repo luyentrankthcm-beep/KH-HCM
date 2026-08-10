@@ -1901,7 +1901,15 @@ function parseFeeReportWorkbook(buffer, orderMap) {
   if (headerRowIdx < 0) {
     throw new Error('Khong doc duoc dong tieu de trong file "Du lieu bao cao phi theo GD thanh toan".');
   }
-  const grossColFeeReport = cols.grossColTruocKM !== undefined ? cols.grossColTruocKM : cols.grossCol;
+  // Luyen, 2026-08-10: Zalo App (FUNZONE MINI APP) va VNPay Offline dung cot
+  // gross KHAC NHAU:
+  //   - Offline (FARM, GHOST...): KM do VNPay tu bu → lay "Số tiền trước KM"
+  //     (nha hang thuc huong bang so truoc KM vi VNPay bu lai).
+  //   - Online Zalo App (FUNZONE): KM do ZALO tu bu, KHONG phai VNPay →
+  //     "Số tiền hạch toán thu hộ" moi la so thuc thu cua Funzone.
+  //     "Số tiền trước KM" CAO HON thuc te vi da bao gom phan Zalo giam.
+  const grossColOffline = cols.grossColTruocKM !== undefined ? cols.grossColTruocKM : cols.grossCol;
+  const grossColOnline  = cols.grossCol; // = "So tien hach toan thu ho"
 
   const onlineDates = new Set();
   const products = new Set();
@@ -1928,7 +1936,9 @@ function parseFeeReportWorkbook(buffer, orderMap) {
       const status = row[cols.statusCol];
       if (status && !/thanh cong|th.nh c.ng/i.test(String(status))) continue;
     }
-    const gross = grossColFeeReport !== undefined ? Number(row[grossColFeeReport]) || 0 : 0;
+    const isOnlineRow = /^FUNZONE MINI APP$/i.test(diemThu);
+    const grossColToUse = isOnlineRow ? grossColOnline : grossColOffline;
+    const gross = grossColToUse !== undefined ? Number(row[grossColToUse]) || 0 : 0;
     if (!gross) continue;
     const netRaw = cols.netCol !== undefined ? row[cols.netCol] : null;
     const fee = cols.feeCol !== undefined ? Number(row[cols.feeCol]) || 0 : 0;
@@ -1939,7 +1949,6 @@ function parseFeeReportWorkbook(buffer, orderMap) {
     // cach tinh Online tu truoc gio (kien cac GD Online thieu "Ngày hạch
     // toán thu hộ" tiep tuc bi bo qua nhu cu, du la tien that) -- xac dinh
     // Online/Offline TRUOC khi tinh date de fallback chi ap dung dung 1 ben.
-    const isOnlineRow = /^FUNZONE MINI APP$/i.test(diemThu);
     const dateRaw = cols.dateCol !== undefined ? row[cols.dateCol] : null;
     let date = toIsoDate(dateRaw);
     if (!date && !isOnlineRow && cols.gdTimeCol !== undefined) {
