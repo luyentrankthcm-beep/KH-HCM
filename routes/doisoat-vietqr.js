@@ -798,6 +798,13 @@ function ensureChannelShape(store) {
   if (store.invoice_diem_alias["CHKQT CAM RANH"] === "Chưa khớp") {
     delete store.invoice_diem_alias["CHKQT CAM RANH"];
   }
+  // Luyen, 2026-08-10: hop dong Nha Trang het -- xoa gia tri cu "FARM LOTTE NHA TRANG"
+  // khoi store de vong lap seed ben duoi ap dung duoc gia tri moi tu code default
+  // ("POSH MN CGV Vincom Xuan Khanh"). Chi xoa gia tri CU cu the, khong anh huong
+  // cac alias khac nguoi dung co the da chinh tay.
+  if (store.ma_cong_trinh_display_alias["LM NHA TRANG KVC"] === "FARM LOTTE NHA TRANG") {
+    delete store.ma_cong_trinh_display_alias["LM NHA TRANG KVC"];
+  }
   Object.keys(MA_CONG_TRINH_DISPLAY_ALIAS_DEFAULTS).forEach((k) => {
     if (!store.ma_cong_trinh_display_alias[k]) {
       store.ma_cong_trinh_display_alias[k] = MA_CONG_TRINH_DISPLAY_ALIAS_DEFAULTS[k];
