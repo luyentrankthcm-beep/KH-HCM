@@ -292,6 +292,9 @@ const INVOICE_SHARE_PAIRS = {
 // "tk 77021 thoi nha"), bidv7702 khong doi.
 const INVOICE_SHARE_PAIRS_STOP_FROM = {
   bidv77021: "2026-07-29",
+  // Luyen, 2026-08-10: tu T8 hop dong Nha Trang het, khong con cap AM TP PHCM /
+  // LM NHA TRANG KVC xuat chung hoa don nua -- tat co che chia tu dong tu ngay nay.
+  bidv7702: "2026-08-01",
 };
 
 // Chi Nhan, 2026-07-30: xem ghi chu day du o cho goi -- CHI 2 kenh nay duoc
@@ -423,7 +426,12 @@ const MA_CONG_TRINH_DISPLAY_ALIAS_DEFAULTS = {
   "Go Âu Cơ (EB Tân Phú)": "GO AU CO PHCM",
   "AE Tân Phú ghế": "AM TP PHCM",
   "Lotte mart Nam Sài Gòn": "LOTTE Q7 (NSG) PHM",
-  "LM NHA TRANG KVC": "FARM LOTTE NHA TRANG",
+  // Luyen, 2026-08-10: hop dong Nha Trang (Posh/JP/Farm) het -- tu thang 8 tro
+  // di cac giao dich BIDV7702 co tham chieu "LM NHA TRANG KVC" hach toan vao
+  // "POSH MN CGV Vincom Xuan Khanh" thay vi "FARM LOTTE NHA TRANG".
+  // Du lieu thang 6-7 (LM NHA TRANG KVC cu) da doi chieu xong, doi alias se
+  // hien thi lai ten moi cho cac thang do -- chap nhan duoc vi Luyen xac nhan.
+  "LM NHA TRANG KVC": "POSH MN CGV Vincom Xuân Khánh",
   "JP vicom 3.2 BIDV": "VC 3/2 JP-Posh",
   "VINCOM GAND PARK": "JP-POSH GRAND PARK",
   // Chi Nhan, 2026-07-29: "mã công trình JPSBNB đổi thành JP SB NOI BAI đúng
