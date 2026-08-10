@@ -1665,39 +1665,24 @@ const SEED_CHT_NOP_TIEN_ROWS = [
   }
   if (seedFixChuaKhopCamRanhTenDiem(store)) changed = true;
 
-  // Luyen, 2026-08-10: "hóa đơn momo kh cũ của vũng tàu đây nhá map vô cho
-  // tôi đi" -- HĐ 2512 (3.957.000đ, doanh thu 07-31) va HĐ 2547 (20.548.000đ,
-  // doanh thu 08-01+08-02) cho gian KVC LOTTE VUNG TAU chua xuat hien trong
-  // momo kh cu (hien "Chua co HD"). Trong MTT file, hoa don loai nay duoc tag
-  // "ZALO MINI APP" nen parseMttFile se luu vao store.zvp_invoices.zalo (khong
-  // phai momo_invoices). buildMomoReconciliation da co MOMO_SHARED_ZVP_GIANS
-  // de chia se chung vao pool Momo, nhung cac HĐ nay chua duoc upload MTT T8.
-  // Seed truc tiep vao zvp_invoices.zalo (nhu noi chung se di) de ca 2 kenh
-  // Momo (qua MOMO_SHARED_ZVP_GIANS) va ZVP Zalo deu hien dung. De-dup bang
-  // key "${soHd}|${ngayHd}|${maDiem}" giong upload route chinh thuc.
-  function seedVungTauKhCuMomoHdAug2026(store) {
-    if (!store.zvp_invoices) store.zvp_invoices = {};
-    if (!store.zvp_invoices.zalo) store.zvp_invoices.zalo = [];
-    const pool = store.zvp_invoices.zalo;
-    const toSeed = [
-      // HD 2512: doanh thu 07-31, hoa don ngay 08-01
-      { soHd: "2512", ngayHd: "2026-08-01", maDiem: "KVC LOTTE VUNG TAU", tongTt: 3957000, days: [31], raw: "ZALO MINI APP" },
-      // HD 2547: doanh thu 08-01 + 08-02, hoa don ngay 08-03
-      { soHd: "2547", ngayHd: "2026-08-03", maDiem: "KVC LOTTE VUNG TAU", tongTt: 20548000, days: [1, 2], raw: "ZALO MINI APP" },
-    ];
-    const existing = new Set(pool.map((i) => `${i.soHd}|${i.ngayHd}|${i.maDiem}`));
-    let added = 0;
-    for (const inv of toSeed) {
-      const k = `${inv.soHd}|${inv.ngayHd}|${inv.maDiem}`;
-      if (existing.has(k)) continue;
-      pool.push(inv);
-      existing.add(k);
-      added++;
-    }
-    if (added > 0) console.log(`[seed] Da them ${added} hoa don KVC LOTTE VUNG TAU (HĐ 2512/2547, t08.2026) vao zvp_invoices.zalo.`);
-    return added > 0;
+  // Luyen, 2026-08-10: xoa seed HĐ 2512/2547 KVC LOTTE VUNG TAU da them nham
+  // vao zvp_invoices.zalo -- cac HĐ nay da co san trong momo_invoices (tu MTT
+  // upload truoc do), seed lam double-count. Root cause that la alias bi ghi de
+  // boi INVOICE_DIEM_ALIAS_DEFAULTS trong doisoat-vietqr.js ("KVC LOTTE VUNG
+  // TAU" -> "VUNG TAU PHCM") da duoc sua qua KNOWN_INVOICE_DIEM_ALIASES trong
+  // doisoat.js -- khong can seed them nua. Xoa ca 2 ban se-seed de don dep.
+  function removeWrongSeedVungTauZalo(store) {
+    if (!store.zvp_invoices || !store.zvp_invoices.zalo) return false;
+    const badSoHds = new Set(["2512", "2547"]);
+    const before = store.zvp_invoices.zalo.length;
+    store.zvp_invoices.zalo = store.zvp_invoices.zalo.filter(
+      (i) => !(badSoHds.has(String(i.soHd)) && i.maDiem === "KVC LOTTE VUNG TAU" && i.raw === "ZALO MINI APP" && !i.uploaded_at)
+    );
+    const removed = before - store.zvp_invoices.zalo.length;
+    if (removed > 0) console.log(`[seed] Da xoa ${removed} hoa don seed sai KVC LOTTE VUNG TAU (HĐ 2512/2547) khoi zvp_invoices.zalo.`);
+    return removed > 0;
   }
-  if (seedVungTauKhCuMomoHdAug2026(store)) changed = true;
+  if (removeWrongSeedVungTauZalo(store)) changed = true;
 
   // Xoa file rac MOI LAN KHOI DONG de giai phong Volume:
   // 1. .bak files: moi lan restore tao 1 file .bak 138MB, giu toi da 2 ban moi nhat.
