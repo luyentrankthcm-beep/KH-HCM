@@ -10,6 +10,7 @@ const {
   parsePayooRawReport,
   parseVnpayOfflineFeeReport,
   isDuplicateGrossUpload,
+  parseSharedInvoiceWorkbook,
 } = require("../utils/zvpReconcile");
 const { getCompany } = require("../utils/companies");
 
@@ -721,6 +722,46 @@ router.post("/doi-soat/vnpay-khmoi/upload-payoo/:id/delete", requireAdmin, (req,
     store.vnpay_khmoi_payoo_uploads = (store.vnpay_khmoi_payoo_uploads || []).filter((u) => u.id !== id);
     save(store);
     res.redirect("/doi-soat/vnpay-khmoi?success=" + encodeURIComponent("Da xoa bang doanh thu Payoo nay."));
+  } catch (e) {
+    res.redirect("/doi-soat/vnpay-khmoi?error=" + encodeURIComponent(e.message));
+  }
+});
+
+// ---------- Upload: file hóa đơn MTT (sheet "kê ds xuất HĐ MTT - 705") ----------
+// Luyen, 2026-08-10: trang VNPay/Payoo KH Moi chua co cho tai hoa don MTT.
+// parseSharedInvoiceWorkbook doc TAT CA sheet khop /k.\s*ds\s*xu.t/i (ca 705 lan
+// 989) va loc theo tag "vnpay"/"payoo" -- cho vao store.zvp_invoices.vnpay/.payoo.
+// migrateVnpayKhMoiInvoices (chay tu ensureVnpayKhMoiShape moi lan load page) tu
+// dong phan loai:
+//   - maDiem nam trong VNPAY_KHMOI_INVOICE_MADIEM_MAP → viet_qr_invoices.vnpayKhMoi
+//   - maDiem KHONG trong map (gian KH Cu) → giu lai zvp_invoices cho trang ZVP.
+// KHONG xu ly "zalo"/"momo" o day vi cac kenh do thuoc KH Cu (ACB31268).
+router.post("/doi-soat/vnpay-khmoi/upload-hoadon", requireDataEntry, upload.single("file"), (req, res) => {
+  const store = load();
+  try {
+    if (!req.file) throw new Error("Vui long chon 1 file de tai len.");
+    const shared = parseSharedInvoiceWorkbook(req.file.buffer, getCompany(req));
+    if (!store.zvp_invoices) store.zvp_invoices = { zalo: [], vnpay: [], payoo: [] };
+
+    const addedCounts = {};
+    for (const key of ["vnpay", "payoo"]) {
+      if (!store.zvp_invoices[key]) store.zvp_invoices[key] = [];
+      const existingKeys = new Set(store.zvp_invoices[key].map((i) => `${i.soHd}|${i.ngayHd}|${i.maDiem}`));
+      let added = 0;
+      for (const inv of shared[key]) {
+        const k = `${inv.soHd}|${inv.ngayHd}|${inv.maDiem}`;
+        if (existingKeys.has(k)) continue;
+        existingKeys.add(k);
+        store.zvp_invoices[key].push(inv);
+        added++;
+      }
+      addedCounts[key] = added;
+    }
+
+    save(store);
+    const total = addedCounts.vnpay + addedCounts.payoo;
+    let successMsg = `Da nap hoa don MTT: them ${addedCounts.vnpay} HD VNPay, ${addedCounts.payoo} HD Payoo (tong ${total} hoa don moi). Hoa don KH Moi se tu dong phan loai vao dung kenh khi tai lai trang.`;
+    res.redirect("/doi-soat/vnpay-khmoi?success=" + encodeURIComponent(successMsg));
   } catch (e) {
     res.redirect("/doi-soat/vnpay-khmoi?error=" + encodeURIComponent(e.message));
   }

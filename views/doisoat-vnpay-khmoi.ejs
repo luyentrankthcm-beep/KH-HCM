@@ -149,6 +149,22 @@
     </section>
 
     <section class="panel">
+      <details>
+        <summary style="font-weight:700;color:#111;cursor:pointer;">3. Tải hóa đơn MTT</summary>
+        <div style="margin-top:12px;">
+          <p class="muted">
+            Tải file MTT xuất từ hệ thống hóa đơn (sheet "kê ds xuất HĐ MTT - 705"). Web sẽ tự lọc hóa đơn
+            Payoo và VNPay rồi gắn đúng gian. Có thể tải nhiều lần — không bị trùng.
+          </p>
+          <form method="POST" action="/doi-soat/vnpay-khmoi/upload-hoadon" enctype="multipart/form-data" class="form-inline">
+            <input type="file" name="file" accept=".xlsx,.xls" required />
+            <button type="submit" class="btn btn-primary">Tải lên</button>
+          </form>
+        </div>
+      </details>
+    </section>
+
+    <section class="panel">
       <% if (months.length > 0) { %>
       <form method="GET" action="/doi-soat/vnpay-khmoi" class="form-inline">
         <label style="margin:0;">Chọn tháng:</label>
