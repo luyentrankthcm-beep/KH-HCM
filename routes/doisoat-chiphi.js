@@ -87,6 +87,7 @@ function ensureShape(store) {
   if (!store.chi_phi_raw_uploads) store.chi_phi_raw_uploads = {};
   if (!store.chi_phi_vendor_tk_map) store.chi_phi_vendor_tk_map = {};
   if (!store.chi_phi_gian_override) store.chi_phi_gian_override = {};
+  if (!store.chi_phi_gian_tk_manual) store.chi_phi_gian_tk_manual = {}; // chiPhiId -> "1388"|"331" (override thu cong khi tu dong khong dung)
   if (!store.chi_phi_vendor_ncc_map) store.chi_phi_vendor_ncc_map = {}; // NCC go tay khi khong tu khop duoc
   if (!store.chi_phi_ncc_list) store.chi_phi_ncc_list = null; // null = dung danh sach goc 884 NCC di kem app
   if (!store.chi_phi_ncc_meta) store.chi_phi_ncc_meta = null; // { uploaded_at, file_name, count }
@@ -978,7 +979,7 @@ router.get("/doi-soat/chi-phi-saoke", (req, res) => {
       daHachToan: cp ? !!cp.daHachToan : false,
       chiPhiId: (cp && cp.id) || "",
       matchType,
-      tk: cp ? getGianTK(cp.gian, chiaSeTKSet) : "",
+      tk: cp ? (store.chi_phi_gian_tk_manual[String(cp.id)] || getGianTK(cp.gian, chiaSeTKSet)) : "",
     };
   }).sort((a, b) => a.date.localeCompare(b.date));
 
@@ -1003,6 +1004,31 @@ router.get("/doi-soat/chi-phi-saoke", (req, res) => {
   } catch (e) {
     console.error("[doi-soat/chi-phi-saoke] ERROR:", e.message);
     res.status(500).send("Lỗi: " + e.message);
+  }
+});
+
+// Override TK thu cong cho 1 dong chi phi (khi tu dong suy TK sai do ten gian
+// trong chi_phi khong khop du voi danh sach hoa_don_dau_vao_gian_list).
+// POST body: { chiPhiId, tk } -- tk la "1388" hoac "331" hoac "" (xoa override).
+router.post("/doi-soat/chi-phi-saoke/set-gian-tk", requireDataEntry, (req, res) => {
+  try {
+    const store = load();
+    ensureShape(store);
+    const { chiPhiId, tk } = req.body;
+    if (!chiPhiId) throw new Error("Thieu chiPhiId.");
+    if (tk && tk !== "1388" && tk !== "331") throw new Error("TK phai la 1388 hoac 331 hoac chuoi rong.");
+    if (!tk) {
+      delete store.chi_phi_gian_tk_manual[String(chiPhiId)];
+    } else {
+      store.chi_phi_gian_tk_manual[String(chiPhiId)] = tk;
+    }
+    save(store);
+    const back = req.headers.referer || "/doi-soat/chi-phi-saoke";
+    const msg = tk ? "Da cap nhat TK thanh " + tk + " cho dong chi phi nay." : "Da xoa override TK, se dung tu dong.";
+    res.redirect(back + (back.includes("?") ? "&" : "?") + "success=" + encodeURIComponent(msg));
+  } catch (e) {
+    const back = req.headers.referer || "/doi-soat/chi-phi-saoke";
+    res.redirect(back + (back.includes("?") ? "&" : "?") + "error=" + encodeURIComponent(e.message));
   }
 });
 
