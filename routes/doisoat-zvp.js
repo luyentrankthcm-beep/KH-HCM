@@ -91,9 +91,22 @@ function mergeResolvedGross(uploads) {
   const netByCode = {};
   const sorted = [...uploads].sort((a, b) => new Date(a.uploaded_at) - new Date(b.uploaded_at));
   for (const u of sorted) {
-    (u.codes || []).forEach((c) => codes.add(c));
-    for (const [k, v] of Object.entries(u.grossByCode || {})) grossByCode[k] = v;
-    for (const [k, v] of Object.entries(u.netByCode || {})) netByCode[k] = v;
+    (u.codes || []).forEach((c) => { if (c) codes.add(c); });
+    for (const [k, v] of Object.entries(u.grossByCode || {})) {
+      // Luyen, 2026-08-10: bo qua entry co ma cong trinh TRONG (blank code)
+      // -- xay ra khi san pham chua duoc map lan dau, sau do duoc seed/map
+      // dung vao upload moi hon. Entry cu van con key "ngay|" (rong) trong
+      // store; neu khong bo qua, no hien thanh dong blank tren trang doi soat
+      // va lam tang tong sai ngay ca khi da upload lai du dung.
+      const code = k.includes("|") ? k.slice(k.indexOf("|") + 1) : k;
+      if (!code) continue;
+      grossByCode[k] = v;
+    }
+    for (const [k, v] of Object.entries(u.netByCode || {})) {
+      const code = k.includes("|") ? k.slice(k.indexOf("|") + 1) : k;
+      if (!code) continue;
+      netByCode[k] = v;
+    }
   }
   return { codes: Array.from(codes), grossByCode, netByCode };
 }
