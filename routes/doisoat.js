@@ -287,6 +287,17 @@ const KNOWN_INVOICE_DIEM_ALIASES = {
   // la 1 ten khac cua CUNG gian Tan Phu). Them alias nay de hoa don 1082 tu
   // dong duoc tinh vao "AM TP KVCM", het "Lệch".
   "AE BT KVCM": "AM TP KVCM",
+  // Luyen, 2026-08-10: "hóa đơn momo kh cũ của vũng tàu đây nhá map vô cho tôi
+  // đi" -- hoa don KVC LOTTE VUNG TAU (seed o store.js, HĐ 2512/2547 t08.2026)
+  // bi reconcileMomo khong khop vi INVOICE_DIEM_ALIAS_DEFAULTS ben doisoat-
+  // vietqr.js co entry "KVC LOTTE VUNG TAU" -> "VUNG TAU PHCM" (dung cho VietQR
+  // BIDV7702), entry nay duoc seed vao store.invoice_diem_alias (bang chung) va
+  // momoEffectiveDiemAlias() ke thua -- effectiveMaDiem thanh "VUNG TAU PHCM"
+  // trong khi gross Momo KH Cu dung dung "KVC LOTTE VUNG TAU" nen khong bao gio
+  // khop. Bao ve bang KNOWN_INVOICE_DIEM_ALIASES: Momo ghi de lai "KVC LOTTE
+  // VUNG TAU" -> "KVC LOTTE VUNG TAU" (tu tham chieu = no-op cho ghi de), giu
+  // nguyen ma gian chinh xac cho reconcileMomo tim duoc invoice 2512/2547.
+  "KVC LOTTE VUNG TAU": "KVC LOTTE VUNG TAU",
 };
 
 function ensureKnownInvoiceDiemAliases(store) {
