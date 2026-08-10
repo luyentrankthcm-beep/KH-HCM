@@ -292,6 +292,13 @@ const DICH_VU_KEYWORDS = [
   "phi thue", "thue gian", "thue mat bang", "phi quan ly",
   "bao hiem", "tu van", "bao tri", "bao duong", "van chuyen",
   "dao tao", "kiem toan", "hoa hong", "ve ", "dich vu", "phi dich vu",
+  // Luyen, 2026-08-10: cong ty vui choi giai tri KHONG gia cong/xay dung --
+  // bat ky dien giai co cac tu khoa nay luon la DICH VU (TK 154), KHONG PHAI
+  // hang hoa ban ra (du ten vat lieu xuat hien trong dien giai, vd "thi cong
+  // decal formex" = dich vu thi cong, khong phai ban formex cho khach).
+  "thi cong", "lap dat", "sua chua", "gia cong", "nhan cong",
+  "thiet ke", "gia lap", "boc ep", "dan decal", "cat decal",
+  "cat be tong", "son ", "han ", "khoan ", "dien nuoc",
 ];
 // Chi Nhan, 2026-07-29: "các nvl phải qua chế biến mới bỏ vào 154 nhá còn kem
 // hay cái nào đếm được bán liền không qua chế biến thì đưa vô 156 nhá" --
@@ -396,7 +403,14 @@ function matchTenHangHoa(dienGiai, hangHoaList) {
 // tinh chat "Hàng hóa" (hoac khong ghi ro tinh chat) moi mac dinh 156.
 function classifyFromHangHoaMatch(matched, dienGiai, soTienTruocThue) {
   const isDichVu = normVN(matched.tinhChat).includes("dich vu");
-  if (isDichVu) {
+  // Luyen, 2026-08-10: du danh muc ghi tinh chat "Hang hoa" (vd formex, decal)
+  // nhung neu dien giai ro rang la DICH VU THI CONG (co cac tu khoa nhu "thi
+  // cong", "lap dat", "sua chua"...) thi danh gia la dich vu, KHONG phai hang
+  // hoa ban ra. Ten vat lieu xuat hien trong dien giai vi la vat lieu thi cong,
+  // khong phai mat hang ban cho khach (vd "thi cong decal formex" != ban formex).
+  const t = normVN(dienGiai);
+  const isDichVuByKeyword = DICH_VU_KEYWORDS.some((k) => t.includes(k));
+  if (isDichVu || isDichVuByKeyword) {
     const classified = classifyPhanLoai(dienGiai, soTienTruocThue);
     return {
       tenHangHoaMisa: matched.ten,
