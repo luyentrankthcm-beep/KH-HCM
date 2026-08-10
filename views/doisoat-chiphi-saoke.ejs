@@ -122,6 +122,12 @@
               <td>
                 <% if (r.matchType === 'exact') { %>
                   <span class="badge badge-success" style="font-size:11px;" title="Khớp chính xác qua mã GD ngân hàng">Chính xác</span>
+                  <% if (r.chiPhiId) { %>
+                  <form method="POST" action="/doi-soat/chi-phi-saoke/unlink-banktxid" style="display:inline-block;margin-left:4px;" onsubmit="return confirm('Hủy liên kết GD này khỏi chi phí?')">
+                    <input type="hidden" name="chiPhiId" value="<%= r.chiPhiId %>">
+                    <button type="submit" title="Hủy liên kết (ghép sai)" style="background:none;border:none;cursor:pointer;font-size:12px;color:var(--color-muted,#888);padding:0 2px;">✂️</button>
+                  </form>
+                  <% } %>
                 <% } else if (r.matchType === 'fuzzy') { %>
                   <span class="badge badge-warn" style="font-size:11px;" title="Khớp tương đối: số tiền ±1.000đ + ngày ±7 ngày">Tương đối</span>
                 <% } else { %>

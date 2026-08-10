@@ -946,6 +946,7 @@ router.get("/doi-soat/chi-phi-saoke", (req, res) => {
       gian: (cp && cp.gian) || "",
       ncc: (cp && cp.ncc) || "",
       daHachToan: cp ? !!cp.daHachToan : false,
+      chiPhiId: (cp && cp.id) || "",
       matchType,
     };
   }).sort((a, b) => a.date.localeCompare(b.date));
@@ -971,6 +972,28 @@ router.get("/doi-soat/chi-phi-saoke", (req, res) => {
   } catch (e) {
     console.error("[doi-soat/chi-phi-saoke] ERROR:", e.message);
     res.status(500).send("Lỗi: " + e.message);
+  }
+});
+
+// Huy lien ket bankTxId sai (GD ngan hang bi ghep nham voi dong chi phi do
+// fuzzy match cu chua co kiem tra NCC). Xoa bankTxId + daHachToan tren dong
+// chi_phi de cho phep ghep lai dung sau khi sua.
+router.post("/doi-soat/chi-phi-saoke/unlink-banktxid", requireDataEntry, (req, res) => {
+  try {
+    const store = load();
+    const { chiPhiId } = req.body;
+    if (!chiPhiId) throw new Error("Thieu chiPhiId.");
+    const r = (store.chi_phi || []).find((x) => String(x.id) === String(chiPhiId));
+    if (!r) throw new Error("Khong tim thay dong chi phi ID " + chiPhiId);
+    const oldTxId = r.bankTxId;
+    r.bankTxId = "";
+    r.daHachToan = false;
+    save(store);
+    const back = req.headers.referer || "/doi-soat/chi-phi-saoke";
+    res.redirect(back + (back.includes("?") ? "&" : "?") + "success=" + encodeURIComponent("Da huy lien ket GD " + (oldTxId || "") + " khoi dong chi phi nay."));
+  } catch (e) {
+    const back = req.headers.referer || "/doi-soat/chi-phi-saoke";
+    res.redirect(back + (back.includes("?") ? "&" : "?") + "error=" + encodeURIComponent(e.message));
   }
 });
 

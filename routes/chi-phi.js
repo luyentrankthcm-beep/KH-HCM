@@ -19,6 +19,7 @@ const {
 const gmailApi = require("../utils/gmailApi");
 const gmailInvoiceMatcher = require("../utils/gmailInvoiceMatcher");
 const { parseAmount } = require("../utils/parse");
+const { normText } = require("../utils/chiphiReconcile");
 
 const router = express.Router();
 router.use(requireLogin);
@@ -1066,11 +1067,21 @@ router.post("/chi-phi/:mien(mien-nam|mien-bac)/cap-nhat-da-chi-ngan-hang", requi
       const windowStart = new Date(rDateMs - windowMs).toISOString().slice(0, 10);
       const windowEnd   = new Date(rDateMs + windowMs).toISOString().slice(0, 10);
 
+      // Them dieu kien NCC: neu chi phi co NCC, phai co it nhat 1 tu >= 5 ky
+      // tu cua NCC xuat hien trong tenDoiUng/dien giai GD ngan hang -- tranh
+      // ghep nham GD trung so tien nhung khac doi tuong (vd tien nop kho bac
+      // trung so tien voi hoa don do dau xe cua NCC khac).
+      const nccWords = r.ncc ? normText(r.ncc).split(/\s+/).filter((w) => w.length >= 5) : [];
       let found = null;
       for (const t of txPool) {
         if (t.date < windowStart) continue;
         if (t.date > windowEnd) break;
         if (Math.abs(t.amount - r.soTien) <= AMOUNT_TOLERANCE) {
+          // Kiem tra NCC neu co
+          if (nccWords.length > 0) {
+            const tText = normText((t.tenDoiUng || "") + " " + (t.description || ""));
+            if (!nccWords.some((w) => tText.includes(w))) continue;
+          }
           found = t;
           break;
         }
