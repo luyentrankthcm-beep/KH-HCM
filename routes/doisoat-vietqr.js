@@ -442,6 +442,9 @@ const MA_CONG_TRINH_DISPLAY_ALIAS_DEFAULTS = {
   // day du), nen hien thi van con "JPSBNB". Alias hien thi thang ve dung ten
   // chuan; KHONG doi ma noi bo dung de doi soat (van la "JPSBNB").
   JPSBNB: "JP SB NOI BAI",
+  // Luyen, 2026-08-10: doi ten hien thi gian LOTTE GO VAP (KH Moi, BIDV7702)
+  // sang ten chuong trinh chinh thuc moi.
+  "LOTTE GO VAP VR-PHN": "POSH MN CGV Vincom Phan Văn Trị",
 };
 
 // Chi Nhan, 2026-07-24: giong het KNOWN_INVOICE_DIEM_ALIASES ben routes/
