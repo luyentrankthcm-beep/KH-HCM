@@ -59,6 +59,30 @@ const CHANNELS = {
 const CHANNEL_KEYS = Object.keys(CHANNELS);
 const UPDATED_NOTE = " Ket qua ben duoi da tu cap nhat theo du lieu moi.";
 
+// TK theo Hinh Thuc Hop Tac: "chia se" -> TK Co 1388 (khoan phai thu),
+// con lai ("tien thue"...) -> TK No 331 (phai tra nguoi ban).
+// Dung store.hoa_don_dau_vao_gian_list de xay lookup dong (user da upload
+// "Danh sach cac gian" Google Sheet). Neu chua co list -> tra chuoi rong.
+function buildChiaSeTKSet(gianList) {
+  const chiaSe = new Set();
+  const tienThue = new Set();
+  (gianList || []).forEach((g) => {
+    const isChiaSe = normText(g.hinhThucHopTac || "").includes("chia");
+    const words = normText((g.maDiemThue || "") + " " + (g.gianHang || ""))
+      .split(/\s+/).filter((w) => w.length >= 3);
+    words.forEach((w) => (isChiaSe ? chiaSe : tienThue).add(w));
+  });
+  // Xoa cac tu xuat hien ca 2 nhom (khong phan biet duoc)
+  for (const w of chiaSe) if (tienThue.has(w)) chiaSe.delete(w);
+  return chiaSe;
+}
+
+function getGianTK(gian, chiaSeTKSet) {
+  if (!gian) return "331"; // mac dinh: tien thue -> 331
+  const words = normText(gian).split(/\s+/).filter((w) => w.length >= 3);
+  return words.some((w) => chiaSeTKSet.has(w)) ? "1388" : "331";
+}
+
 function ensureShape(store) {
   if (!store.chi_phi_raw_uploads) store.chi_phi_raw_uploads = {};
   if (!store.chi_phi_vendor_tk_map) store.chi_phi_vendor_tk_map = {};
@@ -725,7 +749,7 @@ router.post("/doi-soat/chi-phi/vendor-ncc", requireDataEntry, (req, res) => {
 // day du cot hoa don + lay Dien giai sach tu UNC; khong khop hoa don nao thi
 // thu rut so HD ngay tu dien giai; khong co gi ca thi de trong toan bo cot
 // hoa don nhung VAN xuat dong do (khong bo qua) theo yeu cau cua Luyen.
-function buildExportRows(lines, startNo, bankAccount, bankFullName) {
+function buildExportRows(lines, startNo, bankAccount, bankFullName, chiaSeTKSet) {
   let seq = startNo;
   return lines
     .filter((l) => l.debit > 0)
@@ -770,7 +794,9 @@ function buildExportRows(lines, startNo, bankAccount, bankFullName) {
         "Nơi cấp CMND": "",
         "Mã nhân viên": "",
         "Diễn giải (hạch toán)": dienGiai,
-        "TK Nợ (*)": l.tkNo || "",
+        // TK No: uu tien ban Luyen go tay (vendorTkMap); neu chua co thi tu
+        // suy tu Hinh Thuc Hop Tac cua gian: "chia se" -> 1388, con lai -> 331.
+        "TK Nợ (*)": l.tkNo || getGianTK(l.finalGian, chiaSeTKSet),
         "TK Có (*)": "1121",
         "Số tiền": l.debit,
         "Tên người hưởng": l.vendor || "",
@@ -826,7 +852,8 @@ router.get("/doi-soat/chi-phi/export.xlsx", (req, res) => {
   let startNo = parseInt(req.query.start || "1", 10);
   if (isNaN(startNo) || startNo < 1) startNo = 1;
 
-  const rows = buildExportRows(built.lines, startNo, bank.account_number, `Ngân hàng ${bank.bank_name}`);
+  const chiaSeTKSetExport = buildChiaSeTKSet(store.hoa_don_dau_vao_gian_list);
+  const rows = buildExportRows(built.lines, startNo, bank.account_number, `Ngân hàng ${bank.bank_name}`, chiaSeTKSetExport);
 
   const sheetLabel = CHANNELS[channelKey].company === "kh_moi" ? "MISAKHMOI" : "MISAKHCU";
   const ws = XLSX.utils.json_to_sheet(rows);
@@ -877,6 +904,9 @@ router.get("/doi-soat/chi-phi-saoke", (req, res) => {
 
   const selectedMonth = req.query.thang || months[0] || "";
   const selectedBankName = req.query.nganHang || "";
+
+  // Xay dung TK lookup tu danh sach gian (Hinh Thuc Hop Tac)
+  const chiaSeTKSet = buildChiaSeTKSet(store.hoa_don_dau_vao_gian_list);
 
   // Chi phi index: exact by bankTxId
   const chiPhiByBankTxId = {};
@@ -948,6 +978,7 @@ router.get("/doi-soat/chi-phi-saoke", (req, res) => {
       daHachToan: cp ? !!cp.daHachToan : false,
       chiPhiId: (cp && cp.id) || "",
       matchType,
+      tk: cp ? getGianTK(cp.gian, chiaSeTKSet) : "",
     };
   }).sort((a, b) => a.date.localeCompare(b.date));
 

@@ -99,6 +99,7 @@
               <th>Số HĐ</th>
               <th>Gian</th>
               <th>NCC</th>
+              <th>TK</th>
               <th>Đã chi</th>
               <th>Khớp</th>
             </tr>
@@ -116,6 +117,15 @@
               <td><%= r.soHoaDon || '' %></td>
               <td style="max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="<%= r.gian %>"><%= r.gian || '' %></td>
               <td style="max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="<%= r.ncc %>"><%= r.ncc || '' %></td>
+              <td style="text-align:center;white-space:nowrap;">
+                <% if (r.tk === '1388') { %>
+                  <span class="badge badge-success" style="font-size:11px;" title="Doanh thu chia sẻ — TK Có 1388">TK Có 1388</span>
+                <% } else if (r.tk === '331') { %>
+                  <span class="badge badge-neutral" style="font-size:11px;" title="Tiền thuê — TK Nợ 331">TK Nợ 331</span>
+                <% } else { %>
+                  <span class="muted" style="font-size:11px;">—</span>
+                <% } %>
+              </td>
               <td style="text-align:center;">
                 <% if (r.daHachToan) { %><span style="color:var(--color-success,#2d9e5f);">✓</span><% } else { %><span class="muted">—</span><% } %>
               </td>
