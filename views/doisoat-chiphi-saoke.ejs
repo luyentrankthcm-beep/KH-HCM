@@ -56,19 +56,40 @@
             <% }) %>
           </select>
         </label>
+        <label style="display:flex;flex-direction:column;gap:4px;font-size:13px;">
+          Loại GD
+          <select name="loai" onchange="this.form.submit()" style="min-width:120px;">
+            <option value="chi" <%= selectedLoai === 'chi' ? 'selected' : '' %>>Chỉ Chi ↓</option>
+            <option value="thu" <%= selectedLoai === 'thu' ? 'selected' : '' %>>Chỉ Thu ↑</option>
+            <option value="tat-ca" <%= selectedLoai === 'tat-ca' ? 'selected' : '' %>>Tất cả (Thu + Chi)</option>
+          </select>
+        </label>
       </form>
     </section>
 
     <!-- Tổng kết -->
     <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:18px;">
+      <% if (selectedLoai !== 'thu') { %>
       <div class="stat-card" style="flex:1;min-width:140px;">
-        <div class="stat-label">Tổng giao dịch Chi</div>
-        <div class="stat-value"><%= totalRows.toLocaleString('vi-VN') %></div>
+        <div class="stat-label">Giao dịch Chi</div>
+        <div class="stat-value"><%= rows.filter(function(r){return r.txType==='chi';}).length.toLocaleString('vi-VN') %></div>
       </div>
       <div class="stat-card" style="flex:1;min-width:140px;">
-        <div class="stat-label">Tổng số tiền Chi</div>
-        <div class="stat-value"><%= totalAmount.toLocaleString('vi-VN') %>đ</div>
+        <div class="stat-label">Tổng tiền Chi</div>
+        <div class="stat-value"><%= chiTotal.toLocaleString('vi-VN') %>đ</div>
       </div>
+      <% } %>
+      <% if (selectedLoai !== 'chi') { %>
+      <div class="stat-card" style="flex:1;min-width:140px;border-color:var(--color-info,#1976d2);">
+        <div class="stat-label">Giao dịch Thu</div>
+        <div class="stat-value" style="color:var(--color-info,#1976d2);"><%= rows.filter(function(r){return r.txType==='thu';}).length.toLocaleString('vi-VN') %></div>
+      </div>
+      <div class="stat-card" style="flex:1;min-width:140px;border-color:var(--color-info,#1976d2);">
+        <div class="stat-label">Tổng tiền Thu</div>
+        <div class="stat-value" style="color:var(--color-info,#1976d2);"><%= thuTotal.toLocaleString('vi-VN') %>đ</div>
+      </div>
+      <% } %>
+      <% if (selectedLoai !== 'thu') { %>
       <div class="stat-card" style="flex:1;min-width:140px;border-color:var(--color-success, #2d9e5f);">
         <div class="stat-label">Đã khớp Chi phí</div>
         <div class="stat-value" style="color:var(--color-success,#2d9e5f);"><%= matchedCount %> / <%= totalRows %></div>
@@ -77,6 +98,7 @@
         <div class="stat-label">Chưa khớp</div>
         <div class="stat-value" style="color:var(--color-warn,#c67b00);"><%= totalRows - matchedCount %></div>
       </div>
+      <% } %>
     </div>
 
     <!-- Bảng chi tiết -->
@@ -92,7 +114,7 @@
           <thead>
             <tr>
               <th>Ngày</th>
-              <th>Ngân hàng</th>
+              <th>NH / Loại</th>
               <th>Tên đối tác (sao kê)</th>
               <th>Diễn giải</th>
               <th style="text-align:right;">Số tiền</th>
@@ -106,16 +128,38 @@
           </thead>
           <tbody>
             <% rows.forEach(function(r) { %>
-            <tr class="<%= r.matchType === 'exact' ? 'row-matched-exact' : r.matchType === 'fuzzy' ? 'row-matched-fuzzy' : 'row-unmatched' %>">
+            <tr class="<%= r.txType === 'thu' ? 'row-thu' : r.matchType === 'exact' ? 'row-matched-exact' : r.matchType === 'fuzzy' ? 'row-matched-fuzzy' : 'row-unmatched' %>">
               <td><%= r.date %></td>
-              <td><span class="badge badge-neutral" style="font-size:11px;"><%= r.bankLabel || r.bankName %></span></td>
+              <td style="white-space:nowrap;">
+                <span class="badge badge-neutral" style="font-size:11px;"><%= r.bankLabel || r.bankName %></span>
+                <% if (r.txType === 'thu') { %>
+                  <span class="badge badge-success" style="font-size:10px;margin-left:2px;" title="Tiền vào (Thu)">↑ Thu</span>
+                <% } else { %>
+                  <span class="badge badge-warn" style="font-size:10px;margin-left:2px;background:none;color:var(--color-muted,#888);" title="Tiền ra (Chi)">↓ Chi</span>
+                <% } %>
+              </td>
               <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="<%= r.tenDoiUng %>"><%= r.tenDoiUng || '—' %></td>
               <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="<%= r.description %>"><%= r.description || '—' %></td>
-              <td style="text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;">
-                <%= r.amount.toLocaleString('vi-VN') %>đ
+              <td style="text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;color:<%= r.txType==='thu' ? 'var(--color-success,#2d9e5f)' : 'inherit' %>;">
+                <%= r.txType === 'thu' ? '+' : '' %><%= r.amount.toLocaleString('vi-VN') %>đ
               </td>
               <td><%= r.soHoaDon || '' %></td>
-              <td style="max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="<%= r.gian %>"><%= r.gian || '' %></td>
+              <td style="max-width:160px;white-space:nowrap;" title="<%= r.gian || r.suggestedGian %>">
+                <% if (r.gian) { %>
+                  <span style="overflow:hidden;text-overflow:ellipsis;display:inline-block;max-width:120px;vertical-align:middle;" title="<%= r.gian %>"><%= r.gian %></span>
+                  <% if (r.hasOvr) { %><span title="Gán tay trên saoke" style="font-size:10px;color:var(--color-muted,#aaa);margin-left:2px;">✏️</span><% } %>
+                <% } else if (r.suggestedGian) { %>
+                  <span style="color:var(--color-muted,#888);font-size:11px;font-style:italic;" title="Gợi ý từ NCC">≈ <%= r.suggestedGian %></span>
+                  <form method="POST" action="/doi-soat/chi-phi-saoke/set-gian-banktx" style="display:inline-block;margin-left:3px;">
+                    <input type="hidden" name="bankTxId" value="<%= r.id %>">
+                    <input type="hidden" name="gian" value="<%= r.suggestedGian %>">
+                    <input type="hidden" name="tk" value="<%= r.suggestedTk %>">
+                    <button type="submit" title="Xác nhận gán gian này" style="background:var(--color-success,#2d9e5f);color:#fff;border:none;border-radius:3px;padding:1px 5px;font-size:11px;cursor:pointer;">✓</button>
+                  </form>
+                <% } else { %>
+                  <span class="muted" style="font-size:11px;">—</span>
+                <% } %>
+              </td>
               <td style="max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="<%= r.ncc %>"><%= r.ncc || '' %></td>
               <td style="text-align:center;white-space:nowrap;">
                 <% if (r.tk === '1388') { %>
@@ -164,6 +208,7 @@
     .row-matched-exact { background: rgba(45,158,95,0.05); }
     .row-matched-fuzzy { background: rgba(198,123,0,0.07); }
     .row-unmatched {}
+    .row-thu { background: rgba(25,118,210,0.05); }
     .stat-card {
       background: var(--color-surface, #fff);
       border: 1.5px solid var(--color-hairline, #e0e0e0);

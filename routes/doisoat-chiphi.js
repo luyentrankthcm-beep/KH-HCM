@@ -93,6 +93,7 @@ function ensureShape(store) {
   if (!store.chi_phi_ncc_meta) store.chi_phi_ncc_meta = null; // { uploaded_at, file_name, count }
   if (!store.chi_phi_invoice_list) store.chi_phi_invoice_list = []; // danh sach hoa don NCC (sheet HDDV KH CU) -- doi chieu Ten NCC+So tien
   if (!store.chi_phi_invoice_meta) store.chi_phi_invoice_meta = null; // { uploaded_at, file_name, count, sheetName }
+  if (!store.chi_phi_saoke_gian_override) store.chi_phi_saoke_gian_override = {}; // bankTxId -> {gian, tk} khi user xac nhan go tay tren trang saoke
   if (!store.chi_phi_unc_list) store.chi_phi_unc_list = []; // bang lenh chi UNC -- doi chieu Ten NCC+So tien de lay Dien giai sach
   if (!store.chi_phi_unc_meta) store.chi_phi_unc_meta = null; // { uploaded_at, file_name, count, sheetName }
   CHANNEL_KEYS.forEach((ch) => {
@@ -905,9 +906,48 @@ router.get("/doi-soat/chi-phi-saoke", (req, res) => {
 
   const selectedMonth = req.query.thang || months[0] || "";
   const selectedBankName = req.query.nganHang || "";
+  const selectedLoai = req.query.loai || "chi"; // "chi" | "thu" | "tat-ca"
 
   // Xay dung TK lookup tu danh sach gian (Hinh Thuc Hop Tac)
   const chiaSeTKSet = buildChiaSeTKSet(store.hoa_don_dau_vao_gian_list);
+
+  // NCC -> gian lookup tu hoa_don_dau_vao_gian_list (cho unmatched rows)
+  // Moi NCC co the co nhieu gian -- giu het, dung description de chon dung.
+  const nccGianIndex = {}; // normText(tenKhachHang) -> [{gianHang, hinhThucHopTac, maDiemThue}, ...]
+  (store.hoa_don_dau_vao_gian_list || []).forEach((g) => {
+    if (!g.tenKhachHang || !g.gianHang) return;
+    const key = normText(g.tenKhachHang);
+    if (!nccGianIndex[key]) nccGianIndex[key] = [];
+    // Khong them trung gianHang
+    if (!nccGianIndex[key].find((x) => x.gianHang === g.gianHang)) {
+      nccGianIndex[key].push({ gianHang: g.gianHang, hinhThucHopTac: g.hinhThucHopTac || "", maDiemThue: g.maDiemThue || "" });
+    }
+  });
+  // Tim gian goi y tu tenDoiUng va description: khop NCC, roi dung description
+  // de chon gian dung khi co nhieu ung vien (VD: nhieu gian cung 1 landlord).
+  function suggestGianForTx(tenDoiUng, description) {
+    const normDU = normText(tenDoiUng || "");
+    const normDesc = normText(description || "");
+    // Tim NCC key nao co tu >= 5 ky tu xuat hien trong normDU
+    let candidates = [];
+    for (const [nccKey, gians] of Object.entries(nccGianIndex)) {
+      const words = nccKey.split(/\s+/).filter((w) => w.length >= 5);
+      if (words.length > 0 && words.some((w) => normDU.includes(w))) {
+        candidates = candidates.concat(gians);
+      }
+    }
+    if (candidates.length === 0) return null;
+    if (candidates.length === 1) return candidates[0];
+    // Nhieu ung vien: thu dung description de chon
+    // Lay maDiemThue/gianHang, normalize, tim trong description
+    const scored = candidates.map((c) => {
+      const words = normText(c.maDiemThue + " " + c.gianHang).split(/\s+/).filter((w) => w.length >= 3);
+      const score = words.filter((w) => normDesc.includes(w)).length;
+      return { ...c, score };
+    });
+    scored.sort((a, b) => b.score - a.score);
+    return scored[0].score > 0 ? scored[0] : null;
+  }
 
   // Chi phi index: exact by bankTxId
   const chiPhiByBankTxId = {};
@@ -919,13 +959,17 @@ router.get("/doi-soat/chi-phi-saoke", (req, res) => {
     chiPhiCompany.push(r);
   });
 
+  const saokGianOvr = store.chi_phi_saoke_gian_override || {};
+
   const AMOUNT_TOL = 1000;
   const DATE_WIN_MS = 7 * 86400000;
   function dateMs(d) { return new Date(d + "T00:00:00").getTime(); }
 
-  // Loc GD chi
+  // Loc GD theo loai va ngan hang
   const chiTxs = (store.transactions || []).filter((t) => {
-    if (t.type !== "chi" || !chiBankIds.has(t.bank_id)) return false;
+    if (!chiBankIds.has(t.bank_id)) return false;
+    if (selectedLoai === "chi" && t.type !== "chi") return false;
+    if (selectedLoai === "thu" && t.type !== "thu") return false;
     if (selectedMonth && (t.date || "").slice(0, 7) !== selectedMonth) return false;
     const bankName = (banksById[t.bank_id] || {}).name || "";
     if (selectedBankName && bankName !== selectedBankName) return false;
@@ -965,8 +1009,27 @@ router.get("/doi-soat/chi-phi-saoke", (req, res) => {
       if (cp) matchType = "fuzzy";
     }
 
+    // Gian va TK: uu tien (1) chi_phi record, (2) override tay tren saoke, (3) goi y tu NCC
+    const cpGian = (cp && cp.gian) || "";
+    const cpTk = cp ? (store.chi_phi_gian_tk_manual[String(cp.id)] || getGianTK(cp.gian, chiaSeTKSet)) : "";
+    const ovr = saokGianOvr[String(t.id)] || null;
+    const finalGian = cpGian || (ovr && ovr.gian) || "";
+    const finalTk = cpTk || (ovr && ovr.tk) || "";
+
+    // Goi y gian khi chua co (chua co cp record va chua override)
+    let suggestedGian = "";
+    let suggestedTk = "";
+    if (!finalGian && t.type === "chi") {
+      const sug = suggestGianForTx(t.tenDoiUng, t.description);
+      if (sug) {
+        suggestedGian = sug.gianHang;
+        suggestedTk = normText(sug.hinhThucHopTac).includes("chia") ? "1388" : "331";
+      }
+    }
+
     return {
       id: t.id,
+      txType: t.type || "chi",
       date: t.date,
       bankName,
       bankLabel,
@@ -974,16 +1037,21 @@ router.get("/doi-soat/chi-phi-saoke", (req, res) => {
       description: t.description || "",
       amount: t.amount,
       soHoaDon: (cp && cp.soHoaDon) || "",
-      gian: (cp && cp.gian) || "",
+      gian: finalGian,
       ncc: (cp && cp.ncc) || "",
       daHachToan: cp ? !!cp.daHachToan : false,
       chiPhiId: (cp && cp.id) || "",
       matchType,
-      tk: cp ? (store.chi_phi_gian_tk_manual[String(cp.id)] || getGianTK(cp.gian, chiaSeTKSet)) : "",
+      tk: finalTk,
+      hasOvr: !!ovr,
+      suggestedGian,
+      suggestedTk,
     };
   }).sort((a, b) => a.date.localeCompare(b.date));
 
   const { COMPANIES } = require("../utils/companies");
+  const chiRows = rows.filter((r) => r.txType === "chi");
+  const thuRows = rows.filter((r) => r.txType === "thu");
   const viewData = {
     COMPANIES,
     activeCompany,
@@ -992,10 +1060,13 @@ router.get("/doi-soat/chi-phi-saoke", (req, res) => {
     months,
     selectedMonth,
     selectedBankName,
+    selectedLoai,
     chiBankNames: [...chiBankNameSet],
     rows,
     totalRows: rows.length,
     totalAmount: rows.reduce((s, r) => s + r.amount, 0),
+    chiTotal: chiRows.reduce((s, r) => s + r.amount, 0),
+    thuTotal: thuRows.reduce((s, r) => s + r.amount, 0),
     matchedCount: rows.filter((r) => r.matchType).length,
     successMsg: req.query.success || "",
     errorMsg: req.query.error || "",
@@ -1026,6 +1097,29 @@ router.post("/doi-soat/chi-phi-saoke/set-gian-tk", requireDataEntry, (req, res) 
     const back = req.headers.referer || "/doi-soat/chi-phi-saoke";
     const msg = tk ? "Da cap nhat TK thanh " + tk + " cho dong chi phi nay." : "Da xoa override TK, se dung tu dong.";
     res.redirect(back + (back.includes("?") ? "&" : "?") + "success=" + encodeURIComponent(msg));
+  } catch (e) {
+    const back = req.headers.referer || "/doi-soat/chi-phi-saoke";
+    res.redirect(back + (back.includes("?") ? "&" : "?") + "error=" + encodeURIComponent(e.message));
+  }
+});
+
+// Luu override gian+TK cho 1 GD ngan hang (unmatched) -- dung khi khong co
+// dong chi_phi nao khop, chi luu theo bankTxId de hien thi dung tren trang saoke.
+router.post("/doi-soat/chi-phi-saoke/set-gian-banktx", requireDataEntry, (req, res) => {
+  try {
+    const store = load();
+    ensureShape(store);
+    const { bankTxId, gian, tk } = req.body;
+    if (!bankTxId) throw new Error("Thieu bankTxId.");
+    if (tk && tk !== "1388" && tk !== "331") throw new Error("TK phai la 1388 hoac 331.");
+    if (!gian && !tk) {
+      delete store.chi_phi_saoke_gian_override[String(bankTxId)];
+    } else {
+      store.chi_phi_saoke_gian_override[String(bankTxId)] = { gian: gian || "", tk: tk || "" };
+    }
+    save(store);
+    const back = req.headers.referer || "/doi-soat/chi-phi-saoke";
+    res.redirect(back + (back.includes("?") ? "&" : "?") + "success=" + encodeURIComponent("Da gan gian \"" + (gian || "") + "\" cho GD ngan hang nay."));
   } catch (e) {
     const back = req.headers.referer || "/doi-soat/chi-phi-saoke";
     res.redirect(back + (back.includes("?") ? "&" : "?") + "error=" + encodeURIComponent(e.message));
