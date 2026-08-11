@@ -80,6 +80,12 @@
           </form>
           <p class="muted" style="margin:4px 0 0; font-size:12px;">Phân loại lại các dòng cũ chưa có Phân loại (156/153/242/154/642).</p>
         </div>
+        <div>
+          <form method="POST" action="/hoa-don-dau-vao/re-phan-loai-tat-ca" onsubmit="return confirm('Chạy lại phân loại tự động cho TẤT CẢ dòng (kể cả đã có phân loại)?\n\nCác dòng bạn đã tự sửa tay sẽ không bị thay đổi.\nCác dòng còn lại sẽ được cập nhật theo logic mới nhất.')">
+            <button type="submit" class="btn btn-secondary" style="background:var(--color-warn,#c67b00);border-color:var(--color-warn,#c67b00);color:#fff;">🔄 Re-phân loại tất cả</button>
+          </form>
+          <p class="muted" style="margin:4px 0 0; font-size:12px;">Chạy lại phân loại theo keyword mới (đường→154, kem béo→154, cước CP→154...).</p>
+        </div>
       </div>
     </section>
 

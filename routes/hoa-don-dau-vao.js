@@ -1338,6 +1338,43 @@ router.post("/hoa-don-dau-vao/cap-nhat-phan-loai", requireDataEntry, (req, res) 
   res.redirect("/hoa-don-dau-vao?success=" + encodeURIComponent(`Đã phân loại thêm ${filled} dòng đang trống.`));
 });
 
+// Luyen, 2026-08-11: Chay lai phan loai TU DONG cho TAT CA dong (ke ca dong
+// da co phan loai cu) theo logic moi nhat -- dung khi vua cap nhat keyword
+// (vd NVL: duong/nuoc da/kem beo, dich vu: cuoc chuyen phat...).
+// KHONG ghi de dong da duoc CHINH TAY (phanLoaiManual === true).
+router.post("/hoa-don-dau-vao/re-phan-loai-tat-ca", requireDataEntry, (req, res) => {
+  const store = load();
+  ensureShape(store);
+  const activeCompany = getCompany(req);
+  const hangHoaList = store.hoa_don_dau_vao_hang_hoa_list || [];
+  let changed = 0;
+  store.hoa_don_dau_vao.forEach((r) => {
+    if (r.congTy !== activeCompany) return;
+    // Bo qua dong da chinh tay (user tu sua bang nut Sua)
+    if (r.phanLoaiManual) return;
+    const matchedHH = hangHoaList.length > 0 ? matchHangHoaRecord(r.dienGiai, hangHoaList) : null;
+    let newPL, newTK, newTen;
+    if (matchedHH) {
+      const classified = classifyFromHangHoaMatch(matchedHH, r.dienGiai, r.soTienTruocThue);
+      newPL = classified.phanLoai;
+      newTK = classified.taiKhoanNo;
+      newTen = classified.tenHangHoaMisa;
+    } else {
+      const cl = classifyPhanLoai(r.dienGiai, r.soTienTruocThue);
+      newPL = cl.phanLoai;
+      newTK = cl.taiKhoanNo;
+    }
+    if (newPL && (r.phanLoai !== newPL || r.taiKhoanNo !== newTK)) {
+      r.phanLoai = newPL;
+      r.taiKhoanNo = newTK;
+      if (newTen) r.tenHangHoaMisa = r.tenHangHoaMisa || newTen;
+      changed++;
+    }
+  });
+  save(store);
+  res.redirect("/hoa-don-dau-vao?success=" + encodeURIComponent(`Đã cập nhật lại ${changed} dòng theo phân loại mới nhất.`));
+});
+
 module.exports = router;
 // Chi Nhan, 2026-07-30: export de trang "Cong No NCC" (routes/congno-ncc.js)
 // tai su dung DUNG logic gom dong theo hoa don + gia tri mac dinh cot, khong
