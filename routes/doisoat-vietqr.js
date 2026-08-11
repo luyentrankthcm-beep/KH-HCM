@@ -622,6 +622,14 @@ const MANUAL_MATCH_DEFAULTS = {
     "2026-08-02|AE HP PHN": { invoiceNumbers: ["11748"], amount: 11540000, grossAdjustment: 0, note: "Can tru thu cong: hoa don gop T7+CN ngay 1+2/08/2026 -- ep khop theo gross tung ngay." },
     "2026-08-01|VC SMART PHN": { invoiceNumbers: ["11766"], amount: 1980000, grossAdjustment: 0, note: "Can tru thu cong: hoa don gop T7+CN ngay 1+2/08/2026 -- ep khop theo gross tung ngay." },
     "2026-08-02|VC SMART PHN": { invoiceNumbers: ["11766"], amount: 1600000, grossAdjustment: 0, note: "Can tru thu cong: hoa don gop T7+CN ngay 1+2/08/2026 -- ep khop theo gross tung ngay." },
+    // Luyen, 2026-08-11: hoa don gop T7+CN ngay 8+9/08/2026 kenh bidv77021 --
+    // 5 gian co ti le chia so le (tong hoa don != tong gross 2 ngay), ep khop
+    // theo dung gross tung ngay. Du lieu tu screenshot Luyen cung cap.
+    "2026-08-08|VC TIMES PHN": { invoiceNumbers: ["12651"], amount: 4060000, grossAdjustment: 0, note: "Can tru thu cong: hoa don gop T7+CN ngay 8+9/08/2026 -- ep khop theo gross tung ngay." },
+    "2026-08-08|AE HP PHN": { invoiceNumbers: ["12638"], amount: 3240000, grossAdjustment: 0, note: "Can tru thu cong: hoa don gop T7+CN ngay 8+9/08/2026 -- ep khop theo gross tung ngay." },
+    "2026-08-08|VINKE-TCUNG": { invoiceNumbers: ["12698"], amount: 1260000, grossAdjustment: 0, note: "Can tru thu cong: hoa don gop T7+CN ngay 8+9/08/2026 -- ep khop theo gross tung ngay." },
+    "2026-08-08|THE GARDEN PHN": { invoiceNumbers: ["12674"], amount: 680000, grossAdjustment: 0, note: "Can tru thu cong: hoa don gop T7+CN ngay 8+9/08/2026 -- ep khop theo gross tung ngay." },
+    "2026-08-08|VC PHAM HUNG (SKYLAKE)": { invoiceNumbers: ["12645"], amount: 585000, grossAdjustment: 0, note: "Can tru thu cong: hoa don gop T7+CN ngay 8+9/08/2026 -- ep khop theo gross tung ngay." },
   },
   // Luyen, 2026-08-03: "cấn trừ đưa vô 200k cho khớp cho tôi đi số 200k phú
   // quốc á" -- kenh BIDV7704, ngay 20/06 "Lệch Ngân hàng-Dữ liệu: -200.000đ"
