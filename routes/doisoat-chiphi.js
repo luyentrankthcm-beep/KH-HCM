@@ -878,24 +878,15 @@ router.get("/doi-soat/chi-phi/export.xlsx", (req, res) => {
 // +-7d) de lay soHoaDon / gian / ncc / daHachToan. Khac trang "Tai khoan Chi"
 // hien co (upload file raw, xuat MISA) -- trang nay de xem nhanh tung giao
 // dich va doi chieu chi phi da nhap.
-router.get("/doi-soat/chi-phi-saoke", (req, res) => {
-  try {
-  const store = load();
-  ensureShape(store);
-  const activeCompany = getCompany(req);
-
-  // Tai khoan chi cua cong ty dang xem
+// Ham xay dung rows cho trang saoke -- dung chung cho GET (hien thi) va export.xlsx
+function buildSaokeRows(store, activeCompany, selectedMonth, selectedBankName, selectedLoai) {
   const companyChannelKeys = CHANNEL_KEYS.filter((k) => CHANNELS[k].company === activeCompany);
   const chiBankNameSet = new Set(companyChannelKeys.map((k) => CHANNELS[k].bankName));
-
   const banksById = {};
   (store.banks || []).forEach((b) => { banksById[b.id] = b; });
-
   const chiBankIds = new Set(
     (store.banks || []).filter((b) => chiBankNameSet.has(b.name)).map((b) => b.id)
   );
-
-  // Danh sach thang co GD chi tren 2 tai khoan nay
   const monthSet = new Set();
   (store.transactions || []).forEach((t) => {
     if (t.type !== "chi" || !chiBankIds.has(t.bank_id)) return;
@@ -904,68 +895,45 @@ router.get("/doi-soat/chi-phi-saoke", (req, res) => {
   });
   const months = [...monthSet].sort().reverse();
 
-  const selectedMonth = req.query.thang || months[0] || "";
-  const selectedBankName = req.query.nganHang || "";
-  const selectedLoai = req.query.loai || "chi"; // "chi" | "thu" | "tat-ca"
-
-  // Xay dung TK lookup tu danh sach gian (Hinh Thuc Hop Tac)
   const chiaSeTKSet = buildChiaSeTKSet(store.hoa_don_dau_vao_gian_list);
-
-  // NCC -> gian lookup tu hoa_don_dau_vao_gian_list (cho unmatched rows)
-  // Moi NCC co the co nhieu gian -- giu het, dung description de chon dung.
-  const nccGianIndex = {}; // normText(tenKhachHang) -> [{gianHang, hinhThucHopTac, maDiemThue}, ...]
+  const nccGianIndex = {};
   (store.hoa_don_dau_vao_gian_list || []).forEach((g) => {
     if (!g.tenKhachHang || !g.gianHang) return;
     const key = normText(g.tenKhachHang);
     if (!nccGianIndex[key]) nccGianIndex[key] = [];
-    // Khong them trung gianHang
     if (!nccGianIndex[key].find((x) => x.gianHang === g.gianHang)) {
       nccGianIndex[key].push({ gianHang: g.gianHang, hinhThucHopTac: g.hinhThucHopTac || "", maDiemThue: g.maDiemThue || "" });
     }
   });
-  // Tim gian goi y tu tenDoiUng va description: khop NCC, roi dung description
-  // de chon gian dung khi co nhieu ung vien (VD: nhieu gian cung 1 landlord).
   function suggestGianForTx(tenDoiUng, description) {
     const normDU = normText(tenDoiUng || "");
     const normDesc = normText(description || "");
-    // Tim NCC key nao co tu >= 5 ky tu xuat hien trong normDU
     let candidates = [];
     for (const [nccKey, gians] of Object.entries(nccGianIndex)) {
       const words = nccKey.split(/\s+/).filter((w) => w.length >= 5);
-      if (words.length > 0 && words.some((w) => normDU.includes(w))) {
-        candidates = candidates.concat(gians);
-      }
+      if (words.length > 0 && words.some((w) => normDU.includes(w))) candidates = candidates.concat(gians);
     }
     if (candidates.length === 0) return null;
     if (candidates.length === 1) return candidates[0];
-    // Nhieu ung vien: thu dung description de chon
-    // Lay maDiemThue/gianHang, normalize, tim trong description
     const scored = candidates.map((c) => {
       const words = normText(c.maDiemThue + " " + c.gianHang).split(/\s+/).filter((w) => w.length >= 3);
-      const score = words.filter((w) => normDesc.includes(w)).length;
-      return { ...c, score };
-    });
-    scored.sort((a, b) => b.score - a.score);
+      return { ...c, score: words.filter((w) => normDesc.includes(w)).length };
+    }).sort((a, b) => b.score - a.score);
     return scored[0].score > 0 ? scored[0] : null;
   }
 
-  // Chi phi index: exact by bankTxId
   const chiPhiByBankTxId = {};
-  // Also fuzzy list for this company (so tien + ngay)
   const chiPhiCompany = [];
   (store.chi_phi || []).forEach((r) => {
     if ((r.congTy || "kh_cu") !== activeCompany) return;
     if (r.bankTxId) chiPhiByBankTxId[r.bankTxId] = r;
     chiPhiCompany.push(r);
   });
-
   const saokGianOvr = store.chi_phi_saoke_gian_override || {};
-
   const AMOUNT_TOL = 1000;
   const DATE_WIN_MS = 7 * 86400000;
   function dateMs(d) { return new Date(d + "T00:00:00").getTime(); }
 
-  // Loc GD theo loai va ngan hang
   const chiTxs = (store.transactions || []).filter((t) => {
     if (!chiBankIds.has(t.bank_id)) return false;
     if (selectedLoai === "chi" && t.type !== "chi") return false;
@@ -981,14 +949,8 @@ router.get("/doi-soat/chi-phi-saoke", (req, res) => {
     const bankName = bank.name || "";
     const channelKey = companyChannelKeys.find((k) => CHANNELS[k].bankName === bankName);
     const bankLabel = channelKey ? CHANNELS[channelKey].label : bankName;
-
-    // Exact match by bankTxId
     let cp = chiPhiByBankTxId[t.id] || null;
     let matchType = cp ? "exact" : "";
-
-    // Fuzzy match: so tien +-1000 + ngay +-7d + NCC phai co tu nao khop tenDoiUng
-    // Them dieu kien NCC de tranh ghep nham GD trung so tien nhung khac doi
-    // tuong hoan toan (vd tien nop kho bac trung so tien voi hoa don do dau xe).
     if (!cp) {
       const tMs = dateMs(t.date);
       const tSearchText = normText((t.tenDoiUng || "") + " " + (t.description || ""));
@@ -996,10 +958,6 @@ router.get("/doi-soat/chi-phi-saoke", (req, res) => {
         if (!r.ngay || !r.soTien) return false;
         if (Math.abs((r.soTien || 0) - t.amount) > AMOUNT_TOL) return false;
         if (Math.abs(dateMs(r.ngay) - tMs) > DATE_WIN_MS) return false;
-        // Neu chi phi co NCC va GD co noi dung, yeu cau NCC phai co it nhat
-        // 1 tu >= 5 ky tu (bo cac tu qua ngan/pho bien) khop voi tenDoiUng
-        // hoac dien giai cua GD ngan hang. Neu NCC khong co tu nao du dai,
-        // tha loi dieu kien nay (fallback ve so tien + ngay nhu cu).
         if (r.ncc && (t.tenDoiUng || t.description)) {
           const nccWords = normText(r.ncc).split(/\s+/).filter((w) => w.length >= 5);
           if (nccWords.length > 0 && !nccWords.some((w) => tSearchText.includes(w))) return false;
@@ -1008,61 +966,50 @@ router.get("/doi-soat/chi-phi-saoke", (req, res) => {
       }) || null;
       if (cp) matchType = "fuzzy";
     }
-
-    // Gian va TK: uu tien (1) chi_phi record, (2) override tay tren saoke, (3) goi y tu NCC
     const cpGian = (cp && cp.gian) || "";
     const cpTk = cp ? (store.chi_phi_gian_tk_manual[String(cp.id)] || getGianTK(cp.gian, chiaSeTKSet)) : "";
     const ovr = saokGianOvr[String(t.id)] || null;
     const finalGian = cpGian || (ovr && ovr.gian) || "";
     const finalTk = cpTk || (ovr && ovr.tk) || "";
-
-    // Goi y gian khi chua co (chua co cp record va chua override)
-    let suggestedGian = "";
-    let suggestedTk = "";
+    let suggestedGian = "", suggestedTk = "";
     if (!finalGian && t.type === "chi") {
       const sug = suggestGianForTx(t.tenDoiUng, t.description);
-      if (sug) {
-        suggestedGian = sug.gianHang;
-        suggestedTk = normText(sug.hinhThucHopTac).includes("chia") ? "1388" : "331";
-      }
+      if (sug) { suggestedGian = sug.gianHang; suggestedTk = normText(sug.hinhThucHopTac).includes("chia") ? "1388" : "331"; }
     }
-
     return {
-      id: t.id,
-      txType: t.type || "chi",
-      date: t.date,
-      bankName,
-      bankLabel,
-      tenDoiUng: t.tenDoiUng || "",
-      description: t.description || "",
-      amount: t.amount,
-      soHoaDon: (cp && cp.soHoaDon) || "",
-      gian: finalGian,
-      ncc: (cp && cp.ncc) || "",
-      daHachToan: cp ? !!cp.daHachToan : false,
-      chiPhiId: (cp && cp.id) || "",
-      matchType,
-      tk: finalTk,
-      hasOvr: !!ovr,
-      suggestedGian,
-      suggestedTk,
+      id: t.id, txType: t.type || "chi", date: t.date, bankName, bankLabel,
+      tenDoiUng: t.tenDoiUng || "", description: t.description || "", amount: t.amount,
+      soHoaDon: (cp && cp.soHoaDon) || "", gian: finalGian, ncc: (cp && cp.ncc) || "",
+      daHachToan: cp ? !!cp.daHachToan : false, chiPhiId: (cp && cp.id) || "",
+      matchType, tk: finalTk, hasOvr: !!ovr, suggestedGian, suggestedTk,
     };
   }).sort((a, b) => a.date.localeCompare(b.date));
 
+  return { rows, months, chiBankNameSet, companyChannelKeys };
+}
+
+router.get("/doi-soat/chi-phi-saoke", (req, res) => {
+  try {
+  const store = load();
+  ensureShape(store);
+  const activeCompany = getCompany(req);
+  const { rows, months, chiBankNameSet } = buildSaokeRows(
+    store, activeCompany,
+    req.query.thang || "",
+    req.query.nganHang || "",
+    req.query.loai || "chi"
+  );
+  const selectedMonth = req.query.thang || months[0] || "";
+  const selectedBankName = req.query.nganHang || "";
+  const selectedLoai = req.query.loai || "chi";
   const { COMPANIES } = require("../utils/companies");
   const chiRows = rows.filter((r) => r.txType === "chi");
   const thuRows = rows.filter((r) => r.txType === "thu");
-  const viewData = {
-    COMPANIES,
-    activeCompany,
-    userName: req.session.userName,
-    isAdmin: req.session.isAdmin,
-    months,
-    selectedMonth,
-    selectedBankName,
-    selectedLoai,
-    chiBankNames: [...chiBankNameSet],
-    rows,
+  res.render("doisoat-chiphi-saoke", {
+    COMPANIES, activeCompany,
+    userName: req.session.userName, isAdmin: req.session.isAdmin,
+    months, selectedMonth, selectedBankName, selectedLoai,
+    chiBankNames: [...chiBankNameSet], rows,
     totalRows: rows.length,
     totalAmount: rows.reduce((s, r) => s + r.amount, 0),
     chiTotal: chiRows.reduce((s, r) => s + r.amount, 0),
@@ -1070,11 +1017,58 @@ router.get("/doi-soat/chi-phi-saoke", (req, res) => {
     matchedCount: rows.filter((r) => r.matchType).length,
     successMsg: req.query.success || "",
     errorMsg: req.query.error || "",
-  };
-  res.render("doisoat-chiphi-saoke", viewData);
+  });
   } catch (e) {
     console.error("[doi-soat/chi-phi-saoke] ERROR:", e.message);
     res.status(500).send("Lỗi: " + e.message);
+  }
+});
+
+// Xuat Excel trang saoke -- cung bo loc (thang, nganHang, loai) nhu trang hien thi.
+router.get("/doi-soat/chi-phi-saoke/export.xlsx", (req, res) => {
+  try {
+    const store = load();
+    ensureShape(store);
+    const activeCompany = getCompany(req);
+    const thang = req.query.thang || "";
+    const nganHang = req.query.nganHang || "";
+    const loai = req.query.loai || "chi";
+    const { rows } = buildSaokeRows(store, activeCompany, thang, nganHang, loai);
+
+    const exportRows = rows.map((r) => ({
+      "Ngày": r.date,
+      "Loại GD": r.txType === "thu" ? "Thu" : "Chi",
+      "Ngân hàng": r.bankLabel || r.bankName,
+      "Tên đối tác (sao kê)": r.tenDoiUng,
+      "Diễn giải": r.description,
+      "Số tiền": r.txType === "thu" ? r.amount : -r.amount,
+      "Số HĐ": r.soHoaDon,
+      "Gian": r.gian || r.suggestedGian || "",
+      "NCC": r.ncc,
+      "TK": r.tk || r.suggestedTk || "",
+      "Đã chi": r.daHachToan ? "✓" : "",
+      "Khớp": r.matchType === "exact" ? "Chính xác" : r.matchType === "fuzzy" ? "Tương đối" : "Chưa khớp",
+      "Gian (trạng thái)": r.gian ? (r.hasOvr ? "Gán tay (saoke)" : "Từ chi phí") : (r.suggestedGian ? "Gợi ý (chưa xác nhận)" : ""),
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(exportRows);
+    // Auto column width
+    const colWidths = Object.keys(exportRows[0] || {}).map((k) => ({
+      wch: Math.max(k.length, ...exportRows.map((r) => String(r[k] || "").length)) + 2
+    }));
+    ws["!cols"] = colWidths;
+
+    const wb = XLSX.utils.book_new();
+    const sheetName = `Saoke ${thang || "tat-ca"} ${loai}`.slice(0, 31);
+    XLSX.utils.book_append_sheet(wb, ws, sheetName);
+    const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
+    const fname = `saoke-chiphi-${activeCompany}-${thang || "all"}-${loai}.xlsx`;
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    res.setHeader("Content-Disposition", `attachment; filename=${fname}`);
+    res.send(buf);
+  } catch (e) {
+    console.error("[doi-soat/chi-phi-saoke/export.xlsx] ERROR:", e.message);
+    res.status(500).send("Lỗi xuất Excel: " + e.message);
   }
 });
 

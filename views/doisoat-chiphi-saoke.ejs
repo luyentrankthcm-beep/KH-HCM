@@ -101,6 +101,14 @@
       <% } %>
     </div>
 
+    <!-- Nút xuất Excel -->
+    <div style="margin-bottom:12px;text-align:right;">
+      <a href="/doi-soat/chi-phi-saoke/export.xlsx?thang=<%= encodeURIComponent(selectedMonth) %>&nganHang=<%= encodeURIComponent(selectedBankName) %>&loai=<%= encodeURIComponent(selectedLoai) %>"
+         style="display:inline-flex;align-items:center;gap:6px;background:var(--color-success,#2d9e5f);color:#fff;text-decoration:none;border-radius:6px;padding:7px 14px;font-size:13px;font-weight:600;">
+        ⬇ Xuất Excel (<%= rows.length %> dòng)
+      </a>
+    </div>
+
     <!-- Bảng chi tiết -->
     <section class="panel">
       <% if (rows.length === 0) { %>
