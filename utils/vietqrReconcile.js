@@ -1090,11 +1090,20 @@ function resolveGianGrossByBankRef(bankTxs, rawRows, storeNameMap, tenDiemToProj
   const override = storeCodeOverride || {};
   const refOv = refOverride || {};
   const refIndex = new Map(); // Ma tham chieu -> [rawRow, ...]
+  // Luyen, 2026-08-11: index phu theo ma VQR (vqrCode) de xu ly truong hop
+  // ngan hang gui tien qua cong trung gian (Liobank, SHB, Techcombank...) ma
+  // he thong VietQR ghi refCode KHAC voi "So tham chieu" tren sao ke BIDV.
+  // Nhung giao dich nay van co ma VQR trong dien giai ngan hang (vd
+  // "VQR263075109OZ1J PaymentForOrder") trung voi truong vqrCode trong du lieu
+  // QR -- dung do lam fallback truoc khi ve defaultBlankCode.
+  const vqrIndex = new Map(); // vqrCode (upper) -> rawRow
   rawRows.forEach((row) => {
     const ref = (row.refCode || "").trim();
     if (!ref) return;
     if (!refIndex.has(ref)) refIndex.set(ref, []);
     refIndex.get(ref).push(row);
+    const vc = (row.vqrCode || "").trim().toUpperCase();
+    if (vc && !vqrIndex.has(vc)) vqrIndex.set(vc, row);
   });
 
   const grossByCode = {};
@@ -1119,6 +1128,14 @@ function resolveGianGrossByBankRef(bankTxs, rawRows, storeNameMap, tenDiemToProj
     let raw = candidates.find((r) => r.date === tx.date);
     if (!raw && candidates.length > 0) {
       raw = candidates.slice().sort((a, b) => (a.date || "").localeCompare(b.date || ""))[0];
+    }
+    // Luyen, 2026-08-11: fallback -- neu khong khop duoc bang refCode, thu
+    // trich xuat ma VQR tu dien giai ngan hang va tra cuu lai. Ap dung cho
+    // cac giao dich ngan hang cong trung gian (Liobank, SHB...) ma he thong
+    // doi tac VietQR luu vqrCode trong du lieu QR nhung refCode la khac nhau.
+    if (!raw) {
+      const vqrInDesc = extractVqrCode(tx.description || "");
+      if (vqrInDesc) raw = vqrIndex.get(vqrInDesc.toUpperCase()) || null;
     }
     if (!raw) {
       if (defaultBlankCode) {
