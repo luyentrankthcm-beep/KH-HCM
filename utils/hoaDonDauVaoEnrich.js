@@ -299,6 +299,16 @@ const DICH_VU_KEYWORDS = [
   "thi cong", "lap dat", "sua chua", "gia cong", "nhan cong",
   "thiet ke", "gia lap", "boc ep", "dan decal", "cat decal",
   "cat be tong", "son ", "han ", "khoan ", "dien nuoc",
+  // Luyen, 2026-08-11: phi van chuyen / buu chinh -- la dich vu, KHONG phai
+  // hang hoa. "van chuyen" da co o tren nhung "cuoc chuyen phat"/"buu chinh"
+  // thi chua co nen bi xep nham vao hang hoa 156.
+  "cuoc chuyen phat",  // cước chuyển phát (bưu chính, courier)
+  "cuoc van chuyen",   // cước vận chuyển
+  "phi van chuyen",    // phí vận chuyển
+  "phi chuyen phat",   // phí chuyển phát
+  "buu chinh",         // bưu chính (Vnpost, EMS...)
+  "cuoc buu chinh",    // cước bưu chính
+  "vnpost", "ems ",    // các courier phổ biến
 ];
 // Chi Nhan, 2026-07-29: "các nvl phải qua chế biến mới bỏ vào 154 nhá còn kem
 // hay cái nào đếm được bán liền không qua chế biến thì đưa vô 156 nhá" --
@@ -314,6 +324,28 @@ const NVL_CHE_BIEN_KEYWORDS = [
   // Chi Nhan, 2026-07-29: them tu du lieu that -- xot/sot dung de che bien
   // mon an (khong ban rieng cho khach), tinh la NVL nhu gia vi.
   "xot ", "sot ",
+  // Luyen, 2026-08-11: bo sung NVL pho bien bi phan loai nham sang 156 --
+  // nhung thu nay phai qua che bien truoc khi ban (nguyen lieu nau an, pha do
+  // uong...), KHONG phai hang hoa ban thang cho khach.
+  "nuoc da",           // nước đá -- NVL pha do uong
+  "duong trang",       // đường trắng -- NVL nau an/pha che
+  "duong phen",        // đường phèn
+  "duong cat",         // đường cát
+  "duong ",            // đường (chung) -- co dau cach de tranh khop "van duong"
+  "kem beo",           // kem béo (heavy cream) -- NVL, khac voi kem (ice cream) ban thang
+  "kem merino",        // kem Merino -- NVL lam banh
+  "beo thuc vat",      // béo thực vật
+  "sua tuoi",          // sữa tươi -- NVL pha che
+  "bot matcha",        // bột matcha -- NVL
+  "matcha",            // matcha (dang bot/bao bi)
+  "bot mi",            // bột mì -- NVL lam banh
+  "bot nang",          // bột năng -- tinh bot
+  "tinh bot",          // tinh bột
+  "dau an",            // dầu ăn -- NVL nau an
+  "dau thuc vat",      // dầu thực vật
+  "siro ",             // syrup/siro -- NVL pha che
+  "syrup",             // syrup
+  "toa kem",           // topping kem
 ];
 // Chi Nhan, 2026-07-29: mo rong tu du lieu that (kiem tra 2026-07-29, cac
 // mat hang nay KHONG khop duoc voi danh muc hang hoa Chi Nhan da tai truoc
@@ -416,6 +448,17 @@ function classifyFromHangHoaMatch(matched, dienGiai, soTienTruocThue) {
       tenHangHoaMisa: matched.ten,
       phanLoai: classified.phanLoai || "Dịch vụ (theo danh mục)",
       taiKhoanNo: matched.tkKho || classified.taiKhoanNo || "154",
+    };
+  }
+  // Luyen, 2026-08-11: du danh muc hang hoa ghi tkKho=156 nhung neu dien giai
+  // ro rang la NVL PHAI QUA CHE BIEN (duong, nuoc da, kem beo, matcha...) thi
+  // override ve 154 -- hang nay khong ban thang ma dung de nau/pha che.
+  const isNvlByKeyword = NVL_CHE_BIEN_KEYWORDS.some((k) => t.includes(k));
+  if (isNvlByKeyword) {
+    return {
+      tenHangHoaMisa: matched.ten,
+      phanLoai: "NVL chế biến",
+      taiKhoanNo: (matched.tkKho && matched.tkKho !== "156") ? matched.tkKho : "154",
     };
   }
   return {
