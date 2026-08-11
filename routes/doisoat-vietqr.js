@@ -630,6 +630,11 @@ const MANUAL_MATCH_DEFAULTS = {
     "2026-08-08|VINKE-TCUNG": { invoiceNumbers: ["12698"], amount: 1260000, grossAdjustment: 0, note: "Can tru thu cong: hoa don gop T7+CN ngay 8+9/08/2026 -- ep khop theo gross tung ngay." },
     "2026-08-08|THE GARDEN PHN": { invoiceNumbers: ["12674"], amount: 680000, grossAdjustment: 0, note: "Can tru thu cong: hoa don gop T7+CN ngay 8+9/08/2026 -- ep khop theo gross tung ngay." },
     "2026-08-08|VC PHAM HUNG (SKYLAKE)": { invoiceNumbers: ["12645"], amount: 585000, grossAdjustment: 0, note: "Can tru thu cong: hoa don gop T7+CN ngay 8+9/08/2026 -- ep khop theo gross tung ngay." },
+    // Luyen, 2026-08-11: ngay 10/08/2026 VC PHAM HUNG (SKYLAKE) gross=310.000d
+    // va hoa don 12806=310.000d da khop chinh xac, nhung he thong auto-bu tru
+    // 20.000d tu AE HP PHN sang day (hoa don 12800), lam doanh thu hien 330.000d
+    // sai. Ep khop dung 310.000d, loai bo grossAdjustment.
+    "2026-08-10|VC PHAM HUNG (SKYLAKE)": { invoiceNumbers: ["12806"], amount: 310000, grossAdjustment: 0, note: "Ep khop dung 310.000d (gross = hoa don 12806 = 310.000d), loai bo auto-bu 20.000d tu AE HP PHN -- Luyen xac nhan 11/08." },
   },
   // Luyen, 2026-08-03: "cấn trừ đưa vô 200k cho khớp cho tôi đi số 200k phú
   // quốc á" -- kenh BIDV7704, ngay 20/06 "Lệch Ngân hàng-Dữ liệu: -200.000đ"
