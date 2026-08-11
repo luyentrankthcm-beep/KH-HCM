@@ -606,6 +606,22 @@ const MANUAL_MATCH_DEFAULTS = {
       note:
         'Chuyen het 100.000d doanh thu ngay 05/06 ve "AM TP PHCM" (hoa don 4966 chi ghi 1 gian, khong chia doi) -- theo file Book5.xlsx (khong co dong "FARM LOTTE NHA TRANG" ngay nay).',
     },
+    // Luyen, 2026-08-11: hoa don gop T7+CN ngay 1+2/08/2026 -- chia ti le tao
+    // so le (vi tong hoa don != tong gross), ep khop theo dung gross tung ngay.
+    "2026-08-01|AM TP PHCM": { invoiceNumbers: ["11852"], amount: 6930000, grossAdjustment: 0, note: "Can tru thu cong: hoa don gop T7+CN ngay 1+2/08/2026 -- ep khop theo gross tung ngay." },
+    "2026-08-02|AM TP PHCM": { invoiceNumbers: ["11852"], amount: 8480000, grossAdjustment: 0, note: "Can tru thu cong: hoa don gop T7+CN ngay 1+2/08/2026 -- ep khop theo gross tung ngay." },
+    "2026-08-01|LOTTE Q7 (NSG) PHM": { invoiceNumbers: ["11868"], amount: 1650000, grossAdjustment: 0, note: "Can tru thu cong: hoa don gop T7+CN ngay 1+2/08/2026 -- ep khop theo gross tung ngay." },
+    "2026-08-02|LOTTE Q7 (NSG) PHM": { invoiceNumbers: ["11868"], amount: 1520000, grossAdjustment: 0, note: "Can tru thu cong: hoa don gop T7+CN ngay 1+2/08/2026 -- ep khop theo gross tung ngay." },
+    "2026-08-01|AE BD PHCM": { invoiceNumbers: ["11855"], amount: 1410000, grossAdjustment: 0, note: "Can tru thu cong: hoa don gop T7+CN ngay 1+2/08/2026 -- ep khop theo gross tung ngay." },
+    "2026-08-02|AE BD PHCM": { invoiceNumbers: ["11855"], amount: 2600000, grossAdjustment: 0, note: "Can tru thu cong: hoa don gop T7+CN ngay 1+2/08/2026 -- ep khop theo gross tung ngay." },
+  },
+  // Luyen, 2026-08-11: hoa don gop T7+CN ngay 1+2/08/2026 kenh bidv77021 --
+  // AE HP PHN va VC SMART PHN co ti le chia khong tron, ep khop theo gross.
+  bidv77021: {
+    "2026-08-01|AE HP PHN": { invoiceNumbers: ["11748"], amount: 8200000, grossAdjustment: 0, note: "Can tru thu cong: hoa don gop T7+CN ngay 1+2/08/2026 -- ep khop theo gross tung ngay." },
+    "2026-08-02|AE HP PHN": { invoiceNumbers: ["11748"], amount: 11540000, grossAdjustment: 0, note: "Can tru thu cong: hoa don gop T7+CN ngay 1+2/08/2026 -- ep khop theo gross tung ngay." },
+    "2026-08-01|VC SMART PHN": { invoiceNumbers: ["11766"], amount: 1980000, grossAdjustment: 0, note: "Can tru thu cong: hoa don gop T7+CN ngay 1+2/08/2026 -- ep khop theo gross tung ngay." },
+    "2026-08-02|VC SMART PHN": { invoiceNumbers: ["11766"], amount: 1600000, grossAdjustment: 0, note: "Can tru thu cong: hoa don gop T7+CN ngay 1+2/08/2026 -- ep khop theo gross tung ngay." },
   },
   // Luyen, 2026-08-03: "cấn trừ đưa vô 200k cho khớp cho tôi đi số 200k phú
   // quốc á" -- kenh BIDV7704, ngay 20/06 "Lệch Ngân hàng-Dữ liệu: -200.000đ"
