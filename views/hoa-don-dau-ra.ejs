@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <%- include('partials/head') %>
+</head>
+<body>
+  <%- include('partials/nav') %>
+  <main class="container">
+    <h1>Hóa Đơn Đầu Ra — <%= COMPANIES[activeCompany].label %></h1>
+    <p class="muted" style="margin-top:-10px;margin-bottom:20px;">
+      Sổ ghi hóa đơn bán hàng / xuất cho khách — tách riêng KH Cũ / KH Mới qua nút ở góc trên.
+    </p>
+
+    <% if (success) { %><div class="alert alert-success"><%= success %></div><% } %>
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+
+    <!-- Tổng kết -->
+    <div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:16px;">
+      <div class="stat-card" style="flex:1;min-width:130px;">
+        <div class="stat-label">Số hóa đơn (theo bộ lọc)</div>
+        <div class="stat-value"><%= rows.length.toLocaleString('vi-VN') %></div>
+      </div>
+      <div class="stat-card" style="flex:1;min-width:150px;border-color:var(--color-success,#2d9e5f);">
+        <div class="stat-label">Tổng tiền chưa VAT</div>
+        <div class="stat-value" style="color:var(--color-success,#2d9e5f);font-size:18px;"><%= tongTien.toLocaleString('vi-VN') %>đ</div>
+      </div>
+      <div class="stat-card" style="flex:1;min-width:150px;border-color:var(--color-info,#1976d2);">
+        <div class="stat-label">Tổng tiền VAT</div>
+        <div class="stat-value" style="color:var(--color-info,#1976d2);font-size:18px;"><%= tongTienVAT.toLocaleString('vi-VN') %>đ</div>
+      </div>
+    </div>
+
+    <!-- Bộ lọc + Thêm mới -->
+    <section class="panel" style="margin-bottom:16px;">
+      <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;">
+        <form method="GET" action="/hoa-don-dau-ra" style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;flex:1;">
+          <label style="display:flex;flex-direction:column;gap:4px;font-size:13px;">
+            Tháng
+            <select name="thang" onchange="this.form.submit()" style="min-width:120px;">
+              <option value="">Tất cả</option>
+              <% months.forEach(function(m) { %>
+              <option value="<%= m %>" <%= selectedMonth === m ? 'selected' : '' %>><%= m %></option>
+              <% }) %>
+            </select>
+          </label>
+          <label style="display:flex;flex-direction:column;gap:4px;font-size:13px;">
+            Loại HĐ
+            <select name="loai" onchange="this.form.submit()" style="min-width:130px;">
+              <option value="">Tất cả</option>
+              <option value="khach-le" <%= selectedLoai === 'khach-le' ? 'selected' : '' %>>Khách lẻ</option>
+              <option value="hop-dong" <%= selectedLoai === 'hop-dong' ? 'selected' : '' %>>Hợp đồng</option>
+              <option value="khac" <%= selectedLoai === 'khac' ? 'selected' : '' %>>Khác</option>
+            </select>
+          </label>
+          <label style="display:flex;flex-direction:column;gap:4px;font-size:13px;">
+            Tìm kiếm
+            <input type="text" name="q" value="<%= searchQ %>" placeholder="Số HĐ / Tên KH..." style="min-width:180px;padding:5px 8px;border:1px solid var(--color-hairline,#ddd);border-radius:4px;font-size:13px;">
+          </label>
+          <button type="submit" class="btn btn-secondary" style="font-size:13px;">Lọc</button>
+          <% if (selectedMonth || selectedLoai || searchQ) { %>
+          <a href="/hoa-don-dau-ra" style="font-size:12px;align-self:center;">✕ Xóa bộ lọc</a>
+          <% } %>
+        </form>
+      </div>
+    </section>
+
+    <!-- Form thêm mới -->
+    <details class="panel" style="margin-bottom:16px;">
+      <summary style="cursor:pointer;font-weight:600;font-size:14px;padding:10px 0;">➕ Thêm hóa đơn mới</summary>
+      <form method="POST" action="/hoa-don-dau-ra/them" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px;margin-top:14px;">
+        <label style="display:flex;flex-direction:column;gap:4px;font-size:13px;">
+          Ngày HĐ <span style="color:red;">*</span>
+          <input type="date" name="ngayHD" required style="padding:5px 8px;border:1px solid var(--color-hairline,#ddd);border-radius:4px;font-size:13px;">
+        </label>
+        <label style="display:flex;flex-direction:column;gap:4px;font-size:13px;">
+          Số HĐ
+          <input type="text" name="soHD" placeholder="VD: 0001234" style="padding:5px 8px;border:1px solid var(--color-hairline,#ddd);border-radius:4px;font-size:13px;">
+        </label>
+        <label style="display:flex;flex-direction:column;gap:4px;font-size:13px;">
+          Mã KH
+          <input type="text" name="maKH" placeholder="Mã đối tượng KH" style="padding:5px 8px;border:1px solid var(--color-hairline,#ddd);border-radius:4px;font-size:13px;">
+        </label>
+        <label style="display:flex;flex-direction:column;gap:4px;font-size:13px;">
+          Tên khách hàng <span style="color:red;">*</span>
+          <input type="text" name="tenKhachHang" required placeholder="Tên KH / đơn vị" style="padding:5px 8px;border:1px solid var(--color-hairline,#ddd);border-radius:4px;font-size:13px;">
+        </label>
+        <label style="display:flex;flex-direction:column;gap:4px;font-size:13px;">
+          Loại HĐ
+          <select name="loaiHD" style="padding:5px 8px;border:1px solid var(--color-hairline,#ddd);border-radius:4px;font-size:13px;">
+            <option value="">—</option>
+            <option value="khach-le">Khách lẻ</option>
+            <option value="hop-dong">Hợp đồng</option>
+            <option value="khac">Khác</option>
+          </select>
+        </label>
+        <label style="display:flex;flex-direction:column;gap:4px;font-size:13px;">
+          Diễn giải
+          <input type="text" name="dienGiai" placeholder="Nội dung hóa đơn" style="padding:5px 8px;border:1px solid var(--color-hairline,#ddd);border-radius:4px;font-size:13px;">
+        </label>
+        <label style="display:flex;flex-direction:column;gap:4px;font-size:13px;">
+          Tiền chưa VAT (đ)
+          <input type="number" name="soTien" min="0" step="1" placeholder="0" style="padding:5px 8px;border:1px solid var(--color-hairline,#ddd);border-radius:4px;font-size:13px;">
+        </label>
+        <label style="display:flex;flex-direction:column;gap:4px;font-size:13px;">
+          % VAT
+          <select name="thueVAT" style="padding:5px 8px;border:1px solid var(--color-hairline,#ddd);border-radius:4px;font-size:13px;">
+            <option value="">—</option>
+            <option value="0">0%</option>
+            <option value="5">5%</option>
+            <option value="8">8%</option>
+            <option value="10">10%</option>
+          </select>
+        </label>
+        <label style="display:flex;flex-direction:column;gap:4px;font-size:13px;">
+          Tiền VAT (đ)
+          <input type="number" name="soTienVAT" min="0" step="1" placeholder="0" style="padding:5px 8px;border:1px solid var(--color-hairline,#ddd);border-radius:4px;font-size:13px;">
+        </label>
+        <label style="display:flex;flex-direction:column;gap:4px;font-size:13px;">
+          Ghi chú
+          <input type="text" name="ghiChu" placeholder="Ghi chú thêm" style="padding:5px 8px;border:1px solid var(--color-hairline,#ddd);border-radius:4px;font-size:13px;">
+        </label>
+        <div style="display:flex;align-items:flex-end;padding-bottom:2px;">
+          <button type="submit" class="btn btn-primary" style="width:100%;">Thêm</button>
+        </div>
+      </form>
+    </details>
+
+    <!-- Bảng danh sách -->
+    <section class="panel">
+      <% if (rows.length === 0) { %>
+      <p class="muted">Chưa có hóa đơn đầu ra nào<% if (selectedMonth) { %> trong tháng <%= selectedMonth %><% } %>. Bấm "Thêm hóa đơn mới" bên trên để nhập.</p>
+      <% } else { %>
+      <div style="overflow-x:auto;">
+        <table class="data-table" style="font-size:13px;">
+          <thead>
+            <tr>
+              <th>Ngày HĐ</th>
+              <th>Số HĐ</th>
+              <th>Mã KH</th>
+              <th>Tên khách hàng</th>
+              <th>Loại</th>
+              <th>Diễn giải</th>
+              <th style="text-align:right;">Tiền chưa VAT</th>
+              <th style="text-align:center;">% VAT</th>
+              <th style="text-align:right;">Tiền VAT</th>
+              <th>Ghi chú</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <% rows.forEach(function(r) { %>
+            <tr>
+              <td style="white-space:nowrap;font-weight:600;"><%= r.ngayHD || '—' %></td>
+              <td style="white-space:nowrap;"><%= r.soHD || '—' %></td>
+              <td style="font-size:11px;color:var(--color-muted,#888);"><%= r.maKH || '—' %></td>
+              <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="<%= r.tenKhachHang %>"><%= r.tenKhachHang || '—' %></td>
+              <td>
+                <% if (r.loaiHD === 'khach-le') { %>
+                  <span class="badge badge-neutral" style="font-size:11px;">Khách lẻ</span>
+                <% } else if (r.loaiHD === 'hop-dong') { %>
+                  <span class="badge badge-success" style="font-size:11px;">Hợp đồng</span>
+                <% } else if (r.loaiHD) { %>
+                  <span class="badge badge-neutral" style="font-size:11px;"><%= r.loaiHD %></span>
+                <% } else { %>
+                  <span class="muted">—</span>
+                <% } %>
+              </td>
+              <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="<%= r.dienGiai %>"><%= r.dienGiai || '—' %></td>
+              <td style="text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;color:var(--color-success,#2d9e5f);">
+                <% if (r.soTien) { %><%= Number(r.soTien).toLocaleString('vi-VN') %>đ<% } else { %><span class="muted">—</span><% } %>
+              </td>
+              <td style="text-align:center;"><%= r.thueVAT ? r.thueVAT + '%' : '—' %></td>
+              <td style="text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;color:var(--color-info,#1976d2);">
+                <% if (r.soTienVAT) { %><%= Number(r.soTienVAT).toLocaleString('vi-VN') %>đ<% } else { %><span class="muted">—</span><% } %>
+              </td>
+              <td style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;color:var(--color-muted,#888);" title="<%= r.ghiChu %>"><%= r.ghiChu || '' %></td>
+              <td style="white-space:nowrap;">
+                <details style="display:inline-block;">
+                  <summary class="btn-link" style="font-size:12px;cursor:pointer;list-style:none;">Sửa</summary>
+                  <div style="position:absolute;z-index:100;background:var(--color-surface,#fff);border:1px solid var(--color-hairline,#ddd);border-radius:8px;padding:16px;min-width:340px;box-shadow:0 4px 16px rgba(0,0,0,0.12);margin-top:4px;">
+                    <form method="POST" action="/hoa-don-dau-ra/sua/<%= r.id %>" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+                      <label style="display:flex;flex-direction:column;gap:3px;font-size:12px;">Ngày HĐ<input type="date" name="ngayHD" value="<%= r.ngayHD %>" required style="padding:4px 6px;border:1px solid #ddd;border-radius:4px;font-size:12px;"></label>
+                      <label style="display:flex;flex-direction:column;gap:3px;font-size:12px;">Số HĐ<input type="text" name="soHD" value="<%= r.soHD %>" style="padding:4px 6px;border:1px solid #ddd;border-radius:4px;font-size:12px;"></label>
+                      <label style="display:flex;flex-direction:column;gap:3px;font-size:12px;">Mã KH<input type="text" name="maKH" value="<%= r.maKH %>" style="padding:4px 6px;border:1px solid #ddd;border-radius:4px;font-size:12px;"></label>
+                      <label style="display:flex;flex-direction:column;gap:3px;font-size:12px;">Tên KH<input type="text" name="tenKhachHang" value="<%= r.tenKhachHang %>" required style="padding:4px 6px;border:1px solid #ddd;border-radius:4px;font-size:12px;"></label>
+                      <label style="display:flex;flex-direction:column;gap:3px;font-size:12px;">Loại HĐ
+                        <select name="loaiHD" style="padding:4px 6px;border:1px solid #ddd;border-radius:4px;font-size:12px;">
+                          <option value="" <%= !r.loaiHD ? 'selected' : '' %>>—</option>
+                          <option value="khach-le" <%= r.loaiHD === 'khach-le' ? 'selected' : '' %>>Khách lẻ</option>
+                          <option value="hop-dong" <%= r.loaiHD === 'hop-dong' ? 'selected' : '' %>>Hợp đồng</option>
+                          <option value="khac" <%= r.loaiHD === 'khac' ? 'selected' : '' %>>Khác</option>
+                        </select>
+                      </label>
+                      <label style="display:flex;flex-direction:column;gap:3px;font-size:12px;">% VAT
+                        <select name="thueVAT" style="padding:4px 6px;border:1px solid #ddd;border-radius:4px;font-size:12px;">
+                          <option value="" <%= !r.thueVAT ? 'selected' : '' %>>—</option>
+                          <option value="0" <%= r.thueVAT === '0' ? 'selected' : '' %>>0%</option>
+                          <option value="5" <%= r.thueVAT === '5' ? 'selected' : '' %>>5%</option>
+                          <option value="8" <%= r.thueVAT === '8' ? 'selected' : '' %>>8%</option>
+                          <option value="10" <%= r.thueVAT === '10' ? 'selected' : '' %>>10%</option>
+                        </select>
+                      </label>
+                      <label style="display:flex;flex-direction:column;gap:3px;font-size:12px;grid-column:1/-1;">Diễn giải<input type="text" name="dienGiai" value="<%= r.dienGiai %>" style="padding:4px 6px;border:1px solid #ddd;border-radius:4px;font-size:12px;"></label>
+                      <label style="display:flex;flex-direction:column;gap:3px;font-size:12px;">Tiền chưa VAT<input type="number" name="soTien" value="<%= r.soTien %>" min="0" style="padding:4px 6px;border:1px solid #ddd;border-radius:4px;font-size:12px;"></label>
+                      <label style="display:flex;flex-direction:column;gap:3px;font-size:12px;">Tiền VAT<input type="number" name="soTienVAT" value="<%= r.soTienVAT %>" min="0" style="padding:4px 6px;border:1px solid #ddd;border-radius:4px;font-size:12px;"></label>
+                      <label style="display:flex;flex-direction:column;gap:3px;font-size:12px;grid-column:1/-1;">Ghi chú<input type="text" name="ghiChu" value="<%= r.ghiChu %>" style="padding:4px 6px;border:1px solid #ddd;border-radius:4px;font-size:12px;"></label>
+                      <button type="submit" class="btn btn-primary" style="font-size:12px;">Lưu</button>
+                      <% if (isAdmin) { %>
+                      <form method="POST" action="/hoa-don-dau-ra/xoa/<%= r.id %>" onsubmit="return confirm('Xóa hóa đơn này?')" style="display:inline;">
+                        <button type="submit" class="btn btn-danger" style="font-size:12px;width:100%;">Xóa</button>
+                      </form>
+                      <% } %>
+                    </form>
+                  </div>
+                </details>
+              </td>
+            </tr>
+            <% }) %>
+          </tbody>
+          <tfoot>
+            <tr style="font-weight:700;background:var(--color-hairline,#f5f5f5);">
+              <td colspan="6" style="text-align:right;font-size:12px;color:var(--color-muted,#888);">Tổng cộng:</td>
+              <td style="text-align:right;font-variant-numeric:tabular-nums;color:var(--color-success,#2d9e5f);"><%= tongTien.toLocaleString('vi-VN') %>đ</td>
+              <td></td>
+              <td style="text-align:right;font-variant-numeric:tabular-nums;color:var(--color-info,#1976d2);"><%= tongTienVAT.toLocaleString('vi-VN') %>đ</td>
+              <td colspan="2"></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+      <% } %>
+    </section>
+  </main>
+
+  <style>
+    .stat-card {
+      background: var(--color-surface, #fff);
+      border: 1.5px solid var(--color-hairline, #e0e0e0);
+      border-radius: 10px;
+      padding: 14px 18px;
+    }
+    .stat-label { font-size: 12px; color: var(--color-muted, #888); margin-bottom: 4px; }
+    .stat-value { font-size: 22px; font-weight: 700; }
+    .btn-link { color: var(--color-info, #1976d2); background: none; border: none; cursor: pointer; font-size: 13px; text-decoration: underline; }
+    .badge-neutral { background: #eee; color: #555; border-radius: 4px; padding: 2px 6px; }
+    .badge-success { background: rgba(45,158,95,0.12); color: var(--color-success,#2d9e5f); border-radius: 4px; padding: 2px 6px; }
+    details > summary::-webkit-details-marker { display: none; }
+  </style>
+  <%- include('partials/scroll-restore') %>
+  <%- include('partials/details-restore') %>
+</body>
+</html>
