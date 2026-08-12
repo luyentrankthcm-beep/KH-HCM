@@ -68,38 +68,76 @@
     </section>
 
     <!-- Tổng kết -->
-    <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:18px;">
+    <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:12px;">
       <% if (selectedLoai !== 'thu') { %>
-      <div class="stat-card" style="flex:1;min-width:140px;">
+      <div class="stat-card" style="flex:1;min-width:130px;">
         <div class="stat-label">Giao dịch Chi</div>
         <div class="stat-value"><%= rows.filter(function(r){return r.txType==='chi';}).length.toLocaleString('vi-VN') %></div>
       </div>
-      <div class="stat-card" style="flex:1;min-width:140px;">
-        <div class="stat-label">Tổng tiền Chi</div>
+      <div class="stat-card" style="flex:1;min-width:130px;">
+        <div class="stat-label">Tổng tiền Chi ↓</div>
         <div class="stat-value"><%= chiTotal.toLocaleString('vi-VN') %>đ</div>
       </div>
       <% } %>
       <% if (selectedLoai !== 'chi') { %>
-      <div class="stat-card" style="flex:1;min-width:140px;border-color:var(--color-info,#1976d2);">
+      <div class="stat-card" style="flex:1;min-width:130px;border-color:var(--color-info,#1976d2);">
         <div class="stat-label">Giao dịch Thu</div>
         <div class="stat-value" style="color:var(--color-info,#1976d2);"><%= rows.filter(function(r){return r.txType==='thu';}).length.toLocaleString('vi-VN') %></div>
       </div>
-      <div class="stat-card" style="flex:1;min-width:140px;border-color:var(--color-info,#1976d2);">
-        <div class="stat-label">Tổng tiền Thu</div>
+      <div class="stat-card" style="flex:1;min-width:130px;border-color:var(--color-info,#1976d2);">
+        <div class="stat-label">Tổng tiền Thu ↑</div>
         <div class="stat-value" style="color:var(--color-info,#1976d2);"><%= thuTotal.toLocaleString('vi-VN') %>đ</div>
       </div>
       <% } %>
       <% if (selectedLoai !== 'thu') { %>
-      <div class="stat-card" style="flex:1;min-width:140px;border-color:var(--color-success, #2d9e5f);">
+      <div class="stat-card" style="flex:1;min-width:130px;border-color:var(--color-success, #2d9e5f);">
         <div class="stat-label">Đã khớp Chi phí</div>
         <div class="stat-value" style="color:var(--color-success,#2d9e5f);"><%= matchedCount %> / <%= totalRows %></div>
       </div>
-      <div class="stat-card" style="flex:1;min-width:140px;border-color:var(--color-warn, #c67b00);">
-        <div class="stat-label">Chưa khớp</div>
-        <div class="stat-value" style="color:var(--color-warn,#c67b00);"><%= totalRows - matchedCount %></div>
-      </div>
       <% } %>
     </div>
+
+    <!-- Widget số dư cuối kỳ -->
+    <% if (selectedMonth) { %>
+    <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:stretch;margin-bottom:18px;">
+      <div class="stat-card" style="flex:1;min-width:150px;">
+        <div class="stat-label">Đầu kỳ (tính ngược)</div>
+        <div class="stat-value" style="font-size:16px;">
+          <% if (sodudauky !== null) { %>
+            <span style="color:<%= sodudauky < 0 ? 'var(--color-error,#c0392b)' : 'inherit' %>;">
+              <%= sodudauky.toLocaleString('vi-VN') %>đ
+            </span>
+          <% } else { %><span class="muted" style="font-size:13px;">— (chưa nhập cuối kỳ)</span><% } %>
+        </div>
+        <div class="stat-label" style="margin-top:4px;">= Cuối kỳ − Thu + Chi</div>
+      </div>
+      <div class="stat-card" style="flex:1;min-width:100px;opacity:0.7;">
+        <div class="stat-label">+ Thu (tất cả GD)</div>
+        <div class="stat-value" style="font-size:16px;color:var(--color-info,#1976d2);">+<%= allThuTotal.toLocaleString('vi-VN') %>đ</div>
+      </div>
+      <div class="stat-card" style="flex:1;min-width:100px;opacity:0.7;">
+        <div class="stat-label">− Chi (tất cả GD)</div>
+        <div class="stat-value" style="font-size:16px;">−<%= allChiTotal.toLocaleString('vi-VN') %>đ</div>
+      </div>
+      <div class="stat-card" style="flex:2;min-width:200px;border-color:var(--color-info,#1976d2);background:rgba(25,118,210,0.04);">
+        <div class="stat-label">Số dư cuối kỳ (từ ngân hàng)</div>
+        <% if (soducucoiky !== null) { %>
+          <div class="stat-value" style="font-size:18px;color:var(--color-info,#1976d2);"><%= soducucoiky.toLocaleString('vi-VN') %>đ</div>
+        <% } else { %>
+          <div class="stat-value" style="font-size:13px;color:var(--color-muted,#888);margin-bottom:6px;">Chưa nhập — nhập để tính đầu kỳ</div>
+        <% } %>
+        <form method="POST" action="/doi-soat/chi-phi-saoke/set-sodu-cuoiky" style="display:flex;gap:6px;margin-top:6px;align-items:center;">
+          <input type="hidden" name="soduKey" value="<%= soduKey %>">
+          <input type="number" name="soducucoiky" value="<%= soducucoiky !== null ? soducucoiky : '' %>" placeholder="Nhập số dư cuối kỳ..."
+            style="flex:1;padding:5px 8px;border:1px solid var(--color-hairline,#ddd);border-radius:4px;font-size:13px;">
+          <button type="submit" style="background:var(--color-info,#1976d2);color:#fff;border:none;border-radius:4px;padding:5px 10px;font-size:12px;cursor:pointer;white-space:nowrap;">Lưu</button>
+          <% if (soducucoiky !== null) { %>
+          <button type="submit" name="soducucoiky" value="" style="background:none;border:1px solid var(--color-hairline,#ddd);border-radius:4px;padding:5px 8px;font-size:11px;cursor:pointer;color:var(--color-muted,#888);">Xóa</button>
+          <% } %>
+        </form>
+      </div>
+    </div>
+    <% } %>
 
     <!-- Nút xuất Excel -->
     <div style="margin-bottom:12px;text-align:right;">
@@ -130,7 +168,6 @@
               <th>Gian</th>
               <th>NCC</th>
               <th>TK</th>
-              <th>Đã chi</th>
               <th>Khớp</th>
             </tr>
           </thead>
@@ -184,9 +221,6 @@
                     <button type="submit" style="background:none;border:none;cursor:pointer;font-size:10px;color:var(--color-muted,#aaa);padding:0 2px;" title="<%= r.tk === '1388' ? 'Chuyển sang TK Nợ 331' : 'Chuyển sang TK Có 1388' %>">⇄</button>
                   </form>
                 <% } %>
-              </td>
-              <td style="text-align:center;">
-                <% if (r.daHachToan) { %><span style="color:var(--color-success,#2d9e5f);">✓</span><% } else { %><span class="muted">—</span><% } %>
               </td>
               <td>
                 <% if (r.matchType === 'exact') { %>

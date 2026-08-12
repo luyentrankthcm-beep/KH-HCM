@@ -94,6 +94,7 @@ function ensureShape(store) {
   if (!store.chi_phi_invoice_list) store.chi_phi_invoice_list = []; // danh sach hoa don NCC (sheet HDDV KH CU) -- doi chieu Ten NCC+So tien
   if (!store.chi_phi_invoice_meta) store.chi_phi_invoice_meta = null; // { uploaded_at, file_name, count, sheetName }
   if (!store.chi_phi_saoke_gian_override) store.chi_phi_saoke_gian_override = {}; // bankTxId -> {gian, tk} khi user xac nhan go tay tren trang saoke
+  if (!store.bank_sodu_cuoiky) store.bank_sodu_cuoiky = {}; // "{bankName}_{thang}" -> so tien so du cuoi ky tu ngan hang
   if (!store.chi_phi_unc_list) store.chi_phi_unc_list = []; // bang lenh chi UNC -- doi chieu Ten NCC+So tien de lay Dien giai sach
   if (!store.chi_phi_unc_meta) store.chi_phi_unc_meta = null; // { uploaded_at, file_name, count, sheetName }
   CHANNEL_KEYS.forEach((ch) => {
@@ -1005,6 +1006,18 @@ router.get("/doi-soat/chi-phi-saoke", (req, res) => {
   const { COMPANIES } = require("../utils/companies");
   const chiRows = rows.filter((r) => r.txType === "chi");
   const thuRows = rows.filter((r) => r.txType === "thu");
+
+  // Tinh toan so du: luon dung tat-ca GD (khong phu thuoc loai filter hien tai)
+  const { rows: allRows } = selectedLoai === "tat-ca"
+    ? { rows }
+    : buildSaokeRows(store, activeCompany, selectedMonth, selectedBankName, "tat-ca");
+  const allThuTotal = allRows.filter((r) => r.txType === "thu").reduce((s, r) => s + r.amount, 0);
+  const allChiTotal = allRows.filter((r) => r.txType === "chi").reduce((s, r) => s + r.amount, 0);
+  const soduKey = (selectedBankName || "all") + "_" + selectedMonth;
+  const soducucoiky = store.bank_sodu_cuoiky[soduKey] != null ? store.bank_sodu_cuoiky[soduKey] : null;
+  // So du dau ky = cuoi ky - (thu - chi)  <=>  cuoi ky = dau ky + thu - chi
+  const sodudauky = soducucoiky !== null ? soducucoiky - allThuTotal + allChiTotal : null;
+
   res.render("doisoat-chiphi-saoke", {
     COMPANIES, activeCompany,
     userName: req.session.userName, isAdmin: req.session.isAdmin,
@@ -1014,6 +1027,7 @@ router.get("/doi-soat/chi-phi-saoke", (req, res) => {
     totalAmount: rows.reduce((s, r) => s + r.amount, 0),
     chiTotal: chiRows.reduce((s, r) => s + r.amount, 0),
     thuTotal: thuRows.reduce((s, r) => s + r.amount, 0),
+    allThuTotal, allChiTotal, soducucoiky, sodudauky, soduKey,
     matchedCount: rows.filter((r) => r.matchType).length,
     successMsg: req.query.success || "",
     errorMsg: req.query.error || "",
@@ -1069,6 +1083,29 @@ router.get("/doi-soat/chi-phi-saoke/export.xlsx", (req, res) => {
   } catch (e) {
     console.error("[doi-soat/chi-phi-saoke/export.xlsx] ERROR:", e.message);
     res.status(500).send("Lỗi xuất Excel: " + e.message);
+  }
+});
+
+// Luu so du cuoi ky tu ngan hang (de tinh so du dau ky va kiem tra chenh lech).
+// POST body: { soduKey (bankName_thang), soducucoiky (so nguyen, co the am) }
+router.post("/doi-soat/chi-phi-saoke/set-sodu-cuoiky", requireDataEntry, (req, res) => {
+  try {
+    const store = load();
+    ensureShape(store);
+    const { soduKey, soducucoiky } = req.body;
+    if (!soduKey) throw new Error("Thieu soduKey.");
+    const val = soducucoiky === "" || soducucoiky == null ? null : Number(String(soducucoiky).replace(/[^0-9\-]/g, ""));
+    if (val === null) {
+      delete store.bank_sodu_cuoiky[soduKey];
+    } else {
+      store.bank_sodu_cuoiky[soduKey] = val;
+    }
+    save(store);
+    const back = req.headers.referer || "/doi-soat/chi-phi-saoke";
+    res.redirect(back + (back.includes("?") ? "&" : "?") + "success=" + encodeURIComponent("Đã lưu số dư cuối kỳ."));
+  } catch (e) {
+    const back = req.headers.referer || "/doi-soat/chi-phi-saoke";
+    res.redirect(back + (back.includes("?") ? "&" : "?") + "error=" + encodeURIComponent(e.message));
   }
 });
 
