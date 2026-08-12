@@ -630,6 +630,11 @@ const MANUAL_MATCH_DEFAULTS = {
     "2026-08-08|VINKE-TCUNG": { invoiceNumbers: ["12698"], amount: 1260000, grossAdjustment: 0, note: "Can tru thu cong: hoa don gop T7+CN ngay 8+9/08/2026 -- ep khop theo gross tung ngay." },
     "2026-08-08|THE GARDEN PHN": { invoiceNumbers: ["12674"], amount: 680000, grossAdjustment: 0, note: "Can tru thu cong: hoa don gop T7+CN ngay 8+9/08/2026 -- ep khop theo gross tung ngay." },
     "2026-08-08|VC PHAM HUNG (SKYLAKE)": { invoiceNumbers: ["12645"], amount: 585000, grossAdjustment: 0, note: "Can tru thu cong: hoa don gop T7+CN ngay 8+9/08/2026 -- ep khop theo gross tung ngay." },
+    // Luyen, 2026-08-12: ngay 9/08/2026 (CN) -- cung hoa don T7+CN voi ngay 8,
+    // so HĐ giong het ngay 8, so tien = doanh thu QR tron (khong chia ty le).
+    "2026-08-09|AE HP PHN": { invoiceNumbers: ["12638"], amount: 11510000, grossAdjustment: 0, note: "Hoa don gop T7+CN 8+9/08/2026 -- phan ngay CN, so tien tron tu QR gross." },
+    "2026-08-09|VC TIMES PHN": { invoiceNumbers: ["12651"], amount: 7510000, grossAdjustment: 0, note: "Hoa don gop T7+CN 8+9/08/2026 -- phan ngay CN, so tien tron tu QR gross." },
+    "2026-08-09|VINKE-TCUNG": { invoiceNumbers: ["12698"], amount: 1970000, grossAdjustment: 0, note: "Hoa don gop T7+CN 8+9/08/2026 -- phan ngay CN, so tien tron tu QR gross." },
     // Luyen, 2026-08-11: ngay 10/08/2026 VC PHAM HUNG (SKYLAKE) gross=310.000d
     // va hoa don 12806=310.000d da khop chinh xac, nhung he thong auto-bu tru
     // 20.000d tu AE HP PHN sang day (hoa don 12800), lam doanh thu hien 330.000d
