@@ -1048,6 +1048,18 @@ router.get("/doi-soat/chi-phi-saoke", (req, res) => {
   // So du dau ky = cuoi ky - (thu - chi)  <=>  cuoi ky = dau ky + thu - chi
   const sodudauky = soducucoiky !== null ? soducucoiky - allThuTotal + allChiTotal : null;
 
+  // Tinh so du tich luy cho tung dong (dua tren allRows, sort tang dan theo ngay).
+  // Key = r.id (bankTxId) hoac fallback index trong allRows.
+  // So du sau dong i = sodudauky + sum(thu[0..i]) - sum(chi[0..i]).
+  const allRowsSorted = [...allRows].sort((a, b) => a.date.localeCompare(b.date));
+  const balanceByTxId = {};
+  let runBal = sodudauky; // null neu chua nhap cuoi ky
+  allRowsSorted.forEach((r, idx) => {
+    if (runBal !== null) runBal += r.txType === "thu" ? r.amount : -r.amount;
+    const key = r.id != null ? String(r.id) : "__idx__" + idx;
+    balanceByTxId[key] = runBal;
+  });
+
   res.render("doisoat-chiphi-saoke", {
     COMPANIES, activeCompany,
     userName: req.session.userName, isAdmin: req.session.isAdmin,
@@ -1058,6 +1070,7 @@ router.get("/doi-soat/chi-phi-saoke", (req, res) => {
     chiTotal: chiRows.reduce((s, r) => s + r.amount, 0),
     thuTotal: thuRows.reduce((s, r) => s + r.amount, 0),
     allThuTotal, allChiTotal, soducucoiky, sodudauky, soduKey,
+    balanceByTxId,
     matchedCount: rows.filter((r) => r.matchType).length,
     successMsg: req.query.success || "",
     errorMsg: req.query.error || "",

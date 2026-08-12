@@ -159,11 +159,13 @@
         <table class="data-table" style="font-size:13px;">
           <thead>
             <tr>
-              <th>Ngày</th>
+              <th style="min-width:94px;">Ngày</th>
               <th>NH / Loại</th>
               <th>Tên đối tác (sao kê)</th>
               <th>Diễn giải</th>
-              <th style="text-align:right;">Số tiền</th>
+              <th style="text-align:right;color:var(--color-success,#2d9e5f);white-space:nowrap;">Thu ↑</th>
+              <th style="text-align:right;white-space:nowrap;">Chi ↓</th>
+              <th style="text-align:right;white-space:nowrap;color:var(--color-info,#1976d2);">Số dư</th>
               <th>Số HĐ</th>
               <th>Gian</th>
               <th>NCC</th>
@@ -173,20 +175,42 @@
           </thead>
           <tbody>
             <% rows.forEach(function(r) { %>
+            <%
+              var txKey = r.id != null ? String(r.id) : null;
+              var rowBal = txKey && balanceByTxId[txKey] !== undefined ? balanceByTxId[txKey] : null;
+            %>
             <tr class="<%= r.txType === 'thu' ? 'row-thu' : r.matchType === 'exact' ? 'row-matched-exact' : r.matchType === 'fuzzy' ? 'row-matched-fuzzy' : 'row-unmatched' %>">
-              <td><%= r.date %></td>
+              <td style="white-space:nowrap;">
+                <span class="date-cell"><%= r.date %></span>
+              </td>
               <td style="white-space:nowrap;">
                 <span class="badge badge-neutral" style="font-size:11px;"><%= r.bankLabel || r.bankName %></span>
-                <% if (r.txType === 'thu') { %>
-                  <span class="badge badge-success" style="font-size:10px;margin-left:2px;" title="Tiền vào (Thu)">↑ Thu</span>
-                <% } else { %>
-                  <span class="badge badge-warn" style="font-size:10px;margin-left:2px;background:none;color:var(--color-muted,#888);" title="Tiền ra (Chi)">↓ Chi</span>
-                <% } %>
               </td>
               <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="<%= r.tenDoiUng %>"><%= r.tenDoiUng || '—' %></td>
               <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="<%= r.description %>"><%= r.description || '—' %></td>
-              <td style="text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;color:<%= r.txType==='thu' ? 'var(--color-success,#2d9e5f)' : 'inherit' %>;">
-                <%= r.txType === 'thu' ? '+' : '' %><%= r.amount.toLocaleString('vi-VN') %>đ
+              <!-- Thu -->
+              <td style="text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;">
+                <% if (r.txType === 'thu') { %>
+                  <span style="color:var(--color-success,#2d9e5f);font-weight:600;">+<%= r.amount.toLocaleString('vi-VN') %>đ</span>
+                <% } else { %>
+                  <span class="muted">—</span>
+                <% } %>
+              </td>
+              <!-- Chi -->
+              <td style="text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;">
+                <% if (r.txType === 'chi') { %>
+                  <span style="color:var(--color-error,#c0392b);">−<%= r.amount.toLocaleString('vi-VN') %>đ</span>
+                <% } else { %>
+                  <span class="muted">—</span>
+                <% } %>
+              </td>
+              <!-- Số dư -->
+              <td style="text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;">
+                <% if (rowBal !== null) { %>
+                  <span style="color:var(--color-info,#1976d2);font-weight:600;"><%= rowBal.toLocaleString('vi-VN') %>đ</span>
+                <% } else { %>
+                  <span class="muted" style="font-size:11px;">—</span>
+                <% } %>
               </td>
               <td><%= r.soHoaDon || '' %></td>
               <td style="max-width:160px;white-space:nowrap;" title="<%= r.gian || r.suggestedGian %>">
@@ -261,6 +285,12 @@
     .stat-value { font-size: 22px; font-weight: 700; }
     .badge-neutral { background: #eee; color: #555; border-radius: 4px; padding: 2px 6px; font-size: 11px; }
     .badge-warn { background: #fff3cd; color: #856404; border-radius: 4px; padding: 2px 6px; }
+    .date-cell {
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 0.3px;
+      color: var(--color-text, #222);
+    }
   </style>
   <%- include('partials/scroll-restore') %>
   <%- include('partials/details-restore') %>
