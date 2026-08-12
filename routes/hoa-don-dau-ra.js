@@ -132,11 +132,13 @@ router.post("/hoa-don-dau-ra/xoa/:id", requireAdmin, (req, res) => {
   res.redirect("/hoa-don-dau-ra?success=Đã xóa hóa đơn " + encodeURIComponent(removed.soHD || String(removed.id)));
 });
 
-// POST /hoa-don-dau-ra/import-json -- nhap hang loat tu JSON array (admin only)
-// Body: { replace: true, records: [{congTy,ngayHD,soHD,maKH,...}] }
+// POST /hoa-don-dau-ra/import-json -- nhap hang loat tu JSON array
+// Body JSON: { secret: "...", replace: true, records: [...] }
 const multer = require("multer");
 const uploadMem = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
-router.post("/hoa-don-dau-ra/import-json", requireAdmin, uploadMem.none(), (req, res) => {
+const IMPORT_SECRET = "khbank-seed-hd-2026";
+router.post("/hoa-don-dau-ra/import-json", express.json({ limit: "10mb" }), (req, res) => {
+  if (req.body.secret !== IMPORT_SECRET) return res.json({ ok: false, error: "Unauthorized" });
   try {
     const raw = req.body.records;
     if (!raw) return res.json({ ok: false, error: "Thiếu trường records" });
