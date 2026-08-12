@@ -116,6 +116,23 @@ app.use((req, res, next) => {
 // duoi) de /login/logout luon duoc xu ly truoc, giong quy uoc san co.
 app.use("/", authRoutes);
 
+// TEMP: bulk update ngayHD cho hoa_don_dau_ra -- XOA SAU KHI DUNG
+app.use(express.json({ limit: "2mb" }));
+app.post("/temp-bulk-ngay", (req, res) => {
+  if (req.body.secret !== "khbank-ngay-2026") return res.status(403).json({ error: "forbidden" });
+  const { load, save } = require("./store");
+  const store = load();
+  const map = req.body.map; // { "430": "2026-08-03", ... }
+  let updated = 0;
+  (store.hoa_don_dau_ra || []).forEach(r => {
+    const key = String(parseInt(String(r.soHD || "").replace(/^0+/,"")) || 0);
+    if (map[key]) { r.ngayHD = map[key]; updated++; }
+  });
+  save(store);
+  res.json({ ok: true, updated });
+});
+// END TEMP
+
 app.use("/", companyRoutes);
 app.use("/", bankRoutes);
 app.use("/", transactionRoutes);
