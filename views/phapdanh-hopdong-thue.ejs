@@ -77,6 +77,7 @@
             <option value="">-- chọn --</option>
             <option value="Khu vui chơi">Khu vui chơi</option>
             <option value="Máy tự động">Máy tự động</option>
+            <option value="Ghế">Ghế (cinema CGV...)</option>
           </select>
         </label>
         <label>Gian (tên điểm xuất hóa đơn) <input type="text" name="gian" required placeholder="vd AE Bình Tân ghế" /></label>
@@ -102,6 +103,7 @@
           <a class="btn btn-secondary <%= !loaiFilter ? 'is-active' : '' %>" href="/phap-danh/hop-dong-thue-gian-hang<%= thangFilter ? '?thang=' + thangFilter : '' %>">Tất cả (<%= totalForCompany %>)</a>
           <a class="btn btn-secondary <%= loaiFilter === 'Khu vui chơi' ? 'is-active' : '' %>" href="/phap-danh/hop-dong-thue-gian-hang?loai=<%= encodeURIComponent('Khu vui chơi') %><%= thangFilter ? '&thang=' + thangFilter : '' %>">Khu vui chơi (<%= counts['Khu vui chơi'] %>)</a>
           <a class="btn btn-secondary <%= loaiFilter === 'Máy tự động' ? 'is-active' : '' %>" href="/phap-danh/hop-dong-thue-gian-hang?loai=<%= encodeURIComponent('Máy tự động') %><%= thangFilter ? '&thang=' + thangFilter : '' %>">Máy tự động (<%= counts['Máy tự động'] %>)</a>
+          <a class="btn btn-secondary <%= loaiFilter === 'Ghế' ? 'is-active' : '' %>" href="/phap-danh/hop-dong-thue-gian-hang?loai=<%= encodeURIComponent('Ghế') %><%= thangFilter ? '&thang=' + thangFilter : '' %>">Ghế (<%= counts['Ghế'] || 0 %>)</a>
           <a class="btn btn-primary" href="/phap-danh/hop-dong-thue-gian-hang/export.xlsx<%= loaiFilter || thangFilter ? '?' : '' %><%= loaiFilter ? 'loai=' + encodeURIComponent(loaiFilter) : '' %><%= loaiFilter && thangFilter ? '&' : '' %><%= thangFilter ? 'thang=' + thangFilter : '' %>">📊 Xuất Excel</a>
         </div>
       </div>

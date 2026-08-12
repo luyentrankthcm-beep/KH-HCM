@@ -152,6 +152,7 @@ function parseHopDongHcmWorkbook(buffer, opts) {
       thuocBP,
       soHopDong,
       viTri: cellText(row[10]),
+      soGheMayDienTich: cellText(row[11]), // "Số ghế/ Máy tự động/ Diện tích" -- dung de suy loaiHinh (ghe/may/dien tich)
       soTKNHkhach: cellText(row[16]),
       khachMoTaiNH: cellText(row[17]),
       ngayKyHD: cellDate(row[18]),

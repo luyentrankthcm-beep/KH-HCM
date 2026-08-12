@@ -249,6 +249,9 @@ router.get("/phap-danh/hop-dong-thue-gian-hang", (req, res) => {
     "Máy tự động": store.phap_danh_hop_dong_thue.filter(
       (r) => (r.congTy || "kh_cu") === activeCompany && isMienNamRow(r) && r.loaiHinh === "Máy tự động"
     ).length,
+    "Ghế": store.phap_danh_hop_dong_thue.filter(
+      (r) => (r.congTy || "kh_cu") === activeCompany && isMienNamRow(r) && r.loaiHinh === "Ghế"
+    ).length,
   };
   res.render("phapdanh-hopdong-thue", {
     userName: req.session.userName,
@@ -640,6 +643,9 @@ router.post("/phap-danh/hop-dong-thue-gian-hang/cap-nhat-tu-sheet", requireAdmin
       // NHUNG CHI khi con trong (khong ghi de neu Luyen da tu sua tay khac di).
       const benChoThueSheet = groupRows.map((r) => r.tenKH).find((v) => v) || "";
       const mstBenChoThueSheet = groupRows.map((r) => r.mstKH).find((v) => v) || "";
+      // Suy loaiHinh tu cot soGheMayDienTich (vd "02 ghe" -> "Ghe", "01 may" -> "May tu dong")
+      const soGheMay = groupRows.map((r) => r.soGheMayDienTich).find((v) => v) || "";
+      const detectedLoaiHinh = loaiHinhFromSoGheMay(soGheMay, "");
       const matchKey = soHopDong + "||" + congTy;
       const existing = existingBySoHopDong.get(matchKey);
       if (existing) {
@@ -648,6 +654,8 @@ router.post("/phap-danh/hop-dong-thue-gian-hang/cap-nhat-tu-sheet", requireAdmin
         Object.assign(existing, fields);
         if (!existing.benChoThue && benChoThueSheet) existing.benChoThue = benChoThueSheet;
         if (!existing.mstBenChoThue && mstBenChoThueSheet) existing.mstBenChoThue = mstBenChoThueSheet;
+        // Cap nhat loaiHinh neu dang de trong va detect duoc tu cot soGheMay
+        if (!existing.loaiHinh && detectedLoaiHinh) existing.loaiHinh = detectedLoaiHinh;
         updatedExisting++;
         updatedNames.push(existing.gian || diaDiem);
       } else {
@@ -655,7 +663,7 @@ router.post("/phap-danh/hop-dong-thue-gian-hang/cap-nhat-tu-sheet", requireAdmin
         // (Luyen xac nhan qua AskUserQuestion 2026-07-21: "Thêm cả gian mới chưa có").
         store.phap_danh_hop_dong_thue.push({
           id: nextId(store, "phap_danh_hop_dong_thue_seq") || Date.now(),
-          loaiHinh: "",
+          loaiHinh: detectedLoaiHinh || "",
           congTy,
           maDiemMisa: "",
           tenDiemNoiBo: "",
@@ -731,6 +739,15 @@ function loaiHinhFromSheetLabel(label) {
   if (n.includes("mtd")) return "Máy tự động";
   if (n.includes("kvc")) return "Khu vui chơi";
   return "";
+}
+// Luyen, 2026-08-12: tu dong suy loaiHinh tu cot "So ghe/ May tu dong/ Dien tich"
+// tren Google Sheet HCM -- CGV ghe o day se co gia tri nhu "02 ghe", may ATM
+// se co "01 may"... Neu khong co thong tin nay thi fallback ve sheet label.
+function loaiHinhFromSoGheMay(soGheMayDienTich, sheetLabelFallback) {
+  const v = normVN(soGheMayDienTich || "");
+  if (v.includes("ghe")) return "Ghế";
+  if (v.includes("may")) return "Máy tự động";
+  return loaiHinhFromSheetLabel(sheetLabelFallback || "");
 }
 
 // Khoa ghep AN TOAN gian mien Bac da co: "gian" (= Ma Diem Thue, nguon goc
