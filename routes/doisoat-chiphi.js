@@ -935,6 +935,35 @@ function buildSaokeRows(store, activeCompany, selectedMonth, selectedBankName, s
   const DATE_WIN_MS = 7 * 86400000;
   function dateMs(d) { return new Date(d + "T00:00:00").getTime(); }
 
+  // Lookup so hoa don tu hoa_don_dau_vao khi chi_phi khong co soHoaDon.
+  // Khop: ten NCC (>= 1 tu >= 5 ky tu chung) + tong tien (sau thue) +-5000 + ngay +-60 ngay.
+  const hdForCompany = (store.hoa_don_dau_vao || []).filter(
+    (h) => (h.congTy || "kh_cu") === activeCompany && h.soHoaDon
+  );
+  function findSoHoaDonFromHD(tenDoiUng, amount, date) {
+    const normDU = normText(tenDoiUng || "");
+    const txMs = dateMs(date);
+    const found = hdForCompany.filter((h) => {
+      // Khop ten NCC
+      const normNCC = normText(h.tenNCC || "");
+      const nccWords = normNCC.split(/\s+/).filter((w) => w.length >= 5);
+      const duWords = normDU.split(/\s+/).filter((w) => w.length >= 5);
+      if (!nccWords.some((w) => normDU.includes(w)) && !duWords.some((w) => normNCC.includes(w))) return false;
+      // Khop so tien (soTien = tong sau thue)
+      const total = Number(h.soTien) || ((Number(h.soTienTruocThue) || 0) + (Number(h.thue) || 0));
+      if (Math.abs(total - amount) > 5000) return false;
+      // Khop ngay: +-60 ngay
+      if (h.ngayHD) {
+        const hdMs = dateMs(h.ngayHD.slice(0, 10));
+        if (Math.abs(hdMs - txMs) > 60 * 86400000) return false;
+      }
+      return true;
+    });
+    if (found.length === 0) return "";
+    const soHDs = [...new Set(found.map((c) => String(c.soHoaDon)))];
+    return soHDs.slice(0, 3).join(", "); // toi da 3 so HĐ neu trung ten+tien
+  }
+
   const chiTxs = (store.transactions || []).filter((t) => {
     if (!chiBankIds.has(t.bank_id)) return false;
     if (selectedLoai === "chi" && t.type !== "chi") return false;
@@ -980,7 +1009,8 @@ function buildSaokeRows(store, activeCompany, selectedMonth, selectedBankName, s
     return {
       id: t.id, txType: t.type || "chi", date: t.date, bankName, bankLabel,
       tenDoiUng: t.tenDoiUng || "", description: t.description || "", amount: t.amount,
-      soHoaDon: (cp && cp.soHoaDon) || "", gian: finalGian, ncc: (cp && cp.ncc) || "",
+      soHoaDon: (cp && cp.soHoaDon) || findSoHoaDonFromHD(t.tenDoiUng, t.amount, t.date),
+      gian: finalGian, ncc: (cp && cp.ncc) || "",
       daHachToan: cp ? !!cp.daHachToan : false, chiPhiId: (cp && cp.id) || "",
       matchType, tk: finalTk, hasOvr: !!ovr, suggestedGian, suggestedTk,
     };
