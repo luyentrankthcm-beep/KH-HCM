@@ -69,6 +69,139 @@ router.get("/hoa-don-dau-ra", requireLogin, (req, res) => {
   });
 });
 
+// GET /hoa-don-dau-ra/export-misa -- xuat Excel dinh dang MISA hoa don ban ra
+router.get("/hoa-don-dau-ra/export-misa", requireLogin, (req, res) => {
+  const XLSX = require("xlsx");
+  const store = load();
+  ensureShape(store);
+  const activeCompany = getCompany(req);
+  const selectedMonth = (req.query.thang || "").trim(); // "YYYY-MM" hoac ""
+
+  // Helper: parse ngayHD ve { dt, dmyStr }
+  // Store co the luu "DD/MM/YYYY" (import tu baocaochitiet) hoac "YYYY-MM-DD" (form HTML)
+  function parseNgay(s) {
+    if (!s) return { dt: null, dmyStr: "" };
+    s = String(s).trim();
+    if (/^\d{2}\/\d{2}\/\d{4}$/.test(s)) {
+      // DD/MM/YYYY
+      const [d, m, y] = s.split("/");
+      return { dt: new Date(+y, +m - 1, +d), dmyStr: s, ym: `${y}-${m}` };
+    }
+    if (/^\d{4}-\d{2}-\d{2}/.test(s)) {
+      // YYYY-MM-DD
+      const dt = new Date(s);
+      const d = String(dt.getDate()).padStart(2, "0");
+      const m = String(dt.getMonth() + 1).padStart(2, "0");
+      const y = dt.getFullYear();
+      return { dt, dmyStr: `${d}/${m}/${y}`, ym: `${y}-${m}` };
+    }
+    return { dt: null, dmyStr: s, ym: "" };
+  }
+
+  // Helper: map ma khach hang MISA
+  function mapKH(row) {
+    const g = (row.ghiChu || "").toLowerCase();
+    const t = (row.tenKhachHang || "").toUpperCase();
+    if (g.includes("momo")) return "TRỰC TUYẾN0305289153";
+    if (g.includes("vnpay") || g.includes("zalo")) return "VN PAY0102182292";
+    if (g.includes("payoo") || g.includes("dong viet")) return "DONGVIET0305458683";
+    if (t.includes("YOKIDS")) return "YOKIDS0801365316";
+    if (t.includes("KIWOOZA")) return "KIWOOZA0315850120";
+    if (t.includes("HOA SEN")) return "HOA SEN3700381324";
+    return "KL";
+  }
+
+  // Helper: ky hieu HĐ tu soHD (chi ap dung cho T8/2026 -- cap nhat khi co thang moi)
+  function getKyHieu(soHD) {
+    const n = parseInt(String(soHD).replace(/^0+/, "")) || 0;
+    return n < 5000 ? "1C26TYY" : "1C26MKH";
+  }
+
+  let rows = store.hoa_don_dau_ra.filter(r => (r.congTy || "kh_cu") === activeCompany);
+
+  // Loc theo thang neu co
+  if (selectedMonth) {
+    rows = rows.filter(r => {
+      const { ym } = parseNgay(r.ngayHD);
+      return ym === selectedMonth;
+    });
+  }
+
+  // Sap xep theo so HD tang dan
+  rows = [...rows].sort((a, b) => {
+    const na = parseInt(String(a.soHD || "").replace(/^0+/, "")) || 0;
+    const nb = parseInt(String(b.soHD || "").replace(/^0+/, "")) || 0;
+    return na - nb;
+  });
+
+  // Build data rows cho MISA (khong co header -- dan thang tu row 9 cua template)
+  const dataRows = rows.map(row => {
+    const { dmyStr } = parseNgay(row.ngayHD);
+    const soInt = parseInt(String(row.soHD || "").replace(/^0+/, "")) || 0;
+    const kyHieu = getKyHieu(soInt);
+    const ngay = dmyStr;
+    // Lay nam/thang tu ngayHD
+    let mm = "08", yy = "26";
+    if (dmyStr && dmyStr.length === 10) {
+      mm = dmyStr.slice(3, 5);
+      yy = dmyStr.slice(8, 10);
+    }
+    const soCT = `BH${mm}-${String(soInt).padStart(6, "0")}/${yy}`;
+    const maKH = mapKH(row);
+    const soTien = Number(row.soTien) || 0;
+    const soVAT = Number(row.soTienVAT) || 0;
+    const thueVAT = String(row.thueVAT || "8").replace("%", "").trim();
+    const maCT = row.maKH || "";
+    // ten KH chi hien thi voi cong ty co ten rieng
+    const tenKH = (row.tenKhachHang && !["Bán cho người tiêu dùng", ""].includes(row.tenKhachHang))
+      ? row.tenKhachHang : "";
+
+    // Tao mang 57 phan tu (cot 1-57), null cho cot trong
+    const r = new Array(57).fill(null);
+    r[0]  = "Chưa thu tiền";
+    r[1]  = "Không";
+    r[2]  = "Có";
+    r[3]  = "Đã lập";
+    r[4]  = ngay;  // ngay hach toan
+    r[5]  = ngay;  // ngay chung tu
+    r[6]  = soCT;  // so chung tu
+    r[9]  = kyHieu;
+    r[10] = soInt;
+    r[11] = ngay;
+    r[12] = maKH;
+    r[17] = `Dịch vụ vui chơi giải trí theo HĐ ${soInt} ký hiệu ${kyHieu}`;
+    r[23] = "KVC";
+    r[24] = "Dịch vụ vui chơi giải trí";
+    r[28] = 131;
+    r[29] = 5113;
+    r[30] = "Kỳ";
+    r[31] = 1;
+    r[32] = soTien;
+    r[33] = soTien;
+    r[37] = thueVAT;
+    r[38] = soVAT;
+    r[39] = 33311;
+    r[44] = maCT;
+    if (tenKH) r[56] = tenKH;
+    return r;
+  });
+
+  // Tao workbook
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet(dataRows);
+  const sheetName = selectedMonth ? selectedMonth.replace("-", "") : "HoaDonBanRa";
+  XLSX.utils.book_append_sheet(wb, ws, sheetName);
+
+  const buf = XLSX.write(wb, { bookType: "xlsx", type: "buffer" });
+  const fname = selectedMonth
+    ? `HoaDon_BanRa_MISA_${selectedMonth.replace("-", "_")}.xlsx`
+    : `HoaDon_BanRa_MISA_TatCa.xlsx`;
+
+  res.setHeader("Content-Disposition", `attachment; filename="${fname}"`);
+  res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+  res.send(buf);
+});
+
 // POST /hoa-don-dau-ra/them -- them moi 1 dong
 router.post("/hoa-don-dau-ra/them", requireDataEntry, (req, res) => {
   const store = load();
