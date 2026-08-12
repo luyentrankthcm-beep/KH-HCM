@@ -116,22 +116,6 @@ app.use((req, res, next) => {
 // duoi) de /login/logout luon duoc xu ly truoc, giong quy uoc san co.
 app.use("/", authRoutes);
 
-// TEMP: cap nhat phap_danh id=137 -- XOA SAU KHI DUNG
-app.use(express.json({ limit: "1mb" }));
-app.post("/temp-update-pd137", (req, res) => {
-  if (req.body.secret !== "khbank-pd137-2026") return res.status(403).json({ error: "forbidden" });
-  const { load, save } = require("./store");
-  const store = load();
-  const pd = (store.phap_danh_hop_dong_thue || []).find(r => r.id === 137);
-  if (!pd) return res.status(404).json({ error: "not found" });
-  pd.tenDiemNoiBo = "AE GO BA RIA KVC";
-  pd.maCongTrinh  = "AE GO BA RIA KVC";
-  pd.updatedAt    = new Date().toISOString();
-  save(store);
-  res.json({ ok: true, tenDiemNoiBo: pd.tenDiemNoiBo, maCongTrinh: pd.maCongTrinh });
-});
-// END TEMP
-
 app.use("/", companyRoutes);
 app.use("/", bankRoutes);
 app.use("/", transactionRoutes);
