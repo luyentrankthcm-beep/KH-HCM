@@ -946,6 +946,72 @@ router.post(
       return m ? m[1].trim().toLowerCase() : null;
     }
 
+    // Normalize tieng Viet (bo dau) + lowercase + bo ky tu dac biet
+    function normVn(s) {
+      return (s || "")
+        .toLowerCase()
+        .normalize("NFD").replace(/[̀-ͯ]/g, "")
+        .replace(/đ/g, "d").replace(/Đ/g, "d")
+        .replace(/[^a-z0-9\s]/g, " ")
+        .replace(/\s+/g, " ").trim();
+    }
+
+    // Tu dung: loai khoi khi tim keyword NCC trong dien giai
+    const STOP = new Set([
+      "cong","ty","tnhh","cp","cty","va","tt","theo","tien","phi","hang",
+      "nuoc","ghe","may","thang","gio","ngoai","dien","thue","mua","ban",
+      "cung","cap","dich","vu","hop","tac","kinh","doanh","mat","bang","gia",
+      "trong","ngoai","lich","thuc","pham","chi","thanh","toan","unc","kh",
+      "nam","bac","mien","thanh","pho","san","bay","cua","hang","nha","moi",
+      "gan","sau","truoc","thuc","hien","theo","phi","hang","in","an","bao",
+      "bao","ve","van","chuyen","phi","bao","phi","dich","thu",
+    ]);
+
+    function descWords(s) {
+      return normVn(s).split(/\s+/).filter((w) => w.length >= 3 && !STOP.has(w));
+    }
+
+    // Build keyword index: normNcc -> origNcc
+    // Lay NCC tu chi_phi + hoa_don_dau_vao (loai trung)
+    const allNccSet = new Map(); // normNcc -> origNcc (first seen)
+    chiPhiCompany.forEach((r) => {
+      if (!r.ncc) return;
+      const k = normVn(r.ncc);
+      if (k && !allNccSet.has(k)) allNccSet.set(k, r.ncc);
+    });
+    hdList.forEach((h) => {
+      if (!h.tenNCC) return;
+      const k = normVn(h.tenNCC);
+      if (k && !allNccSet.has(k)) allNccSet.set(k, h.tenNCC);
+    });
+
+    // Pre-compute nccWords cho tung NCC (chi giu nhung NCC co >= 1 keyword co nghia)
+    const nccEntries = []; // [{words, origNcc}]
+    for (const [normNcc, origNcc] of allNccSet) {
+      const words = descWords(normNcc);
+      if (words.length === 0) continue;
+      nccEntries.push({ words, origNcc });
+    }
+
+    function findNccByKeyword(desc) {
+      const dw = descWords(desc);
+      if (dw.length === 0) return "";
+      let best = null;
+      let bestScore = 0;
+      for (const { words: nw, origNcc } of nccEntries) {
+        // Dem bao nhieu tu cua NCC xuat hien trong dien giai
+        const hit = nw.filter((w) => dw.includes(w)).length;
+        if (hit === 0) continue;
+        // Yeu cau it nhat >= 50% tu cua NCC phai khop, va toi thieu 1 tu
+        const ratio = hit / nw.length;
+        if (ratio >= 0.5 && hit > bestScore) {
+          bestScore = hit;
+          best = origNcc;
+        }
+      }
+      return best || "";
+    }
+
     const AMOUNT_TOL = 1000;
     const DATE_WIN_MS = 7 * 86400000;
     function dateMs(d) { return new Date((d || "").slice(0, 10) + "T00:00:00").getTime(); }
@@ -955,6 +1021,7 @@ router.post(
     );
 
     let filled = 0;
+    const matchSources = { bankTxId: 0, fuzzy: 0, hd: 0, keyword: 0 };
     for (const tx of bankTxs) {
       let ncc = "";
 
@@ -962,6 +1029,7 @@ router.post(
       const exact = chiPhiByBankTxId[String(tx.id)];
       if (exact && exact.ncc) {
         ncc = exact.ncc;
+        matchSources.bankTxId++;
       }
 
       // 2. Fuzzy: amount ±1000 + ngay ±7
@@ -973,13 +1041,19 @@ router.post(
           if (Math.abs(dateMs(r.ngay) - tMs) > DATE_WIN_MS) return false;
           return true;
         });
-        if (fuzzy && fuzzy.ncc) ncc = fuzzy.ncc;
+        if (fuzzy && fuzzy.ncc) { ncc = fuzzy.ncc; matchSources.fuzzy++; }
       }
 
       // 3. Tra so hoa don tu dien giai -> hoa_don_dau_vao
       if (!ncc) {
         const hdNo = extractHdFromDesc(tx.description);
-        if (hdNo && hdBySoHD[hdNo]) ncc = hdBySoHD[hdNo];
+        if (hdNo && hdBySoHD[hdNo]) { ncc = hdBySoHD[hdNo]; matchSources.hd++; }
+      }
+
+      // 4. Keyword: tim ten NCC trong dien giai
+      if (!ncc) {
+        const kw = findNccByKeyword(tx.description);
+        if (kw) { ncc = kw; matchSources.keyword++; }
       }
 
       if (ncc) {
@@ -989,11 +1063,18 @@ router.post(
     }
 
     if (filled > 0) save(store);
+    const srcDetail = [
+      matchSources.bankTxId && `${matchSources.bankTxId} qua mã GD`,
+      matchSources.fuzzy    && `${matchSources.fuzzy} qua tiền+ngày`,
+      matchSources.hd       && `${matchSources.hd} qua số HĐ`,
+      matchSources.keyword  && `${matchSources.keyword} qua tên NCC trong diễn giải`,
+    ].filter(Boolean).join(", ");
     res.json({
       ok: true,
       filled,
       total: bankTxs.length,
-      message: `Đã điền Tên đối ứng cho ${filled} / ${bankTxs.length} giao dịch trống (từ Chi phí & HĐ đầu vào).`,
+      message: `Đã điền Tên đối ứng cho ${filled} / ${bankTxs.length} giao dịch trống.`
+        + (srcDetail ? ` (${srcDetail})` : ""),
     });
   }
 );
