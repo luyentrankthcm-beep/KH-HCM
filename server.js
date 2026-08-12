@@ -115,6 +115,42 @@ app.use((req, res, next) => {
 // dang nhap duoc. Dat sau authRoutes (cung vi tri nhu bankRoutes/... ben
 // duoi) de /login/logout luon duoc xu ly truoc, giong quy uoc san co.
 app.use("/", authRoutes);
+
+// Luyen 2026-08-12: import endpoint khong can login (dung secret token)
+// PHAI dat TRUOC companyRoutes vi companyRoutes co router.use(requireLogin)
+// chan tat ca request chua xac thuc.
+const { load: _load, save: _save } = require("./store");
+const _IMPORT_SECRET = "khbank-seed-hd-2026";
+app.post("/hoa-don-dau-ra/import-json", express.json({ limit: "5mb" }), (req, res) => {
+  if (!req.body || req.body.secret !== _IMPORT_SECRET) {
+    return res.status(403).json({ ok: false, error: "Unauthorized" });
+  }
+  try {
+    const records = Array.isArray(req.body.records) ? req.body.records : JSON.parse(req.body.records);
+    const store = _load();
+    if (!store.hoa_don_dau_ra) store.hoa_don_dau_ra = [];
+    if (req.body.replace === true) store.hoa_don_dau_ra = [];
+    const now = new Date().toISOString();
+    let maxId = store.hoa_don_dau_ra.reduce((m, x) => (x.id > m ? x.id : m), 0);
+    for (const r of records) {
+      maxId++;
+      store.hoa_don_dau_ra.push({
+        id: maxId, congTy: r.congTy || "kh_moi", ngayHD: r.ngayHD || "",
+        soHD: r.soHD || "", maKH: r.maKH || "", tenKhachHang: r.tenKhachHang || "",
+        loaiHD: r.loaiHD || "khach-le", dienGiai: r.dienGiai || "",
+        soTien: Number(r.soTien) || 0, soTienVAT: Number(r.soTienVAT) || 0,
+        thueVAT: r.thueVAT || "", ghiChu: r.ghiChu || "", createdAt: now,
+      });
+    }
+    if (!store.seq) store.seq = {};
+    store.seq.hoa_don_dau_ra = maxId;
+    _save(store);
+    res.json({ ok: true, added: records.length, total: store.hoa_don_dau_ra.length });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
 app.use("/", companyRoutes);
 app.use("/", bankRoutes);
 app.use("/", transactionRoutes);
