@@ -132,4 +132,52 @@ router.post("/hoa-don-dau-ra/xoa/:id", requireAdmin, (req, res) => {
   res.redirect("/hoa-don-dau-ra?success=Đã xóa hóa đơn " + encodeURIComponent(removed.soHD || String(removed.id)));
 });
 
+// POST /hoa-don-dau-ra/import-json -- nhap hang loat tu JSON array (admin only)
+// Body: { replace: true, records: [{congTy,ngayHD,soHD,maKH,...}] }
+const multer = require("multer");
+const uploadMem = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
+router.post("/hoa-don-dau-ra/import-json", requireAdmin, uploadMem.none(), (req, res) => {
+  try {
+    const raw = req.body.records;
+    if (!raw) return res.json({ ok: false, error: "Thiếu trường records" });
+    const records = typeof raw === "string" ? JSON.parse(raw) : raw;
+    if (!Array.isArray(records)) return res.json({ ok: false, error: "records phải là array" });
+
+    const store = load();
+    ensureShape(store);
+    if (req.body.replace === "true" || req.body.replace === true) {
+      store.hoa_don_dau_ra = [];
+    }
+
+    const now = new Date().toISOString();
+    let maxId = store.hoa_don_dau_ra.reduce((m, x) => (x.id > m ? x.id : m), 0);
+    const added = [];
+    for (const r of records) {
+      maxId++;
+      added.push({
+        id: maxId,
+        congTy: r.congTy || "kh_moi",
+        ngayHD: r.ngayHD || "",
+        soHD: r.soHD || "",
+        maKH: r.maKH || "",
+        tenKhachHang: r.tenKhachHang || "",
+        loaiHD: r.loaiHD || "khach-le",
+        dienGiai: r.dienGiai || "",
+        soTien: Number(r.soTien) || 0,
+        soTienVAT: Number(r.soTienVAT) || 0,
+        thueVAT: r.thueVAT || "",
+        ghiChu: r.ghiChu || "",
+        createdAt: now,
+      });
+    }
+    store.hoa_don_dau_ra.push(...added);
+    if (!store.seq) store.seq = {};
+    store.seq.hoa_don_dau_ra = maxId;
+    save(store);
+    res.json({ ok: true, added: added.length, total: store.hoa_don_dau_ra.length });
+  } catch (e) {
+    res.json({ ok: false, error: e.message });
+  }
+});
+
 module.exports = router;
