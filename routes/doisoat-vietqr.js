@@ -303,6 +303,16 @@ const INVOICE_SHARE_PAIRS_STOP_FROM = {
 // de nguyen thanh "Lech Ngan hang-Du lieu" cho Chi Nhan tu can doi tay.
 const TAN_PHU_AUTO_APPLY_CHANNELS = new Set(["bidv7702", "bidv77021"]);
 
+// Luyen, 2026-08-12: "bỏ cái bù trừ 80 ngàn này cho tôi đi" -- ngay 9/8
+// kenh bidv77021 con du 80.000d (sau khi bỏ MANUAL 3 gian ngay CN), Luyen
+// muon can tru thu cong, khong can he thong tu dong gop vao AE HP PHN.
+// Dung Set de tat tan goc, tranh hien banner va tranh lam xau so lieu gian
+// mac dinh. "Lech Ngan hang-Du lieu" van hien ra cho ngay do (dung, vi co
+// tien that chua duoc can tru) -- Luyen biet va xu ly tay.
+const TAN_PHU_SUPPRESS = {
+  bidv77021: new Set(["2026-08-09"]),
+};
+
 function applyInvoiceSharePairs(reconciled, pairs, stopFrom) {
   if (!pairs || pairs.length === 0) return;
   reconciled.forEach((r) => {
@@ -1634,6 +1644,7 @@ function buildChannelReconciliation(store, channelKey) {
       if (!r.pendingBank) {
         r.diffVsBank = r.totalNetComputed - r.bankAmount;
         if (!autoApplyTanPhu) return;
+        if (TAN_PHU_SUPPRESS[channelKey]?.has(r.settlementDate)) return;
         const leftover = r.bankAmount - r.totalNetComputed;
         if (leftover > 1000) {
           let line = r.lines.find((l) => l.code === tanPhuTarget);
