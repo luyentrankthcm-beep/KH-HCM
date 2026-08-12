@@ -898,6 +898,106 @@ router.post(
   }
 );
 
+// ---------- Backfill tenDoiUng từ chi_phi + hoa_don_dau_vao ----------
+//
+// Luyen, 2026-08-12: "soa kê nó hk có tên đối ứng vp bank á bạn check từ
+// diễn giải với trên chi phí với lại hóa đơn đầu vào xem số tiền đi của ncc
+// nào dựa vào số tiền và diễn giải á để lấy ra tên ncc điền vào đây" --
+// VPBANK9997 (và các NH khác không in tên đối ứng) hay có UNC đã hạch toán
+// trên chi phí MN, nên khớp qua chi_phi (exact bankTxId rồi fuzzy amount ±1k
+// + ngay ±7) để điền tenDoiUng = NCC.  Nếu không khớp chi phí thì thử rút
+// số HĐ từ diễn giải (pattern "theo hd N" / "hd N") rồi tra hoa_don_dau_vao.
+router.post(
+  "/transactions/backfill-from-chiphi",
+  requireDataEntry,
+  (req, res) => {
+    const store = load();
+    const bankId = Number(req.body.bank_id);
+    const bank = (store.banks || []).find((b) => b.id === bankId);
+    if (!bank) return res.status(400).json({ error: `Không tìm thấy ngân hàng id=${bankId}` });
+
+    // Xac dinh company tu bank
+    const company = bank.company || "kh_cu";
+
+    // Chi phi records cua company nay
+    const chiPhiCompany = (store.chi_phi || []).filter(
+      (r) => (r.congTy || "kh_cu") === company
+    );
+    const chiPhiByBankTxId = {};
+    chiPhiCompany.forEach((r) => {
+      if (r.bankTxId) chiPhiByBankTxId[String(r.bankTxId)] = r;
+    });
+
+    // Hoa don dau vao cua company
+    const hdList = (store.hoa_don_dau_vao || []).filter(
+      (h) => (h.congTy || "kh_cu") === company && h.soHoaDon && h.tenNCC
+    );
+    // Index soHoaDon -> tenNCC (normalize: lowercase, bo dau cach)
+    const hdBySoHD = {};
+    hdList.forEach((h) => {
+      const k = String(h.soHoaDon).trim().toLowerCase();
+      if (k && !hdBySoHD[k]) hdBySoHD[k] = h.tenNCC;
+    });
+
+    // Rut so hoa don tu dien giai: "theo hd 513", "hd513", "hd 97634"
+    function extractHdFromDesc(desc) {
+      if (!desc) return null;
+      const m = (desc + "").match(/\bhd\s*(\d+)/i);
+      return m ? m[1].trim().toLowerCase() : null;
+    }
+
+    const AMOUNT_TOL = 1000;
+    const DATE_WIN_MS = 7 * 86400000;
+    function dateMs(d) { return new Date((d || "").slice(0, 10) + "T00:00:00").getTime(); }
+
+    const bankTxs = (store.transactions || []).filter(
+      (t) => t.bank_id === bankId && !t.tenDoiUng
+    );
+
+    let filled = 0;
+    for (const tx of bankTxs) {
+      let ncc = "";
+
+      // 1. Exact match qua bankTxId
+      const exact = chiPhiByBankTxId[String(tx.id)];
+      if (exact && exact.ncc) {
+        ncc = exact.ncc;
+      }
+
+      // 2. Fuzzy: amount ±1000 + ngay ±7
+      if (!ncc) {
+        const tMs = dateMs(tx.date);
+        const fuzzy = chiPhiCompany.find((r) => {
+          if (!r.ngay || !r.soTien) return false;
+          if (Math.abs((Number(r.soTien) || 0) - tx.amount) > AMOUNT_TOL) return false;
+          if (Math.abs(dateMs(r.ngay) - tMs) > DATE_WIN_MS) return false;
+          return true;
+        });
+        if (fuzzy && fuzzy.ncc) ncc = fuzzy.ncc;
+      }
+
+      // 3. Tra so hoa don tu dien giai -> hoa_don_dau_vao
+      if (!ncc) {
+        const hdNo = extractHdFromDesc(tx.description);
+        if (hdNo && hdBySoHD[hdNo]) ncc = hdBySoHD[hdNo];
+      }
+
+      if (ncc) {
+        tx.tenDoiUng = ncc;
+        filled++;
+      }
+    }
+
+    if (filled > 0) save(store);
+    res.json({
+      ok: true,
+      filled,
+      total: bankTxs.length,
+      message: `Đã điền Tên đối ứng cho ${filled} / ${bankTxs.length} giao dịch trống (từ Chi phí & HĐ đầu vào).`,
+    });
+  }
+);
+
 // One-time migration: rename KVC ROYAL -> PINBALL DA NANG in vnpay_khmoi
 // uploads for dates >= 2026-07-31 (Luyen, 2026-08-08).
 // Idempotent -- safe to call multiple times.

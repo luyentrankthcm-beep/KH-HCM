@@ -176,6 +176,55 @@
       </script>
     </section>
 
+    <!-- Điền Tên đối ứng từ Chi phí & HĐ đầu vào -->
+    <section class="panel">
+      <h2>Điền Tên đối ứng từ Chi phí &amp; HĐ đầu vào</h2>
+      <p class="muted">
+        Dành cho ngân hàng không in tên đối tác trong sao kê (VPBANK9997 v.v.). Tự động khớp
+        giao dịch đang trống "Tên đối ứng" với <strong>hồ sơ Chi phí</strong> (qua bankTxId hoặc
+        số tiền ±1.000đ + ngày ±7 ngày) và <strong>Hóa đơn đầu vào</strong> (qua số HĐ trong diễn giải)
+        rồi điền tên NCC vào.
+      </p>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+        <select id="backfillChiPhiBankId" style="min-width:160px;">
+          <option value="">-- Chọn ngân hàng --</option>
+          <% banks.forEach(function(b) { %>
+          <option value="<%= b.id %>"><%= b.name %></option>
+          <% }) %>
+        </select>
+        <button type="button" id="backfillChiPhiBtn" class="btn btn-secondary">Điền NCC từ Chi phí &amp; HĐ</button>
+      </div>
+      <div id="backfillChiPhiResult" style="display:none;margin-top:10px;"></div>
+      <script>
+      document.getElementById('backfillChiPhiBtn').addEventListener('click', function() {
+        var bankId = document.getElementById('backfillChiPhiBankId').value;
+        if (!bankId) { alert('Vui lòng chọn ngân hàng trước.'); return; }
+        var btn = this;
+        btn.disabled = true; btn.textContent = 'Đang xử lý...';
+        fetch('/transactions/backfill-from-chiphi', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: 'bank_id=' + encodeURIComponent(bankId),
+        })
+          .then(r => r.json())
+          .then(data => {
+            var el = document.getElementById('backfillChiPhiResult');
+            el.style.display = '';
+            el.className = data.ok ? 'alert alert-success' : 'alert alert-error';
+            el.textContent = data.message || data.error || 'Xong.';
+            btn.disabled = false; btn.textContent = 'Điền NCC từ Chi phí & HĐ';
+            if (data.ok && data.filled > 0) setTimeout(function(){ location.reload(); }, 1200);
+          })
+          .catch(err => {
+            var el = document.getElementById('backfillChiPhiResult');
+            el.style.display = ''; el.className = 'alert alert-error';
+            el.textContent = 'Lỗi kết nối: ' + err;
+            btn.disabled = false; btn.textContent = 'Điền NCC từ Chi phí & HĐ';
+          });
+      });
+      </script>
+    </section>
+
     <section class="panel">
       <h2>Dán sao kê ngân hàng (nhiều dòng)</h2>
       <p class="muted">
