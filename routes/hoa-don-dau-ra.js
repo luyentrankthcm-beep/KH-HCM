@@ -75,30 +75,28 @@ router.get("/hoa-don-dau-ra/export-misa", requireLogin, (req, res) => {
   const store = load();
   ensureShape(store);
   const activeCompany = getCompany(req);
-  const selectedMonth = (req.query.thang || "").trim(); // "YYYY-MM" hoac ""
+  const tuNgay   = (req.query.tuNgay   || "").trim(); // "YYYY-MM-DD"
+  const denNgay  = (req.query.denNgay  || "").trim(); // "YYYY-MM-DD"
+  const selectedMonth = (req.query.thang || "").trim(); // "YYYY-MM" (fallback cu)
 
-  // Helper: parse ngayHD ve { dt, dmyStr }
-  // Store co the luu "DD/MM/YYYY" (import tu baocaochitiet) hoac "YYYY-MM-DD" (form HTML)
+  // Helper: parse ngayHD -> { dt, dmyStr, ym }
   function parseNgay(s) {
-    if (!s) return { dt: null, dmyStr: "" };
+    if (!s) return { dt: null, dmyStr: "", ym: "" };
     s = String(s).trim();
     if (/^\d{2}\/\d{2}\/\d{4}$/.test(s)) {
-      // DD/MM/YYYY
       const [d, m, y] = s.split("/");
       return { dt: new Date(+y, +m - 1, +d), dmyStr: s, ym: `${y}-${m}` };
     }
     if (/^\d{4}-\d{2}-\d{2}/.test(s)) {
-      // YYYY-MM-DD
       const dt = new Date(s);
-      const d = String(dt.getDate()).padStart(2, "0");
-      const m = String(dt.getMonth() + 1).padStart(2, "0");
-      const y = dt.getFullYear();
-      return { dt, dmyStr: `${d}/${m}/${y}`, ym: `${y}-${m}` };
+      const dd = String(dt.getDate()).padStart(2, "0");
+      const mm = String(dt.getMonth() + 1).padStart(2, "0");
+      const yy = dt.getFullYear();
+      return { dt, dmyStr: `${dd}/${mm}/${yy}`, ym: `${yy}-${mm}` };
     }
     return { dt: null, dmyStr: s, ym: "" };
   }
 
-  // Helper: map ma khach hang MISA
   function mapKH(row) {
     const g = (row.ghiChu || "").toLowerCase();
     const t = (row.tenKhachHang || "").toUpperCase();
@@ -111,7 +109,6 @@ router.get("/hoa-don-dau-ra/export-misa", requireLogin, (req, res) => {
     return "KL";
   }
 
-  // Helper: ky hieu HĐ tu soHD (chi ap dung cho T8/2026 -- cap nhat khi co thang moi)
   function getKyHieu(soHD) {
     const n = parseInt(String(soHD).replace(/^0+/, "")) || 0;
     return n < 5000 ? "1C26TYY" : "1C26MKH";
@@ -119,83 +116,81 @@ router.get("/hoa-don-dau-ra/export-misa", requireLogin, (req, res) => {
 
   let rows = store.hoa_don_dau_ra.filter(r => (r.congTy || "kh_cu") === activeCompany);
 
-  // Loc theo thang neu co
-  if (selectedMonth) {
+  // Loc theo khoang ngay (uu tien) hoac theo thang (fallback)
+  const dtTu  = tuNgay  ? new Date(tuNgay)  : null;
+  const dtDen = denNgay ? new Date(denNgay) : null;
+  if (dtTu || dtDen) {
     rows = rows.filter(r => {
-      const { ym } = parseNgay(r.ngayHD);
-      return ym === selectedMonth;
+      const { dt } = parseNgay(r.ngayHD);
+      if (!dt) return false;
+      const d = new Date(dt.getFullYear(), dt.getMonth(), dt.getDate());
+      if (dtTu  && d < new Date(dtTu.getFullYear(),  dtTu.getMonth(),  dtTu.getDate()))  return false;
+      if (dtDen && d > new Date(dtDen.getFullYear(), dtDen.getMonth(), dtDen.getDate())) return false;
+      return true;
     });
+  } else if (selectedMonth) {
+    rows = rows.filter(r => parseNgay(r.ngayHD).ym === selectedMonth);
   }
 
-  // Sap xep theo so HD tang dan
   rows = [...rows].sort((a, b) => {
     const na = parseInt(String(a.soHD || "").replace(/^0+/, "")) || 0;
     const nb = parseInt(String(b.soHD || "").replace(/^0+/, "")) || 0;
     return na - nb;
   });
 
-  // Build data rows cho MISA (khong co header -- dan thang tu row 9 cua template)
+  // 8 dong header theo mau MISA
+  const MISA_HEADERS = [
+    ["FILE MẪU CHỨNG TỪ BÁN HÀNG TRONG NƯỚC ĐỂ NHẬP VÀO PHẦN MỀM AMIS ACCOUNTING"],
+    ["Hướng dẫn:"],
+    ["- Điền dữ liệu vào các cột tương ứng trên file này"],
+    ["- Các cột có dấu (*) là những cột bắt buộc"],
+    ["- Nếu muốn nhập nhiều thông tin hơn người dùng có thể tải mẫu đầy đủ/hoặc tự thêm cột trên mẫu cơ bản"],
+    ["- Các dòng dữ liệu phía dưới chỉ là ví dụ minh họa"],
+    [null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,"Chi tiết hàng tiền",null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,"Chi tiết giá vốn"],
+    ["Phương thức thanh toán","Kiêm phiếu xuất kho","Lập kèm hóa đơn","Đã lập hóa đơn","Ngày hạch toán (*)","Ngày chứng từ (*)","Số chứng từ (*)","Số phiếu xuất","Mẫu số HĐ","Ký hiệu HĐ","Số hóa đơn","Ngày hóa đơn","Khách hàng","Địa chỉ","Mã số thuế","Người nộp","Nộp vào TK","Diễn giải/Lý do nộp","Lý do xuất","Mã nhân viên bán hàng","Số chứng từ kèm theo (Phiếu thu)","Số chứng từ kèm theo (Phiếu xuất)","Hạn thanh toán","Mã hàng (*)","Tên hàng","Là dòng ghi chú","Hàng khuyến mại","Chiết khấu thương mại","TK Tiền/Chi phí/Nợ (*)","TK Doanh thu/Có (*)","ĐVT","Số lượng","Đơn giá","Thành tiền","Tỷ lệ CK (%)","Tiền chiết khấu","TK chiết khấu","% thuế GTGT","Tiền thuế GTGT","TK thuế GTGT","HH không TH trên tờ khai thuế GTGT","Mã khoản mục chi phí","Mã đơn vị","Mã đối tượng THCP","Mã công trình","Số đơn đặt hàng","Số hợp đồng bán","Mã thống kê","CP không hợp lý","Mã kho","Vị trí","TK giá vốn","TK Kho","Đơn giá vốn","Tiền vốn","Hàng hóa giữ hộ/bán hộ","Tên khách hàng"],
+  ];
+
   const dataRows = rows.map(row => {
     const { dmyStr } = parseNgay(row.ngayHD);
     const soInt = parseInt(String(row.soHD || "").replace(/^0+/, "")) || 0;
     const kyHieu = getKyHieu(soInt);
     const ngay = dmyStr;
-    // Lay nam/thang tu ngayHD
     let mm = "08", yy = "26";
-    if (dmyStr && dmyStr.length === 10) {
-      mm = dmyStr.slice(3, 5);
-      yy = dmyStr.slice(8, 10);
-    }
-    const soCT = `BH${mm}-${String(soInt).padStart(6, "0")}/${yy}`;
+    if (dmyStr && dmyStr.length === 10) { mm = dmyStr.slice(3,5); yy = dmyStr.slice(8,10); }
+    const soCT = `BH${mm}-${String(soInt).padStart(6,"0")}/${yy}`;
     const maKH = mapKH(row);
     const soTien = Number(row.soTien) || 0;
-    const soVAT = Number(row.soTienVAT) || 0;
-    const thueVAT = String(row.thueVAT || "8").replace("%", "").trim();
+    const soVAT  = Number(row.soTienVAT) || 0;
+    const thueVAT = String(row.thueVAT || "8").replace("%","").trim();
     const maCT = row.maKH || "";
-    // ten KH chi hien thi voi cong ty co ten rieng
-    const tenKH = (row.tenKhachHang && !["Bán cho người tiêu dùng", ""].includes(row.tenKhachHang))
+    const tenKH = (row.tenKhachHang && !["Bán cho người tiêu dùng",""].includes(row.tenKhachHang))
       ? row.tenKhachHang : "";
 
-    // Tao mang 57 phan tu (cot 1-57), null cho cot trong
     const r = new Array(57).fill(null);
-    r[0]  = "Chưa thu tiền";
-    r[1]  = "Không";
-    r[2]  = "Có";
-    r[3]  = "Đã lập";
-    r[4]  = ngay;  // ngay hach toan
-    r[5]  = ngay;  // ngay chung tu
-    r[6]  = soCT;  // so chung tu
-    r[9]  = kyHieu;
-    r[10] = soInt;
-    r[11] = ngay;
-    r[12] = maKH;
-    r[17] = `Dịch vụ vui chơi giải trí theo HĐ ${soInt} ký hiệu ${kyHieu}`;
-    r[23] = "KVC";
-    r[24] = "Dịch vụ vui chơi giải trí";
-    r[28] = 131;
-    r[29] = 5113;
-    r[30] = "Kỳ";
-    r[31] = 1;
-    r[32] = soTien;
-    r[33] = soTien;
-    r[37] = thueVAT;
-    r[38] = soVAT;
-    r[39] = 33311;
-    r[44] = maCT;
-    if (tenKH) r[56] = tenKH;
+    r[0]="Chưa thu tiền"; r[1]="Không"; r[2]="Có"; r[3]="Đã lập";
+    r[4]=ngay; r[5]=ngay; r[6]=soCT;
+    r[9]=kyHieu; r[10]=soInt; r[11]=ngay; r[12]=maKH;
+    r[17]=`Dịch vụ vui chơi giải trí theo HĐ ${soInt} ký hiệu ${kyHieu}`;
+    r[23]="KVC"; r[24]="Dịch vụ vui chơi giải trí";
+    r[28]=131; r[29]=5113; r[30]="Kỳ"; r[31]=1;
+    r[32]=soTien; r[33]=soTien;
+    r[37]=thueVAT; r[38]=soVAT; r[39]=33311;
+    r[44]=maCT;
+    if (tenKH) r[56]=tenKH;
     return r;
   });
 
-  // Tao workbook
   const wb = XLSX.utils.book_new();
-  const ws = XLSX.utils.aoa_to_sheet(dataRows);
-  const sheetName = selectedMonth ? selectedMonth.replace("-", "") : "HoaDonBanRa";
+  const ws = XLSX.utils.aoa_to_sheet([...MISA_HEADERS, ...dataRows]);
+  let sheetName = "Ban hang trong nuoc";
+  if (tuNgay && denNgay) sheetName = `${tuNgay.slice(5).replace("-","")}--${denNgay.slice(5).replace("-","")}`;
+  else if (selectedMonth) sheetName = selectedMonth.replace("-","");
   XLSX.utils.book_append_sheet(wb, ws, sheetName);
 
   const buf = XLSX.write(wb, { bookType: "xlsx", type: "buffer" });
-  const fname = selectedMonth
-    ? `HoaDon_BanRa_MISA_${selectedMonth.replace("-", "_")}.xlsx`
-    : `HoaDon_BanRa_MISA_TatCa.xlsx`;
+  let fname = "HoaDon_BanRa_MISA_TatCa.xlsx";
+  if (tuNgay && denNgay) fname = `HoaDon_BanRa_MISA_${tuNgay}_${denNgay}.xlsx`;
+  else if (selectedMonth) fname = `HoaDon_BanRa_MISA_${selectedMonth.replace("-","_")}.xlsx`;
 
   res.setHeader("Content-Disposition", `attachment; filename="${fname}"`);
   res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");

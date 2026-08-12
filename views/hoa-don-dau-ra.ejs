@@ -65,13 +65,24 @@
     </section>
 
     <!-- Xuất MISA -->
-    <div style="margin-bottom:12px;">
-      <a href="/hoa-don-dau-ra/export-misa<%= selectedMonth ? '?thang=' + selectedMonth : '' %>"
-         class="btn btn-primary" style="font-size:13px;text-decoration:none;">
-        ⬇ Xuất MISA<%= selectedMonth ? ' — ' + selectedMonth : ' (tất cả)' %>
-      </a>
-      <span style="font-size:12px;color:#888;margin-left:10px;">Tải file Excel nhập vào MISA (hóa đơn bán ra)</span>
-    </div>
+    <section class="panel" style="margin-bottom:16px;padding:12px 16px;">
+      <div style="font-weight:600;font-size:13px;margin-bottom:10px;">⬇ Xuất MISA — Hóa đơn bán ra</div>
+      <form method="GET" action="/hoa-don-dau-ra/export-misa"
+            style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;">
+        <label style="display:flex;flex-direction:column;gap:4px;font-size:13px;">
+          Từ ngày
+          <input type="date" name="tuNgay"
+                 style="padding:5px 8px;border:1px solid var(--color-hairline,#ddd);border-radius:4px;font-size:13px;">
+        </label>
+        <label style="display:flex;flex-direction:column;gap:4px;font-size:13px;">
+          Đến ngày
+          <input type="date" name="denNgay"
+                 style="padding:5px 8px;border:1px solid var(--color-hairline,#ddd);border-radius:4px;font-size:13px;">
+        </label>
+        <button type="submit" class="btn btn-primary" style="font-size:13px;">⬇ Xuất Excel MISA</button>
+        <span style="font-size:12px;color:#888;align-self:center;">Để trống = xuất tất cả</span>
+      </form>
+    </section>
 
     <!-- Form thêm mới -->
     <details class="panel" style="margin-bottom:16px;">
