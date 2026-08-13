@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <%- include('partials/head') %>
+</head>
+<body>
+  <%- include('partials/nav') %>
+  <main class="container">
+    <h1><%= page.title %></h1>
+    <p class="muted" style="margin-top:-10px;margin-bottom:20px;">
+      Danh mục <%= page.title.toLowerCase() %> — dùng làm mã tham chiếu trong hóa đơn, chi phí, đối soát.
+    </p>
+
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+    <% if (success) { %><div class="alert alert-success"><%= success %></div><% } %>
+
+    <!-- Form them moi -->
+    <section class="panel" style="margin-bottom:16px;">
+      <div class="panel-head"><h2>+ Thêm mới</h2></div>
+      <form method="POST" action="/danh-muc/<%= slug %>/them" style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;padding-top:4px;">
+        <div>
+          <label style="display:block;font-size:12px;color:var(--muted);margin-bottom:3px;"><%= page.colLabel %> <span style="color:var(--color-chi)">*</span></label>
+          <input type="text" name="ma" placeholder="Ví dụ: KVC001" required style="min-width:160px;" />
+        </div>
+        <div>
+          <label style="display:block;font-size:12px;color:var(--muted);margin-bottom:3px;">Tên / Diễn giải</label>
+          <input type="text" name="ten" placeholder="Tên đầy đủ" style="min-width:220px;" />
+        </div>
+        <div>
+          <label style="display:block;font-size:12px;color:var(--muted);margin-bottom:3px;">Ghi chú</label>
+          <input type="text" name="ghiChu" placeholder="Ghi chú thêm (nếu có)" style="min-width:180px;" />
+        </div>
+        <button type="submit" class="btn btn-primary">Thêm</button>
+      </form>
+    </section>
+
+    <!-- Danh sach -->
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Danh sách (<%= rows.length %> mục)</h2>
+        <form method="GET" action="/danh-muc/<%= slug %>" style="display:flex;gap:8px;align-items:center;">
+          <input type="text" name="q" value="<%= searchQ %>" placeholder="Tìm kiếm..." style="width:200px;" />
+          <button type="submit" class="btn btn-secondary" style="padding:6px 12px;">Tìm</button>
+          <% if (searchQ) { %><a href="/danh-muc/<%= slug %>" class="link-btn">✕ Bỏ lọc</a><% } %>
+        </form>
+      </div>
+      <% if (rows.length === 0) { %>
+        <p class="muted" style="padding:12px 0;">Chưa có mục nào<% if (searchQ) { %> khớp tìm kiếm<% } %>.</p>
+      <% } else { %>
+      <div style="overflow-x:auto;">
+        <table class="table">
+          <thead>
+            <tr>
+              <th style="width:180px;"><%= page.colLabel %></th>
+              <th>Tên / Diễn giải</th>
+              <th>Ghi chú</th>
+              <th style="width:120px;">Ngày tạo</th>
+              <th style="width:140px;text-align:center;">Thao tác</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% rows.forEach(function(r) { %>
+            <tr>
+              <td><strong><%= r.ma %></strong></td>
+              <td><%= r.ten || '—' %></td>
+              <td><%= r.ghiChu || '—' %></td>
+              <td style="color:var(--muted);font-size:12px;">
+                <%= r.createdAt ? new Date(r.createdAt).toLocaleDateString('vi-VN') : '—' %>
+              </td>
+              <td style="text-align:center;">
+                <!-- Nut sua (inline form) -->
+                <button type="button" class="link-btn"
+                  onclick="openEditRow(<%= r.id %>, '<%= (r.ma||'').replace(/'/g,\"\\\\'\" ) %>', '<%= (r.ten||'').replace(/'/g,\"\\\\'\" ) %>', '<%= (r.ghiChu||'').replace(/'/g,\"\\\\'\" ) %>')"
+                  style="margin-right:8px;">Sửa</button>
+                <!-- Nut xoa -->
+                <form method="POST" action="/danh-muc/<%= slug %>/xoa/<%= r.id %>" style="display:inline;"
+                  onsubmit="return confirm('Xóa mã &quot;<%= r.ma %>&quot;?')">
+                  <button type="submit" class="link-btn" style="color:var(--color-chi);">Xóa</button>
+                </form>
+              </td>
+            </tr>
+            <!-- Hang sua (an/hien) -->
+            <tr id="editRow_<%= r.id %>" style="display:none;background:var(--bg-hover,rgba(0,120,212,0.06));">
+              <td colspan="5">
+                <form method="POST" action="/danh-muc/<%= slug %>/sua/<%= r.id %>" style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;padding:8px 0;">
+                  <div>
+                    <label style="display:block;font-size:12px;color:var(--muted);margin-bottom:3px;"><%= page.colLabel %> *</label>
+                    <input type="text" name="ma" id="editMa_<%= r.id %>" required style="min-width:160px;" />
+                  </div>
+                  <div>
+                    <label style="display:block;font-size:12px;color:var(--muted);margin-bottom:3px;">Tên / Diễn giải</label>
+                    <input type="text" name="ten" id="editTen_<%= r.id %>" style="min-width:220px;" />
+                  </div>
+                  <div>
+                    <label style="display:block;font-size:12px;color:var(--muted);margin-bottom:3px;">Ghi chú</label>
+                    <input type="text" name="ghiChu" id="editGhiChu_<%= r.id %>" style="min-width:180px;" />
+                  </div>
+                  <button type="submit" class="btn btn-primary">Lưu</button>
+                  <button type="button" class="btn btn-secondary" onclick="closeEditRow(<%= r.id %>)">Hủy</button>
+                </form>
+              </td>
+            </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+      <% } %>
+    </section>
+  </main>
+
+  <script>
+    function openEditRow(id, ma, ten, ghiChu) {
+      // Dong tat ca hang sua dang mo
+      document.querySelectorAll('[id^="editRow_"]').forEach(function(r) { r.style.display = 'none'; });
+      var row = document.getElementById('editRow_' + id);
+      if (!row) return;
+      document.getElementById('editMa_' + id).value = ma;
+      document.getElementById('editTen_' + id).value = ten;
+      document.getElementById('editGhiChu_' + id).value = ghiChu;
+      row.style.display = '';
+      document.getElementById('editMa_' + id).focus();
+    }
+    function closeEditRow(id) {
+      var row = document.getElementById('editRow_' + id);
+      if (row) row.style.display = 'none';
+    }
+  </script>
+  <%- include('partials/scroll-restore') %>
+</body>
+</html>
