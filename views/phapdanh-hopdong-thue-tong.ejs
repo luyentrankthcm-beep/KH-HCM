@@ -34,7 +34,16 @@
                                                                                                                                                    <% }) %>
                                                                                                                                                          </div>
                                                                                                                                                          
-                                                                                                                                                               <div style="overflow-x:auto;">
+                                                                                                    <form method="GET" action="/phap-danh/hop-dong-thue-gian-tong" style="display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-bottom:14px;">
+  <input type="hidden" name="sheet" value="<%= sheetParam %>" />
+  <label style="font-size:13px;">Xem hợp đồng còn hiệu lực trong tháng
+    <input type="month" name="thang" value="<%= thangFilter %>" style="margin-left:6px;" />
+  </label>
+  <button type="submit" class="btn btn-secondary">Lọc theo tháng</button>
+  <a class="link-btn" href="/phap-danh/hop-dong-thue-gian-tong?sheet=<%= sheetParam %>&thang=all">Xem tất cả các tháng</a>
+</form>
+
+<div style="overflow-x:auto;">
                                                                                                                                                                        <table class="table">
                                                                                                                                                                                  <thead>
                                                                                                                                                                                              <tr>
