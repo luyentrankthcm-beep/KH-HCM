@@ -707,6 +707,19 @@ router.post("/doi-soat/zvp/khoa-so", requireAdmin, (req, res) => {
     res.redirect("/doi-soat/zvp?error=" + encodeURIComponent(e.message));
   }
 });
+// ---------- DEBUG TAM THOI: xem raw invoice records theo soHd (xoa sau khi dung xong) ----------
+router.get("/doi-soat/zvp/debug-invoices", requireAdmin, (req, res) => {
+  const store = load();
+  const raw = (req.query.soHd || "").trim();
+  const targets = new Set(raw.split(/[,\s]+/).map((s) => s.trim()).filter(Boolean));
+  const out = { zalo: [], vnpay: [], payoo: [], momo: [] };
+  ["zalo", "vnpay", "payoo"].forEach((ch) => {
+    out[ch] = (store.zvp_invoices[ch] || []).filter((i) => targets.has(String(i.soHd)));
+  });
+  out.momo = (store.momo_invoices || []).filter((i) => targets.has(String(i.soHd)));
+  res.type("json").send(JSON.stringify(out, null, 1));
+});
+
 
 // ---------- Sua ma gian tren "Danh muc ten san pham" (Online) ----------
 // Danh cho truong hop 1 san pham moi thuc ra thuoc VE 1 gian DA CO (vd
@@ -1651,6 +1664,40 @@ router.post("/doi-soat/zvp/invoices/clear", requireAdmin, (req, res) => {
   save(store);
   res.redirect("/doi-soat/zvp?success=" + encodeURIComponent("Da xoa toan bo hoa don zalo/vnpay/payoo da nap."));
 });
+// ---------- Xoa hoa don cu/trung theo so HD, ho tro @Ma cong trinh de tranh xoa nham HD trung so o gian/kenh khac (giong Momo) ----------
+router.post("/doi-soat/zvp/invoices/xoa-theo-so", requireAdmin, (req, res) => {
+  const store = load();
+  const channel = ["zalo", "vnpay", "payoo"].includes(req.body.channel) ? req.body.channel : null;
+  if (!channel) {
+    return res.redirect("/doi-soat/zvp?error=" + encodeURIComponent("Thieu kenh (zalo/vnpay/payoo) de xoa hoa don."));
+  }
+  const raw = (req.body.soHdList || "").trim();
+  if (!raw) {
+    return res.redirect("/doi-soat/zvp?error=" + encodeURIComponent("Chua nhap so HD can xoa."));
+  }
+  const targets = raw
+  .split(/[,\n]+/)
+  .map((s) => s.trim())
+  .filter(Boolean)
+  .map((s) => {
+    const idx = s.indexOf("@");
+    if (idx === -1) return { soHd: s, maDiem: null };
+    return { soHd: s.slice(0, idx).trim(), maDiem: s.slice(idx + 1).trim() };
+  });
+  if (!store.zvp_invoices[channel]) store.zvp_invoices[channel] = [];
+  const before = store.zvp_invoices[channel].length;
+  store.zvp_invoices[channel] = store.zvp_invoices[channel].filter(
+    (i) => !targets.some((t) => String(i.soHd) === t.soHd && (t.maDiem === null || i.maDiem === t.maDiem))
+      );
+  const removed = before - store.zvp_invoices[channel].length;
+  save(store);
+  const labels = targets.map((t) => (t.maDiem ? `${t.soHd}@${t.maDiem}` : t.soHd));
+  res.redirect(
+    "/doi-soat/zvp?success=" +
+    encodeURIComponent(`Da xoa ${removed} hoa don (${channel}) theo so HD: ${labels.join(", ")}.`)
+    );
+});
+
 
 // ---------- Manual match: dong "Chua co HD" ma Luyen da xac nhan la co HD bu (thuong la ngay hom sau) ----------
 // Dung cho truong hop 1 gian khong di qua dò hoa don tu dong cho ky doi soat
