@@ -122,7 +122,12 @@ app.get("/temp-debug-store", (req, res) => {
   const store = ld();
   const arr = store.hoa_don_dau_ra || [];
   const sample = arr.slice(0, 3).map(r => ({ id: r.id, soHD: r.soHD, ngayHD: r.ngayHD }));
-  res.json({ count: arr.length, sample });
+  // List all keys in store with array lengths
+  const keys = {};
+  Object.keys(store).forEach(k => {
+    keys[k] = Array.isArray(store[k]) ? store[k].length : typeof store[k];
+  });
+  res.json({ count: arr.length, sample, keys });
 });
 app.post("/temp-update-ngay-v2", express.json({ limit: "2mb" }), (req, res) => {
   if (req.body.secret !== "ngay2026v2") return res.status(403).json({ error: "forbidden" });
