@@ -97,7 +97,24 @@ router.get("/hoa-don-dau-ra/export-misa", requireLogin, (req, res) => {
     return { dt: null, dmyStr: s, ym: "" };
   }
 
-  function mapKH(row) {
+  // Build tap so HD tu doi soat VNPay/Payoo (manual_matches)
+  const mm = store.vnpay_khmoi_manual_matches || {};
+  const vnpayHDs = new Set();
+  const payooHDs  = new Set();
+  ["offline","online"].forEach(ch => {
+    Object.values(mm[ch] || {}).forEach(entry => {
+      (entry.invoiceNumbers || []).forEach(n => vnpayHDs.add(String(parseInt(n) || 0)));
+    });
+  });
+  Object.values(mm.payoo || {}).forEach(entry => {
+    (entry.invoiceNumbers || []).forEach(n => payooHDs.add(String(parseInt(n) || 0)));
+  });
+
+  function mapKH(row, soIntStr) {
+    // Uu tien: doi soat VNPay/Payoo
+    if (vnpayHDs.has(soIntStr)) return "VN PAY0102182292";
+    if (payooHDs.has(soIntStr))  return "DONGVIET0305458683";
+    // Fallback: ghiChu keywords
     const g = (row.ghiChu || "").toLowerCase();
     const t = (row.tenKhachHang || "").toUpperCase();
     if (g.includes("momo")) return "TRỰC TUYẾN0305289153";
@@ -158,7 +175,7 @@ router.get("/hoa-don-dau-ra/export-misa", requireLogin, (req, res) => {
     let mm = "08", yy = "26";
     if (dmyStr && dmyStr.length === 10) { mm = dmyStr.slice(3,5); yy = dmyStr.slice(8,10); }
     const soCT = `BH${mm}-${String(soInt).padStart(6,"0")}/${yy}`;
-    const maKH = mapKH(row);
+    const maKH = mapKH(row, String(soInt));
     const soTien = Number(row.soTien) || 0;
     const soVAT  = Number(row.soTienVAT) || 0;
     const thueVAT = String(row.thueVAT || "8").replace("%","").trim();
