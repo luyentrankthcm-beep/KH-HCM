@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <%- include('partials/head') %>
+</head>
+<body>
+  <%- include('partials/nav') %>
+  <main class="container">
+    <h1>Hợp Đồng Thuê Gian Tổng</h1>
+    <p class="muted" style="margin-top:-10px;margin-bottom:6px;">
+      Danh sách tổng hợp tất cả các gian (4 sheet KVC MN / KVC MB / MTD MN / MTD MB), nạp từ Google Sheet
+      "Bản sao của Danh sách các gian Luyến.xlsx". Đang xem: <strong><%= COMPANIES[activeCompany].label %></strong>
+      (<%= rows.length %> gian ở tab này). Đổi công ty ở nút "Cũ/Mới" trên đầu trang nếu muốn xem công ty kia.
+      Dòng nào ghi "Cả 2" trên sheet gốc sẽ hiện ở cả 2 công ty.
+    </p>
+    <p class="muted" style="margin-bottom:14px;">
+      Tô nền <span style="background:#fdf1e0; padding:1px 6px; border-radius:3px;">cam</span> = hợp đồng hết hạn
+      TRONG THÁNG NÀY, <span style="background:#fdeceb; padding:1px 6px; border-radius:3px;">đỏ</span> = hợp đồng ĐÃ
+      HẾT HẠN (so với ngày hệ thống hôm nay). Gian chưa có ngày hết hạn rõ ràng trên sheet (thời hạn ghi dạng tự do,
+      hoặc để trống) sẽ không tô màu -- chị xem cột "Thời hạn thuê" để tự kiểm tra thêm.
+    </p>
+
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+    <% if (success) { %><div class="alert alert-success"><%= success %></div><% } %>
+
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Chọn sheet</h2>
+      </div>
+      <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:16px;">
+        <% sheets.forEach(function(s) { %>
+        <a class="btn btn-secondary <%= sheetParam === s.key ? 'is-active' : '' %>"
+           href="/phap-danh/hop-dong-thue-gian-tong?sheet=<%= s.key %>"><%= s.label %> (<%= counts[s.key] %>)</a>
+        <% }) %>
+      </div>
+
+      <div style="overflow-x:auto;">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Tên nội bộ</th>
+              <th>Mã công trình</th>
+              <th>MST khách hàng</th>
+              <th>Tên khách hàng</th>
+              <th>Hình thức thuê</th>
+              <th>Thời hạn thuê</th>
+              <th>Ghi chú</th>
+              <th>Link hợp đồng</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% rows.forEach(function(r) {
+              var rowStyle = '';
+              if (r.trangThaiMau === 'het_han') rowStyle = 'background:#fdeceb;';
+              else if (r.trangThaiMau === 'het_han_thang_nay') rowStyle = 'background:#fdf1e0;';
+            %>
+            <tr style="<%= rowStyle %>">
+              <td><%= r.tenNoiBo || '(không có)' %></td>
+              <td><%= r.maCongTrinh || '(không có)' %></td>
+              <td><%= r.mstKhachHang %></td>
+              <td><%= r.tenKhachHang %></td>
+              <td><%= r.hinhThucThue %></td>
+              <td style="white-space:pre-line;">
+                <%= r.thoiHanThueRaw %>
+                <% if (r.trangThaiMau === 'het_han') { %><span class="badge badge-chi" style="margin-left:6px;">Đã hết hạn</span><% } %>
+                <% if (r.trangThaiMau === 'het_han_thang_nay') { %><span class="badge badge-warn" style="margin-left:6px;">Hết hạn tháng này</span><% } %>
+              </td>
+              <td><%= r.ghiChu %></td>
+              <td>
+                <% if (r.linkHopDong && /^https?:\/\//i.test(r.linkHopDong)) { %>
+                <a href="<%= r.linkHopDong %>" target="_blank" rel="noopener">Xem HĐ ↗</a>
+                <% } else if (r.linkHopDong) { %>
+                <%= r.linkHopDong %>
+                <% } else { %>
+                <span class="muted">(không có)</span>
+                <% } %>
+              </td>
+            </tr>
+            <% }) %>
+            <% if (rows.length === 0) { %>
+            <tr><td colspan="8" class="muted">Chưa có gian nào ở tab này cho công ty đang chọn.</td></tr>
+            <% } %>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+</body>
+</html>
