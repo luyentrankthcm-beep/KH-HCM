@@ -115,11 +115,20 @@ app.use((req, res, next) => {
 // cung se bi requireLogin chan va redirect vong lai chinh /login, khong ai
 // dang nhap duoc. Dat sau authRoutes (cung vi tri nhu bankRoutes/... ben
 // duoi) de /login/logout luon duoc xu ly truoc, giong quy uoc san co.
-// TEMP: update ngayHD from new baocaochitiet (remove after use)
+// TEMP: debug + update ngayHD from new baocaochitiet (remove after use)
+app.get("/temp-debug-store", (req, res) => {
+  if (req.query.secret !== "ngay2026v2") return res.status(403).json({ error: "forbidden" });
+  const { load: ld } = require("./store");
+  const store = ld();
+  const arr = store.hoa_don_dau_ra || [];
+  const sample = arr.slice(0, 3).map(r => ({ id: r.id, soHD: r.soHD, ngayHD: r.ngayHD }));
+  res.json({ count: arr.length, sample });
+});
 app.post("/temp-update-ngay-v2", express.json({ limit: "2mb" }), (req, res) => {
   if (req.body.secret !== "ngay2026v2") return res.status(403).json({ error: "forbidden" });
   const { load: ld, save: sv } = require("./store");
   const map = req.body.map || {};
+  const mapSize = Object.keys(map).length;
   const store = ld();
   let updated = 0;
   (store.hoa_don_dau_ra || []).forEach(r => {
@@ -127,7 +136,7 @@ app.post("/temp-update-ngay-v2", express.json({ limit: "2mb" }), (req, res) => {
     if (map[key]) { r.ngayHD = map[key]; updated++; }
   });
   sv(store);
-  res.json({ ok: true, updated });
+  res.json({ ok: true, updated, mapSize, storeCount: (store.hoa_don_dau_ra || []).length });
 });
 
 app.use("/", authRoutes);
