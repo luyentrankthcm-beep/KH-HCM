@@ -133,7 +133,6 @@ app.post("/temp-update-ngay-v2", express.json({ limit: "2mb" }), (req, res) => {
   if (req.body.secret !== "ngay2026v2") return res.status(403).json({ error: "forbidden" });
   const { load: ld, save: sv } = require("./store");
   const map = req.body.map || {};
-  const mapSize = Object.keys(map).length;
   const store = ld();
   let updated = 0;
   (store.hoa_don_dau_ra || []).forEach(r => {
@@ -141,7 +140,24 @@ app.post("/temp-update-ngay-v2", express.json({ limit: "2mb" }), (req, res) => {
     if (map[key]) { r.ngayHD = map[key]; updated++; }
   });
   sv(store);
-  res.json({ ok: true, updated, mapSize, storeCount: (store.hoa_don_dau_ra || []).length });
+  res.json({ ok: true, updated });
+});
+// TEMP: bulk re-insert hoa_don_dau_ra (lost after redeploy)
+app.post("/temp-bulk-insert-hoadonra", express.json({ limit: "5mb" }), (req, res) => {
+  if (req.body.secret !== "ngay2026v2") return res.status(403).json({ error: "forbidden" });
+  const { load: ld, save: sv } = require("./store");
+  const records = req.body.records || [];
+  const store = ld();
+  if (!Array.isArray(store.hoa_don_dau_ra)) store.hoa_don_dau_ra = [];
+  // Them vao (append), tranh trung soHD
+  const existing = new Set(store.hoa_don_dau_ra.map(r => String(parseInt(r.soHD||0))));
+  let added = 0;
+  records.forEach(r => {
+    const key = String(parseInt(String(r.soHD||0)));
+    if (!existing.has(key)) { store.hoa_don_dau_ra.push(r); existing.add(key); added++; }
+  });
+  sv(store);
+  res.json({ ok: true, added, total: store.hoa_don_dau_ra.length });
 });
 
 app.use("/", authRoutes);
