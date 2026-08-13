@@ -1548,7 +1548,24 @@ function computeTrangThaiThueTong(r, todayStr) {
     return "";
 }
 
+// Nhan, 2026-08-13 (lan 2): "lọc theo tháng nhá" -- them bo loc thang giong
+// het cach lam voi trang "Thue Gian Hang" (monthOverlaps ben tren), nhung
+// gian tong dung ten truong rieng ngayBatDauThue/ngayHetHanThue (khac
+// ngayBatDauHD/ngayHetHanHD cua trang Thue Gian Hang) nen viet ham rieng.
+// Gian CHUA parse duoc ngay (phan lon MTD MB, xem chu thich sheetKey/
+// computeTrangThaiThueTong o tren) LUON duoc giu lai, khong bi loc mat.
+function monthOverlapsThueTong(r, thang) {
+    if (!thang) return true;
+    if (!r.ngayBatDauThue && !r.ngayHetHanThue) return true;
+    const monthStart = thang + "-01";
+    const monthEnd = thang + "-31";
+    const bd = r.ngayBatDauThue || "0000-00-00";
+    const hh = r.ngayHetHanThue || "9999-99-99";
+    return bd <= monthEnd && hh >= monthStart;
+}
+
 router.get("/phap-danh/hop-dong-thue-gian-tong", (req, res) => {
+    const thangFilter = resolveThangFilter(req);
     const store = load();
     ensureShape(store);
     const activeCompany = getCompany(req);
@@ -1561,6 +1578,7 @@ router.get("/phap-danh/hop-dong-thue-gian-tong", (req, res) => {
     let rows = store.phap_danh_hop_dong_thue_tong.filter(
           (r) => r.sheetKey === sheetInfo.storeKey && (r.congTy === activeCompany || r.congTy === "ca_2")
               );
+if (thangFilter) rows = rows.filter((r) => monthOverlapsThueTong(r, thangFilter));
     rows.forEach((r) => {
           r.trangThaiMau = computeTrangThaiThueTong(r, todayStr);
     });
@@ -1577,6 +1595,7 @@ router.get("/phap-danh/hop-dong-thue-gian-tong", (req, res) => {
           rows,
           sheets: HOP_DONG_THUE_TONG_SHEETS,
           sheetParam,
+          thangFilter,
           counts,
           error: req.query.error || null,
           success: req.query.success || null,
