@@ -1092,28 +1092,35 @@ router.post("/doi-soat/momo/invoices/clear", requireAdmin, (req, res) => {
 // nut xoa dung 1 so hoa don theo So HD, ap dung cho dung cong ty dang xem --
 // dung khi phat hien 1 so HD cu/trung khong con dung nua (NCC da xuat lai).
 router.post("/doi-soat/momo/invoices/xoa-theo-so", requireAdmin, (req, res) => {
-  const store = load();
-  const momoCfg = MOMO_CHANNELS[getCompany(req)];
-  const raw = (req.body.soHdList || "").trim();
-  if (!raw) {
-    return res.redirect("/doi-soat/momo?error=" + encodeURIComponent("Chưa nhập số HĐ cần xoá."));
-  }
-  const targets = new Set(
-    raw
-      .split(/[,\s]+/)
+    const store = load();
+    const momoCfg = MOMO_CHANNELS[getCompany(req)];
+    const raw = (req.body.soHdList || "").trim();
+    if (!raw) {
+          return res.redirect("/doi-soat/momo?error=" + encodeURIComponent("Chưa nhập số HĐ cần xoá."));
+    }
+    const targets = raw
+      .split(/[,\n]+/)
       .map((s) => s.trim())
       .filter(Boolean)
-  );
-  const before = (store[momoCfg.invoicesKey] || []).length;
-  store[momoCfg.invoicesKey] = (store[momoCfg.invoicesKey] || []).filter(
-    (i) => !targets.has(String(i.soHd))
-  );
-  const removed = before - store[momoCfg.invoicesKey].length;
-  save(store);
-  res.redirect(
-    "/doi-soat/momo?success=" +
-      encodeURIComponent(`Đã xoá ${removed} hoá đơn (${momoCfg.label}) theo số HĐ: ${Array.from(targets).join(", ")}.`)
-  );
+      .map((s) => {
+              const idx = s.indexOf("@");
+              if (idx === -1) return { soHd: s, maDiem: null };
+              return { soHd: s.slice(0, idx).trim(), maDiem: s.slice(idx + 1).trim() };
+      });
+    const before = (store[momoCfg.invoicesKey] || []).length;
+    store[momoCfg.invoicesKey] = (store[momoCfg.invoicesKey] || []).filter(
+          (i) =>
+                  !targets.some(
+                            (t) => String(i.soHd) === t.soHd && (t.maDiem === null || i.maDiem === t.maDiem)
+                                    )
+              );
+    const removed = before - store[momoCfg.invoicesKey].length;
+    save(store);
+    const labels = targets.map((t) => (t.maDiem ? `${t.soHd}@${t.maDiem}` : t.soHd));
+    res.redirect(
+          "/doi-soat/momo?success=" +
+            encodeURIComponent(`Đã xoá ${removed} hoá đơn (${momoCfg.label}) theo số HĐ: ${labels.join(", ")}.`)
+        );
 });
 
 // Export in the EXACT "Mau phieu thu tien gui de nhap vao AMIS Accounting"
