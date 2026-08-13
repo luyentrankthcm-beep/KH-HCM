@@ -1602,6 +1602,176 @@ if (thangFilter) rows = rows.filter((r) => monthOverlapsThueTong(r, thangFilter)
     });
 });
 
+// Nhan, 2026-08-13 (lan 3): "làm nút Cập nhật từ Google Sheet trên web thật"
+// -- truoc gio 246 dong chi nap 1 LAN qua script tam tren may cuc bo (KHONG
+// co tren Railway vi data/ khong di theo git). Nut nay doc THANG tu chinh
+// Google Sheet nguon (spreadsheet "Bản sao của Danh sách các gian Luyến.xlsx",
+// id 1VdTxB5Tkh_QxCfmQezfaFYdvDE7lp1NH -- xac nhan dung link Nhan gui lan 2,
+// TRUNG voi link 1 ve gid nen dung link nao cung ra cung du lieu) qua gviz
+// CSV (giong cach lam voi Hop Dong NCC/Thue Gian Hang o tren), KHONG can dang
+// nhap rieng vi sheet da chia se cong khai. Da doi chieu ket qua ham parse
+// nay TRUNG KHOP 100% voi 246 dong nhap tay ban dau (23/33/60/130, ca
+// congTy breakdown tung sheet) truoc khi dua vao code that.
+const HOP_DONG_THUE_TONG_SPREADSHEET_ID =
+    process.env.HOP_DONG_THUE_TONG_SHEET_ID || "1VdTxB5Tkh_QxCfmQezfaFYdvDE7lp1NH";
+const HOP_DONG_THUE_TONG_GIDS = {
+    kvc_mn: "254418876",
+    mtd_mn: "337828892",
+    kvc_mb: "11361918",
+    mtd_mb: "1750812066",
+};
+
+// Parser CSV THAT SU (khong chi split theo dong) -- gviz CSV co the co 1 o
+// chua xuong dong that trong dau ngoac kep (gap 1 dong o sheet MTD MB), neu
+// chi split("\n") don gian se cat nham 1 dong thanh 2, lam sai lech so dem.
+function parseGvizCsv(text) {
+    const rows = [];
+    let row = [];
+    let cur = "";
+    let inQuotes = false;
+    for (let i = 0; i < text.length; i++) {
+          const c = text[i];
+          if (inQuotes) {
+                  if (c === '"') {
+                            if (text[i + 1] === '"') {
+                                        cur += '"';
+                                        i++;
+                            } else inQuotes = false;
+                  } else cur += c;
+          } else if (c === '"') inQuotes = true;
+          else if (c === ",") {
+                  row.push(cur);
+                  cur = "";
+          } else if (c === "\r") {
+                  // bo qua
+          } else if (c === "\n") {
+                  row.push(cur);
+                  cur = "";
+                  rows.push(row);
+                  row = [];
+          } else cur += c;
+    }
+    if (cur.length > 0 || row.length > 0) {
+          row.push(cur);
+          rows.push(row);
+    }
+    return rows.filter((r) => r.length > 1 || (r[0] || "").trim() !== "");
+}
+
+function buildGvizHeaderIndex(headerRow) {
+    const idx = {};
+    headerRow.forEach((h, i) => {
+          const key = (h || "").trim();
+          if (key && !(key in idx)) idx[key] = i;
+    });
+    return idx;
+}
+
+function gvizCol(rowArr, idx, name) {
+    const i = idx[name];
+    return i === undefined ? "" : (rowArr[i] || "").trim();
+}
+
+// "KH mới"/"KH cũ"/"Cả 2" (nhu cot Phap nhan tren sheet) -> "kh_moi"/"kh_cu"/
+// "ca_2"; rong hoac gia tri la khac -> "" (chua xac dinh, KHONG doan).
+function congTyFromPhapNhan(v) {
+    const n = (v || "").trim();
+    if (n === "KH mới") return "kh_moi";
+    if (n === "KH cũ") return "kh_cu";
+    if (n.toLowerCase().includes("cả 2") || n.toLowerCase().includes("ca 2")) return "ca_2";
+    return "";
+}
+
+// "dd/mm/yyyy - dd/mm/yyyy" -> {start, end} dang ISO "yyyy-mm-dd". Khong
+// khop duoc dinh dang (thoi han ghi tu do, hoac de trong) -> "" ca 2, KHONG doan.
+function parseThoiHanThueRange(raw) {
+    const m = (raw || "").match(/(\d{1,2})\/(\d{1,2})\/(\d{4})\s*-\s*(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+    if (!m) return { start: "", end: "" };
+    const p2 = (s) => String(s).padStart(2, "0");
+    return {
+          start: `${m[3]}-${p2(m[2])}-${p2(m[1])}`,
+          end: `${m[6]}-${p2(m[5])}-${p2(m[4])}`,
+    };
+}
+
+function stripLinkQuery(v) {
+    return (v || "").split("?")[0];
+}
+
+// Nhan, 2026-08-13 (lan 3): moi tab (KVC MN/MB, MTD MN/MB) co SO CỘT KHAC
+// NHAU (vd MTD co them "Bên giữ tiền"/"TK NỢ"/"TK CÓ", KVC MB khong co cot
+// "Địa điểm"/"Ghi Chú") -- tra cot theo TEN HEADER (khong theo vi tri cot cu
+// the) de doc dung du lieu moi sheet, khong bi lech cot.
+async function fetchHopDongThueTongSheet(storeKey) {
+    const gid = HOP_DONG_THUE_TONG_GIDS[storeKey];
+    const url = `https://docs.google.com/spreadsheets/d/${HOP_DONG_THUE_TONG_SPREADSHEET_ID}/gviz/tq?tqx=out:csv&gid=${gid}`;
+    const resp = await fetch(url);
+    if (!resp.ok) {
+          throw new Error(
+                  `Không đọc được sheet ${storeKey} (mã lỗi ${resp.status}). Kiểm tra lại sheet đã chia sẻ "Bất kỳ ai có link đều xem được" chưa.`
+                );
+    }
+    const text = await resp.text();
+    const rows = parseGvizCsv(text);
+    if (rows.length === 0) return [];
+    const idx = buildGvizHeaderIndex(rows[0]);
+    return rows
+      .slice(1)
+      .map((r) => {
+              const thoiHanThueRaw = gvizCol(r, idx, "Thời hạn hợp đồng");
+              const { start, end } = parseThoiHanThueRange(thoiHanThueRaw);
+              return {
+                        sheetKey: storeKey,
+                        congTy: congTyFromPhapNhan(gvizCol(r, idx, "Pháp nhân")),
+                        congTyRaw: gvizCol(r, idx, "Pháp nhân"),
+                        khuVuc: gvizCol(r, idx, "Khu Vực"),
+                        dichVu: gvizCol(r, idx, "Dịch vụ"),
+                        tenNoiBo: gvizCol(r, idx, "Mã Điểm Nội Bộ"),
+                        maCongTrinh: gvizCol(r, idx, "Mã Điểm Thuế"),
+                        diaDiem: gvizCol(r, idx, "Địa điểm"),
+                        tenKhachHang: gvizCol(r, idx, "Tên khách hàng"),
+                        mstKhachHang: gvizCol(r, idx, "MST khách hàng"),
+                        hinhThucThue: gvizCol(r, idx, "Hình Thức Hợp Tác"),
+                        thoiHanThueRaw,
+                        ngayBatDauThue: start,
+                        ngayHetHanThue: end,
+                        ghiChu: gvizCol(r, idx, "Ghi Chú"),
+                        linkHopDong: stripLinkQuery(gvizCol(r, idx, "Link hợp đồng")),
+                        trangThaiRaw: gvizCol(r, idx, "còn hạn không"),
+              };
+      })
+      .filter((r) => r.tenNoiBo || r.diaDiem || r.tenKhachHang); // bo dong rong hoan toan
+}
+
+router.post("/phap-danh/hop-dong-thue-gian-tong/cap-nhat-tu-sheet", requireAdmin, async (req, res) => {
+    const store = load();
+    ensureShape(store);
+    try {
+          const perSheetCounts = {};
+          let allNewRows = [];
+          for (const s of HOP_DONG_THUE_TONG_SHEETS) {
+                  const rows = await fetchHopDongThueTongSheet(s.storeKey);
+                  perSheetCounts[s.key] = rows.length;
+                  allNewRows = allNewRows.concat(rows);
+          }
+          const otherRows = store.phap_danh_hop_dong_thue_tong.filter(
+                  (r) => !HOP_DONG_THUE_TONG_SHEETS.some((s) => s.storeKey === r.sheetKey)
+                        );
+          allNewRows.forEach((r) => {
+                  r.id = nextId(store, "phap_danh_hop_dong_thue_tong_seq") || Date.now();
+          });
+          store.phap_danh_hop_dong_thue_tong = otherRows.concat(allNewRows);
+          save(store);
+          const msg =
+                  `Đã cập nhật từ Google Sheet: ${allNewRows.length} dòng (` +
+                  HOP_DONG_THUE_TONG_SHEETS.map((s) => `${s.label} ${perSheetCounts[s.key]}`).join(", ") +
+                  `).`;
+          res.redirect("/phap-danh/hop-dong-thue-gian-tong?success=" + encodeURIComponent(msg));
+    } catch (e) {
+          res.redirect("/phap-danh/hop-dong-thue-gian-tong?error=" + encodeURIComponent(e.message));
+    }
+});
+
 // "Đối chiếu gian XHD, Tiền thuê" (routes/hoa-don-dau-vao.js) can doc lai
 // danh sach hop dong thue gian (benChoThue/tienThueThang/...) -- xuat them
 // cac ham nay (truoc gio chi co router duoc export) de dung LAI, khong doan
