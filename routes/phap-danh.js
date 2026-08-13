@@ -1585,9 +1585,11 @@ if (thangFilter) rows = rows.filter((r) => monthOverlapsThueTong(r, thangFilter)
   
     const counts = {};
     HOP_DONG_THUE_TONG_SHEETS.forEach((s) => {
-          counts[s.key] = store.phap_danh_hop_dong_thue_tong.filter(
+          let sheetRows = store.phap_danh_hop_dong_thue_tong.filter(
                   (r) => r.sheetKey === s.storeKey && (r.congTy === activeCompany || r.congTy === "ca_2")
-                        ).length;
+                        );
+    if (thangFilter) sheetRows = sheetRows.filter((r) => monthOverlapsThueTong(r, thangFilter));
+    counts[s.key] = sheetRows.length;
     });
   
     res.render("phapdanh-hopdong-thue-tong", {
