@@ -30,6 +30,14 @@ function ensureShape(store) {
   // cho thue xuat hoa don dua tren so Chi Nhan tu bao cao cho ho -- KHONG the
   // tu tinh tu doi soat nhu loai "giu_tien" o tren).
   if (!store.phap_danh_doanhthu_chiase_xuathoadon) store.phap_danh_doanhthu_chiase_xuathoadon = [];
+  // Nhan, 2026-08-13: "Hợp Đồng Thuê Gian Tổng" -- muc moi trong dropdown
+  // Phap danh, nap tu Google Sheet "Bản sao của Danh sách các gian Luyến.xlsx"
+  // (4 tab KVC MN/KVC MB/MTD MN/MTD MB, xem tmp_import_hopdong_tong.js da chay
+  // 1 lan de nap 246 dong). Moi dong = 1 gian, sheetKey phan biet 4 tab, congTy
+  // "kh_cu"/"kh_moi"/"ca_2" (dong "Cả 2" hien o CA 2 cong ty khi loc, xem route
+  // ben duoi) hoac "" khi sheet ghi "Không tìm thấy"/rong (chua xac dinh duoc,
+  // KHONG doan).
+  if (!store.phap_danh_hop_dong_thue_tong) store.phap_danh_hop_dong_thue_tong = [];
   fillSnowAeBinhDuongFromContract(store);
 }
 
@@ -1510,6 +1518,71 @@ router.post("/phap-danh/doanh-thu-chia-se/xuat-hoa-don/:id/delete", requireDataE
 module.exports = router;
 // Luyen, 2026-08-01: "từ cái hợp đồng thuê gian á nó sẽ có tên đối tác ký hợp
 // đồng với mình từ cái tên đó bạn map với lại hóa đơn đầu vào" -- trang moi
+// ---------- Hop Dong Thue Gian Tong ----------
+// Nhan, 2026-08-13: "thêm 1 mục mới trong dropdown Pháp danh ... gọi là Hợp
+// Đồng Thuê Gian Tổng ... có 4 sheet KVC MN, KVC MB, MTD MN, MTD MB" -- khac
+// voi 2 trang Thue Gian Hang / Thue Gian Hang Mien Bac o tren (nguon la sheet
+// hop dong "THEO DOI HD HN-HCM" + "Danh sach cac gian", chi 1 danh sach cho
+// Nam va 1 cho Bac), trang nay nguon la 1 file Google Sheet DUY NHAT "Bản sao
+// của Danh sách các gian Luyến.xlsx" voi DUNG 4 tab (KVC MN/KVC MB/MTD MN/MTD
+// MB), hien thi RIENG 4 tab qua query "sheet". Da nap san 246 dong qua
+// tmp_import_hopdong_tong.js (23/33/60/130 dong -- xem bao cao gui Nhan).
+const HOP_DONG_THUE_TONG_SHEETS = [
+  { key: "kvc-mn", storeKey: "kvc_mn", label: "KVC MN" },
+  { key: "kvc-mb", storeKey: "kvc_mb", label: "KVC MB" },
+  { key: "mtd-mn", storeKey: "mtd_mn", label: "MTD MN" },
+  { key: "mtd-mb", storeKey: "mtd_mb", label: "MTD MB" },
+  ];
+
+// Tinh trang thai mau cho 1 dong, so voi ngay he thong hien tai (todayStr,
+// dang "YYYY-MM-DD"): "het_han" (do) neu ngayHetHanThue < hom nay; "het_han_
+// thang_nay" (cam) neu ngayHetHanThue cung nam-thang voi hom nay VA >= hom
+// nay; con lai (chua co ngay, hoac het han xa hon thang nay) khong to mau.
+// Chi dung khi ngayHetHanThue da parse duoc ro rang (dang "dd/mm/yyyy -
+// dd/mm/yyyy") -- gian chua ro thoi han (con lai phan lon o MTD MB) se KHONG
+// bi to mau, dung y "khong doan" da noi trong yeu cau.
+function computeTrangThaiThueTong(r, todayStr) {
+    if (!r.ngayHetHanThue) return "";
+    if (r.ngayHetHanThue < todayStr) return "het_han";
+    if (r.ngayHetHanThue.slice(0, 7) === todayStr.slice(0, 7)) return "het_han_thang_nay";
+    return "";
+}
+
+router.get("/phap-danh/hop-dong-thue-gian-tong", (req, res) => {
+    const store = load();
+    ensureShape(store);
+    const activeCompany = getCompany(req);
+    const sheetParam = HOP_DONG_THUE_TONG_SHEETS.some((s) => s.key === req.query.sheet)
+      ? req.query.sheet
+          : "kvc-mn";
+    const sheetInfo = HOP_DONG_THUE_TONG_SHEETS.find((s) => s.key === sheetParam);
+    const todayStr = new Date().toISOString().slice(0, 10);
+  
+    let rows = store.phap_danh_hop_dong_thue_tong.filter(
+          (r) => r.sheetKey === sheetInfo.storeKey && (r.congTy === activeCompany || r.congTy === "ca_2")
+              );
+    rows.forEach((r) => {
+          r.trangThaiMau = computeTrangThaiThueTong(r, todayStr);
+    });
+  
+    const counts = {};
+    HOP_DONG_THUE_TONG_SHEETS.forEach((s) => {
+          counts[s.key] = store.phap_danh_hop_dong_thue_tong.filter(
+                  (r) => r.sheetKey === s.storeKey && (r.congTy === activeCompany || r.congTy === "ca_2")
+                        ).length;
+    });
+  
+    res.render("phapdanh-hopdong-thue-tong", {
+          userName: req.session.userName,
+          rows,
+          sheets: HOP_DONG_THUE_TONG_SHEETS,
+          sheetParam,
+          counts,
+          error: req.query.error || null,
+          success: req.query.success || null,
+    });
+});
+
 // "Đối chiếu gian XHD, Tiền thuê" (routes/hoa-don-dau-vao.js) can doc lai
 // danh sach hop dong thue gian (benChoThue/tienThueThang/...) -- xuat them
 // cac ham nay (truoc gio chi co router duoc export) de dung LAI, khong doan
