@@ -1787,18 +1787,6 @@ module.exports = router;
 // Nhan, 2026-08-13: "thêm 1 mục mới trong dropdown Pháp danh ... gọi là Hợp
 // Đồng Thuê Gian Tổng ... có 4 sheet KVC MN, KVC MB, MTD MN, MTD MB" -- khac
 // voi 2 trang Thue Gian Hang / Thue Gian Hang Mien Bac o tren (nguon la sheet
-// hop dong "THEO DOI HD HN-HCM" + "Danh sach cac gian", chi 1 danh sach cho
-// Nam va 1 cho Bac), trang nay nguon la 1 file Google Sheet DUY NHAT "Bản sao
-// của Danh sách các gian Luyến.xlsx" voi DUNG 4 tab (KVC MN/KVC MB/MTD MN/MTD
-// MB), hien thi RIENG 4 tab qua query "sheet". Da nap san 246 dong qua
-// tmp_import_hopdong_tong.js (23/33/60/130 dong -- xem bao cao gui Nhan).
-const HOP_DONG_THUE_TONG_SHEETS = [
-  { key: "kvc-mn", storeKey: "kvc_mn", label: "KVC MN" },
-  { key: "kvc-mb", storeKey: "kvc_mb", label: "KVC MB" },
-  { key: "mtd-mn", storeKey: "mtd_mn", label: "MTD MN" },
-  { key: "mtd-mb", storeKey: "mtd_mb", label: "MTD MB" },
-  ];
-
 // Tinh trang thai mau cho 1 dong, so voi ngay he thong hien tai (todayStr,
 // dang "YYYY-MM-DD"): "het_han" (do) neu ngayHetHanThue < hom nay; "het_han_
 // thang_nay" (cam) neu ngayHetHanThue cung nam-thang voi hom nay VA >= hom
@@ -1868,25 +1856,6 @@ if (thangFilter) rows = rows.filter((r) => monthOverlapsThueTong(r, thangFilter)
           success: req.query.success || null,
     });
 });
-
-// Nhan, 2026-08-13 (lan 3): "làm nút Cập nhật từ Google Sheet trên web thật"
-// -- truoc gio 246 dong chi nap 1 LAN qua script tam tren may cuc bo (KHONG
-// co tren Railway vi data/ khong di theo git). Nut nay doc THANG tu chinh
-// Google Sheet nguon (spreadsheet "Bản sao của Danh sách các gian Luyến.xlsx",
-// id 1VdTxB5Tkh_QxCfmQezfaFYdvDE7lp1NH -- xac nhan dung link Nhan gui lan 2,
-// TRUNG voi link 1 ve gid nen dung link nao cung ra cung du lieu) qua gviz
-// CSV (giong cach lam voi Hop Dong NCC/Thue Gian Hang o tren), KHONG can dang
-// nhap rieng vi sheet da chia se cong khai. Da doi chieu ket qua ham parse
-// nay TRUNG KHOP 100% voi 246 dong nhap tay ban dau (23/33/60/130, ca
-// congTy breakdown tung sheet) truoc khi dua vao code that.
-const HOP_DONG_THUE_TONG_SPREADSHEET_ID =
-    process.env.HOP_DONG_THUE_TONG_SHEET_ID || "1VdTxB5Tkh_QxCfmQezfaFYdvDE7lp1NH";
-const HOP_DONG_THUE_TONG_GIDS = {
-    kvc_mn: "254418876",
-    mtd_mn: "337828892",
-    kvc_mb: "11361918",
-    mtd_mb: "1750812066",
-};
 
 // Parser CSV THAT SU (khong chi split theo dong) -- gviz CSV co the co 1 o
 // chua xuong dong that trong dau ngoac kep (gap 1 dong o sheet MTD MB), neu
