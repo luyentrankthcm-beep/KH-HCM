@@ -877,9 +877,13 @@ function ensureChannelShape(store) {
     // lieu QR), nen cac dong "doi tru" nay khong con can nua; neu con ton tai
     // (chay truoc khi co fix, hoac store.json bi ghi de lai) se tu xoa moi
     // lan load() de gian tu dong tro ve 1 dong CHKQT CAM RANH duy nhat.
+    // Luyen, 2026-08-14: chi xoa manual match CU cho "SB CAM RANH PHN"
+    // (ten sai cu), KHONG xoa "CHKQT CAM RANH" -- truoc day xoa ca 2 nen
+    // moi lan Luyen luu "+/- Sua D'" cho CHKQT CAM RANH la bi xoa ngay
+    // (khong co hieu luc gi). Gio chi don dep ten cu, giu lai ten dung.
     if (ch === "mb11521268" && store.viet_qr_manual_matches[ch]) {
       Object.keys(store.viet_qr_manual_matches[ch]).forEach((k) => {
-        if (k.endsWith("|SB CAM RANH PHN") || k.endsWith("|CHKQT CAM RANH")) {
+        if (k.endsWith("|SB CAM RANH PHN")) {
           delete store.viet_qr_manual_matches[ch][k];
         }
       });
