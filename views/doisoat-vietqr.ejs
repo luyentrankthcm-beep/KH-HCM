@@ -988,6 +988,28 @@
               </span>
             </span>
           </summary>
+          <%
+            const dayBankTxs = ((built[ch] && built[ch].bankTxsByDate) || {})[r.settlementDate] || [];
+          %>
+          <% if (isAdmin && dayBankTxs.length > 0) { %>
+          <details style="margin:6px 0; font-size:12px;">
+            <summary style="cursor:pointer; color:#555;">🏦 Giao dịch ngân hàng (<%= dayBankTxs.length %> giao dịch — click để xem/xóa)</summary>
+            <table style="margin-top:6px; width:100%; font-size:12px; border-collapse:collapse;">
+              <% dayBankTxs.forEach(function(tx) { %>
+              <tr style="border-bottom:1px solid #eee;">
+                <td style="padding:3px 6px; white-space:nowrap;"><%= tx.amount.toLocaleString('vi-VN') %>đ</td>
+                <td style="padding:3px 6px; color:#555; max-width:400px; overflow:hidden; text-overflow:ellipsis;" title="<%= tx.description %>"><%= tx.description %></td>
+                <td style="padding:3px 6px;">
+                  <form method="POST" action="/transactions/<%= tx.id %>/xoa" style="display:inline;"
+                    onsubmit="return confirm('Xoá giao dịch ngày <%= tx.date %> số tiền <%= tx.amount.toLocaleString('vi-VN') %>đ?')">
+                    <button type="submit" class="link-btn" style="font-size:11px; color:#c0392b;">Xoá</button>
+                  </form>
+                </td>
+              </tr>
+              <% }) %>
+            </table>
+          </details>
+          <% } %>
           <% if (r.tanPhuSuggestion) { %>
           <p class="badge badge-warn" style="display:block; margin-top:8px; font-size:12px; padding:6px 10px;">
             ✅ Sau khi trừ giao dịch không phải VietQR, Ngân hàng ngày này còn dư <strong><%= r.tanPhuSuggestion.amount.toLocaleString('vi-VN') %> đ</strong> so với dữ liệu đối soát — đã tự động gộp vào gian <strong><%= r.tanPhuSuggestion.targetCode %></strong>.

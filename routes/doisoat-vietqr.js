@@ -693,6 +693,9 @@ const MANUAL_MATCH_DEFAULTS = {
 const TEN_DIEM_MASTER_DEFAULTS = {
   mb11521268: {
     "1 jp sb cam ranh.new": "CHKQT CAM RANH",
+    // Luyen, 2026-08-14: "SB PHU QUOC PHCM" la ten cu (sai), phai gop vao
+    // "CHKQT PHU QUOC" -- dung override truc tiep (khong qua fuzzy) de chac.
+    "sb phu quoc phcm": "CHKQT PHU QUOC",
   },
   // Nhan, 2026-08-06: "cửa hàng POSH Funzone Bắc Giang này á là của LOTTE BAC
   // GIANG PHN tôi đưa nhầm vào KUBO BAC GIANG PHN rồi" -- sua lai override
@@ -1821,10 +1824,19 @@ function buildChannelReconciliation(store, channelKey) {
     unmatchedInvoiceCodesSet.add(inv.maDiem);
   });
 
+  // Luyen, 2026-08-14: "thêm cái xóa giao dịch ngân hàng" -- nhom cac GD ngan
+  // hang theo ngay de view co the hien danh sach + nut Xoa cho tung GD.
+  const bankTxsByDate = {};
+  extractVietQrThuTransactions(txs).forEach((t) => {
+    if (!bankTxsByDate[t.date]) bankTxsByDate[t.date] = [];
+    bankTxsByDate[t.date].push({ id: t.id, date: t.date, amount: t.amount, description: (t.description || "").slice(0, 100) });
+  });
+
   return {
     reconciled,
     lockDate,
     allCodes: Array.from(allCodes).sort(),
+    bankTxsByDate,
     unmappedStores: resolved.unmapped,
     // Luyen, 2026-07-17: "map giữ tên điểm nội bộ có trong file hệ thống với
     // Mã công trình -- mã nào chưa map được hiện ra cho tôi" -- structured
