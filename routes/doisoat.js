@@ -613,9 +613,24 @@ router.get("/doi-soat/momo", (req, res) => {
   // that su lon (hang trieu tro len, nhu vu 200tr/50tr da gap truoc do) thi
   // van hien ra chu khong bi am tham nuot mat. (ROUNDING_ABSORB_THRESHOLD
   // dinh nghia o module-scope phia tren, dung chung voi export.xlsx.)
+  // Luyen, 2026-08-14: "them cho chinh sua cho toi nha" -- ap dung override
+  // thu cong (momo_manual_matches) len tung dong truoc khi hien thi. Nguoi
+  // dung bam "Sua HD" de nhap so HD + so tien dung, luu vao store, trang tu
+  // hien lai voi so lieu da chinh.
+  const momoManual = store.momo_manual_matches || {};
   const reconciled = reconciledMonth
     .map((r) => {
       const lines = r.lines.filter((l) => (activeCompany === "kh_moi" ? l.tkCo === "SKIP" : l.tkCo !== "SKIP"));
+      // Apply manual invoice overrides BEFORE rounding-absorb step
+      lines.forEach((l) => {
+        const mm = momoManual[`${r.settlementDate}|${l.code}`];
+        if (!mm) return;
+        if (mm.invoiceNumbers) l.invoiceNumbers = mm.invoiceNumbers;
+        if (mm.amount !== null && mm.amount !== undefined) l.invoiceTotal = mm.amount;
+        l.diff = l.invoiceTotal - l.gross;
+        l.matched = l.invoiceNumbers.length > 0 && Math.abs(l.diff) <= 1000;
+        l.manualOverride = true;
+      });
       if (activeCompany !== "kh_moi") return { ...r, lines };
       // pendingBank (chua co giao dich ngan hang that cho ngay nay -- xem
       // buildPendingDaySettlements) -- giu nguyen diffVsBank = null, KHONG
@@ -1151,6 +1166,48 @@ router.post("/doi-soat/momo/invoices/xoa-theo-so", requireAdmin, (req, res) => {
           "/doi-soat/momo?success=" +
             encodeURIComponent(`Đã xoá ${removed} hoá đơn (${momoCfg.label}) theo số HĐ: ${labels.join(", ")}.`)
         );
+});
+
+// Luyen, 2026-08-14: Sua HD thu cong cho momo -- luu override vao
+// store.momo_manual_matches["settlementDate|code"] = {invoiceNumbers, amount}
+// Tuong tu viet_qr_manual_matches nhung don gian hon (khong can grossAdjustment).
+router.post("/doi-soat/momo/manual-match", requireDataEntry, (req, res) => {
+  const store = load();
+  if (!store.momo_manual_matches) store.momo_manual_matches = {};
+  try {
+    const { settlementDate, code, invoiceNumbers, amount } = req.body;
+    if (!settlementDate || !code) throw new Error("Thiếu settlementDate hoặc code.");
+    const key = `${settlementDate}|${code}`;
+    const invoiceList = (invoiceNumbers || "")
+      .split(/[,\s]+/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+    const amt = amount ? Number(String(amount).replace(/[^\d]/g, "")) : null;
+    store.momo_manual_matches[key] = {
+      invoiceNumbers: invoiceList,
+      amount: amt,
+      created_at: new Date().toISOString(),
+    };
+    save(store);
+    res.redirect(
+      "/doi-soat/momo?success=" + encodeURIComponent(`Đã sửa HĐ thủ công cho "${code}" ngày ${settlementDate}.`)
+    );
+  } catch (e) {
+    res.redirect("/doi-soat/momo?error=" + encodeURIComponent(e.message));
+  }
+});
+
+router.post("/doi-soat/momo/manual-match/delete", requireAdmin, (req, res) => {
+  const store = load();
+  if (!store.momo_manual_matches) store.momo_manual_matches = {};
+  try {
+    const { settlementDate, code } = req.body;
+    delete store.momo_manual_matches[`${settlementDate}|${code}`];
+    save(store);
+    res.redirect("/doi-soat/momo?success=" + encodeURIComponent("Đã xóa sửa HĐ thủ công."));
+  } catch (e) {
+    res.redirect("/doi-soat/momo?error=" + encodeURIComponent(e.message));
+  }
 });
 
 // Export in the EXACT "Mau phieu thu tien gui de nhap vao AMIS Accounting"
