@@ -116,6 +116,28 @@ app.use((req, res, next) => {
 // dang nhap duoc. Dat sau authRoutes (cung vi tri nhu bankRoutes/... ben
 // duoi) de /login/logout luon duoc xu ly truoc, giong quy uoc san co.
 
+// TEMP: import Farm Times City Payoo invoices from MTT 13.08 (xoa sau khi chay)
+app.post("/temp-import-farmtimes-payoo", (req, res) => {
+  if ((req.body || {}).secret !== "farmtimespayoo2026") return res.status(403).json({ error: "forbidden" });
+  const { load: ld, save: sv } = require("./store");
+  const store = ld();
+  if (!store.zvp_invoices) store.zvp_invoices = { zalo: [], vnpay: [], payoo: [] };
+  if (!store.zvp_invoices.payoo) store.zvp_invoices.payoo = [];
+  const invs = req.body.invoices || [];
+  const existingKeys = new Set(store.zvp_invoices.payoo.map((i) => `${i.soHd}|${i.ngayHd}|${i.maDiem}`));
+  let added = 0;
+  for (const inv of invs) {
+    const k = `${inv.soHd}|${inv.ngayHd}|${inv.maDiem}`;
+    if (!existingKeys.has(k)) {
+      store.zvp_invoices.payoo.push(inv);
+      existingKeys.add(k);
+      added++;
+    }
+  }
+  sv(store);
+  res.json({ ok: true, added, total: store.zvp_invoices.payoo.length });
+});
+
 app.use("/", authRoutes);
 
 app.use("/", companyRoutes);
