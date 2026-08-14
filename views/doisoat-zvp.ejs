@@ -487,6 +487,20 @@
         <button type="submit" class="btn btn-secondary">Xoá hết hóa đơn đã nạp</button>
       </form>
       <% } %>
+      <form method="POST" action="/doi-soat/zvp/invoices/xoa-theo-so" class="form-inline" style="margin-top:8px;" onsubmit="return confirm('Xoá đúng (các) số HĐ này khỏi danh sách đã nạp?');">
+        <label style="margin:0;">Xoá HĐ cũ/trùng theo số (kênh</label>
+        <select name="channel" style="width:90px;">
+          <option value="zalo">zalo</option>
+          <option value="vnpay">vnpay</option>
+          <option value="payoo">payoo</option>
+        </select>
+        <label style="margin:0;">), cách nhau bằng dấu phẩy:</label>
+        <input type="text" name="soHdList" placeholder="VD: 2536@Kid Farm MM Market Da Nang" style="min-width:280px;" />
+        <button type="submit" class="btn btn-secondary">Xoá các số HĐ này</button>
+      </form>
+      <p class="muted" style="margin-top:4px;">
+        Dùng khi hóa đơn cũ/trùng bị cộng nhầm vào đối soát (giống bên Momo). Gõ thêm <code>@Mã công trình</code> nếu số HĐ bị trùng số với 1 gian khác (không liên quan nhau) để chỉ xoá đúng dòng của gian đó — không có "@" thì xoá hết các dòng cùng số HĐ trong kênh đã chọn.
+      </p>
         </div>
       </details>
     </section>

@@ -26,15 +26,28 @@
     <section class="panel">
       <div class="panel-head">
         <h2>Chọn sheet</h2>
+        <form method="POST" action="/phap-danh/hop-dong-thue-gian-tong/cap-nhat-tu-sheet"
+              onsubmit="return confirm('Nạp lại toàn bộ 4 sheet từ Google Sheet? Dữ liệu hiện có của 4 sheet này sẽ được thay bằng dữ liệu mới nhất trên Google Sheet.');">
+          <button type="submit" class="btn btn-primary">🔄 Cập nhật từ Google Sheet</button>
+        </form>
       </div>
       <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:16px;">
         <% sheets.forEach(function(s) { %>
         <a class="btn btn-secondary <%= sheetParam === s.key ? 'is-active' : '' %>"
-           href="/phap-danh/hop-dong-thue-gian-tong?sheet=<%= s.key %>"><%= s.label %> (<%= counts[s.key] %>)</a>
+           href="/phap-danh/hop-dong-thue-gian-tong?sheet=<%= s.key %><%= thangFilter ? '&thang=' + thangFilter : '' %>"><%= s.label %> (<%= counts[s.key] %>)</a>
         <% }) %>
       </div>
 
-      <div style="overflow-x:auto;">
+      <form method="GET" action="/phap-danh/hop-dong-thue-gian-tong" style="display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-bottom:14px;">
+        <input type="hidden" name="sheet" value="<%= sheetParam %>" />
+        <label style="font-size:13px;">Xem hợp đồng còn hiệu lực trong tháng
+          <input type="month" name="thang" value="<%= thangFilter %>" style="margin-left:6px;" />
+        </label>
+        <button type="submit" class="btn btn-secondary">Lọc theo tháng</button>
+        <a class="link-btn" href="/phap-danh/hop-dong-thue-gian-tong?sheet=<%= sheetParam %>&thang=all">Xem tất cả các tháng</a>
+      </form>
+
+      <div class="table-scroll">
         <table class="table">
           <thead>
             <tr>
