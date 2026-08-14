@@ -813,8 +813,14 @@ function ensureChannelShape(store) {
   // (dung y "cái nào mới thì thông báo"). Xem tanPhuAutoApplied trong
   // buildChannelReconciliation va route /doi-soat/vietqr/tanphu-ack/:channel.
   if (!store.viet_qr_tanphu_ack) store.viet_qr_tanphu_ack = {};
+  // Luyen, 2026-08-14: doi tu fill-if-empty sang ghi de KHONG DIEU KIEN
+  // (giong TEN_DIEM_MASTER_DEFAULTS o duoi, xem ly do tai ghi chu dong 869).
+  // fill-if-empty khong bao gio sua duoc gia tri SAI da co san trong
+  // store.json tren Railway (vd "SB PHU QUOC PHCM" -> self-map thay vi
+  // "CHKQT PHU QUOC") -- GIAN_MERGE_DEFAULTS la cac gop vinh vien da xac
+  // nhan, khong phai gia tri "chi dien vao cho trong" nen unconditional la dung.
   Object.keys(GIAN_MERGE_DEFAULTS).forEach((k) => {
-    if (!store.viet_qr_gian_merge[k]) store.viet_qr_gian_merge[k] = GIAN_MERGE_DEFAULTS[k];
+    store.viet_qr_gian_merge[k] = GIAN_MERGE_DEFAULTS[k];
   });
   if (!store.invoice_diem_alias) store.invoice_diem_alias = {};
   Object.keys(INVOICE_DIEM_ALIAS_DEFAULTS).forEach((k) => {
