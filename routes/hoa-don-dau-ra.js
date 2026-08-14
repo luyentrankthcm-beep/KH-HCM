@@ -242,11 +242,11 @@ router.get("/hoa-don-dau-ra/export-misa", requireLogin, (req, res) => {
     return "KL";
   }
 
-  // Luyen, 2026-08-13: nguong doi Ky hieu HD THAT (doi chieu tu file goc
-  // "baocaochitiet.xlsx" -- cot Ky hieu chuyen tu "1C26TYY" sang "1C26MKH"
-  // dung tai hoa don so 11585, KHONG phai 5000 nhu code cu (sai, gay xuat
-  // nham Ky hieu cho hang nghin hoa don so 5000-11584). Trung voi moc 11585
-  // da dung san trong THU_HO_MAP o tren.
+// Luyen, 2026-08-13: nguong doi Ky hieu HD THAT (doi chieu tu file goc
+      // "baocaochitiet.xlsx" -- cot Ky hieu chuyen tu "1C26TYY" sang "1C26MKH"
+      // dung tai hoa don so 11585, KHONG phai 5000 nhu code cu (sai, gay xuat
+      // nham Ky hieu cho hang nghin hoa don so 5000-11584). Trung voi moc 11585
+      // da dung san trong THU_HO_MAP o tren.
   function getKyHieu(soHD) {
     const n = parseInt(String(soHD).replace(/^0+/, "")) || 0;
     return n < 11585 ? "1C26TYY" : "1C26MKH";
