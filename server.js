@@ -193,6 +193,48 @@ app.post("/temp-diag2026", (req, res) => {
   res.json({ error: "unknown action" });
 });
 
+// TEMP: fix Farm Times City payoo invoices + SB PHU QUOC PHCM (xoa sau khi chay)
+app.post("/temp-fix2-aug2026", (req, res) => {
+  if ((req.body || {}).secret !== "fix2aug2026") return res.status(403).json({ error: "forbidden" });
+  const { load: ld, save: sv } = require("./store");
+  const store = ld();
+  const results = {};
+
+  // 1. Xoa Farm Times City khoi zvp_invoices.payoo
+  if (store.zvp_invoices && store.zvp_invoices.payoo) {
+    const before = store.zvp_invoices.payoo.length;
+    store.zvp_invoices.payoo = store.zvp_invoices.payoo.filter(
+      (i) => !/farm.times/i.test(i.maDiem || "")
+    );
+    results.payooFarmRemoved = before - store.zvp_invoices.payoo.length;
+    results.payooTotal = store.zvp_invoices.payoo.length;
+  }
+
+  // 2. Fix SB PHU QUOC PHCM -> CHKQT PHU QUOC trong mb11521268
+  if (!store.viet_qr_store_code_override) store.viet_qr_store_code_override = {};
+  if (!store.viet_qr_store_code_override.mb11521268) store.viet_qr_store_code_override.mb11521268 = {};
+  store.viet_qr_store_code_override.mb11521268["SB PHU QUOC PHCM"] = "CHKQT PHU QUOC";
+  // Dam bao gian_merge cung dung
+  if (!store.viet_qr_gian_merge) store.viet_qr_gian_merge = {};
+  store.viet_qr_gian_merge["SB PHU QUOC PHCM"] = { maCongTrinh: "CHKQT PHU QUOC", isCse: false };
+  results.sbPhuQuocFixed = true;
+
+  // 3. Bao cao offline QR transactions hien tai
+  const offlineAug = store.transactions.filter(
+    (t) => t.type === "thu" && t.date >= "2026-08-01" && /QR.OFFLINE/i.test(t.description || "")
+  );
+  results.offlineAugCount = offlineAug.length;
+  results.offlineTxs = offlineAug.map((t) => ({
+    id: t.id,
+    date: t.date,
+    amount: t.amount,
+    desc: (t.description || "").slice(0, 60),
+  }));
+
+  sv(store);
+  res.json({ ok: true, ...results });
+});
+
 app.use("/", authRoutes);
 
 app.use("/", companyRoutes);
