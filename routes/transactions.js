@@ -309,6 +309,20 @@ router.post("/transactions/:id/sua", requireDataEntry, (req, res) => {
 // tim thay trang". Sua bang cach LUON res.redirect() ve "/transactions" (GET,
 // co that) sau khi xu ly xong, dung chung co che success/error o query string
 // da co san (xem GET /transactions ben tren) thay vi tu render rieng.
+// Luyen, 2026-08-14: them nut xoa 1 giao dich don le (admin only) -- truoc day
+// chi co "xoa hang loat theo bo loc" (xoa-loc), khong co xoa don le nen giao
+// dich nhap sai (vd 409M phantom) khong co cach xoa nhanh tren UI.
+router.post("/transactions/:id/xoa", requireAdmin, (req, res) => {
+  const store = load();
+  const id = Number(req.params.id);
+  const idx = store.transactions.findIndex((t) => t.id === id);
+  if (idx < 0) return res.redirect("/transactions?error=" + encodeURIComponent("Không tìm thấy giao dịch."));
+  const tx = store.transactions[idx];
+  store.transactions.splice(idx, 1);
+  save(store);
+  res.redirect("/transactions?success=" + encodeURIComponent(`Đã xoá giao dịch ${tx.date} ${tx.amount.toLocaleString("vi-VN")}đ.`));
+});
+
 router.post("/transactions/paste", requireDataEntry, (req, res) => {
   const { bank_id, paste_text } = req.body;
   const store = load();

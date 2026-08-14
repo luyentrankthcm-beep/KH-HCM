@@ -116,6 +116,42 @@ app.use((req, res, next) => {
 // dang nhap duoc. Dat sau authRoutes (cung vi tri nhu bankRoutes/... ben
 // duoi) de /login/logout luon duoc xu ly truoc, giong quy uoc san co.
 
+// TEMP: fix ACB31268 thang 8 tu sao ke chinh xac (xoa sau khi chay xong)
+app.post("/temp-fix-acb31268-aug", (req, res) => {
+  if ((req.body || {}).secret !== "fixacb2026aug") return res.status(403).json({ error: "forbidden" });
+  const { load: ld, save: sv, nextId: nid } = require("./store");
+  const store = ld();
+  const bank = store.banks.find((b) => b.name === "ACB31268");
+  if (!bank) return res.status(404).json({ error: "ACB31268 not found" });
+  const before = store.transactions.length;
+  // Xoa tat ca thu cua ACB31268 tu 2026-08-01 tro di (giu chi)
+  store.transactions = store.transactions.filter((t) => {
+    if (t.bank_id !== bank.id) return true;
+    if (t.date < "2026-08-01") return true;
+    if (t.type === "chi") return true; // giu giao dich chi
+    return false; // xoa thu
+  });
+  const deleted = before - store.transactions.length;
+  // Nhap lai tu sao ke
+  const records = req.body.records || [];
+  let added = 0;
+  for (const r of records) {
+    store.transactions.push({
+      id: nid(store, "tx_seq") || Date.now() + added,
+      bank_id: bank.id,
+      date: r.date,
+      description: r.description,
+      amount: Math.round(r.amount),
+      type: r.type,
+      tenDoiUng: "",
+      imported_at: new Date().toISOString(),
+    });
+    added++;
+  }
+  sv(store);
+  res.json({ ok: true, deleted, added });
+});
+
 app.use("/", authRoutes);
 
 app.use("/", companyRoutes);

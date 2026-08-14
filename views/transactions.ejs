@@ -387,6 +387,11 @@
                 </label>
                 <button type="submit" class="btn btn-secondary" style="font-size:12px; padding:3px 10px;">Lưu</button>
                 <button type="button" class="link-btn" style="font-size:12px;" onclick="txToggleEdit(event, '<%= t.id %>')">Hủy</button>
+                <% if (isAdmin) { %>
+                <form method="POST" action="/transactions/<%= t.id %>/xoa" style="display:inline;" onsubmit="return confirm('Xoá giao dịch <%= t.date %> <%= t.amount.toLocaleString('vi-VN') %>đ?')">
+                  <button type="submit" class="link-btn" style="font-size:12px; color:#c0392b;">Xoá</button>
+                </form>
+                <% } %>
               </form>
             </td>
           </tr>
