@@ -1565,7 +1565,15 @@ function reconcileZvpChannel(settlements, grossData, invoiceData, gianMapping, m
     for (const day of inv.days) {
       let y = invY;
       let mo = invMo;
-      if (day > 20 && invD <= 3) {
+      // Luyen, 2026-08-14: file MTT co tat ca hoa don cung ngayHd = ngay xuat
+      // file (vd 2026-08-13) du doanh thu thuoc nhieu ngay khac nhau (30, 31,
+      // 1, 2...). Dieu kien cu "day > 20 && invD <= 3" chi xu ly duoc truong
+      // hop hoa don phat hanh dau thang (invD <= 3) nhung KHONG xu ly duoc
+      // truong hop invD=13 voi day=31 (31/7 bi nham thanh 31/8). Dieu kien
+      // moi "day > invD": neu so ngay doanh thu LON HON ngay phat hanh hoa
+      // don thi chac chan thuoc thang truoc -- an toan vi Zalo App thanh toan
+      // doanh thu qua khu, khong bao gio ngay doanh thu > ngay hoa don.
+      if (day > invD) {
         mo -= 1;
         if (mo === 0) {
           mo = 12;
@@ -1653,7 +1661,7 @@ function reconcileZvpChannel(settlements, grossData, invoiceData, gianMapping, m
         for (const d of inv.days) {
           let y = invY;
           let mo = invMo;
-          if (d > 20 && invD <= 3) {
+          if (d > invD) {
             mo -= 1;
             if (mo === 0) {
               mo = 12;
