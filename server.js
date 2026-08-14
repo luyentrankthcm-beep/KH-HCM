@@ -116,6 +116,30 @@ app.use((req, res, next) => {
 // dang nhap duoc. Dat sau authRoutes (cung vi tri nhu bankRoutes/... ben
 // duoi) de /login/logout luon duoc xu ly truoc, giong quy uoc san co.
 
+// TEMP: find + delete phantom 409M QR OFFLINE (xoa sau khi chay)
+app.post("/temp-del-phantom", (req, res) => {
+  if ((req.body || {}).secret !== "delphantom2026") return res.status(403).json({ error: "forbidden" });
+  const { load: ld, save: sv } = require("./store");
+  const store = ld();
+  // Tim tat ca QR OFFLINE bat ke thang nao
+  const allOffline = store.transactions.filter(t =>
+    t.type === "thu" && /QR.OFFLINE/i.test(t.description || "")
+  );
+  // Tim bat ky GD nao ~409M
+  const big = store.transactions.filter(t => t.amount > 400000000 && t.amount < 420000000);
+  if (req.body.action === "delete") {
+    const ids = req.body.ids || [];
+    const before = store.transactions.length;
+    store.transactions = store.transactions.filter(t => !ids.includes(t.id));
+    sv(store);
+    return res.json({ ok: true, deleted: before - store.transactions.length });
+  }
+  res.json({
+    allOffline: allOffline.map(t => ({ id: t.id, date: t.date, amount: t.amount, desc: (t.description||"").slice(0,80) })),
+    big: big.map(t => { const b = (store.banks||[]).find(b=>b.id===t.bank_id); return { id: t.id, bank: b?.name, date: t.date, amount: t.amount, desc: (t.description||"").slice(0,80) }; })
+  });
+});
+
 app.use("/", authRoutes);
 
 app.use("/", companyRoutes);
