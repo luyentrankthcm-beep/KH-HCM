@@ -884,16 +884,22 @@ router.post("/doi-soat/momo/upload-hoadon", requireDataEntry, upload.single("fil
     const shared = parseSharedInvoiceWorkbook(req.file.buffer, activeCompany);
 
     const existingKeysMomo = new Set(store[momoCfg.invoicesKey].map((i) => `${i.soHd}|${i.ngayHd}|${i.maDiem}`));
+    // Luyen, 2026-08-14: dedup thu cap theo ngayHd|maDiem -- giong VietQR,
+    // ngan upload file MTT luy ke moi (soHd cap lai) khoi tao invoice 2x.
+    const existingDayDiemMomo = new Set(store[momoCfg.invoicesKey].map((i) => `${i.ngayHd}|${i.maDiem}`));
     let addedMomo = 0;
     let blockedMomo = 0;
     for (const inv of shared.momo) {
       const key = `${inv.soHd}|${inv.ngayHd}|${inv.maDiem}`;
       if (existingKeysMomo.has(key)) continue;
+      const key2 = `${inv.ngayHd}|${inv.maDiem}`;
+      if (existingDayDiemMomo.has(key2)) continue;
       if (MOMO_INVOICE_BLOCKLIST.has(key)) {
         blockedMomo++;
         continue;
       }
       existingKeysMomo.add(key);
+      existingDayDiemMomo.add(key2);
       store[momoCfg.invoicesKey].push(inv);
       addedMomo++;
     }
@@ -1077,6 +1083,30 @@ router.post("/doi-soat/momo/invoices/clear", requireAdmin, (req, res) => {
   store[momoCfg.invoicesKey] = [];
   save(store);
   res.redirect("/doi-soat/momo?success=" + encodeURIComponent(`Da xoa toan bo hoa don momo da nap (${momoCfg.label}).`));
+});
+
+// Luyen, 2026-08-14: xoa HD momo theo ngayHd chinh xac -- go trung lap khi
+// file MTT tai len 2 lan voi soHd khac nhau cho cung ngay (invoice 2x).
+// Body: { ngayHd: "2026-08-10" }  -- xoa cho cong ty dang xem (req company).
+router.post("/doi-soat/momo/invoices/clear-by-ngayhd", requireAdmin, (req, res) => {
+  const store = load();
+  const momoCfg = MOMO_CHANNELS[getCompany(req)];
+  try {
+    const { ngayHd } = req.body || {};
+    if (!ngayHd) throw new Error("Thieu ngayHd (vd: 2026-08-10).");
+    const before = (store[momoCfg.invoicesKey] || []).length;
+    store[momoCfg.invoicesKey] = (store[momoCfg.invoicesKey] || []).filter((i) => i.ngayHd !== ngayHd);
+    const removed = before - store[momoCfg.invoicesKey].length;
+    save(store);
+    res.redirect(
+      "/doi-soat/momo?success=" +
+        encodeURIComponent(
+          `Da xoa ${removed} hoa don momo ngay ${ngayHd} (${momoCfg.label}). Hay tai lai file MTT de nap lai dung.`
+        )
+    );
+  } catch (e) {
+    res.redirect("/doi-soat/momo?error=" + encodeURIComponent(e.message));
+  }
 });
 
 // Chi Nhan (2026-07-23): "đối chiếu từng ngày đi bị trùng á" -- Luyen phat

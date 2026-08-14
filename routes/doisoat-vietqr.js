@@ -2742,11 +2742,22 @@ router.post("/doi-soat/vietqr/upload-hoadon", requireDataEntry, upload.single("f
       const parsed = parseInvoiceWorkbookByTag(req.file.buffer, CHANNELS[ch].tagPattern);
       sheetName = parsed.sheetName;
       const existingKeys = new Set(store.viet_qr_invoices[ch].map((i) => `${i.soHd}|${i.ngayHd}|${i.maDiem}`));
+      // Luyen, 2026-08-14: dedup thu cap theo ngayHd|maDiem (khong phu thuoc
+      // soHd) -- khi upload file MTT luy ke moi (re-export cung thang, soHd
+      // duoc cap lai), invoice cu va moi khac soHd nhung CUNG ngay+gian se bi
+      // ghi lap vao store (2x). Check thu cap nay chan truong hop do: neu da co
+      // 1 HD cho ngay X + gian Y roi, khong them HD thu 2 du soHd khac. VietQR
+      // chi co 1 thanh toan/gian/ngay nen 2 HD cung ngay+gian la chac chan
+      // trung lap, khong phai 2 hoa don hop le.
+      const existingDayDiem = new Set(store.viet_qr_invoices[ch].map((i) => `${i.ngayHd}|${i.maDiem}`));
       let added = 0;
       for (const inv of parsed.invoices) {
         const k = `${inv.soHd}|${inv.ngayHd}|${inv.maDiem}`;
         if (existingKeys.has(k)) continue;
+        const k2 = `${inv.ngayHd}|${inv.maDiem}`;
+        if (existingDayDiem.has(k2)) continue;
         existingKeys.add(k);
+        existingDayDiem.add(k2);
         store.viet_qr_invoices[ch].push(inv);
         added++;
       }
@@ -2850,6 +2861,36 @@ router.post("/doi-soat/vietqr/invoices/remove-by-date", requireAdmin, (req, res)
       "/doi-soat/vietqr?success=" +
         encodeURIComponent(
           `Da xoa ${removedTotal} hoa don ngay ${day}${minNum ? ` co so HD >= ${minNum}` : ""} (tat ca kenh).`
+        )
+    );
+  } catch (e) {
+    res.redirect("/doi-soat/vietqr?error=" + encodeURIComponent(e.message));
+  }
+});
+
+// ---------- Xoa HD theo ngayHd chinh xac + filter cong ty ----------
+// Luyen, 2026-08-14: xoa HD ngay cu bi trung lap do file MTT tai len 2 lan
+// (file moi co soHd khac -> dedup cu khong chan -> invoice 2x).
+// Body: { ngayHd: "2026-08-10", company: "kh_moi" }  (company optional, mac dinh tat ca)
+router.post("/doi-soat/vietqr/invoices/clear-by-ngayhd", requireAdmin, (req, res) => {
+  const store = load();
+  ensureChannelShape(store);
+  try {
+    const { ngayHd, company } = req.body || {};
+    if (!ngayHd) throw new Error("Thieu ngayHd (vd: 2026-08-10).");
+    const targetCompany = company || null;
+    let removedTotal = 0;
+    for (const ch of CHANNEL_KEYS) {
+      if (targetCompany && CHANNELS[ch].company !== targetCompany) continue;
+      const before = store.viet_qr_invoices[ch].length;
+      store.viet_qr_invoices[ch] = store.viet_qr_invoices[ch].filter((inv) => inv.ngayHd !== ngayHd);
+      removedTotal += before - store.viet_qr_invoices[ch].length;
+    }
+    save(store);
+    res.redirect(
+      "/doi-soat/vietqr?success=" +
+        encodeURIComponent(
+          `Da xoa ${removedTotal} hoa don ngay ${ngayHd}${targetCompany ? ` (cong ty ${targetCompany})` : " (tat ca kenh)"}. Hay tai lai file MTT de nap lai dung.`
         )
     );
   } catch (e) {
