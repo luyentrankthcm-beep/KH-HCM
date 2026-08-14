@@ -2742,19 +2742,24 @@ router.post("/doi-soat/vietqr/upload-hoadon", requireDataEntry, upload.single("f
       const parsed = parseInvoiceWorkbookByTag(req.file.buffer, CHANNELS[ch].tagPattern);
       sheetName = parsed.sheetName;
       const existingKeys = new Set(store.viet_qr_invoices[ch].map((i) => `${i.soHd}|${i.ngayHd}|${i.maDiem}`));
-      // Luyen, 2026-08-14: dedup thu cap theo ngayHd|maDiem (khong phu thuoc
-      // soHd) -- khi upload file MTT luy ke moi (re-export cung thang, soHd
-      // duoc cap lai), invoice cu va moi khac soHd nhung CUNG ngay+gian se bi
-      // ghi lap vao store (2x). Check thu cap nay chan truong hop do: neu da co
-      // 1 HD cho ngay X + gian Y roi, khong them HD thu 2 du soHd khac. VietQR
-      // chi co 1 thanh toan/gian/ngay nen 2 HD cung ngay+gian la chac chan
-      // trung lap, khong phai 2 hoa don hop le.
-      const existingDayDiem = new Set(store.viet_qr_invoices[ch].map((i) => `${i.ngayHd}|${i.maDiem}`));
+      // Luyen, 2026-08-14: dedup thu cap theo ngayHd|maDiem|days (khong phu
+      // thuoc soHd) -- khi upload file MTT luy ke moi (re-export cung thang,
+      // soHd duoc cap lai), invoice cu va moi khac soHd nhung CUNG ngay+gian se
+      // bi ghi lap vao store (2x). Check thu cap nay chan truong hop do.
+      // Luyen, 2026-08-14 (fix): them days vao key de khong loai bo nhung HD
+      // hop le cung ngay+gian nhung cover NGAY DOANH THU khac nhau (vd "MTD MN
+      // 10", "MTD MN 11", "MTD MN 12" deu co ngayHd=2026-08-13 nhung days khac
+      // nhau [10], [11], [12] -- neu chi dedup theo ngayHd|maDiem se mat HD 11
+      // va 12). Key day day du: neu cung soHd thi check thu nhat da loai; neu
+      // khac soHd nhung CUNG ngay+gian+days thi la trung lap thuc su.
+      const existingDayDiem = new Set(
+        store.viet_qr_invoices[ch].map((i) => `${i.ngayHd}|${i.maDiem}|${(i.days || []).slice().sort().join(",")}`)
+      );
       let added = 0;
       for (const inv of parsed.invoices) {
         const k = `${inv.soHd}|${inv.ngayHd}|${inv.maDiem}`;
         if (existingKeys.has(k)) continue;
-        const k2 = `${inv.ngayHd}|${inv.maDiem}`;
+        const k2 = `${inv.ngayHd}|${inv.maDiem}|${(inv.days || []).slice().sort().join(",")}`;
         if (existingDayDiem.has(k2)) continue;
         existingKeys.add(k);
         existingDayDiem.add(k2);
