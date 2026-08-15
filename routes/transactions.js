@@ -592,6 +592,72 @@ router.post("/transactions/upload-statement/:id/xoa", requireAdmin, (req, res) =
   );
 });
 
+// Luyen, 2026-08-15: "bạn dựa vào diễn giải á của tài khoản chi VP5888 với lại
+// 9997 á bạn check trên link đi UNC Miền nam ... lấy ra tên ncc của lệnh đi
+// tiền đó nhá" -- nhan mapping {cu: {desc: ncc, ...}, moi: {desc: ncc, ...}}
+// tu UNC Mien Nam Google Sheet, ap dung vao cac giao dich CHI dang trong
+// Ten doi ung cua VP9997 (KH cu) va VP58888 (KH moi).
+//
+// Matching: normalize ca hai chuoi (lowercase, bo dau cach thua), check
+// containment (UNC desc la substring cua bank desc, hoac nguoc lai) -- dung
+// cho truong hop bank desc co prefix/suffix ngan hang khong co trong UNC.
+router.post("/transactions/apply-unc-ncc", requireDataEntry, (req, res) => {
+  const store = load();
+  const { cu, moi } = req.body || {};
+  if (!cu && !moi) return res.status(400).json({ error: "Thieu du lieu mapping" });
+
+  // Tim bank IDs cho VP9997 (kh_cu) va VP58888 (kh_moi)
+  const cuBankIds = new Set(
+    store.banks.filter((b) => b.company === "kh_cu" || !b.company).map((b) => b.id)
+  );
+  const moiBankIds = new Set(
+    store.banks.filter((b) => b.company === "kh_moi").map((b) => b.id)
+  );
+
+  function normDesc(s) {
+    return String(s || "").toLowerCase().replace(/\s+/g, " ").trim();
+  }
+
+  // Build lookup list: [{norm: ..., ncc: ...}] for fast substring matching
+  const cuList = Object.entries(cu || {}).map(([d, n]) => ({ norm: normDesc(d), ncc: n }));
+  const moiList = Object.entries(moi || {}).map(([d, n]) => ({ norm: normDesc(d), ncc: n }));
+
+  function findNCC(txDesc, list) {
+    const txNorm = normDesc(txDesc);
+    // 1. Exact match
+    for (const { norm, ncc } of list) {
+      if (txNorm === norm) return ncc;
+    }
+    // 2. UNC desc contained in bank desc (UNC is shorter, bank may have prefix)
+    for (const { norm, ncc } of list) {
+      if (norm.length >= 15 && txNorm.includes(norm)) return ncc;
+    }
+    // 3. Bank desc contained in UNC desc
+    for (const { norm, ncc } of list) {
+      if (txNorm.length >= 15 && norm.includes(txNorm)) return ncc;
+    }
+    return null;
+  }
+
+  let updated = 0;
+  (store.transactions || []).forEach((t) => {
+    if (t.type !== "chi") return;
+    if (t.tenDoiUng && t.tenDoiUng.trim()) return;
+    const isCu = cuBankIds.has(t.bank_id);
+    const isMoi = moiBankIds.has(t.bank_id);
+    if (!isCu && !isMoi) return;
+    const list = isCu ? cuList : moiList;
+    const ncc = findNCC(t.description, list);
+    if (ncc) {
+      t.tenDoiUng = ncc;
+      updated++;
+    }
+  });
+
+  if (updated > 0) save(store);
+  res.json({ success: true, updated });
+});
+
 // Luyen, 2026-08-15: "tôi cần gắn vào đây mà" -- backfill Ten doi ung = NCC
 // (benChoThue) cho cac giao dich CHI tien thue gian da co san ma dang de trong
 // Ten doi ung (giao dich nhap truoc khi co tinh nang nay). Dung extractGianRentText
