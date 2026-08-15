@@ -1265,6 +1265,31 @@ router.get("/doi-soat/momo/export.xlsx", (req, res) => {
     reconciled = reconciled.filter((r) => r.settlementDate.slice(0, 7) === monthFilter);
   }
 
+  // Luyen, 2026-08-15: "tan an co 2 hoa don ma xuat ra co 1 hoa don vay" --
+  // phat hien export route KHONG ap dung momo_manual_matches (ghi de so HD thu
+  // cong) trong khi trang xem /doi-soat/momo da ap dung (lines 620-633 trong
+  // GET route phia tren). Ket qua: override invoiceNumbers cua AE TAN AN KVC
+  // (["13409","13410"]) hien dung tren trang nhung file xuat chi ra ["13409"]
+  // (raw tu reconcileMomo sau buoc loc AE-TAN-AN-KVC). Sua bang cach ap dung
+  // cung 1 logic override o day truoc khi build rows.
+  const momoManual = store.momo_manual_matches || {};
+  reconciled = reconciled.map((r) => {
+    const lines = r.lines.map((l) => {
+      const mm = momoManual[`${r.settlementDate}|${l.code}`];
+      if (!mm) return l;
+      const updated = { ...l };
+      if (mm.invoiceNumbers) updated.invoiceNumbers = mm.invoiceNumbers;
+      if (mm.amount !== null && mm.amount !== undefined) {
+        updated.invoiceTotal = mm.amount;
+        updated.diff = updated.invoiceTotal - updated.gross;
+        updated.matched = updated.invoiceNumbers.length > 0 && Math.abs(updated.diff) <= 1000;
+      }
+      updated.manualOverride = true;
+      return updated;
+    });
+    return { ...r, lines };
+  });
+
   let startNo = parseInt(req.query.start || "1", 10);
   if (isNaN(startNo) || startNo < 1) startNo = 1;
   let seq = startNo;
