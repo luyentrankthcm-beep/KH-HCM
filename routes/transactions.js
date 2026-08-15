@@ -592,6 +592,17 @@ router.post("/transactions/upload-statement/:id/xoa", requireAdmin, (req, res) =
   );
 });
 
+// temp debug: xem bank ids va mau giao dich VP58888
+router.get("/transactions/debug-unc", requireDataEntry, (req, res) => {
+  const store = load();
+  const banks = store.banks.map(b => ({id: b.id, name: b.name, company: b.company || 'n/a', account: b.accountNumber || ''}));
+  const moiIds = store.banks.filter(b => b.company === 'kh_moi').map(b => b.id);
+  const cuIds = store.banks.filter(b => b.company === 'kh_cu' || !b.company).map(b => b.id);
+  const chiMoi = (store.transactions || []).filter(t => t.type === 'chi' && moiIds.includes(t.bank_id)).slice(0, 10).map(t => ({id: t.id, bank_id: t.bank_id, desc: t.description, tenDoiUng: t.tenDoiUng || ''}));
+  const chiCu = (store.transactions || []).filter(t => t.type === 'chi' && cuIds.includes(t.bank_id)).slice(0, 5).map(t => ({id: t.id, bank_id: t.bank_id, desc: t.description, tenDoiUng: t.tenDoiUng || ''}));
+  res.json({ banks, moiIds, cuIds, chiMoi, chiCu });
+});
+
 // Luyen, 2026-08-15: "bạn dựa vào diễn giải á của tài khoản chi VP5888 với lại
 // 9997 á bạn check trên link đi UNC Miền nam ... lấy ra tên ncc của lệnh đi
 // tiền đó nhá" -- nhan mapping {cu: {desc: ncc, ...}, moi: {desc: ncc, ...}}
