@@ -634,8 +634,21 @@ router.post("/transactions/apply-unc-ncc", requireDataEntry, (req, res) => {
     store.banks.filter((b) => b.company === "kh_moi").map((b) => b.id)
   );
 
+  // Normalize: bo dau, lowercase, collapse spaces, sau do bo prefix ten cong ty
+  // K&H (UNC dung "CTY K VA H TT", sao ke VP58888 dung "Cty TNHH GIAI TRI K VA H tt",
+  // sao ke VP9997 cung co the khac) -- chi giu lai phan noi dung thanh toan thuc su.
+  function removeDiac(s) {
+    return String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/đ/gi, "d");
+  }
+  const PAYER_PREFIX_RE = /^(?:cong\s+ty\s+tnhh\s+giai\s+tri\s+)?(?:cty\s+tnhh\s+giai\s+tri\s+)?(?:cong\s+ty\s+)?(?:cty\s+)?k(?:\s+va?\s+|\s*&\s*)h(?:\s+tnhh(?:\s+giai\s+tri)?)?\s+tt?\s*/i;
+
   function normDesc(s) {
-    return String(s || "").toLowerCase().replace(/\s+/g, " ").trim();
+    let n = removeDiac(String(s || "")).toLowerCase().replace(/\s+/g, " ").trim();
+    // Bo prefix "xcty k va h tt" (co chu X dau nham)
+    n = n.replace(/^x/, "").trim();
+    // Bo prefix ten cong ty K&H
+    n = n.replace(PAYER_PREFIX_RE, "").trim();
+    return n;
   }
 
   // Build lookup list: [{norm: ..., ncc: ...}] for fast substring matching
@@ -644,17 +657,18 @@ router.post("/transactions/apply-unc-ncc", requireDataEntry, (req, res) => {
 
   function findNCC(txDesc, list) {
     const txNorm = normDesc(txDesc);
+    if (!txNorm || txNorm.length < 8) return null;
     // 1. Exact match
     for (const { norm, ncc } of list) {
       if (txNorm === norm) return ncc;
     }
-    // 2. UNC desc contained in bank desc (UNC is shorter, bank may have prefix)
+    // 2. UNC desc contained in bank desc
     for (const { norm, ncc } of list) {
-      if (norm.length >= 15 && txNorm.includes(norm)) return ncc;
+      if (norm.length >= 10 && txNorm.includes(norm)) return ncc;
     }
     // 3. Bank desc contained in UNC desc
     for (const { norm, ncc } of list) {
-      if (txNorm.length >= 15 && norm.includes(txNorm)) return ncc;
+      if (txNorm.length >= 10 && norm.includes(txNorm)) return ncc;
     }
     return null;
   }
