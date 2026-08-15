@@ -858,7 +858,11 @@ router.post("/chi-phi/:mien(mien-nam|mien-bac)/quet-ngan-hang", requireDataEntry
         mien,
         ngay: t.date,
         gian: rec.gian,
-        ncc: "",
+        // Luyen, 2026-08-15: "cập nhật tên ncc với gian bên chi phí cho tôi đi
+        // 9997 á như bên 888 kh mới á" -- dien ncc tu benChoThue cua ban ghi
+        // hop dong tuong ung, khong de trong nua (ap dung ca VPBANK9997 va
+        // VP58888 va moi ngan hang khac quet qua day).
+        ncc: rec.benChoThue || "",
         soHoaDon: "",
         soUNC: "",
         soChungTuLienQuan: "",
@@ -901,6 +905,37 @@ router.post("/chi-phi/:mien(mien-nam|mien-bac)/quet-ngan-hang", requireDataEntry
   } catch (e) {
     res.redirect("/chi-phi/" + mienSeg(mien) + "?error=" + encodeURIComponent(e.message));
   }
+});
+
+// ---------- Backfill NCC tu benChoThue cho cac dong chi phi da tao tu bank scan ----------
+// Luyen, 2026-08-15: bo sung NCC cho cac record cu (nguon="Ngân hàng ...") dang
+// de trong ncc -- tra cuu lai hop dong theo gian, lay benChoThue dien vao.
+router.post("/chi-phi/backfill-ncc", requireAdmin, (req, res) => {
+  const store = load();
+  const gianList = store.phap_danh_hop_dong_thue || [];
+  const { aliasIndex } = (() => {
+    // build a simple map: gian text -> benChoThue
+    const map = {};
+    gianList.forEach((g) => {
+      if (g.gian) map[g.gian.trim().toLowerCase()] = g.benChoThue || "";
+    });
+    return { aliasIndex: map };
+  })();
+
+  let updated = 0;
+  (store.chi_phi || []).forEach((r) => {
+    if (!r.nguon || !r.nguon.startsWith("Ngân hàng")) return; // chi xu ly ban ghi tu quet ngan hang
+    if (r.ncc && r.ncc.trim()) return; // da co ncc roi, bo qua
+    if (!r.gian || !r.gian.trim()) return; // khong biet gian, bo qua
+    // Tim ban ghi hop dong theo gian
+    const rec = matchGianRecord(r.gian, gianList);
+    if (rec && rec.benChoThue) {
+      r.ncc = rec.benChoThue;
+      updated++;
+    }
+  });
+  save(store);
+  res.json({ success: true, updated });
 });
 
 // Nhan, 2026-07-22: "thêm cho tôi 1 nút cập nhật tìm hóa đơn ... tìm trên
