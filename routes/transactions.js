@@ -603,7 +603,16 @@ router.post("/transactions/upload-statement/:id/xoa", requireAdmin, (req, res) =
 // cho truong hop bank desc co prefix/suffix ngan hang khong co trong UNC.
 router.post("/transactions/apply-unc-ncc", requireDataEntry, (req, res) => {
   const store = load();
-  const { cu, moi } = req.body || {};
+  // Doc tu file uncNccMap.json trong utils/ (cap nhat tu UNC Mien Nam GSheet)
+  let cu, moi;
+  try {
+    const mapPath = require("path").join(__dirname, "../utils/uncNccMap.json");
+    const mapData = JSON.parse(require("fs").readFileSync(mapPath, "utf-8"));
+    cu = mapData.cu;
+    moi = mapData.moi;
+  } catch (e) {
+    return res.status(500).json({ error: "Khong doc duoc uncNccMap.json: " + e.message });
+  }
   if (!cu && !moi) return res.status(400).json({ error: "Thieu du lieu mapping" });
 
   // Tim bank IDs cho VP9997 (kh_cu) va VP58888 (kh_moi)
