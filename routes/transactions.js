@@ -7,6 +7,7 @@ const { parsePastedTransactions, parseAmount, parseDate } = require("../utils/pa
 const { parseBankStatement, computeThuChi } = require("../utils/bankStatementParser");
 const { getCompany } = require("../utils/companies");
 const { parseMaCongTrinhSheet } = require("../utils/maCongTrinh");
+const { extractGianRentText, matchGianRecord } = require("../utils/rentPaymentMatcher");
 
 const router = express.Router();
 router.use(requireLogin);
@@ -407,6 +408,9 @@ router.post("/transactions/upload-statement", requireDataEntry, upload.single("f
   const lastDate = parsed.rows[parsed.rows.length - 1].date;
   const priorBalance = bankBalanceBefore(store, bankIdNum, firstDate);
   const candidates = computeThuChi(parsed.rows, priorBalance);
+  // Luyen, 2026-08-15: "tôi cần gắn vào đây mà" -- dung de dien NCC (benChoThue)
+  // vao Ten doi ung cua giao dich chi tien thue gian (VPBANK9997...) khi import.
+  const gianListForImport = store.phap_danh_hop_dong_thue || [];
 
   // Self-heal: if this statement format exposes a real per-row reference
   // number (only known for formats where the header-based detection in
@@ -475,6 +479,15 @@ router.post("/transactions/upload-statement", requireDataEntry, upload.single("f
         if (!existingRow.tenDoiUng && c.tenDoiUng) {
           existingRow.tenDoiUng = c.tenDoiUng;
           backfilledVendor++;
+        } else if (!existingRow.tenDoiUng && c.type === "chi") {
+          const gianText = extractGianRentText(c.description);
+          if (gianText) {
+            const rec = matchGianRecord(gianText, gianListForImport);
+            if (rec && rec.benChoThue) {
+              existingRow.tenDoiUng = rec.benChoThue;
+              backfilledVendor++;
+            }
+          }
         }
         continue;
       }
@@ -485,6 +498,17 @@ router.post("/transactions/upload-statement", requireDataEntry, upload.single("f
         continue;
       }
       existingKeys.add(key);
+    }
+    // Luyen, 2026-08-15: neu giao dich chi tien thue gian ma file sao ke khong
+    // co cot Ten doi ung (vd VPBANK9997 file Excel co the de trong), tu dien
+    // benChoThue tu hop dong thue gian de hien tren trang sao ke.
+    let tenDoiUngForRow = c.tenDoiUng || "";
+    if (!tenDoiUngForRow && c.type === "chi") {
+      const gianText = extractGianRentText(c.description);
+      if (gianText) {
+        const rec = matchGianRecord(gianText, gianListForImport);
+        if (rec && rec.benChoThue) tenDoiUngForRow = rec.benChoThue;
+      }
     }
     const newRow = {
       id: nextId(store, "transactions"),
@@ -498,7 +522,7 @@ router.post("/transactions/upload-statement", requireDataEntry, upload.single("f
       // cái tên đối ứng trên sao kê" -- luu them Ten doi ung (neu file sao ke
       // co cot nay, xem utils/bankStatementParser.js) de hien tren bang Giao
       // dich va dung doi soat Da chi tien ben Hoa Don Dau Vao.
-      tenDoiUng: c.tenDoiUng || "",
+      tenDoiUng: tenDoiUngForRow,
       created_at: new Date().toISOString(),
       created_by: req.session.userName || "",
     };
@@ -566,6 +590,29 @@ router.post("/transactions/upload-statement/:id/xoa", requireAdmin, (req, res) =
       "&success=" +
       encodeURIComponent(`Da xoa ${removed} giao dich cua lan tai "${upload.file_name}".`)
   );
+});
+
+// Luyen, 2026-08-15: "tôi cần gắn vào đây mà" -- backfill Ten doi ung = NCC
+// (benChoThue) cho cac giao dich CHI tien thue gian da co san ma dang de trong
+// Ten doi ung (giao dich nhap truoc khi co tinh nang nay). Dung extractGianRentText
+// + matchGianRecord de nhan biet va ghep hop dong.
+router.post("/transactions/backfill-ncc-ten-doi-ung", requireDataEntry, (req, res) => {
+  const store = load();
+  const gianList = store.phap_danh_hop_dong_thue || [];
+  let updated = 0;
+  (store.transactions || []).forEach((t) => {
+    if (t.type !== "chi") return;
+    if (t.tenDoiUng && t.tenDoiUng.trim()) return;
+    const gianText = extractGianRentText(t.description);
+    if (!gianText) return;
+    const rec = matchGianRecord(gianText, gianList);
+    if (rec && rec.benChoThue) {
+      t.tenDoiUng = rec.benChoThue;
+      updated++;
+    }
+  });
+  if (updated > 0) save(store);
+  res.json({ success: true, updated });
 });
 
 // Chi Nhan, 2026-07-24: don giao dich TRUNG LAP cho 1 ngan hang (xem
