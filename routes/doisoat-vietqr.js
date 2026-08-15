@@ -2903,30 +2903,6 @@ router.post("/doi-soat/vietqr/invoices/clear-by-ngayhd", requireAdmin, (req, res
   }
 });
 
-// ---------- TEMP DEBUG: check 150k excluded tx BIDV7702 Aug13 ----------
-router.get("/doi-soat/vietqr/debug-excluded-tx", requireAdmin, (req, res) => {
-  const store = load();
-  ensureChannelShape(store);
-  const channelKey = req.query.channel || "bidv7702";
-  const dateFilter = req.query.date || "2026-08-13";
-  const cfg = CHANNELS[channelKey];
-  const bank = store.banks.find((b) => b.name === cfg.bankName);
-  const bankId = bank ? bank.id : null;
-  const txs = store.transactions.filter((t) => t.bank_id === bankId);
-  const rawRows = mergeRawRows(store.viet_qr_raw_uploads[channelKey]);
-  const filtered = txs.filter((t) => t.date === dateFilter);
-  const rawFiltered = rawRows.filter((r) => r.date === dateFilter);
-  res.json({
-    bankId,
-    bankName: cfg.bankName,
-    totalStoreTx: txs.length,
-    totalRawRows: rawRows.length,
-    txOnDate: filtered,
-    rawRowsOnDate: rawFiltered,
-    viet_qr_raw_uploads_keys: Object.keys(store.viet_qr_raw_uploads || {}),
-  });
-});
-
 // ---------- Manual match: dong "Chua co HD" da xac nhan la co HD bu ----------
 router.post("/doi-soat/vietqr/manual-match", requireDataEntry, (req, res) => {
   const store = load();
