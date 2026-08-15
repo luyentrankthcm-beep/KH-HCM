@@ -910,7 +910,7 @@ router.post("/chi-phi/:mien(mien-nam|mien-bac)/quet-ngan-hang", requireDataEntry
 // ---------- Backfill NCC tu benChoThue cho cac dong chi phi da tao tu bank scan ----------
 // Luyen, 2026-08-15: bo sung NCC cho cac record cu (nguon="Ngân hàng ...") dang
 // de trong ncc -- tra cuu lai hop dong theo gian, lay benChoThue dien vao.
-router.post("/chi-phi/backfill-ncc", requireAdmin, (req, res) => {
+router.post("/chi-phi/backfill-ncc", requireDataEntry, (req, res) => {
   const store = load();
   const gianList = store.phap_danh_hop_dong_thue || [];
   const { aliasIndex } = (() => {
