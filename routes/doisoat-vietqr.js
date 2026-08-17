@@ -2094,6 +2094,10 @@ function renderVietQrPage(req, res, activeKeys, pageTitle, pageSubtitle) {
     (built[ch].refUnmappedTenDiem || []).forEach((r) => allRefUnmappedTenDiem.push({ channel: ch, channelLabel: CHANNELS[ch].label, ...r }));
   });
   allRefUnmatchedBankTx.sort((a, b) => (a.date || "").localeCompare(b.date || ""));
+  // Chi hien thi giao dich cua thang dang xem (tranh hien 10000+ dong khi xem toan bo).
+  const allRefUnmatchedBankTxFiltered = selectedMonth
+    ? allRefUnmatchedBankTx.filter((r) => (r.date || "").startsWith(selectedMonth))
+    : allRefUnmatchedBankTx;
   allRefLateMatches.sort((a, b) => (a.bankDate || "").localeCompare(b.bankDate || ""));
   allRefUnmappedStoreCodes.sort((a, b) => b.total - a.total);
   allRefUnmappedTenDiem.sort((a, b) => b.total - a.total);
@@ -2171,7 +2175,7 @@ function renderVietQrPage(req, res, activeKeys, pageTitle, pageSubtitle) {
     allCrossMatchSuggestions,
     allNocodeAssignments,
     allStoreGroups,
-    allRefUnmatchedBankTx,
+    allRefUnmatchedBankTx: allRefUnmatchedBankTxFiltered,
     allRefLateMatches,
     allRefUnmappedStoreCodes,
     allRefUnmappedTenDiem,
