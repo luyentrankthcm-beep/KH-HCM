@@ -312,6 +312,10 @@ function parseOfflineVnpayWorkbook(buffer) {
       // (xem chu thich ben do) -- uu tien "Số tiền trước KM" neu file co, vi
       // khuyen mai la CUA VNPAY tu bu, khong phai cong ty giam gia.
       if (idx.grossColTruocKM === undefined && s.includes("so tien truoc km")) idx.grossColTruocKM = c;
+      // Luyen, 2026-08-17: neu file khong co col "so tien truoc km", thi lay
+      // "so tien khuyen mai" cong vao "so tien hach toan thu ho" de phuc hoi
+      // so truoc KM (KM la cua VNPay tu bu, khong phai doanh thu giam).
+      if (idx.kmCol === undefined && s.includes("so tien khuyen mai")) idx.kmCol = c;
       if (idx.netCol === undefined && s.includes("so tien sau khi tru phi")) idx.netCol = c;
       if (idx.dateCol === undefined && s.includes("ngay hach toan thu ho")) idx.dateCol = c;
       if (s === "trang thai") idx.statusCol = c;
@@ -339,7 +343,10 @@ function parseOfflineVnpayWorkbook(buffer) {
     if (status !== null && !/thanh cong|th.nh c.ng/i.test(String(status))) continue;
     const diem = cols.diemCol !== undefined ? String(row[cols.diemCol] || "").trim() : "";
     if (!diem) continue;
-    const gross = grossColToUseOffline !== undefined ? Number(row[grossColToUseOffline]) || 0 : 0;
+    const grossBase = grossColToUseOffline !== undefined ? Number(row[grossColToUseOffline]) || 0 : 0;
+    // Neu khong co col truocKM thi cong them KM vao de co so truoc KM
+    const kmAmt = (!cols.grossColTruocKM && cols.kmCol !== undefined) ? Math.abs(Number(row[cols.kmCol]) || 0) : 0;
+    const gross = grossBase + kmAmt;
     if (!gross) continue;
     const net = cols.netCol !== undefined ? Number(row[cols.netCol]) || 0 : gross;
     const dateRaw = cols.dateCol !== undefined ? row[cols.dateCol] : null;
@@ -1878,6 +1885,8 @@ function parseFeeReportWorkbook(buffer, orderMap) {
       // dung doanh thu gop, fallback ve "hach toan thu ho" neu file khong co
       // cot nay (file cu hon).
       if (idx.grossColTruocKM === undefined && s.includes("so tien truoc km")) idx.grossColTruocKM = c;
+      // Luyen, 2026-08-17: fallback khi khong co "truoc KM" -- cong them KM vao
+      if (idx.kmCol === undefined && s.includes("so tien khuyen mai")) idx.kmCol = c;
       if (idx.netCol === undefined && s.includes("so tien sau khi tru phi")) idx.netCol = c;
       if (idx.feeCol === undefined && s.includes("so tien phi thu ho")) idx.feeCol = c;
       if (idx.dateCol === undefined && s.includes("ngay hach toan thu ho")) idx.dateCol = c;
@@ -1954,7 +1963,10 @@ function parseFeeReportWorkbook(buffer, orderMap) {
     }
     const isOnlineRow = /^FUNZONE MINI APP$/i.test(diemThu);
     const grossColToUse = isOnlineRow ? grossColOnline : grossColOffline;
-    const gross = grossColToUse !== undefined ? Number(row[grossColToUse]) || 0 : 0;
+    const grossBase = grossColToUse !== undefined ? Number(row[grossColToUse]) || 0 : 0;
+    // Offline: neu khong co col "truoc KM", cong them KM de phuc hoi so truoc KM
+    const kmAmt = (!isOnlineRow && !cols.grossColTruocKM && cols.kmCol !== undefined) ? Math.abs(Number(row[cols.kmCol]) || 0) : 0;
+    const gross = grossBase + kmAmt;
     if (!gross) continue;
     const netRaw = cols.netCol !== undefined ? row[cols.netCol] : null;
     const fee = cols.feeCol !== undefined ? Number(row[cols.feeCol]) || 0 : 0;
@@ -2063,6 +2075,8 @@ function parseVnpayOfflineFeeReport(buffer) {
       // Chi Nhan, 2026-07-31: cung ly do da sua o parseFeeReportWorkbook ben
       // tren -- uu tien "Số tiền trước KM" (khuyen mai la VNPay tu bu).
       if (idx.grossColTruocKM === undefined && s.includes("so tien truoc km")) idx.grossColTruocKM = c;
+      // Luyen, 2026-08-17: fallback khi khong co "truoc KM" -- cong them KM vao
+      if (idx.kmCol === undefined && s.includes("so tien khuyen mai")) idx.kmCol = c;
       if (idx.netCol === undefined && s.includes("so tien sau khi tru phi")) idx.netCol = c;
       if (idx.feeCol === undefined && s.includes("so tien phi thu ho")) idx.feeCol = c;
       // Luyen, 2026-08-06: Uu tien "Thoi gian GD" (ngay GD thuc te) thay vi
@@ -2107,7 +2121,10 @@ function parseVnpayOfflineFeeReport(buffer) {
       excludedFailedStatus++;
       continue;
     }
-    const gross = grossColOfflineFee !== undefined ? Number(row[grossColOfflineFee]) || 0 : 0;
+    const grossBase = grossColOfflineFee !== undefined ? Number(row[grossColOfflineFee]) || 0 : 0;
+    // Neu khong co col "truoc KM", cong them KM de phuc hoi so truoc KM
+    const kmAmt2 = (!cols.grossColTruocKM && cols.kmCol !== undefined) ? Math.abs(Number(row[cols.kmCol]) || 0) : 0;
+    const gross = grossBase + kmAmt2;
     if (!gross) continue;
     const netRaw = cols.netCol !== undefined ? row[cols.netCol] : null;
     const fee = cols.feeCol !== undefined ? Number(row[cols.feeCol]) || 0 : 0;
