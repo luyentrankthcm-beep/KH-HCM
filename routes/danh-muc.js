@@ -81,6 +81,7 @@ router.get("/danh-muc/:slug", requireLogin, (req, res) => {
     searchQ: req.query.q || "",
     success: req.query.success || "",
     error: req.query.error || "",
+    userName: req.session.userName || "",
   });
 });
 
