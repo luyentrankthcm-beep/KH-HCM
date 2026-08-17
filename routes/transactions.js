@@ -648,6 +648,9 @@ router.post("/transactions/apply-unc-ncc", requireDataEntry, (req, res) => {
     n = n.replace(/^x/, "").trim();
     // Bo prefix ten cong ty K&H
     n = n.replace(PAYER_PREFIX_RE, "").trim();
+    // Bo ky tu & va \ (sao ke ngan hang khong co & trong ten cong ty, UNC GSheet
+    // markdown render lai & thanh \&, sau khi clean key van con the khi so sanh)
+    n = n.replace(/[&\\]/g, "").replace(/\s+/g, " ").trim();
     return n;
   }
 
