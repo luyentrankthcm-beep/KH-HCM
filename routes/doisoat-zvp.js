@@ -288,15 +288,42 @@ function seedZvpInvoiceDiemAliasDefaults(store) {
 // de khong bi mo coi/vong lap khong can thiet. Seed lai + ghi de MOI LAN
 // load() (giong moi hang so *_DEFAULTS khac trong file nay) de khong bi mat
 // khi server restart.
+// Luyen, 2026-08-17: "AE GO BA RIA KVC doi thanh EVMN GHOST MN GO BA RIA,
+// LM PHAN THIET KVC doi thanh FARM LOTTE PHAN THIET, AE BAC GIANG KVCN doi
+// thanh FARM LOTTE BAC GIANG -- chi KH cu" -- cap nhat lai cac ma cong trinh
+// cu thanh ten moi MISA nhan ra. Luu y FARM LOTTE PHAN THIET tung la ten GIA
+// TRANG (old) truoc khi doi thanh LM PHAN THIET KVC; nay doi nguoc lai ve
+// dung ten thuc trong MISA.
 const ZVP_GIAN_CODE_RENAMES = [
-  { from: "NHA MA GO BA RIA", to: "AE GO BA RIA KVC" },
-  { from: "FARM LOTTE PHAN THIET", to: "LM PHAN THIET KVC" },
-  { from: "KVC TIMES", to: "Farm Times City" },
+  // NHA MA GO BA RIA -> EVMN GHOST MN GO BA RIA (cap nhat tu trung gian cu)
+  { from: "NHA MA GO BA RIA",   to: "EVMN GHOST MN GO BÀ RỊA" },
+  { from: "AE GO BA RIA KVC",   to: "EVMN GHOST MN GO BÀ RỊA" },
+  // LM PHAN THIET KVC -> FARM LOTTE PHAN THIET (ten dung trong MISA)
+  { from: "LM PHAN THIET KVC",  to: "FARM LOTTE PHAN THIET" },
+  // AE BAC GIANG KVCN -> FARM LOTTE BAC GIANG
+  { from: "AE BAC GIANG KVCN", to: "FARM LOTTE BAC GIANG" },
+  { from: "KVC TIMES",          to: "Farm Times City" },
+];
+
+// Cac hop redirect cu da bi thay the boi ZVP_GIAN_CODE_RENAMES moi o tren;
+// can xoa khoi store.zvp_gian_list de tranh mau thuan/vong lap 1 buoc.
+const ZVP_GIAN_CODE_RENAMES_CLEANUP = [
+  { tenDiem: "NHA MA GO BA RIA",    maCongTrinh: "AE GO BA RIA KVC" },
+  { tenDiem: "FARM LOTTE PHAN THIET", maCongTrinh: "LM PHAN THIET KVC" },
 ];
 
 function seedZvpGianCodeRenames(store) {
   let changed = false;
   if (!Array.isArray(store.zvp_gian_list)) store.zvp_gian_list = [];
+
+  // Xoa cac redirect cu truoc khi them moi (tranh chain/vong lap)
+  ZVP_GIAN_CODE_RENAMES_CLEANUP.forEach(({ tenDiem, maCongTrinh }) => {
+    const before = store.zvp_gian_list.length;
+    store.zvp_gian_list = store.zvp_gian_list.filter(
+      (g) => !(normText(g.tenDiem) === normText(tenDiem) && g.maCongTrinh === maCongTrinh)
+    );
+    if (store.zvp_gian_list.length !== before) changed = true;
+  });
 
   ZVP_GIAN_CODE_RENAMES.forEach(({ from, to }) => {
     // 1) Hop redirect chinh: ma CU (dung nhu 1 tenDiem) -> ma MOI.
