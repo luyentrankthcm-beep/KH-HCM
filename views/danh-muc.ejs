@@ -16,7 +16,7 @@
 
     <!-- Upload Excel sync -->
     <section class="panel" style="margin-bottom:16px;">
-      <div class="panel-head"><h2>📥 Đồng bộ từ Excel</h2></div>
+      <div class="panel-head"><h2>&#128229; Đồng bộ từ Excel</h2></div>
       <form method="POST" action="/danh-muc/<%= slug %>/upload-excel" enctype="multipart/form-data"
             style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;padding-top:4px;">
         <div>
@@ -86,7 +86,7 @@
               <td style="text-align:center;">
                 <!-- Nut sua (inline form) -->
                 <button type="button" class="link-btn"
-                  onclick="openEditRow(<%= r.id %>, '<%= (r.ma||'').replace(/'/g,\"\\\\'\" ) %>', '<%= (r.ten||'').replace(/'/g,\"\\\\'\" ) %>', '<%= (r.ghiChu||'').replace(/'/g,\"\\\\'\" ) %>')"
+                  onclick="openEditRow(<%= r.id %>, <%- JSON.stringify(r.ma||'') %>, <%- JSON.stringify(r.ten||'') %>, <%- JSON.stringify(r.ghiChu||'') %>)"
                   style="margin-right:8px;">Sửa</button>
                 <!-- Nut xoa -->
                 <form method="POST" action="/danh-muc/<%= slug %>/xoa/<%= r.id %>" style="display:inline;"
