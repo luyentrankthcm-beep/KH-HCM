@@ -302,6 +302,7 @@ const ZVP_GIAN_CODE_RENAMES = [
   { from: "LM PHAN THIET KVC",  to: "FARM LOTTE PHAN THIET" },
   // AE BAC GIANG KVCN -> FARM LOTTE BAC GIANG
   { from: "AE BAC GIANG KVCN", to: "FARM LOTTE BAC GIANG" },
+  { from: "LM NHA TRANG KVC",  to: "FARM LOTTE NHA TRANG" },
   { from: "KVC TIMES",          to: "Farm Times City" },
 ];
 
