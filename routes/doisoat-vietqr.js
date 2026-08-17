@@ -551,6 +551,11 @@ const INVOICE_DIEM_ALIAS_DEFAULTS = {
   // PLAZA", v.v.) -- khong co alias nao noi 2 dang ten nay lai, khien toan bo
   // hoa don CGV bidv7702 khong bao gio khop duoc. Them alias cho tat ca bien
   // the CGV khi thieu tien to "POSH MN".
+  // Luyen, 2026-08-17: bidv77021 -- hoa don POSH MB ECOPARK VINH dung maDiem
+  // "VINH CENTER PHN" tren file MTT 705 (cung maDiem voi gian "Vinh Centre"
+  // nhung ca 2 deu thuoc cung 1 may quet QR / don vi kinh doanh tai Vinh),
+  // can alias ve "POSH MB ECOPARK VINH" de khop dung voi ten cong trinh QR.
+  "VINH CENTER PHN": "POSH MB ECOPARK VINH",
   // Luyen, 2026-08-17: bidv77021 -- hoa don OCP PHN (Ocean City Park, Ha Noi)
   // dung 2 dang maDiem tren file MTT 705: "OCP 2" va "Vincom OCP" -- ca 2 can
   // alias ve "OCP PHN" de khop dung voi ten cong trinh ben gross/QR.
