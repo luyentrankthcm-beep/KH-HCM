@@ -651,6 +651,9 @@ router.post("/transactions/apply-unc-ncc", requireDataEntry, (req, res) => {
     // Bo ky tu & va \ (sao ke ngan hang khong co & trong ten cong ty, UNC GSheet
     // markdown render lai & thanh \&, sau khi clean key van con the khi so sanh)
     n = n.replace(/[&\\]/g, "").replace(/\s+/g, " ").trim();
+    // Luyen, 2026-08-17: VP sao ke cat "Thang" thanh "T hang" (xuong dong giua tu)
+    // trong o dien giai -- normalize lai thanh "thang" de khop voi UNC map key.
+    n = n.replace(/\bt\s+hang\b/g, "thang");
     return n;
   }
 
@@ -678,7 +681,12 @@ router.post("/transactions/apply-unc-ncc", requireDataEntry, (req, res) => {
 
   let updated = 0;
   (store.transactions || []).forEach((t) => {
-    if (t.type !== "chi") return;
+    // Luyen, 2026-08-17: "sao ke la chi het ma soa ban bo qua thu" -- mot so
+    // giao dich la CHI tren sao ke nhung bi parse thanh "thu" do delta so du
+    // tinh sai (vi du so du luy ke bi lech 1 dong). Bo dieu kien chi xu ly
+    // "chi" de UNC matching ap dung cho ca 2 loai -- NCC trong UNC luon la
+    // nguoi NHAN tien tu K&H (chi), neu tim thay khop trong UNC thi chac chan
+    // la giao dich chi du parser co the da classify nham.
     if (t.tenDoiUng && t.tenDoiUng.trim()) return;
     const isCu = cuBankIds.has(t.bank_id);
     const isMoi = moiBankIds.has(t.bank_id);
