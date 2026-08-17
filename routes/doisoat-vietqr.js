@@ -544,6 +544,19 @@ const INVOICE_DIEM_ALIAS_DEFAULTS = {
   // PF" (co dau Đ) da co nhung KHONG bao gio match vi maDiem trong file la
   // "TDBS PF" (khong dau). Them alias ASCII de fix.
   "TDBS PF": "TĐBS PHN",
+  // Luyen, 2026-08-17: kenh bidv7702 -- hoa don CGV (Pearl Plaza, Ly Chinh
+  // Thang, Vincom Landmark, Vincom Phan Van Tri, Vincom Xuan Khanh) ghi maDiem
+  // KHONG co tien to "POSH MN" (vd "CGV PEAL PALAZA", "CGV LÝ CHÍNH THẮNG")
+  // nhung ben gross/QR resolve thanh ma co tien to day du ("POSH MN CGV PEARL
+  // PLAZA", v.v.) -- khong co alias nao noi 2 dang ten nay lai, khien toan bo
+  // hoa don CGV bidv7702 khong bao gio khop duoc. Them alias cho tat ca bien
+  // the CGV khi thieu tien to "POSH MN".
+  "CGV PEAL PALAZA": "POSH MN CGV PEARL PLAZA",
+  "CGV PEARL PLAZA": "POSH MN CGV PEARL PLAZA",
+  "CGV LÝ CHÍNH THẮNG": "POSH MN CGV LÝ CHÍNH THẮNG",
+  "CGV VINCOM LANDMARK": "POSH MN CGV VINCOM LANDMARK",
+  "CGV VINCOM PHAN VĂN TRỊ": "POSH MN CGV VINCOM PHAN VĂN TRỊ",
+  "CGV VINCOM XUÂN KHÁNH": "POSH MN CGV VINCOM XUÂN KHÁNH",
 };
 
 // Chi Nhan, 2026-07-30: "Số hóa đơn á có 20k xem nó đưa vô gian nào á bạn đưa
