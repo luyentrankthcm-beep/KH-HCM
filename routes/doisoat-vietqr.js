@@ -914,6 +914,11 @@ function ensureChannelShape(store) {
     if (btl && btl !== "POSH MB CGV VC BẮC TỪ LIÊM") {
       delete store.invoice_diem_alias["POSH MB CGV VC BẮC TỪ LIÊM"];
     }
+    // "OCP PHN" la ten chinh xac -- neu production co alias sai thi xoa de dung identity.
+    const ocp = store.invoice_diem_alias["OCP PHN"];
+    if (ocp && ocp !== "OCP PHN") {
+      delete store.invoice_diem_alias["OCP PHN"];
+    }
   }
   // Luyen, 2026-08-10: hop dong Nha Trang het -- xoa gia tri cu "FARM LOTTE NHA TRANG"
   // khoi store de vong lap seed ben duoi ap dung duoc gia tri moi tu code default
