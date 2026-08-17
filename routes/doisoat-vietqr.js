@@ -551,6 +551,16 @@ const INVOICE_DIEM_ALIAS_DEFAULTS = {
   // PLAZA", v.v.) -- khong co alias nao noi 2 dang ten nay lai, khien toan bo
   // hoa don CGV bidv7702 khong bao gio khop duoc. Them alias cho tat ca bien
   // the CGV khi thieu tien to "POSH MN".
+  // Luyen, 2026-08-17: bidv77021 -- hoa don CGV POSH MB dung ten co "VC" trong
+  // maDiem file MTT 705 ("POSH MB CGV VC BÀ TRIỆU", "POSH MB CGV VC THE LOOP",
+  // "POSH MB CGV VC PHẠM HÙNG") nhung canonical ben gross/QR khong co "VC"
+  // ("POSH MB CGV BÀ TRIỆU", "POSH MB CGV THE LOOP", "POSH MB CGV VINCOM PHẠM
+  // HÙNG"). Them alias de 2 ben khop nhau. Rieng OCEAN CITY: file MTT ghi
+  // "OCEAN CITY" nhung canonical la "OCEAN PARK" -- override alias cu (identity).
+  "POSH MB CGV VC BÀ TRIỆU": "POSH MB CGV BÀ TRIỆU",
+  "POSH MB CGV VC THE LOOP": "POSH MB CGV THE LOOP",
+  "POSH MB CGV VC PHẠM HÙNG": "POSH MB CGV VINCOM PHẠM HÙNG",
+  "POSH MB CGV VC OCEAN CITY": "POSH MB CGV VC OCEAN PARK",
   // Luyen, 2026-08-17: bidv77021 -- hoa don POSH MB ECOPARK VINH dung maDiem
   // "VINH CENTER PHN" tren file MTT 705 (cung maDiem voi gian "Vinh Centre"
   // nhung ca 2 deu thuoc cung 1 may quet QR / don vi kinh doanh tai Vinh),
