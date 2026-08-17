@@ -2669,6 +2669,27 @@ router.post("/doi-soat/vietqr/tanphu-ack/:channel", requireDataEntry, (req, res)
   }
 });
 
+// Bulk ack: danh dau tat ca cac muc "tan phu auto applied" da xem 1 lan bam.
+// Body: items[] mang cac chuoi "channel:date:amount"
+router.post("/doi-soat/vietqr/tanphu-ack-all", requireDataEntry, (req, res) => {
+  const store = load();
+  ensureChannelShape(store);
+  try {
+    const items = [].concat(req.body.items || []);
+    for (const item of items) {
+      const [channelKey, date, amount] = item.split(":");
+      if (!CHANNELS[channelKey] || !date || !amount) continue;
+      store.viet_qr_tanphu_ack[channelKey][`${date}|${amount}`] = {
+        ackedAt: new Date().toISOString(),
+      };
+    }
+    save(store);
+    res.redirect("/doi-soat/vietqr?success=" + encodeURIComponent("Đã đánh dấu tất cả đã xem."));
+  } catch (e) {
+    res.redirect("/doi-soat/vietqr?error=" + encodeURIComponent(e.message));
+  }
+});
+
 router.post("/doi-soat/vietqr/store-map/:channel", requireDataEntry, (req, res) => {
   const store = load();
   ensureChannelShape(store);

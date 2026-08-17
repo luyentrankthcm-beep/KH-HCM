@@ -357,6 +357,12 @@
         đây thực chất là tiền của gian khác, hãy tải bổ sung file dữ liệu QR mới nhất rồi kiểm tra lại; nếu đã biết
         và không cần xem lại, bấm "Đã xem" — lần sau chỉ báo khoản MỚI, không hiện lại khoản này nữa.
       </p>
+      <form method="POST" action="/doi-soat/vietqr/tanphu-ack-all" style="margin-bottom:10px;">
+        <% allTanPhuAutoApplied.forEach(function(r) { %>
+        <input type="hidden" name="items[]" value="<%= r.channel %>:<%= r.date %>:<%= r.amount %>" />
+        <% }) %>
+        <button type="submit" class="btn btn-secondary" style="font-weight:600;">✓ Đánh dấu tất cả đã xem (<%= allTanPhuAutoApplied.length %>)</button>
+      </form>
       <table class="table">
         <thead><tr><th>Ngày</th><th>Kênh</th><th>Số tiền đã gộp</th><th>Gộp vào gian</th><th></th></tr></thead>
         <tbody>
