@@ -405,9 +405,11 @@ function computeThuChi(rows, priorBalance) {
     } else if (delta < 0) {
       type = "chi";
       amount = -delta;
-    } else {
+    } else if (!isNaN(delta)) {
       running = r.balance;
-      return; // no actual movement (delta ~ 0) -> skip
+      return; // delta === 0: no actual movement -> skip
+      // NaN delta (priorBalance unknown): fall through to idx===0 explicit
+      // credit/debit recovery below rather than silently dropping the row.
     }
     // Chi Nhan, 2026-07-30: chi ap dung luoi an toan nay cho DONG DAU TIEN cua
     // lan tai nay (idx===0) -- day la dong DUY NHAT phu thuoc "running"
@@ -416,6 +418,8 @@ function computeThuChi(rows, priorBalance) {
     // trong CUNG file nay; cac dong sau deu tu chuoi dung theo file, khong can
     // (va khong nen) can thiep. Neu file co san cot No/Co hop le va gia tri do
     // mau thuan ro voi (type, amount) tinh tu delta, uu tien No/Co.
+    // Luyen 2026-08-17: cung xu ly NaN delta (priorBalance = undefined khi goi
+    // khong truyen tham so) -- neu khong co explicit No/Co thi skip hang nay.
     if (idx === 0 && (r.debit !== null || r.credit !== null)) {
       const explicitCredit = r.credit || 0;
       const explicitDebit = r.debit || 0;
@@ -428,10 +432,15 @@ function computeThuChi(rows, priorBalance) {
         explicitType = "chi";
         explicitAmount = explicitDebit;
       }
-      if (explicitType && (explicitType !== type || Math.abs(explicitAmount - amount) > 1)) {
+      if (explicitType && (!type || explicitType !== type || Math.abs(explicitAmount - amount) > 1)) {
         type = explicitType;
         amount = explicitAmount;
       }
+    }
+    if (!type) {
+      // Could not determine direction (e.g. NaN delta + no usable explicit cols)
+      running = r.balance;
+      return;
     }
     out.push({
       date: r.date,
