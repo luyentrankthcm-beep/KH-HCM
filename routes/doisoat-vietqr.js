@@ -551,6 +551,11 @@ const INVOICE_DIEM_ALIAS_DEFAULTS = {
   // PLAZA", v.v.) -- khong co alias nao noi 2 dang ten nay lai, khien toan bo
   // hoa don CGV bidv7702 khong bao gio khop duoc. Them alias cho tat ca bien
   // the CGV khi thieu tien to "POSH MN".
+  // Luyen, 2026-08-17: bidv77021 -- hoa don OCP PHN (Ocean City Park, Ha Noi)
+  // dung 2 dang maDiem tren file MTT 705: "OCP 2" va "Vincom OCP" -- ca 2 can
+  // alias ve "OCP PHN" de khop dung voi ten cong trinh ben gross/QR.
+  "OCP 2": "OCP PHN",
+  "VINCOM OCP": "OCP PHN",
   "CGV PEAL PALAZA": "POSH MN CGV PEARL PLAZA",
   "CGV PEARL PLAZA": "POSH MN CGV PEARL PLAZA",
   "CGV LÝ CHÍNH THẮNG": "POSH MN CGV LÝ CHÍNH THẮNG",
