@@ -561,6 +561,12 @@ const INVOICE_DIEM_ALIAS_DEFAULTS = {
   "POSH MB CGV VC THE LOOP": "POSH MB CGV THE LOOP",
   "POSH MB CGV VC PHẠM HÙNG": "POSH MB CGV VINCOM PHẠM HÙNG",
   "POSH MB CGV VC OCEAN CITY": "POSH MB CGV VC OCEAN PARK",
+  // Luyen, 2026-08-17 (lan 2): bidv77021 -- MTT 17.08 dung "POSH MB CGV LIỄU GIAI"
+  // (tag 13) va "POSH MB CGV VC LIỄU GIAI" (tags 14, 15,16) nhung canonical ben
+  // gross/QR dung "POSH MB CGV VC LIÊU GIAI" (LIÊU khac dau voi LIỄU trong file).
+  // Them alias de khop chinh ta.
+  "POSH MB CGV LIỄU GIAI": "POSH MB CGV VC LIÊU GIAI",
+  "POSH MB CGV VC LIỄU GIAI": "POSH MB CGV VC LIÊU GIAI",
   // Luyen, 2026-08-17: bidv77021 -- hoa don POSH MB ECOPARK VINH dung maDiem
   // "VINH CENTER PHN" tren file MTT 705 (cung maDiem voi gian "Vinh Centre"
   // nhung ca 2 deu thuoc cung 1 may quet QR / don vi kinh doanh tai Vinh),
@@ -882,6 +888,32 @@ function ensureChannelShape(store) {
   // lan phat hien (khong chi 1 lan) de tru khi file goc duoc sua.
   if (store.invoice_diem_alias["CHKQT CAM RANH"] === "Chưa khớp") {
     delete store.invoice_diem_alias["CHKQT CAM RANH"];
+  }
+  // Luyen, 2026-08-17: Force-override CGV 77021 / OCP / ECOPARK aliases.
+  // Dieu kien `!cur || cur===k` o tren chi seed khi key CHUA CO hoac la identity.
+  // Neu production store da co gia tri cu khac target (vd tu lan chay truoc),
+  // soft-seed se khong ghi de. Doan nay dam bao gia tri LUON dung bat ke ban store.
+  {
+    const CGV_FORCE = {
+      "POSH MB CGV VC BÀ TRIỆU": "POSH MB CGV BÀ TRIỆU",
+      "POSH MB CGV VC THE LOOP": "POSH MB CGV THE LOOP",
+      "POSH MB CGV VC PHẠM HÙNG": "POSH MB CGV VINCOM PHẠM HÙNG",
+      "POSH MB CGV VC OCEAN CITY": "POSH MB CGV VC OCEAN PARK",
+      "POSH MB CGV LIỄU GIAI": "POSH MB CGV VC LIÊU GIAI",
+      "POSH MB CGV VC LIỄU GIAI": "POSH MB CGV VC LIÊU GIAI",
+      "VINH CENTER PHN": "POSH MB ECOPARK VINH",
+      "OCP 2": "OCP PHN",
+      "VINCOM OCP": "OCP PHN",
+    };
+    Object.entries(CGV_FORCE).forEach(([k, v]) => {
+      if (store.invoice_diem_alias[k] !== v) store.invoice_diem_alias[k] = v;
+    });
+    // "POSH MB CGV VC BẮC TỪ LIÊM" la ten chinh xac (khop truc tiep voi QR canonical)
+    // -- neu production co alias sai (vd khong co "VC"), xoa di de dung identity.
+    const btl = store.invoice_diem_alias["POSH MB CGV VC BẮC TỪ LIÊM"];
+    if (btl && btl !== "POSH MB CGV VC BẮC TỪ LIÊM") {
+      delete store.invoice_diem_alias["POSH MB CGV VC BẮC TỪ LIÊM"];
+    }
   }
   // Luyen, 2026-08-10: hop dong Nha Trang het -- xoa gia tri cu "FARM LOTTE NHA TRANG"
   // khoi store de vong lap seed ben duoi ap dung duoc gia tri moi tu code default
