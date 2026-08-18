@@ -1327,7 +1327,9 @@ async function processUncBuffer(buffer, store) {
 
     for (const tx of store.transactions) {
       if (tx.type !== "chi") continue;
-      if (tx.tenDoiUng && tx.tenDoiUng.trim()) continue;
+      const needsTen = !tx.tenDoiUng || !tx.tenDoiUng.trim();
+      const needsGian = !tx.gian || !tx.gian.trim();
+      if (!needsTen && !needsGian) continue; // ca hai da co, bo qua
 
       const descNorm = normUncText(tx.description);
 
@@ -1335,9 +1337,8 @@ async function processUncBuffer(buffer, store) {
         if (unc.noiDungNorm.length < MIN_MATCH_LEN) continue;
         if (!descNorm.includes(unc.noiDungNorm)) continue;
         if (unc.amount > 0 && tx.amount !== unc.amount) continue;
-        tx.tenDoiUng = unc.tenThuHuong;
-        if (unc.boPhan) tx.gian = unc.boPhan;
-        filled++;
+        if (needsTen) { tx.tenDoiUng = unc.tenThuHuong; filled++; }
+        if (needsGian && unc.boPhan) tx.gian = unc.boPhan;
         break;
       }
     }
