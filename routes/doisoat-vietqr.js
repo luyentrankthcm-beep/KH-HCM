@@ -561,12 +561,10 @@ const INVOICE_DIEM_ALIAS_DEFAULTS = {
   "POSH MB CGV VC THE LOOP": "POSH MB CGV THE LOOP",
   "POSH MB CGV VC PHẠM HÙNG": "POSH MB CGV VINCOM PHẠM HÙNG",
   "POSH MB CGV VC OCEAN CITY": "POSH MB CGV VC OCEAN PARK",
-  // Luyen, 2026-08-17 (lan 2): bidv77021 -- MTT 17.08 dung "POSH MB CGV LIỄU GIAI"
-  // (tag 13) va "POSH MB CGV VC LIỄU GIAI" (tags 14, 15,16) nhung canonical ben
-  // gross/QR dung "POSH MB CGV VC LIÊU GIAI" (LIÊU khac dau voi LIỄU trong file).
-  // Them alias de khop chinh ta.
-  "POSH MB CGV LIỄU GIAI": "POSH MB CGV VC LIÊU GIAI",
-  "POSH MB CGV VC LIỄU GIAI": "POSH MB CGV VC LIÊU GIAI",
+  // Luyen, 2026-08-17: bidv77021 -- MTT tag 13 dung "POSH MB CGV LIỄU GIAI" (thieu "VC")
+  // can alias ve canonical "POSH MB CGV VC LIỄU GIAI".
+  // "POSH MB CGV VC LIỄU GIAI" la chinh canonical -- khong can alias.
+  "POSH MB CGV LIỄU GIAI": "POSH MB CGV VC LIỄU GIAI",
   // Luyen, 2026-08-17: bidv77021 -- hoa don POSH MB ECOPARK VINH dung maDiem
   // "VINH CENTER PHN" tren file MTT 705 (cung maDiem voi gian "Vinh Centre"
   // nhung ca 2 deu thuoc cung 1 may quet QR / don vi kinh doanh tai Vinh),
@@ -899,8 +897,9 @@ function ensureChannelShape(store) {
       "POSH MB CGV VC THE LOOP": "POSH MB CGV THE LOOP",
       "POSH MB CGV VC PHẠM HÙNG": "POSH MB CGV VINCOM PHẠM HÙNG",
       "POSH MB CGV VC OCEAN CITY": "POSH MB CGV VC OCEAN PARK",
-      "POSH MB CGV LIỄU GIAI": "POSH MB CGV VC LIÊU GIAI",
-      "POSH MB CGV VC LIỄU GIAI": "POSH MB CGV VC LIÊU GIAI",
+      "POSH MB CGV LIỄU GIAI": "POSH MB CGV VC LIỄU GIAI",
+      // "POSH MB CGV VC LIỄU GIAI" la canonical chinh xac -- xoa alias sai neu co trong production
+
       "VINH CENTER PHN": "POSH MB ECOPARK VINH",
       "OCP 2": "OCP PHN",
       "VINCOM OCP": "OCP PHN",
@@ -918,6 +917,11 @@ function ensureChannelShape(store) {
     const ocp = store.invoice_diem_alias["OCP PHN"];
     if (ocp && ocp !== "OCP PHN") {
       delete store.invoice_diem_alias["OCP PHN"];
+    }
+    // "POSH MB CGV VC LIỄU GIAI" la canonical chinh xac -- xoa alias sai (LIÊU) neu co trong production.
+    const lgiai = store.invoice_diem_alias["POSH MB CGV VC LIỄU GIAI"];
+    if (lgiai && lgiai !== "POSH MB CGV VC LIỄU GIAI") {
+      delete store.invoice_diem_alias["POSH MB CGV VC LIỄU GIAI"];
     }
   }
   // Luyen, 2026-08-10: hop dong Nha Trang het -- xoa gia tri cu "FARM LOTTE NHA TRANG"
