@@ -77,8 +77,17 @@ function buildChiaSeTKSet(gianList) {
   return chiaSe;
 }
 
-function getGianTK(gian, chiaSeTKSet) {
+function getGianTK(gian, chiaSeTKSet, gianNameTkMap) {
   if (!gian) return "331"; // mac dinh: tien thue -> 331
+  // Uu tien override thu cong (chi_phi_gian_name_tk) truoc khi suy tu gian list
+  if (gianNameTkMap) {
+    const key = normText(gian);
+    if (gianNameTkMap[key]) return gianNameTkMap[key];
+    // Also check substring: any override key that is a substring of gian (or vice versa)
+    for (const [k, v] of Object.entries(gianNameTkMap)) {
+      if (k.length >= 4 && (key.includes(k) || k.includes(key))) return v;
+    }
+  }
   const words = normText(gian).split(/\s+/).filter((w) => w.length >= 3);
   return words.some((w) => chiaSeTKSet.has(w)) ? "1388" : "331";
 }
@@ -97,6 +106,9 @@ function ensureShape(store) {
   if (!store.bank_sodu_cuoiky) store.bank_sodu_cuoiky = {}; // "{bankName}_{thang}" -> so tien so du cuoi ky tu ngan hang
   if (!store.chi_phi_unc_list) store.chi_phi_unc_list = []; // bang lenh chi UNC -- doi chieu Ten NCC+So tien de lay Dien giai sach
   if (!store.chi_phi_unc_meta) store.chi_phi_unc_meta = null; // { uploaded_at, file_name, count, sheetName }
+  // Luyen, 2026-08-18: "snow bd là 1388 mà sao đưa vô 331 hết vậy" -- override
+  // TK theo ten gian (normText), uu tien cao hon hoa_don_dau_vao_gian_list.
+  if (!store.chi_phi_gian_name_tk) store.chi_phi_gian_name_tk = {}; // normText(gianName) -> "1388"|"331"
   CHANNEL_KEYS.forEach((ch) => {
     if (!store.chi_phi_raw_uploads[ch]) store.chi_phi_raw_uploads[ch] = [];
   });
@@ -752,7 +764,7 @@ router.post("/doi-soat/chi-phi/vendor-ncc", requireDataEntry, (req, res) => {
 // day du cot hoa don + lay Dien giai sach tu UNC; khong khop hoa don nao thi
 // thu rut so HD ngay tu dien giai; khong co gi ca thi de trong toan bo cot
 // hoa don nhung VAN xuat dong do (khong bo qua) theo yeu cau cua Luyen.
-function buildExportRows(lines, startNo, bankAccount, bankFullName, chiaSeTKSet) {
+function buildExportRows(lines, startNo, bankAccount, bankFullName, chiaSeTKSet, gianNameTkMap) {
   let seq = startNo;
   return lines
     .filter((l) => l.debit > 0)
@@ -799,7 +811,7 @@ function buildExportRows(lines, startNo, bankAccount, bankFullName, chiaSeTKSet)
         "Diễn giải (hạch toán)": dienGiai,
         // TK No: uu tien ban Luyen go tay (vendorTkMap); neu chua co thi tu
         // suy tu Hinh Thuc Hop Tac cua gian: "chia se" -> 1388, con lai -> 331.
-        "TK Nợ (*)": l.tkNo || getGianTK(l.finalGian, chiaSeTKSet),
+        "TK Nợ (*)": l.tkNo || getGianTK(l.finalGian, chiaSeTKSet, gianNameTkMap),
         "TK Có (*)": "1121",
         "Số tiền": l.debit,
         "Tên người hưởng": l.vendor || "",
@@ -856,7 +868,7 @@ router.get("/doi-soat/chi-phi/export.xlsx", (req, res) => {
   if (isNaN(startNo) || startNo < 1) startNo = 1;
 
   const chiaSeTKSetExport = buildChiaSeTKSet(store.hoa_don_dau_vao_gian_list);
-  const rows = buildExportRows(built.lines, startNo, bank.account_number, `Ngân hàng ${bank.bank_name}`, chiaSeTKSetExport);
+  const rows = buildExportRows(built.lines, startNo, bank.account_number, `Ngân hàng ${bank.bank_name}`, chiaSeTKSetExport, store.chi_phi_gian_name_tk || {});
 
   const sheetLabel = CHANNELS[channelKey].company === "kh_moi" ? "MISAKHMOI" : "MISAKHCU";
   const ws = XLSX.utils.json_to_sheet(rows);
@@ -897,6 +909,7 @@ function buildSaokeRows(store, activeCompany, selectedMonth, selectedBankName, s
   const months = [...monthSet].sort().reverse();
 
   const chiaSeTKSet = buildChiaSeTKSet(store.hoa_don_dau_vao_gian_list);
+  const gianNameTkMap = store.chi_phi_gian_name_tk || {};
   const nccGianIndex = {};
   (store.hoa_don_dau_vao_gian_list || []).forEach((g) => {
     if (!g.tenKhachHang || !g.gianHang) return;
@@ -997,14 +1010,14 @@ function buildSaokeRows(store, activeCompany, selectedMonth, selectedBankName, s
       if (cp) matchType = "fuzzy";
     }
     const cpGian = (cp && cp.gian) || "";
-    const cpTk = cp ? (store.chi_phi_gian_tk_manual[String(cp.id)] || getGianTK(cp.gian, chiaSeTKSet)) : "";
+    const cpTk = cp ? (store.chi_phi_gian_tk_manual[String(cp.id)] || getGianTK(cp.gian, chiaSeTKSet, gianNameTkMap)) : "";
     const ovr = saokGianOvr[String(t.id)] || null;
     const finalGian = cpGian || (ovr && ovr.gian) || "";
     const finalTk = cpTk || (ovr && ovr.tk) || "";
     let suggestedGian = "", suggestedTk = "";
     if (!finalGian && t.type === "chi") {
       const sug = suggestGianForTx(t.tenDoiUng, t.description);
-      if (sug) { suggestedGian = sug.gianHang; suggestedTk = normText(sug.hinhThucHopTac).includes("chia") ? "1388" : "331"; }
+      if (sug) { suggestedGian = sug.gianHang; suggestedTk = getGianTK(sug.gianHang, chiaSeTKSet, gianNameTkMap); }
     }
     return {
       id: t.id, txType: t.type || "chi", date: t.date, bankName, bankLabel,
@@ -1072,6 +1085,7 @@ router.get("/doi-soat/chi-phi-saoke", (req, res) => {
     allThuTotal, allChiTotal, soducucoiky, sodudauky, soduKey,
     balanceByTxId,
     matchedCount: rows.filter((r) => r.matchType).length,
+    gianNameTkMap: store.chi_phi_gian_name_tk || {},
     successMsg: req.query.success || "",
     errorMsg: req.query.error || "",
   });
@@ -1216,6 +1230,31 @@ router.post("/doi-soat/chi-phi-saoke/unlink-banktxid", requireDataEntry, (req, r
     save(store);
     const back = req.headers.referer || "/doi-soat/chi-phi-saoke";
     res.redirect(back + (back.includes("?") ? "&" : "?") + "success=" + encodeURIComponent("Da huy lien ket GD " + (oldTxId || "") + " khoi dong chi phi nay."));
+  } catch (e) {
+    const back = req.headers.referer || "/doi-soat/chi-phi-saoke";
+    res.redirect(back + (back.includes("?") ? "&" : "?") + "error=" + encodeURIComponent(e.message));
+  }
+});
+
+// Quan ly ban do gian-name → TK (de ghi de logic chia-se mac dinh).
+// Gian nao co ten khop se dung TK nay thay vi tinh tu hinhThucHopTac.
+router.post("/doi-soat/chi-phi-saoke/set-gian-name-tk", requireAdmin, (req, res) => {
+  try {
+    const store = load();
+    ensureShape(store);
+    const { gian, tk } = req.body;
+    if (!gian || !gian.trim()) throw new Error("Thieu ten gian.");
+    if (tk && tk !== "1388" && tk !== "331") throw new Error("TK phai la 1388 hoac 331.");
+    const key = normText(gian.trim());
+    if (!tk) {
+      delete store.chi_phi_gian_name_tk[key];
+    } else {
+      store.chi_phi_gian_name_tk[key] = tk;
+    }
+    save(store);
+    const msg = tk ? `Da luu: ${gian.trim()} → TK ${tk}.` : `Da xoa: ${gian.trim()}.`;
+    const back = req.headers.referer || "/doi-soat/chi-phi-saoke";
+    res.redirect(back + (back.includes("?") ? "&" : "?") + "success=" + encodeURIComponent(msg));
   } catch (e) {
     const back = req.headers.referer || "/doi-soat/chi-phi-saoke";
     res.redirect(back + (back.includes("?") ? "&" : "?") + "error=" + encodeURIComponent(e.message));

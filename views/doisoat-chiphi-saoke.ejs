@@ -268,6 +268,65 @@
       </div>
       <% } %>
     </section>
+
+    <!-- Cấu hình TK theo tên gian (admin only) -->
+    <% if (locals.user && locals.user.role === 'admin') { %>
+    <section class="panel" style="margin-top:28px;">
+      <h3 style="margin:0 0 12px;">⚙️ Cấu hình TK theo tên gian</h3>
+      <p class="muted" style="margin-top:-8px;margin-bottom:14px;font-size:13px;">
+        Gian nào có tên khớp sẽ dùng TK này thay vì tự tính từ "hình thức hợp tác".
+        Ví dụ: SNOW AMBD → TK 1388.
+      </p>
+
+      <!-- Danh sách hiện tại -->
+      <% const tkMap = locals.gianNameTkMap || {}; %>
+      <% if (Object.keys(tkMap).length > 0) { %>
+      <table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:16px;">
+        <thead>
+          <tr style="border-bottom:2px solid var(--color-hairline);">
+            <th style="text-align:left;padding:6px 10px;">Tên gian (đã chuẩn hoá)</th>
+            <th style="text-align:center;padding:6px 10px;">TK Nợ</th>
+            <th style="padding:6px 10px;"></th>
+          </tr>
+        </thead>
+        <tbody>
+          <% Object.entries(tkMap).forEach(function([k, v]) { %>
+          <tr style="border-bottom:1px solid var(--color-hairline);">
+            <td style="padding:6px 10px;"><code><%= k %></code></td>
+            <td style="text-align:center;padding:6px 10px;"><strong><%= v %></strong></td>
+            <td style="padding:6px 10px;">
+              <form method="POST" action="/doi-soat/chi-phi-saoke/set-gian-name-tk" style="display:inline;">
+                <input type="hidden" name="gian" value="<%= k %>">
+                <input type="hidden" name="tk" value="">
+                <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Xoá cấu hình cho \'<%= k %>\'?')">Xoá</button>
+              </form>
+            </td>
+          </tr>
+          <% }) %>
+        </tbody>
+      </table>
+      <% } else { %>
+      <p class="muted" style="font-size:13px;margin-bottom:14px;">Chưa có cấu hình nào.</p>
+      <% } %>
+
+      <!-- Form thêm mới -->
+      <form method="POST" action="/doi-soat/chi-phi-saoke/set-gian-name-tk" style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;">
+        <label style="display:flex;flex-direction:column;gap:4px;font-size:13px;">
+          Tên gian (một phần hoặc đầy đủ)
+          <input type="text" name="gian" placeholder="VD: SNOW AMBD" style="min-width:220px;padding:6px 10px;border:1px solid var(--color-hairline);border-radius:6px;">
+        </label>
+        <label style="display:flex;flex-direction:column;gap:4px;font-size:13px;">
+          TK Nợ
+          <select name="tk" style="padding:6px 10px;border:1px solid var(--color-hairline);border-radius:6px;">
+            <option value="1388">1388 (Trả trước người bán)</option>
+            <option value="331">331 (Phải trả người bán)</option>
+          </select>
+        </label>
+        <button type="submit" class="btn btn-primary" style="padding:7px 18px;">Lưu</button>
+      </form>
+    </section>
+    <% } %>
+
   </main>
 
   <style>
