@@ -214,6 +214,7 @@ router.get("/transactions", (req, res) => {
     maCongTrinhResult: null,
     duplicateSummary,
     bankStatementUploads: bankStatementUploadsFor(store, companyBankIds(store, activeCompany)),
+    descGianRules: store.description_gian_rules || [],
     error: req.query.error || null,
     success: req.query.success || null,
   });
@@ -1389,6 +1390,73 @@ router.post(
     }
   }
 );
+
+// Ap dung rules keyword → gian len toan bo transactions chua co gian.
+// store.description_gian_rules = [{keyword, gian}] -- keyword khong phan biet
+// dau/hoa/thuong, khop substring vao description.
+function applyDescGianRules(store) {
+  if (!store.description_gian_rules || !store.description_gian_rules.length) return 0;
+  let filled = 0;
+  for (const tx of store.transactions) {
+    if (tx.gian && tx.gian.trim()) continue;
+    const descNorm = normUncText(tx.description);
+    for (const rule of store.description_gian_rules) {
+      if (!rule.keyword || !rule.gian) continue;
+      const kw = normUncText(rule.keyword);
+      if (kw && descNorm.includes(kw)) {
+        tx.gian = rule.gian;
+        filled++;
+        break;
+      }
+    }
+  }
+  return filled;
+}
+
+// Them / xoa 1 rule keyword → gian.
+router.post("/transactions/set-desc-gian-rule", requireAdmin, (req, res) => {
+  try {
+    const store = load();
+    if (!store.description_gian_rules) store.description_gian_rules = [];
+    const { keyword, gian, action } = req.body;
+    if (action === "delete") {
+      const kw = normUncText(keyword || "");
+      store.description_gian_rules = store.description_gian_rules.filter(
+        (r) => normUncText(r.keyword) !== kw
+      );
+      save(store);
+      return res.json({ ok: true, message: `Đã xoá rule "${keyword}".`, rules: store.description_gian_rules });
+    }
+    if (!keyword || !keyword.trim()) return res.json({ ok: false, message: "Thiếu keyword." });
+    if (!gian || !gian.trim()) return res.json({ ok: false, message: "Thiếu tên gian." });
+    // upsert
+    const kw = normUncText(keyword.trim());
+    const existing = store.description_gian_rules.find((r) => normUncText(r.keyword) === kw);
+    if (existing) {
+      existing.gian = gian.trim();
+      existing.keyword = keyword.trim();
+    } else {
+      store.description_gian_rules.push({ keyword: keyword.trim(), gian: gian.trim() });
+    }
+    save(store);
+    return res.json({ ok: true, message: `Đã lưu: "${keyword.trim()}" → "${gian.trim()}".`, rules: store.description_gian_rules });
+  } catch (e) {
+    res.json({ ok: false, message: e.message });
+  }
+});
+
+// Ap dung toan bo rules len transactions chua co gian.
+router.post("/transactions/apply-desc-gian-rules", requireAdmin, (req, res) => {
+  try {
+    const store = load();
+    if (!store.description_gian_rules) store.description_gian_rules = [];
+    const filled = applyDescGianRules(store);
+    if (filled > 0) save(store);
+    res.json({ ok: true, filled, message: `Đã điền Gian cho ${filled} giao dịch.` });
+  } catch (e) {
+    res.json({ ok: false, message: e.message });
+  }
+});
 
 // One-time migration: rename KVC ROYAL -> PINBALL DA NANG in vnpay_khmoi
 // uploads for dates >= 2026-07-31 (Luyen, 2026-08-08).
