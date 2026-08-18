@@ -1269,16 +1269,9 @@ function normUncText(s) {
     .trim();
 }
 
-router.post(
-  "/transactions/import-unc",
-  requireAdmin,
-  upload.single("unc_file"),
-  (req, res) => {
-    if (!req.file) return res.json({ ok: false, message: "Không có file." });
-    const store = load();
-
-    // Parse all sheets
-    const wb = XLSX.read(req.file.buffer, { type: "buffer" });
+// Shared logic: parse UNC buffer → match → fill tenDoiUng
+async function processUncBuffer(buffer, store) {
+  const wb = XLSX.read(buffer, { type: "buffer" });
     const uncRows = []; // { noiDung, tenThuHuong, amount }
 
     for (const sheetName of wb.SheetNames) {
@@ -1312,23 +1305,22 @@ router.post(
     }
 
     if (uncRows.length === 0) {
-      return res.json({ ok: false, message: "Không tìm thấy dữ liệu UNC trong file (cần cột 'Nội dung trên UNC' và 'Tên đơn vị thụ hưởng')." });
+      return { ok: false, message: "Không tìm thấy dữ liệu UNC trong file (cần cột 'Nội dung trên UNC' và 'Tên đơn vị thụ hưởng')." };
     }
 
     // Match against store.transactions
     let filled = 0;
-    const MIN_MATCH_LEN = 10; // minimum UNC noi dung length to avoid false positives
+    const MIN_MATCH_LEN = 10;
 
     for (const tx of store.transactions) {
       if (tx.type !== "chi") continue;
-      if (tx.tenDoiUng && tx.tenDoiUng.trim()) continue; // already has name
+      if (tx.tenDoiUng && tx.tenDoiUng.trim()) continue;
 
       const descNorm = normUncText(tx.description);
 
       for (const unc of uncRows) {
         if (unc.noiDungNorm.length < MIN_MATCH_LEN) continue;
         if (!descNorm.includes(unc.noiDungNorm)) continue;
-        // Amount check: if UNC has amount, must match (exact)
         if (unc.amount > 0 && tx.amount !== unc.amount) continue;
         tx.tenDoiUng = unc.tenThuHuong;
         filled++;
@@ -1337,12 +1329,50 @@ router.post(
     }
 
     if (filled > 0) save(store);
-    res.json({
+    return {
       ok: true,
       uncRows: uncRows.length,
       filled,
+      sheets: wb.SheetNames.length,
       message: `Đã điền tên thụ hưởng cho ${filled} giao dịch (đọc ${uncRows.length} dòng UNC từ ${wb.SheetNames.length} sheet).`,
-    });
+    };
+}
+
+router.post(
+  "/transactions/import-unc",
+  requireAdmin,
+  upload.single("unc_file"),
+  async (req, res) => {
+    const store = load();
+    let buffer;
+
+    // Support both: ggsheet_url (Google Sheet link) or file upload
+    const ggUrl = (req.body && req.body.ggsheet_url) ? req.body.ggsheet_url.trim() : "";
+    if (ggUrl) {
+      // Extract sheet ID from Google Sheet URL and build export URL
+      const m = ggUrl.match(/\/spreadsheets\/d\/([\w-]+)/);
+      if (!m) return res.json({ ok: false, message: "Link Google Sheet không hợp lệ." });
+      const exportUrl = `https://docs.google.com/spreadsheets/d/${m[1]}/export?format=xlsx`;
+      try {
+        const fetch = (...args) => import("node-fetch").then(({ default: f }) => f(...args));
+        const resp = await fetch(exportUrl, { redirect: "follow" });
+        if (!resp.ok) return res.json({ ok: false, message: `Không tải được Google Sheet (${resp.status}). Kiểm tra quyền chia sẻ (phải là "Bất kỳ ai có link").` });
+        buffer = Buffer.from(await resp.arrayBuffer());
+      } catch (e) {
+        return res.json({ ok: false, message: "Lỗi kết nối Google Sheet: " + e.message });
+      }
+    } else if (req.file) {
+      buffer = req.file.buffer;
+    } else {
+      return res.json({ ok: false, message: "Cần nhập link Google Sheet hoặc chọn file." });
+    }
+
+    try {
+      const result = await processUncBuffer(buffer, store);
+      res.json(result);
+    } catch (e) {
+      res.json({ ok: false, message: "Lỗi đọc file: " + e.message });
+    }
   }
 );
 
