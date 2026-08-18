@@ -994,7 +994,17 @@
               <% } else { %>
               Ngân hàng: <strong><%= r.bankAmount.toLocaleString('vi-VN') %> đ</strong>
               <% if (r.bankAmountExcluded) { %>
-              <span class="muted" title="Đã trừ các giao dịch không có Mã tham chiếu VietQR khớp (lãi ngân hàng, chuyển khoản khác...) khỏi tổng Ngân hàng của ngày này.">(đã trừ <%= r.bankAmountExcluded.toLocaleString('vi-VN') %> đ không phải VietQR)</span>
+              <span class="muted">(đã trừ <%= r.bankAmountExcluded.toLocaleString('vi-VN') %> đ không phải VietQR:
+                <% (r.excludedTxs || []).forEach(function(tx) { %>
+                  <span style="display:inline-flex; align-items:center; gap:3px; margin-left:4px;">
+                    <span title="<%= tx.description %>"><%= tx.amount.toLocaleString('vi-VN') %>đ</span>
+                    <form method="POST" action="/transactions/<%= tx.id %>/xoa" style="display:inline;"
+                          onsubmit="return confirm('Xoá GD <%= tx.amount.toLocaleString('vi-VN') %>đ ngày <%= tx.date %>?');">
+                      <button type="submit" class="link-btn link-danger" style="font-size:11px; padding:0 2px;">✕</button>
+                    </form>
+                  </span>
+                <% }) %>
+              )</span>
               <% } %>
               &nbsp;|&nbsp; Tính từ dữ liệu tải lên: <strong><%= r.totalNetComputed.toLocaleString('vi-VN') %> đ</strong>
               &nbsp;|&nbsp;

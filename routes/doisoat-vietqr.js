@@ -1697,8 +1697,11 @@ function buildChannelReconciliation(store, channelKey) {
   const tanPhuAutoAppliedRaw = [];
   if (cfg.refMatchFrom) {
     const excludedByDate = {};
+    const excludedTxsByDate = {};
     refUnmatchedBankTx.forEach((tx) => {
       excludedByDate[tx.date] = (excludedByDate[tx.date] || 0) + tx.amount;
+      if (!excludedTxsByDate[tx.date]) excludedTxsByDate[tx.date] = [];
+      excludedTxsByDate[tx.date].push(tx);
     });
     const tanPhuTarget = cfg.defaultBlankCode || "AM TP PHCM";
     const autoApplyTanPhu = TAN_PHU_AUTO_APPLY_CHANNELS.has(channelKey);
@@ -1725,6 +1728,7 @@ function buildChannelReconciliation(store, channelKey) {
       if (excluded > 0) {
         r.bankAmount -= excluded;
         r.bankAmountExcluded = excluded;
+        r.excludedTxs = excludedTxsByDate[r.settlementDate] || [];
       }
       if (!r.pendingBank) {
         r.diffVsBank = r.totalNetComputed - r.bankAmount;
