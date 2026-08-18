@@ -267,7 +267,7 @@ router.post("/transactions/:id/sua", requireDataEntry, (req, res) => {
     return res.redirect("/transactions?error=" + encodeURIComponent("Không tìm thấy giao dịch này."));
   }
   try {
-    const { date, description, amount, type, tenDoiUng, excludeFromVietQrRecon } = req.body;
+    const { date, description, amount, type, tenDoiUng, gian, excludeFromVietQrRecon } = req.body;
     const parsedDate = parseDate(date) || date;
     const parsedAmount = Math.abs(parseAmount(amount));
     if (!parsedDate || isNaN(parsedAmount) || !["thu", "chi"].includes(type)) {
@@ -279,6 +279,7 @@ router.post("/transactions/:id/sua", requireDataEntry, (req, res) => {
     // truoc khi co tinh nang nay nen dang trong, hoac file sao ke khong co
     // san cot nay).
     tx.tenDoiUng = (tenDoiUng || "").trim();
+    tx.gian = (gian || "").trim();
     // Chi Nhan, 2026-07-29: "hải phòng làm gì cộng dữ liệu nhiều vậy check
     // lại xem có bị trùng hk 77021" -- dieu tra ra: KHONG phai trung du lieu,
     // ma 1 giao dich "thu" khong phai tien khach tra qua VietQR (vd tien doi
@@ -1296,8 +1297,9 @@ async function processUncBuffer(buffer, store) {
         const noiDungCol = row.findIndex((h) => h.includes("noi dung") && (h.includes("unc") || h.includes("tren")));
         const tenCol = row.findIndex((h) => h.includes("ten") && (h.includes("thu huong") || h.includes("don vi")));
         const amtCol = row.findIndex((h) => h.includes("so tien") || h === "tien");
+        const boPhanCol = row.findIndex((h) => h.includes("bo phan") || h.includes("gian") || h === "bp");
         if (noiDungCol >= 0 && tenCol >= 0) {
-          hdr = { noiDungCol, tenCol, amtCol };
+          hdr = { noiDungCol, tenCol, amtCol, boPhanCol };
           hdrIdx = r;
           break;
         }
@@ -1310,7 +1312,8 @@ async function processUncBuffer(buffer, store) {
         const tenThuHuong = String(row[hdr.tenCol] || "").trim();
         if (!noiDung || !tenThuHuong) continue;
         const amount = hdr.amtCol >= 0 ? Math.abs(Number(String(row[hdr.amtCol]).replace(/[^0-9.]/g, "")) || 0) : 0;
-        uncRows.push({ noiDung, tenThuHuong, amount, noiDungNorm: normUncText(noiDung) });
+        const boPhan = hdr.boPhanCol >= 0 ? String(row[hdr.boPhanCol] || "").trim() : "";
+        uncRows.push({ noiDung, tenThuHuong, amount, boPhan, noiDungNorm: normUncText(noiDung) });
       }
     }
 
@@ -1333,6 +1336,7 @@ async function processUncBuffer(buffer, store) {
         if (!descNorm.includes(unc.noiDungNorm)) continue;
         if (unc.amount > 0 && tx.amount !== unc.amount) continue;
         tx.tenDoiUng = unc.tenThuHuong;
+        if (unc.boPhan) tx.gian = unc.boPhan;
         filled++;
         break;
       }
