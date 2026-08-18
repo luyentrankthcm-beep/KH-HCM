@@ -953,78 +953,112 @@
         <summary style="font-weight:600; cursor:pointer; padding:6px 0;">
           ⚠️ Tổng hợp lệch — <%= lechRows.length %> dòng chưa khớp
         </summary>
-        <form method="POST" action="/doi-soat/vietqr/manual-match/bulk" id="bulkLechForm-<%= ch %>">
-          <input type="hidden" name="returnChannel" value="<%= ch %>">
-          <div style="display:flex; gap:10px; align-items:center; margin:8px 0;">
-            <button type="submit" style="font-size:12px; padding:5px 12px; background:#0d6efd; color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:600;">
-              💾 Lưu tất cả đã chọn
-            </button>
-            <label style="font-size:12px; cursor:pointer; display:flex; align-items:center; gap:4px;">
-              <input type="checkbox" id="selectAllLech-<%= ch %>"
-                onchange="toggleAllLech('<%= ch %>', this.checked)" checked>
-              Chọn tất cả
-            </label>
-            <span class="muted" style="font-size:11px;">Điền số HĐ / tiền HĐ / sửa DT rồi bấm Lưu. Hàng nào đã lưu sẽ tự biến mất.</span>
-          </div>
-          <div style="overflow-x:auto;">
-          <table class="table" style="font-size:12px; min-width:820px;">
-            <thead>
-              <tr>
-                <th style="width:28px;"></th>
-                <th style="white-space:nowrap;">Ngày</th>
-                <th>Mã công trình</th>
-                <th style="text-align:right;">DT (NH)</th>
-                <th style="text-align:right;">Tổng HĐ</th>
-                <th style="text-align:right;">Lệch</th>
-                <th>Số HĐ</th>
-                <th>Tiền HĐ</th>
-                <th>Sửa DT (+/-)</th>
-              </tr>
-            </thead>
-            <tbody>
-            <% lechRows.forEach(function(item, idx) { var l = item.l; var fid = ch + '_' + idx; %>
+        <div style="display:flex; gap:10px; align-items:center; margin:8px 0;">
+          <button onclick="submitBulkLech('<%= ch %>')" type="button"
+            style="font-size:12px; padding:5px 12px; background:#0d6efd; color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:600;">
+            💾 Lưu tất cả đã chọn
+          </button>
+          <label style="font-size:12px; cursor:pointer; display:flex; align-items:center; gap:4px;">
+            <input type="checkbox" id="selAll-<%= ch %>"
+              onchange="toggleAllLech('<%= ch %>', this.checked)" checked>
+            Chọn tất cả
+          </label>
+          <span class="muted" style="font-size:11px;">Điền số HĐ / tiền HĐ / sửa DT rồi bấm Lưu. Hàng đã lưu tự biến mất.</span>
+        </div>
+        <div style="overflow-x:auto;">
+        <table class="table" style="font-size:12px; min-width:820px;">
+          <thead>
             <tr>
-              <td>
-                <input type="checkbox" class="lech-sel-<%= ch %>"
-                  onchange="toggleLechRow('<%= fid %>', this.checked)" checked>
-              </td>
-              <td style="white-space:nowrap;"><%= item.date %></td>
-              <td><%= l.maCongTrinh || l.code %></td>
-              <td style="text-align:right;"><%= l.gross.toLocaleString('vi-VN') %></td>
-              <td style="text-align:right;"><%= l.invoiceTotal.toLocaleString('vi-VN') %></td>
-              <td style="text-align:right;" class="<%= l.diff > 0 ? 'text-pos' : 'text-neg' %>">
-                <%= l.diff.toLocaleString('vi-VN') %>
-              </td>
-              <td>
-                <input type="hidden" name="channel" value="<%= ch %>" class="lech-f-<%= fid %>">
-                <input type="hidden" name="settlementDate" value="<%= item.date %>" class="lech-f-<%= fid %>">
-                <input type="hidden" name="code" value="<%= l.code %>" class="lech-f-<%= fid %>">
-                <input type="text" name="invoiceNumbers" value="<%= (l.invoiceNumbers||[]).join(', ') %>"
-                  placeholder="Số HĐ" style="width:80px; font-size:11px;" class="lech-f-<%= fid %>">
-              </td>
-              <td>
-                <input type="number" name="amount" value="<%= l.invoiceTotal %>"
-                  placeholder="Tiền HĐ" style="width:80px; font-size:11px;" class="lech-f-<%= fid %>">
-              </td>
-              <td>
-                <input type="text" name="grossAdjustment" value=""
-                  placeholder="+/-" style="width:65px; font-size:11px;" class="lech-f-<%= fid %>">
-              </td>
+              <th style="width:28px;"></th>
+              <th style="white-space:nowrap;">Ngày</th>
+              <th>Mã công trình</th>
+              <th style="text-align:right;">DT (NH)</th>
+              <th style="text-align:right;">Tổng HĐ</th>
+              <th style="text-align:right;">Lệch</th>
+              <th>Số HĐ</th>
+              <th>Tiền HĐ</th>
+              <th>Sửa DT (+/-)</th>
             </tr>
-            <% }) %>
-            </tbody>
-          </table>
-          </div>
-        </form>
+          </thead>
+          <tbody>
+          <% lechRows.forEach(function(item, idx) { var l = item.l; var fid = ch + '_' + idx; %>
+          <tr class="lrow-<%= ch %>"
+            data-fid="<%= fid %>"
+            data-channel="<%= ch %>"
+            data-date="<%= item.date %>"
+            data-code="<%= encodeURIComponent(l.code) %>"
+            data-inv="<%= encodeURIComponent((l.invoiceNumbers||[]).join(', ')) %>"
+            data-amt="<%= l.invoiceTotal %>">
+            <td>
+              <input type="checkbox" class="lsel-<%= ch %>" checked
+                onchange="toggleAllLech('<%= ch %>', null)">
+            </td>
+            <td style="white-space:nowrap;"><%= item.date %></td>
+            <td><%= l.maCongTrinh || l.code %></td>
+            <td style="text-align:right;"><%= l.gross.toLocaleString('vi-VN') %></td>
+            <td style="text-align:right;"><%= l.invoiceTotal.toLocaleString('vi-VN') %></td>
+            <td style="text-align:right;" class="<%= l.diff > 0 ? 'text-pos' : 'text-neg' %>">
+              <%= l.diff.toLocaleString('vi-VN') %>
+            </td>
+            <td><input type="text" class="linv-<%= fid %>"
+              value="<%= (l.invoiceNumbers||[]).join(', ') %>"
+              placeholder="Số HĐ" style="width:80px; font-size:11px;"></td>
+            <td><input type="number" class="lamt-<%= fid %>"
+              value="<%= l.invoiceTotal %>"
+              placeholder="Tiền HĐ" style="width:80px; font-size:11px;"></td>
+            <td><input type="text" class="lgadj-<%= fid %>"
+              value="" placeholder="+/-" style="width:65px; font-size:11px;"></td>
+          </tr>
+          <% }) %>
+          </tbody>
+        </table>
+        </div>
       </details>
       <script>
-      function toggleLechRow(fid, checked) {
-        document.querySelectorAll('.lech-f-' + fid).forEach(function(el) { el.disabled = !checked; });
-      }
-      function toggleAllLech(ch, checked) {
-        document.querySelectorAll('.lech-sel-' + ch).forEach(function(cb) { cb.checked = checked; });
-        document.querySelectorAll('[class*="lech-f-' + ch + '_"]').forEach(function(el) { el.disabled = !checked; });
-      }
+      (function() {
+        if (window._lechScriptDone) return;
+        window._lechScriptDone = true;
+        window.toggleAllLech = function(ch, val) {
+          var cbs = document.querySelectorAll('.lsel-' + ch);
+          // val=null means sync selectAll checkbox state from individual checkboxes
+          if (val !== null) { cbs.forEach(function(c) { c.checked = val; }); }
+          var selAll = document.getElementById('selAll-' + ch);
+          if (selAll) {
+            var all = Array.from(cbs);
+            selAll.checked = all.length > 0 && all.every(function(c) { return c.checked; });
+            selAll.indeterminate = !selAll.checked && all.some(function(c) { return c.checked; });
+          }
+        };
+        window.submitBulkLech = function(ch) {
+          var rows = Array.from(document.querySelectorAll('.lrow-' + ch));
+          var selected = rows.filter(function(tr) {
+            var cb = tr.querySelector('.lsel-' + ch);
+            return cb && cb.checked;
+          });
+          if (!selected.length) { alert('Chưa chọn dòng nào.'); return; }
+          var form = document.createElement('form');
+          form.method = 'POST';
+          form.action = '/doi-soat/vietqr/manual-match/bulk';
+          form.style.display = 'none';
+          function addHidden(name, val) {
+            var inp = document.createElement('input');
+            inp.type = 'hidden'; inp.name = name; inp.value = val;
+            form.appendChild(inp);
+          }
+          addHidden('returnChannel', ch);
+          selected.forEach(function(tr) {
+            var fid = tr.dataset.fid;
+            addHidden('channel', tr.dataset.channel);
+            addHidden('settlementDate', tr.dataset.date);
+            addHidden('code', decodeURIComponent(tr.dataset.code));
+            addHidden('invoiceNumbers', tr.querySelector('.linv-' + fid) ? tr.querySelector('.linv-' + fid).value : decodeURIComponent(tr.dataset.inv));
+            addHidden('amount', tr.querySelector('.lamt-' + fid) ? tr.querySelector('.lamt-' + fid).value : tr.dataset.amt);
+            addHidden('grossAdjustment', tr.querySelector('.lgadj-' + fid) ? tr.querySelector('.lgadj-' + fid).value : '');
+          });
+          document.body.appendChild(form);
+          form.submit();
+        };
+      })();
       </script>
       <% } %>
 
