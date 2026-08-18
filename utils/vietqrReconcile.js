@@ -1145,6 +1145,7 @@ function resolveGianGrossByBankRef(bankTxs, rawRows, storeNameMap, tenDiemToProj
         continue;
       }
       unmatchedBankTx.push({
+        id: tx.id,
         date: tx.date,
         amount: tx.amount,
         reference: tx.reference || "",

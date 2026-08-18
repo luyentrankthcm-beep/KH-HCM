@@ -3066,6 +3066,23 @@ router.post("/doi-soat/vietqr/manual-match/delete", requireAdmin, (req, res) => 
   }
 });
 
+// ---------- Xóa giao dịch ngoài VietQR (đánh dấu excludeFromVietQrRecon) ----------
+router.post("/doi-soat/vietqr/xoa-gd-ngoai", requireAdmin, (req, res) => {
+  const store = load();
+  try {
+    const { txId, returnUrl } = req.body;
+    if (!txId) throw new Error("Thiếu txId");
+    const tx = store.transactions.find((t) => String(t.id) === String(txId));
+    if (!tx) throw new Error("Không tìm thấy giao dịch id=" + txId);
+    tx.excludeFromVietQrRecon = true;
+    save(store);
+    const redirect = returnUrl || "/doi-soat/vietqr";
+    res.redirect(redirect + (redirect.includes("?") ? "&" : "?") + "success=" + encodeURIComponent("Đã loại giao dịch " + (tx.amount || "").toLocaleString("vi-VN") + "đ khỏi đối soát."));
+  } catch (e) {
+    res.redirect((req.body.returnUrl || "/doi-soat/vietqr") + "?error=" + encodeURIComponent(e.message));
+  }
+});
+
 // ---------- Export: "MISATHue [kenh]" ----------
 // Same 28-column "Mau phieu thu tien gui de nhap vao AMIS Accounting" as
 // Momo/ZVP, with the SAME correct dien giai wording ("Thu tien dich vu vui
