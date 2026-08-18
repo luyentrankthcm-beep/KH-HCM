@@ -1354,7 +1354,6 @@ router.post(
       if (!m) return res.json({ ok: false, message: "Link Google Sheet không hợp lệ." });
       const exportUrl = `https://docs.google.com/spreadsheets/d/${m[1]}/export?format=xlsx`;
       try {
-        const fetch = (...args) => import("node-fetch").then(({ default: f }) => f(...args));
         const resp = await fetch(exportUrl, { redirect: "follow" });
         if (!resp.ok) return res.json({ ok: false, message: `Không tải được Google Sheet (${resp.status}). Kiểm tra quyền chia sẻ (phải là "Bất kỳ ai có link").` });
         buffer = Buffer.from(await resp.arrayBuffer());
