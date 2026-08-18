@@ -247,6 +247,16 @@ router.post("/transactions", requireDataEntry, (req, res) => {
 // CHUA CO cach sua 1 giao dich da co san (chi co them moi qua form/dan/tai
 // file) -- them route sua truc tiep ngay/dien giai/so tien/loai cho 1 dong,
 // dung cho khi phat hien nhap sai nhu the nay.
+// Lightweight route: only update tenDoiUng (used by inline-edit NCC cell)
+router.post("/transactions/:id/update-ncc", requireDataEntry, (req, res) => {
+  const store = load();
+  const tx = store.transactions.find((t) => t.id === Number(req.params.id));
+  if (!tx) return res.status(404).json({ ok: false, message: "Không tìm thấy." });
+  tx.tenDoiUng = (req.body.tenDoiUng || "").trim();
+  save(store);
+  res.json({ ok: true, tenDoiUng: tx.tenDoiUng });
+});
+
 router.post("/transactions/:id/sua", requireDataEntry, (req, res) => {
   const store = load();
   const tx = store.transactions.find((t) => t.id === Number(req.params.id));

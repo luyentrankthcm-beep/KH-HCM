@@ -105,7 +105,9 @@
                 <td class="num" style="<%= r.type === 'chi' ? 'color:var(--color-danger);' : '' %>"><%= r.type === 'chi' ? r.amount.toLocaleString('vi-VN') + ' đ' : '' %></td>
                 <td class="num"><%= r.balance.toLocaleString('vi-VN') %> đ</td>
                 <td style="font-size:12px; max-width:360px; word-break:break-all;"><%= r.description %></td>
-                <td><%= r.tenDoiUng || '—' %></td>
+                <td class="ncc-cell" data-id="<%= r.id %>" data-val="<%= r.tenDoiUng || '' %>" onclick="nccCellClick(this)" style="cursor:pointer; min-width:120px;">
+                  <% if (r.tenDoiUng) { %><%= r.tenDoiUng %><% } else { %><span style="color:#bbb;">—</span><% } %>
+                </td>
               </tr>
               <% }) %>
             </tbody>
@@ -210,6 +212,43 @@
 
       row.dataset.stmtMerged = '1';
       row.style.display = 'none';
+    }
+
+    // Luyen, 2026-08-18: click vào ô NCC ("—") để điền tên thụ hưởng thẳng
+    function nccCellClick(td) {
+      if (td.querySelector('input')) return; // already editing
+      var txId = td.dataset.id;
+      var curVal = td.dataset.val || '';
+      var orig = td.innerHTML;
+      td.innerHTML = '';
+      var inp = document.createElement('input');
+      inp.type = 'text';
+      inp.value = curVal;
+      inp.placeholder = 'Tên đối ứng...';
+      inp.style.cssText = 'width:180px; font-size:12px; padding:2px 5px;';
+      var saveBtn = document.createElement('button');
+      saveBtn.textContent = '✓';
+      saveBtn.title = 'Lưu';
+      saveBtn.style.cssText = 'margin-left:4px; font-size:13px; color:#2a7; cursor:pointer; border:none; background:none;';
+      var cancelBtn = document.createElement('button');
+      cancelBtn.textContent = '✕';
+      cancelBtn.title = 'Huỷ';
+      cancelBtn.style.cssText = 'margin-left:2px; font-size:13px; color:#e33; cursor:pointer; border:none; background:none;';
+      td.appendChild(inp); td.appendChild(saveBtn); td.appendChild(cancelBtn);
+      inp.focus();
+
+      async function doSave() {
+        var newVal = inp.value.trim();
+        var fd = new FormData();
+        fd.append('tenDoiUng', newVal);
+        try { await fetch('/transactions/' + txId + '/update-ncc', { method: 'POST', body: fd }); } catch(e) {}
+        td.dataset.val = newVal;
+        td.innerHTML = newVal ? newVal : '<span style="color:#bbb;">—</span>';
+      }
+
+      saveBtn.addEventListener('click', doSave);
+      inp.addEventListener('keydown', function(e) { if (e.key === 'Enter') doSave(); if (e.key === 'Escape') { td.innerHTML = orig; } });
+      cancelBtn.addEventListener('click', function() { td.innerHTML = orig; });
     }
   </script>
   <style>

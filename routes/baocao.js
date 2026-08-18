@@ -102,6 +102,7 @@ function buildBankStatementTabs(store, monthFilter) {
         }
         bal += t.type === "thu" ? t.amount : -t.amount;
         rows.push({
+          id: t.id,
           date: t.date,
           type: t.type,
           amount: t.amount,
@@ -126,6 +127,7 @@ function buildBankStatementTabs(store, monthFilter) {
       const rows = txs.map((t) => {
         bal += t.type === "thu" ? t.amount : -t.amount;
         return {
+          id: t.id,
           date: t.date,
           type: t.type,
           amount: t.amount,
