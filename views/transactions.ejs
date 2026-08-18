@@ -336,6 +336,11 @@
       <% } %>
 
       <% if (typeof isAdmin !== 'undefined' && isAdmin) { %>
+      <!-- Toggle button -->
+      <div style="margin:6px 0 8px;">
+        <button type="button" onclick="toggleAdminTools()" id="adminToolsToggle" style="font-size:12px;background:none;border:1px solid #bbb;border-radius:5px;padding:3px 10px;cursor:pointer;color:#555;">⚙ Công cụ admin ▾</button>
+      </div>
+      <div id="adminToolsPanel" style="display:none;">
       <!-- Luyen, 2026-08-18: import UNC (file hoac GG Sheet link) → backfill tên thụ hưởng -->
       <div style="margin:6px 0 14px; padding:8px 12px; background:#f0f4ff; border:1px solid #c8d8f0; border-radius:8px;">
         <div style="font-size:13px; font-weight:600; margin-bottom:6px;">Điền tên người thụ hưởng từ file UNC</div>
@@ -419,6 +424,16 @@
         const j = await r.json();
         msg.textContent = j.message; msg.style.color = j.ok ? '#2a7' : '#e33';
         if (j.ok) setTimeout(()=>location.reload(),1200);
+      }
+      </script>
+      </div><!-- /adminToolsPanel -->
+      <script>
+      function toggleAdminTools() {
+        var p = document.getElementById('adminToolsPanel');
+        var btn = document.getElementById('adminToolsToggle');
+        var open = p.style.display !== 'none';
+        p.style.display = open ? 'none' : 'block';
+        btn.textContent = open ? '⚙ Công cụ admin ▾' : '⚙ Công cụ admin ▴';
       }
       </script>
       <% } %>
