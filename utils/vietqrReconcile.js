@@ -246,20 +246,31 @@ function parseVietQrRawWorkbook(buffer) {
     if (loai !== null && loai !== undefined && !normText(String(loai)).includes("giao dich den")) continue;
     // Chi Nhan, 2026-07-27: chi giu giao dich THAT SU la VietQR ("QR giao
     // dich") -- loai "Vang lai" (chuyen khoan/noi dung khac, khong qua QR,
-    // thuong khong co Ma cua hang that -- vd Noi dung TT "massage", Ma cua
-    // hang "-") van la tien that vao tai khoan nhung KHONG phai doanh thu
-    // ban hang qua QR, phai loai khoi doi soat VietQR.
+    // thuong khong co Ma cua hang that -- vd "GLN TRANSFER") van la tien that
+    // vao tai khoan nhung KHONG phai doanh thu ban hang qua QR. Voi kenh
+    // KHONG co refMatchFrom: van bo qua hoan toan (resolveGianGross khong biet
+    // gan vao gian nao). Voi kenh CO refMatchFrom: giu lai voi ma dac biet
+    // __VANG_LAI__ de resolveGianGrossByBankRef nhom thanh 1 dong rieng trong
+    // doi soat (nguoi dung co the gan hoa don thu cong) -- tranh "Lech Ngan
+    // hang-Du lieu" khi co tien chuyen vang lai ve tai khoan nay.
     const loaiGiaoDich = cols.loaiGiaoDich !== undefined ? row[cols.loaiGiaoDich] : null;
-    if (loaiGiaoDich !== null && loaiGiaoDich !== undefined && !normText(String(loaiGiaoDich)).includes("qr")) continue;
+    const isVangLai = loaiGiaoDich !== null && loaiGiaoDich !== undefined && !normText(String(loaiGiaoDich)).includes("qr");
     const amount = cols.soTien !== undefined ? Number(row[cols.soTien]) || 0 : 0;
     if (!amount) continue;
-    const maCuaHang = cols.maCuaHang !== undefined ? String(row[cols.maCuaHang] || "").trim() : "";
-    if (!maCuaHang) continue;
     const noiDung = cols.noiDung !== undefined ? String(row[cols.noiDung] || "") : "";
-    const vqrCode = extractVqrCode(noiDung);
     const thoiGianRaw = cols.thoiGian !== undefined ? row[cols.thoiGian] : null;
     const date = parseVqrDate(thoiGianRaw);
     const refCode = cols.maThamChieu !== undefined ? String(row[cols.maThamChieu] || "").trim() : "";
+    if (isVangLai) {
+      const vqrCode = extractVqrCode(noiDung);
+      // Dung refCode lam vqrCode de mergeRawRows co the de-dup chinh xac
+      // (refCode la "Ma tham chieu" duy nhat cho moi giao dich).
+      rows.push({ vqrCode: refCode || vqrCode || null, maCuaHang: "__VANG_LAI__", amount, date, raw: noiDung, refCode, isVangLai: true });
+      continue;
+    }
+    const maCuaHang = cols.maCuaHang !== undefined ? String(row[cols.maCuaHang] || "").trim() : "";
+    if (!maCuaHang) continue;
+    const vqrCode = extractVqrCode(noiDung);
     rows.push({ vqrCode, maCuaHang, amount, date, raw: noiDung, refCode });
   }
 
@@ -965,6 +976,9 @@ function resolveGianGross(rawRows, storeNameMap, gianCandidates, nocodeAssignmen
   const blankRows = [];
   for (const row of rawRows) {
     if (!row.date) continue;
+    // Vang lai duoc xu ly boi resolveGianGrossByBankRef (kenh co refMatchFrom),
+    // khong tham gia vao fuzzy matching o day.
+    if (row.isVangLai) continue;
     const isBlankCode = !row.maCuaHang || row.maCuaHang === "-";
     // Luyen has manually assigned this SPECIFIC transaction (by its unique
     // vqrCode) to a Ma cong trinh -- route its amount straight there instead
@@ -1161,6 +1175,18 @@ function resolveGianGrossByBankRef(bankTxs, rawRows, storeNameMap, tenDiemToProj
         amount: tx.amount,
         maCuaHang: raw.maCuaHang || "",
       });
+    }
+    // Luyen, 2026-08-18: giao dich "Vang lai" (GLN TRANSFER, chuyen khoan
+    // khong qua QR) co the lam "Lech Ngan hang-Du lieu" vi tien duoc tinh
+    // vao tong ngan hang nhung khong co ma cua hang de khop voi gian nao.
+    // Nhom thanh bucket __VANG_LAI__ per ngay de hien thi nhu 1 dong rieng
+    // trong doi soat -- nguoi dung co the gan hoa don thu cong.
+    if (raw.isVangLai || raw.maCuaHang === "__VANG_LAI__") {
+      const VANG_LAI = "__VANG_LAI__";
+      codes.add(VANG_LAI);
+      const key = `${tx.date}|${VANG_LAI}`;
+      grossByCode[key] = (grossByCode[key] || 0) + tx.amount;
+      continue;
     }
     const overrideCode = override[raw.maCuaHang];
     if (overrideCode) {
@@ -1702,7 +1728,7 @@ function reconcileVietQr(settlements, grossData, invoiceData, gianMapping, manua
       }, 0);
       const line = {
         code: g.code,
-        maCongTrinh: displayCode(effCode),
+        maCongTrinh: effCode === "__VANG_LAI__" ? "Giao dịch vãng lai" : displayCode(effCode),
         // Luyen, 2026-07-17: "doi xuat ra 1388 thanh 131 het" -- khong con
         // fallback ve 1388 cho gian FF/CSE nua.
         tkCo: gianMapping[effCode] || "131",
