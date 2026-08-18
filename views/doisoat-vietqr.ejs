@@ -935,6 +935,86 @@
         <p class="muted" style="margin-top:6px;">Bấm vào 1 ô trong bảng để xem chi tiết ngày đó (hiện ra ở khung giữa màn hình).</p>
       <% } %>
 
+      <%
+        // Tong hop tat ca dong bi lech (khong locked, khong SKIP)
+        var lechRows = [];
+        (reconciled[ch] || []).forEach(function(r) {
+          (r.lines || []).forEach(function(l) {
+            if (l.locked || l.tkCo === 'SKIP') return;
+            if (Math.abs(l.diff) < 1) return;
+            lechRows.push({ date: r.settlementDate, l: l, ch: ch });
+          });
+        });
+      %>
+      <% if (lechRows.length > 0) { %>
+      <details style="margin-top:12px; margin-bottom:4px;" open>
+        <summary style="font-weight:600; cursor:pointer; padding:6px 0;">
+          ⚠️ Tổng hợp lệch — <%= lechRows.length %> dòng chưa khớp
+        </summary>
+        <div style="overflow-x:auto; margin-top:8px;">
+        <table class="table" style="font-size:12px; min-width:700px;">
+          <thead>
+            <tr>
+              <th style="white-space:nowrap;">Ngày</th>
+              <th>Mã công trình</th>
+              <th style="text-align:right;">DT (Ngân hàng)</th>
+              <th style="text-align:right;">Tổng tiền HĐ</th>
+              <th style="text-align:right;">Lệch</th>
+              <th>Điều chỉnh DT</th>
+              <th>Điều chỉnh HĐ</th>
+            </tr>
+          </thead>
+          <tbody>
+          <% lechRows.forEach(function(item) { var l = item.l; %>
+          <tr>
+            <td style="white-space:nowrap;"><%= item.date %></td>
+            <td><%= l.maCongTrinh || l.code %></td>
+            <td style="text-align:right;"><%= l.gross.toLocaleString('vi-VN') %></td>
+            <td style="text-align:right;"><%= l.invoiceTotal.toLocaleString('vi-VN') %></td>
+            <td style="text-align:right;" class="<%= l.diff > 0 ? 'text-pos' : 'text-neg' %>"><%= l.diff.toLocaleString('vi-VN') %></td>
+            <td>
+              <% if (!l.manualOverride) { %>
+              <form method="POST" action="/doi-soat/vietqr/manual-match" style="display:flex; gap:4px; align-items:center;">
+                <input type="hidden" name="channel" value="<%= ch %>" />
+                <input type="hidden" name="settlementDate" value="<%= item.date %>" />
+                <input type="hidden" name="code" value="<%= l.code %>" />
+                <input type="hidden" name="invoiceNumbers" value="<%= (l.invoiceNumbers||[]).join(', ') %>" />
+                <input type="hidden" name="amount" value="<%= l.invoiceTotal %>" />
+                <input type="number" name="grossAdjustment" placeholder="+/- Sửa DT"
+                  title="Cộng/trừ vào doanh thu ngân hàng của dòng này"
+                  style="width:90px; font-size:11px;" />
+                <button type="submit" class="link-btn" style="font-size:11px; white-space:nowrap;">Lưu DT</button>
+              </form>
+              <% } else { %>
+              <span class="muted" style="font-size:11px;">Đã bù trừ</span>
+              <% } %>
+            </td>
+            <td>
+              <form method="POST" action="/doi-soat/vietqr/manual-match" style="display:flex; gap:4px; align-items:center;">
+                <input type="hidden" name="channel" value="<%= ch %>" />
+                <input type="hidden" name="settlementDate" value="<%= item.date %>" />
+                <input type="hidden" name="code" value="<%= l.code %>" />
+                <% if (l.manualOverride) { %>
+                <input type="hidden" name="invoiceNumbers" value="<%= (l.invoiceNumbers||[]).join(', ') %>" />
+                <input type="number" name="amount" placeholder="Số tiền HĐ"
+                  style="width:90px; font-size:11px;" />
+                <% } else { %>
+                <input type="text" name="invoiceNumbers" value="<%= (l.invoiceNumbers||[]).join(', ') %>"
+                  placeholder="Số HĐ" style="width:80px; font-size:11px;" />
+                <input type="number" name="amount" value="<%= l.invoiceTotal %>"
+                  placeholder="Số tiền" style="width:80px; font-size:11px;" />
+                <% } %>
+                <button type="submit" class="link-btn" style="font-size:11px; white-space:nowrap;">Lưu HĐ</button>
+              </form>
+            </td>
+          </tr>
+          <% }) %>
+          </tbody>
+        </table>
+        </div>
+      </details>
+      <% } %>
+
       <div style="margin-top:16px;">
         <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
           <strong>Xem chi tiết theo từng ngày</strong>
