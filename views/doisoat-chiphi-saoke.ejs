@@ -153,14 +153,14 @@
     </div>
 
     <!-- Modal xem trước MISA -->
-    <div id="misaModal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.5);overflow:auto;">
-      <div style="background:#fff;margin:30px auto;border-radius:10px;max-width:1200px;width:96%;box-shadow:0 8px 40px rgba(0,0,0,0.25);">
-        <!-- Header modal -->
-        <div style="padding:16px 20px;border-bottom:1px solid #e0e0e0;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
-          <div style="font-size:16px;font-weight:700;">📄 Xuất MISA — Phiếu Chi Tiền Gửi</div>
+    <div id="misaModal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.5);display:none;align-items:flex-start;justify-content:center;padding:30px 12px;overflow-y:auto;">
+      <div style="background:#fff;border-radius:10px;width:100%;max-width:1200px;box-shadow:0 8px 40px rgba(0,0,0,0.25);display:flex;flex-direction:column;max-height:calc(100vh - 60px);">
+        <!-- Header modal — không cuộn -->
+        <div style="flex-shrink:0;padding:14px 20px;border-bottom:1px solid #e0e0e0;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+          <div style="font-size:15px;font-weight:700;">📄 Xuất MISA — Phiếu Chi Tiền Gửi</div>
           <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
             <label style="font-size:13px;display:flex;align-items:center;gap:6px;">
-              Tiền tố số CT:
+              Tiền tố:
               <input id="misaPrefix" value="UNC" style="width:60px;font-size:13px;padding:4px 6px;border:1px solid #ccc;border-radius:4px;">
             </label>
             <label style="font-size:13px;display:flex;align-items:center;gap:6px;">
@@ -171,12 +171,12 @@
             <button onclick="closeMisaModal()" style="background:#eee;color:#333;border:none;cursor:pointer;border-radius:6px;padding:7px 12px;font-size:13px;">✕ Đóng</button>
           </div>
         </div>
-        <!-- Nội dung: loading / table -->
-        <div id="misaModalBody" style="padding:20px;overflow-x:auto;">
+        <!-- Nội dung: cuộn riêng -->
+        <div id="misaModalBody" style="flex:1;overflow:auto;padding:16px 20px;">
           <p id="misaLoading" style="text-align:center;color:#888;">Đang tải dữ liệu...</p>
           <table id="misaTable" style="display:none;width:100%;border-collapse:collapse;font-size:12px;">
             <thead>
-              <tr style="background:#f0f4ff;position:sticky;top:0;">
+              <tr style="background:#f0f4ff;position:sticky;top:0;z-index:2;">
                 <th style="padding:6px 8px;text-align:center;border:1px solid #ddd;white-space:nowrap;">STT</th>
                 <th style="padding:6px 8px;border:1px solid #ddd;white-space:nowrap;">Ngày CT</th>
                 <th style="padding:6px 8px;border:1px solid #ddd;min-width:80px;">Số CT</th>
@@ -202,7 +202,7 @@
     var _misaNganHang = '<%= selectedBankName %>';
 
     function openMisaModal() {
-      document.getElementById('misaModal').style.display = 'block';
+      document.getElementById('misaModal').style.display = 'flex';
       loadMisaPreview();
     }
     function closeMisaModal() {
