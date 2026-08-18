@@ -139,13 +139,163 @@
     </div>
     <% } %>
 
-    <!-- Nút xuất Excel -->
-    <div style="margin-bottom:12px;text-align:right;">
+    <!-- Nút xuất Excel + MISA -->
+    <div style="margin-bottom:12px;text-align:right;display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;">
       <a href="/doi-soat/chi-phi-saoke/export.xlsx?thang=<%= encodeURIComponent(selectedMonth) %>&nganHang=<%= encodeURIComponent(selectedBankName) %>&loai=<%= encodeURIComponent(selectedLoai) %>"
          style="display:inline-flex;align-items:center;gap:6px;background:var(--color-success,#2d9e5f);color:#fff;text-decoration:none;border-radius:6px;padding:7px 14px;font-size:13px;font-weight:600;">
         ⬇ Xuất Excel (<%= rows.length %> dòng)
       </a>
+      <% if (selectedLoai !== 'thu') { %>
+      <button onclick="openMisaModal()" style="display:inline-flex;align-items:center;gap:6px;background:#1565c0;color:#fff;border:none;cursor:pointer;border-radius:6px;padding:7px 14px;font-size:13px;font-weight:600;">
+        📄 Xuất MISA (Phiếu chi)
+      </button>
+      <% } %>
     </div>
+
+    <!-- Modal xem trước MISA -->
+    <div id="misaModal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.5);overflow:auto;">
+      <div style="background:#fff;margin:30px auto;border-radius:10px;max-width:1200px;width:96%;box-shadow:0 8px 40px rgba(0,0,0,0.25);">
+        <!-- Header modal -->
+        <div style="padding:16px 20px;border-bottom:1px solid #e0e0e0;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+          <div style="font-size:16px;font-weight:700;">📄 Xuất MISA — Phiếu Chi Tiền Gửi</div>
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+            <label style="font-size:13px;display:flex;align-items:center;gap:6px;">
+              Tiền tố số CT:
+              <input id="misaPrefix" value="UNC" style="width:60px;font-size:13px;padding:4px 6px;border:1px solid #ccc;border-radius:4px;">
+            </label>
+            <label style="font-size:13px;display:flex;align-items:center;gap:6px;">
+              Bắt đầu từ số:
+              <input id="misaStartNo" type="number" value="1" min="1" style="width:80px;font-size:13px;padding:4px 6px;border:1px solid #ccc;border-radius:4px;">
+            </label>
+            <button onclick="exportMisa()" style="background:#1565c0;color:#fff;border:none;cursor:pointer;border-radius:6px;padding:7px 16px;font-size:13px;font-weight:600;">⬇ Tải MISA.xlsx</button>
+            <button onclick="closeMisaModal()" style="background:#eee;color:#333;border:none;cursor:pointer;border-radius:6px;padding:7px 12px;font-size:13px;">✕ Đóng</button>
+          </div>
+        </div>
+        <!-- Nội dung: loading / table -->
+        <div id="misaModalBody" style="padding:20px;overflow-x:auto;">
+          <p id="misaLoading" style="text-align:center;color:#888;">Đang tải dữ liệu...</p>
+          <table id="misaTable" style="display:none;width:100%;border-collapse:collapse;font-size:12px;">
+            <thead>
+              <tr style="background:#f0f4ff;position:sticky;top:0;">
+                <th style="padding:6px 8px;text-align:center;border:1px solid #ddd;white-space:nowrap;">STT</th>
+                <th style="padding:6px 8px;border:1px solid #ddd;white-space:nowrap;">Ngày CT</th>
+                <th style="padding:6px 8px;border:1px solid #ddd;min-width:80px;">Số CT</th>
+                <th style="padding:6px 8px;border:1px solid #ddd;min-width:200px;">Diễn giải / Nội dung TT</th>
+                <th style="padding:6px 8px;border:1px solid #ddd;min-width:160px;">Tên đối ứng (sao kê)</th>
+                <th style="padding:6px 8px;border:1px solid #ddd;min-width:160px;">NCC (chi phí)</th>
+                <th style="padding:6px 8px;border:1px solid #ddd;min-width:110px;">Mã NCC ✏️</th>
+                <th style="padding:6px 8px;border:1px solid #ddd;min-width:80px;">Gian</th>
+                <th style="padding:6px 8px;border:1px solid #ddd;min-width:90px;">TK Nợ ✏️</th>
+                <th style="padding:6px 8px;border:1px solid #ddd;text-align:right;min-width:110px;">Số tiền</th>
+                <th style="padding:6px 8px;border:1px solid #ddd;min-width:120px;">TK Chi</th>
+              </tr>
+            </thead>
+            <tbody id="misaTbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <script>
+    var _misaRows = [];
+    var _misaThang = '<%= selectedMonth %>';
+    var _misaNganHang = '<%= selectedBankName %>';
+
+    function openMisaModal() {
+      document.getElementById('misaModal').style.display = 'block';
+      loadMisaPreview();
+    }
+    function closeMisaModal() {
+      document.getElementById('misaModal').style.display = 'none';
+    }
+    // Close on backdrop click
+    document.getElementById('misaModal').addEventListener('click', function(e) {
+      if (e.target === this) closeMisaModal();
+    });
+
+    async function loadMisaPreview() {
+      document.getElementById('misaLoading').style.display = 'block';
+      document.getElementById('misaTable').style.display = 'none';
+      var url = '/doi-soat/chi-phi-saoke/preview-misa?thang=' + encodeURIComponent(_misaThang) + '&nganHang=' + encodeURIComponent(_misaNganHang);
+      try {
+        var r = await fetch(url);
+        var j = await r.json();
+        if (!j.ok) { document.getElementById('misaLoading').textContent = 'Lỗi: ' + (j.message || ''); return; }
+        _misaRows = j.rows;
+        renderMisaTable();
+      } catch(e) {
+        document.getElementById('misaLoading').textContent = 'Lỗi kết nối: ' + e.message;
+      }
+    }
+
+    function getSoCtPreview(idx) {
+      var prefix = document.getElementById('misaPrefix').value || 'UNC';
+      var start = parseInt(document.getElementById('misaStartNo').value) || 1;
+      return prefix + String(start + idx).padStart(4, '0');
+    }
+
+    function renderMisaTable() {
+      document.getElementById('misaLoading').style.display = 'none';
+      var tbody = document.getElementById('misaTbody');
+      tbody.innerHTML = '';
+      var start = parseInt(document.getElementById('misaStartNo').value) || 1;
+      var prefix = document.getElementById('misaPrefix').value || 'UNC';
+      _misaRows.forEach(function(r, i) {
+        var soCt = prefix + String(start + i).padStart(4, '0');
+        var amtFmt = r.amount ? r.amount.toLocaleString('vi-VN') + ' đ' : '';
+        var tkOpts = ['331','1388','1121'].map(function(v) {
+          return '<option value="' + v + '"' + (String(r.tk) === v ? ' selected' : '') + '>' + v + '</option>';
+        }).join('');
+        var matchBg = r.matchType === 'exact' ? '#f0fff4' : r.matchType === 'fuzzy' ? '#fffbf0' : '#fff';
+        var tr = document.createElement('tr');
+        tr.style.background = matchBg;
+        tr.innerHTML =
+          '<td style="padding:5px 8px;border:1px solid #ddd;text-align:center;">' + (i+1) + '</td>' +
+          '<td style="padding:5px 8px;border:1px solid #ddd;white-space:nowrap;">' + r.date + '</td>' +
+          '<td style="padding:5px 8px;border:1px solid #ddd;white-space:nowrap;">' + soCt + '</td>' +
+          '<td style="padding:5px 8px;border:1px solid #ddd;max-width:220px;overflow:hidden;text-overflow:ellipsis;" title="' + (r.description||'').replace(/"/g,'') + '">' + (r.description || '') + '</td>' +
+          '<td style="padding:5px 8px;border:1px solid #ddd;font-size:11px;">' + (r.tenDoiUng || '—') + '</td>' +
+          '<td style="padding:5px 8px;border:1px solid #ddd;font-size:11px;">' + (r.ncc || '—') + '</td>' +
+          '<td style="padding:5px 8px;border:1px solid #ddd;"><input data-idx="' + i + '" data-field="maNCC" value="' + (r.maNCC||'') + '" placeholder="Mã NCC" style="width:100%;font-size:12px;border:1px solid #ccc;border-radius:3px;padding:2px 4px;" oninput="updateMisaRow(this)"></td>' +
+          '<td style="padding:5px 8px;border:1px solid #ddd;font-size:11px;">' + (r.gian || '—') + '</td>' +
+          '<td style="padding:5px 8px;border:1px solid #ddd;"><select data-idx="' + i + '" data-field="tk" onchange="updateMisaRow(this)" style="font-size:12px;">' + tkOpts + '</select></td>' +
+          '<td style="padding:5px 8px;border:1px solid #ddd;text-align:right;white-space:nowrap;">' + amtFmt + '</td>' +
+          '<td style="padding:5px 8px;border:1px solid #ddd;font-size:11px;">' + (r.bankAccount||'') + '</td>';
+        tbody.appendChild(tr);
+      });
+      document.getElementById('misaTable').style.display = '';
+    }
+
+    function updateMisaRow(el) {
+      var idx = parseInt(el.dataset.idx);
+      var field = el.dataset.field;
+      _misaRows[idx][field] = el.value;
+    }
+
+    // Khi thay doi prefix/startNo → re-render so CT
+    document.getElementById('misaPrefix').addEventListener('input', renderMisaTable);
+    document.getElementById('misaStartNo').addEventListener('input', renderMisaTable);
+
+    async function exportMisa() {
+      if (!_misaRows.length) { alert('Chưa có dữ liệu. Mở lại modal để tải.'); return; }
+      var fd = new FormData();
+      fd.append('rows', JSON.stringify(_misaRows));
+      fd.append('startNo', document.getElementById('misaStartNo').value || '1');
+      fd.append('prefix', document.getElementById('misaPrefix').value || 'UNC');
+      var btn = event.target;
+      btn.textContent = 'Đang xuất...';
+      try {
+        var r = await fetch('/doi-soat/chi-phi-saoke/export-misa', { method: 'POST', body: fd });
+        if (!r.ok) { alert('Lỗi xuất file.'); btn.textContent = '⬇ Tải MISA.xlsx'; return; }
+        var blob = await r.blob();
+        var a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'MISA-phieu-chi.xlsx';
+        a.click();
+      } catch(e) { alert('Lỗi: ' + e.message); }
+      btn.textContent = '⬇ Tải MISA.xlsx';
+    }
+    </script>
 
     <!-- Bảng chi tiết -->
     <section class="panel">

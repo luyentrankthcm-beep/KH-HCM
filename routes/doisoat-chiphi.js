@@ -1143,6 +1143,154 @@ router.get("/doi-soat/chi-phi-saoke/export.xlsx", (req, res) => {
   }
 });
 
+// Xem truoc du lieu truoc khi xuat MISA (phieu chi tien gui).
+// Tra ve JSON array cac dong da map san sang de user kiem tra/sua truoc khi xuat.
+router.get("/doi-soat/chi-phi-saoke/preview-misa", requireDataEntry, (req, res) => {
+  try {
+    const store = load();
+    ensureShape(store);
+    const activeCompany = getCompany(req);
+    const thang = req.query.thang || "";
+    const nganHang = req.query.nganHang || "";
+
+    const { rows } = buildSaokeRows(store, activeCompany, thang, nganHang, "chi");
+
+    const nccList = activeNccList(store);
+    const nccIndex = buildNccIndex(nccList);
+    const vendorNccMap = store.chi_phi_vendor_ncc_map || {};
+
+    const misaRows = rows.map((r) => {
+      // Thu tu uu tien: tenDoiUng tu sao ke, sau do ncc tu chi phi
+      const vendorForNcc = r.tenDoiUng || r.ncc || "";
+      const manualNccCode = vendorNccMap[vendorForNcc] || vendorNccMap[r.ncc || ""] || "";
+      let maNCC = "", tenNCC = "", mstNCC = "";
+      if (manualNccCode) {
+        maNCC = manualNccCode;
+        const rec = findNccByCode(manualNccCode, nccList);
+        tenNCC = rec ? rec.tenNCC : "";
+        mstNCC = rec ? rec.mst : "";
+      } else {
+        const nccMatch = matchNccForVendor(vendorForNcc, nccIndex);
+        maNCC = nccMatch.maNCC || "";
+        tenNCC = nccMatch.tenNCC || "";
+        mstNCC = nccMatch.mstNCC || "";
+      }
+      const bank = (store.banks || []).find((b) => b.name === r.bankName);
+      return {
+        txId: r.id,
+        date: r.date,
+        description: r.description,
+        tenDoiUng: r.tenDoiUng || "",
+        ncc: r.ncc || r.tenDoiUng || "",
+        amount: r.amount,
+        gian: r.gian || r.suggestedGian || "",
+        tk: r.tk || r.suggestedTk || "331",
+        maNCC, tenNCC, mstNCC,
+        bankAccount: bank ? bank.account_number : "",
+        bankFullName: bank ? `Ngân hàng ${bank.bank_name}` : r.bankName,
+        matchType: r.matchType,
+      };
+    });
+
+    res.json({ ok: true, rows: misaRows, total: misaRows.length });
+  } catch (e) {
+    res.json({ ok: false, message: e.message });
+  }
+});
+
+// Xuat file XLSX MISA phieu chi tien gui tu JSON rows (co the da sua boi user).
+router.post("/doi-soat/chi-phi-saoke/export-misa", requireDataEntry, (req, res) => {
+  try {
+    let rows = req.body.rows;
+    if (typeof rows === "string") rows = JSON.parse(rows);
+    if (!rows || !Array.isArray(rows)) return res.status(400).send("Thiếu dữ liệu rows.");
+
+    let startNo = parseInt(req.body.startNo || "1", 10);
+    if (isNaN(startNo) || startNo < 1) startNo = 1;
+    const prefix = (req.body.prefix || "UNC").trim() || "UNC";
+
+    let seq = startNo;
+    const exportRows = rows.map((r) => {
+      const soCt = prefix + String(seq).padStart(4, "0");
+      seq++;
+      const ngayDmy = isoToDmy(r.date || "");
+      const dienGiai = (r.description || "").replace(/\s+/g, " ").trim().slice(0, 250);
+      const maNCC = r.maNCC || "";
+      const tenNCC = r.tenNCC || r.ncc || "";
+      return {
+        "Phương thức thanh toán": "Ủy nhiệm chi",
+        "Ngày hạch toán (*)": ngayDmy,
+        "Ngày chứng từ (*)": ngayDmy,
+        "Số chứng từ (*)": soCt,
+        "Lý do chi": "Trả tiền nhà cung cấp (không theo hóa đơn)",
+        "Là UNC chuyển tiền theo lô": "",
+        "Nội dung thanh toán": dienGiai,
+        "Số tài khoản chi": r.bankAccount || "",
+        "Tên ngân hàng chi": r.bankFullName || "",
+        "Mã đối tượng": maNCC,
+        "Tên đối tượng": tenNCC,
+        "Địa chỉ": "",
+        "Số tài khoản nhận": "",
+        "Tên ngân hàng nhận": "",
+        "Người lĩnh tiền": "",
+        "Số CMND": "",
+        "Ngày cấp CMND": "",
+        "Nơi cấp CMND": "",
+        "Mã nhân viên": "",
+        "Diễn giải (hạch toán)": dienGiai,
+        "TK Nợ (*)": String(r.tk || "331"),
+        "TK Có (*)": "1121",
+        "Số tiền": r.amount || 0,
+        "Tên người hưởng": r.tenDoiUng || tenNCC,
+        "TK hưởng": "",
+        "Tên NH thụ hưởng": "",
+        "Tên chi nhánh NH thụ hưởng": "",
+        "Mã đối tượng (hạch toán)": maNCC,
+        "Số khế ước đi vay": "",
+        "Số khế ước cho vay": "",
+        "Mã khoản mục chi phí": "",
+        "Nghiệp vụ": "",
+        "Mã đơn vị": "",
+        "Mã đối tượng THCP": "",
+        "Mã công trình": r.gian || "",
+        "Số đơn đặt hàng": "",
+        "Số đơn mua hàng": "",
+        "Số hợp đồng mua": "",
+        "Số hợp đồng bán": "",
+        "Mã thống kê": "",
+        "CP không hợp lý": "",
+        "Hạch toán gộp nhiều hóa đơn": "",
+        "Diễn giải thuế": "",
+        "Có hóa đơn": "Không",
+        "Giá trị HHDV chưa thuế": "",
+        "% thuế GTGT": "",
+        "% thuế suất KHAC": "",
+        "Tiền thuế GTGT": "",
+        "TK thuế GTGT": "",
+        "Ngày hóa đơn": "",
+        "Số hóa đơn": "",
+        "Mẫu số HĐ": "",
+        "Ký hiệu HĐ": "",
+        "Nhóm HHDV mua vào": "",
+        "Mã NCC": maNCC,
+        "Tên NCC": tenNCC,
+        "Mã số thuế NCC": r.mstNCC || "",
+        "Số hóa đơn (dò tự động)": "",
+      };
+    });
+
+    const ws = XLSX.utils.json_to_sheet(exportRows);
+    const wb2 = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb2, ws, "UNC 8888");
+    const buf = XLSX.write(wb2, { type: "buffer", bookType: "xlsx" });
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    res.setHeader("Content-Disposition", `attachment; filename=MISA-phieu-chi-${Date.now()}.xlsx`);
+    res.send(buf);
+  } catch (e) {
+    res.status(500).send("Lỗi xuất MISA: " + e.message);
+  }
+});
+
 // Luu so du cuoi ky tu ngan hang (de tinh so du dau ky va kiem tra chenh lech).
 // POST body: { soduKey (bankName_thang), soducucoiky (so nguyen, co the am) }
 router.post("/doi-soat/chi-phi-saoke/set-sodu-cuoiky", requireDataEntry, (req, res) => {
