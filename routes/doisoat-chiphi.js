@@ -96,7 +96,7 @@ function broadMatchNcc(vendorName, nccList) {
 
   let bestScore = 0, bestRec = null, bestLen = 0;
   for (const rec of nccList) {
-    const rNorm = normText(rec.tenKhongDau || rec.tenNCC || "");
+    const rNorm = normText(rec.tenKhongDau || rec.tenNCC || rec.ten || "");
     if (!rNorm) continue;
     let score = 0, matchLen = 0;
     for (const w of vWords) {
@@ -151,8 +151,20 @@ function ensureShape(store) {
 
 // Danh sach NCC dang dung: uu tien ban Luyen tu upload lai, khong co thi
 // dung ban goc 884 NCC "KH cu" di kem app.
+// Luyen, 2026-08-18: merge them cac NCC Luyen them tay tu trang Danh Muc
+// (store.danh_muc_ma_nha_cung_cap, cau truc {ma, ten}) -- convert sang dinh
+// dang chi_phi_ncc_list ({maNCC, tenNCC}) roi append vao sau. NCC co trong
+// danh muc se upsert (ghi de) neu ma trung voi ban co.
 function activeNccList(store) {
-  return store.chi_phi_ncc_list && store.chi_phi_ncc_list.length ? store.chi_phi_ncc_list : DEFAULT_NCC_LIST;
+  const base = store.chi_phi_ncc_list && store.chi_phi_ncc_list.length ? store.chi_phi_ncc_list : DEFAULT_NCC_LIST;
+  const extra = (store.danh_muc_ma_nha_cung_cap || [])
+    .filter((r) => r.ma && r.ten)
+    .map((r) => ({ maNCC: r.ma, tenNCC: r.ten, tenKhongDau: r.ten, mst: r.ghiChu || "" }));
+  if (!extra.length) return base;
+  // Ghi de neu trung maNCC, append moi neu chua co
+  const baseMap = new Map(base.map((r) => [String(r.maNCC || "").toLowerCase(), r]));
+  extra.forEach((r) => baseMap.set(String(r.maNCC || "").toLowerCase(), r));
+  return Array.from(baseMap.values());
 }
 
 // Newest upload wins per (ngay, so chung tu, chi ra, thu vao) key -- cung 1
