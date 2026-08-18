@@ -181,20 +181,29 @@
       <!-- Body cuộn -->
       <div style="flex:1;min-height:0;overflow:auto;padding:0 4px 12px;">
         <p id="misaLoading" style="text-align:center;color:#888;padding:20px;">Đang tải dữ liệu...</p>
-        <table id="misaTable" style="display:none;width:100%;border-collapse:collapse;font-size:12px;">
+        <style>
+          #misaTable { table-layout:fixed; }
+          #misaTable th { position:relative; overflow:hidden; white-space:nowrap; }
+          #misaTable th .col-rsz {
+            position:absolute; right:0; top:0; width:5px; height:100%;
+            cursor:col-resize; user-select:none; background:transparent;
+          }
+          #misaTable th .col-rsz:hover, #misaTable th .col-rsz.rsz-active { background:rgba(0,90,200,0.35); }
+        </style>
+        <table id="misaTable" style="display:none;border-collapse:collapse;font-size:12px;">
           <thead>
             <tr style="background:#f0f4ff;position:sticky;top:0;z-index:2;">
-              <th style="padding:6px 6px;text-align:center;border:1px solid #ddd;">#</th>
-              <th style="padding:6px 6px;border:1px solid #ddd;white-space:nowrap;">Ngày CT</th>
-              <th style="padding:6px 6px;border:1px solid #ddd;white-space:nowrap;">Số CT</th>
-              <th style="padding:6px 6px;border:1px solid #ddd;min-width:180px;">Diễn giải</th>
-              <th style="padding:6px 6px;border:1px solid #ddd;min-width:140px;">Tên đối ứng</th>
-              <th style="padding:6px 6px;border:1px solid #ddd;min-width:140px;">NCC</th>
-              <th style="padding:6px 6px;border:1px solid #ddd;min-width:100px;">Mã NCC ✏️</th>
-              <th style="padding:6px 6px;border:1px solid #ddd;min-width:70px;">Gian</th>
-              <th style="padding:6px 6px;border:1px solid #ddd;min-width:80px;">TK Nợ ✏️</th>
-              <th style="padding:6px 6px;border:1px solid #ddd;text-align:right;min-width:100px;">Số tiền</th>
-              <th style="padding:6px 6px;border:1px solid #ddd;min-width:110px;">TK Chi</th>
+              <th style="padding:6px 6px;text-align:center;border:1px solid #ddd;width:36px;">#<div class="col-rsz"></div></th>
+              <th style="padding:6px 6px;border:1px solid #ddd;width:88px;">Ngày CT<div class="col-rsz"></div></th>
+              <th style="padding:6px 6px;border:1px solid #ddd;width:90px;">Số CT<div class="col-rsz"></div></th>
+              <th style="padding:6px 6px;border:1px solid #ddd;width:200px;">Diễn giải<div class="col-rsz"></div></th>
+              <th style="padding:6px 6px;border:1px solid #ddd;width:160px;">Tên đối ứng<div class="col-rsz"></div></th>
+              <th style="padding:6px 6px;border:1px solid #ddd;width:160px;">NCC<div class="col-rsz"></div></th>
+              <th style="padding:6px 6px;border:1px solid #ddd;width:110px;">Mã NCC ✏️<div class="col-rsz"></div></th>
+              <th style="padding:6px 6px;border:1px solid #ddd;width:80px;">Gian<div class="col-rsz"></div></th>
+              <th style="padding:6px 6px;border:1px solid #ddd;width:85px;">TK Nợ ✏️<div class="col-rsz"></div></th>
+              <th style="padding:6px 6px;border:1px solid #ddd;width:110px;text-align:right;">Số tiền<div class="col-rsz"></div></th>
+              <th style="padding:6px 6px;border:1px solid #ddd;width:120px;">TK Chi<div class="col-rsz"></div></th>
             </tr>
           </thead>
           <tbody id="misaTbody"></tbody>
@@ -297,13 +306,17 @@
       if (!_misaRows.length) { alert('Chưa có dữ liệu.'); return; }
       var btn = document.getElementById('misaExportBtn');
       btn.textContent = 'Đang xuất...'; btn.disabled = true;
-      var fd = new FormData();
-      fd.append('rows', JSON.stringify(_misaRows));
-      fd.append('startNo', document.getElementById('misaStartNo').value || '1');
-      fd.append('prefix', document.getElementById('misaPrefix').value || 'UNC');
       try {
-        var r = await fetch('/doi-soat/chi-phi-saoke/export-misa', { method:'POST', body:fd });
-        if (!r.ok) { alert('Lỗi xuất file.'); } else {
+        var r = await fetch('/doi-soat/chi-phi-saoke/export-misa', {
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({
+            rows: _misaRows,
+            startNo: document.getElementById('misaStartNo').value || '1',
+            prefix: document.getElementById('misaPrefix').value || 'UNC'
+          })
+        });
+        if (!r.ok) { var errTxt = await r.text(); alert('Lỗi xuất file: ' + errTxt); } else {
           var blob = await r.blob();
           var a = document.createElement('a');
           a.href = URL.createObjectURL(blob);
@@ -315,6 +328,32 @@
       } catch(e) { alert('Lỗi: ' + e.message); }
       btn.textContent = '⬇ Tải MISA.xlsx'; btn.disabled = false;
     }
+
+    // --- Resizable columns ---
+    (function() {
+      var _rsz = null; // {th, startX, startW}
+      document.addEventListener('mousedown', function(e) {
+        if (!e.target.classList.contains('col-rsz')) return;
+        var th = e.target.parentElement;
+        _rsz = { th: th, startX: e.clientX, startW: th.offsetWidth };
+        e.target.classList.add('rsz-active');
+        document.body.style.cursor = 'col-resize';
+        document.body.style.userSelect = 'none';
+        e.preventDefault();
+      });
+      document.addEventListener('mousemove', function(e) {
+        if (!_rsz) return;
+        var newW = Math.max(40, _rsz.startW + (e.clientX - _rsz.startX));
+        _rsz.th.style.width = newW + 'px';
+      });
+      document.addEventListener('mouseup', function(e) {
+        if (!_rsz) return;
+        _rsz.th.querySelector('.col-rsz').classList.remove('rsz-active');
+        _rsz = null;
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+      });
+    })();
     </script>
 
     <!-- Bảng chi tiết -->
