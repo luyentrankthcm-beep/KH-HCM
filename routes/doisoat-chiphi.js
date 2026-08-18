@@ -1152,8 +1152,13 @@ router.get("/doi-soat/chi-phi-saoke/preview-misa", requireDataEntry, (req, res) 
     const activeCompany = getCompany(req);
     const thang = req.query.thang || "";
     const nganHang = req.query.nganHang || "";
+    const fromDate = req.query.from || "";
+    const toDate = req.query.to || "";
 
-    const { rows } = buildSaokeRows(store, activeCompany, thang, nganHang, "chi");
+    let { rows } = buildSaokeRows(store, activeCompany, thang, nganHang, "chi");
+    // Loc them theo khoang ngay neu co
+    if (fromDate) rows = rows.filter((r) => r.date >= fromDate);
+    if (toDate) rows = rows.filter((r) => r.date <= toDate);
 
     const nccList = activeNccList(store);
     const nccIndex = buildNccIndex(nccList);
