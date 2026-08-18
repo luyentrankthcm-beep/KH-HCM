@@ -77,6 +77,41 @@ function buildChiaSeTKSet(gianList) {
   return chiaSe;
 }
 
+// Cac tu phap ly pho bien -- loai khoi tim kiem tu khoa de tranh khop nham
+const NCC_STOP = new Set([
+  "cong","ty","tnhh","co","phan","mtv","huu","han","trach","nhiem","mot","thanh","vien",
+  "thuong","mai","san","xuat","dich","vu","va","xnk","kd","viet","nam","chi","nhanh",
+  "cty","ctcp","cp","sx","tm","xd","nn","bds","ck","tp","hcm","hn","da","nang",
+  "thi","xa","huyen","quan","tinh","thanh","pho","duong","phong",
+]);
+
+// Tim NCC theo tu khoa (rong hon matchNccForVendor -- dung khi ten viet tat hoac khac chu).
+// Tra ve rec co diem khop cao nhat; null neu khong du tin tuong.
+function broadMatchNcc(vendorName, nccList) {
+  if (!vendorName || !nccList || !nccList.length) return null;
+  const vNorm = normText(vendorName);
+  // Thu expand viet tat truoc
+  const vWords = vNorm.split(/\s+/).filter((w) => w.length >= 2 && !NCC_STOP.has(w));
+  if (!vWords.length) return null;
+
+  let bestScore = 0, bestRec = null, bestLen = 0;
+  for (const rec of nccList) {
+    const rNorm = normText(rec.tenKhongDau || rec.tenNCC || "");
+    if (!rNorm) continue;
+    let score = 0, matchLen = 0;
+    for (const w of vWords) {
+      if (rNorm.includes(w)) { score++; matchLen += w.length; }
+    }
+    if (score > bestScore || (score === bestScore && matchLen > bestLen)) {
+      bestScore = score; bestLen = matchLen; bestRec = rec;
+    }
+  }
+  // Yeu cau: it nhat 2 tu khop, hoac 1 tu khop nhung dai >= 5 ky tu
+  if (bestScore >= 2) return bestRec;
+  if (bestScore === 1 && bestLen >= 5) return bestRec;
+  return null;
+}
+
 function getGianTK(gian, chiaSeTKSet, gianNameTkMap) {
   if (!gian) return "331"; // mac dinh: tien thue -> 331
   // Uu tien override thu cong (chi_phi_gian_name_tk) truoc khi suy tu gian list
@@ -1179,6 +1214,11 @@ router.get("/doi-soat/chi-phi-saoke/preview-misa", requireDataEntry, (req, res) 
         maNCC = nccMatch.maNCC || "";
         tenNCC = nccMatch.tenNCC || "";
         mstNCC = nccMatch.mstNCC || "";
+        // Neu khong khop chinh xac, thu tim rong hon theo tu khoa
+        if (!maNCC) {
+          const broad = broadMatchNcc(vendorForNcc, nccList);
+          if (broad) { maNCC = broad.maNCC || ""; tenNCC = broad.tenNCC || ""; mstNCC = broad.mst || ""; }
+        }
       }
       const bank = (store.banks || []).find((b) => b.name === r.bankName);
       return {

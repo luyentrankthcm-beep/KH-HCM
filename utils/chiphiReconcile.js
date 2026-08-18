@@ -60,8 +60,12 @@ function normHeader(s) {
 // duoc mo rong truoc khi so khop, vi danh sach NCC luon ghi ten day du.
 const ABBREV_MAP = {
   ctcp: "cong ty co phan",
+  ctthhh: "cong ty trach nhiem huu han",
   ct: "cong ty",
   cp: "co phan",
+  tnhh: "trach nhiem huu han",
+  hh: "huu han",
+  mtv: "mot thanh vien",
   sx: "san xuat",
   tm: "thuong mai",
   xnk: "xuat nhap khau",
@@ -69,6 +73,10 @@ const ABBREV_MAP = {
   kd: "kinh doanh",
   tp: "thanh pho",
   vh: "van hanh",
+  ck: "chung khoan",
+  bds: "bat dong san",
+  xd: "xay dung",
+  nn: "nong nghiep",
 };
 function expandAbbrev(normStr) {
   return normStr
