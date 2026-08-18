@@ -1720,6 +1720,16 @@ function reconcileVietQr(settlements, grossData, invoiceData, gianMapping, manua
       if (manualMatches) {
         const mm = manualMatches[`${day}|${line.code}`];
         if (mm) {
+          // skipLine: nguoi dung bam "Xoa khoi doi soat" -- an dong nay hoan toan
+          if (mm.skipLine) {
+            line.tkCo = "SKIP";
+            line.skipLine = true;
+            line.invoiceNumbers = [];
+            line.invoiceTotal = 0;
+            line.diff = -line.gross;
+            line.matched = false;
+            return line;
+          }
           line.invoiceNumbers = mm.invoiceNumbers || [];
           // grossAdjustment: cong them vao DOANH THU cua dong nay (khong chi
           // vao so tien HD hien thi) -- dung cho truong hop 1 GD QR "khong co

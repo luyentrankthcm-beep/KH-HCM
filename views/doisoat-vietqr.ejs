@@ -1185,6 +1185,7 @@
             </thead>
             <tbody>
               <% r.lines.forEach(function(l) { %>
+              <% if (l.skipLine) return; /* an dong da bi Xoa khoi doi soat */ %>
               <tr<%= l.tkCo === 'SKIP' ? ' style="opacity:0.6;"' : '' %>>
                 <td><%= l.maCongTrinh %><%= l.code.endsWith('__FF') ? ' (CSE)' : '' %></td>
                 <td><%= l.tkCo === 'SKIP' ? '—' : l.tkCo %></td>
@@ -1207,9 +1208,29 @@
                       <input type="hidden" name="channel" value="<%= ch %>" />
                       <input type="hidden" name="settlementDate" value="<%= r.settlementDate %>" />
                       <input type="hidden" name="code" value="<%= l.code %>" />
-                      <button type="submit" class="link-btn link-danger" style="font-size:11px;">Xoá</button>
+                      <button type="submit" class="link-btn link-danger" style="font-size:11px;">Xoá bù trừ</button>
                     </form>
+                    <% if (l.gross === 0 && l.invoiceTotal === 0) { %>
+                    <form method="POST" action="/doi-soat/vietqr/skip-line" style="display:inline; margin-left:4px;"
+                          onsubmit="return confirm('Ẩn hẳn dòng này khỏi đối soát?');">
+                      <input type="hidden" name="channel" value="<%= ch %>">
+                      <input type="hidden" name="settlementDate" value="<%= r.settlementDate %>">
+                      <input type="hidden" name="code" value="<%= l.code %>">
+                      <input type="hidden" name="returnUrl" value="/doi-soat/vietqr?channel=<%= ch %>">
+                      <button type="submit" class="link-btn link-danger" style="font-size:11px;">Xóa hẳn</button>
+                    </form>
+                    <% } %>
                     <% if (l.manualNote) { %><div class="muted" style="font-size:11px;"><%= l.manualNote %></div><% } %>
+                  <% } else if (l.gross === 0 && l.invoiceTotal === 0) { %>
+                    <span class="badge badge-chi" style="opacity:0.6;">0đ</span>
+                    <form method="POST" action="/doi-soat/vietqr/skip-line" style="display:inline; margin-left:6px;"
+                          onsubmit="return confirm('Ẩn dòng <%= l.maCongTrinh %> ngày <%= r.settlementDate %> khỏi đối soát?');">
+                      <input type="hidden" name="channel" value="<%= ch %>">
+                      <input type="hidden" name="settlementDate" value="<%= r.settlementDate %>">
+                      <input type="hidden" name="code" value="<%= l.code %>">
+                      <input type="hidden" name="returnUrl" value="/doi-soat/vietqr?channel=<%= ch %>">
+                      <button type="submit" class="link-btn link-danger" style="font-size:11px;">Xóa</button>
+                    </form>
                   <% } else if (l.invoiceNumbers.length === 0) { %>
                     <span class="badge badge-chi">Chưa có HĐ</span>
                     <form method="POST" action="/doi-soat/vietqr/manual-match" style="margin-top:6px;">

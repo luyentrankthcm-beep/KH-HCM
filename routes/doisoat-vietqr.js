@@ -3081,6 +3081,31 @@ router.post("/doi-soat/vietqr/manual-match", requireDataEntry, (req, res) => {
 });
 
 // Bulk save: nhieu dong cung luc tu bang Tong hop lech
+// Xoa 1 dong (gian + ngay) khoi doi soat: an hoan toan, khong anh huong DT/tong
+router.post("/doi-soat/vietqr/skip-line", requireDataEntry, (req, res) => {
+  const store = load();
+  ensureChannelShape(store);
+  try {
+    const { channel, settlementDate, code, returnUrl } = req.body;
+    if (!CHANNELS[channel]) throw new Error("Kênh không hợp lệ.");
+    if (!settlementDate || !code) throw new Error("Thiếu thông tin dòng cần ẩn.");
+    const key = `${settlementDate}|${code}`;
+    store.viet_qr_manual_matches[channel][key] = {
+      skipLine: true,
+      invoiceNumbers: [],
+      amount: 0,
+      grossAdjustment: 0,
+      note: "SKIP",
+      created_at: new Date().toISOString(),
+    };
+    save(store);
+    const redirect = returnUrl || "/doi-soat/vietqr?channel=" + encodeURIComponent(channel);
+    res.redirect(redirect + (redirect.includes("?") ? "&" : "?") + "success=" + encodeURIComponent("Đã ẩn dòng " + code + " ngày " + settlementDate + "."));
+  } catch (e) {
+    res.redirect((req.body.returnUrl || "/doi-soat/vietqr") + "?error=" + encodeURIComponent(e.message));
+  }
+});
+
 router.post("/doi-soat/vietqr/manual-match/bulk", requireDataEntry, (req, res) => {
   const store = load();
   ensureChannelShape(store);
