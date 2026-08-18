@@ -297,6 +297,7 @@
                       <input type="hidden" name="code" value="<%= l.code %>" />
                       <input type="text" name="invoiceNumbers" placeholder="Số HĐ bù" style="width:80px; font-size:11px;" />
                       <input type="text" name="amount" placeholder="Số tiền" style="width:80px; font-size:11px;" />
+                      <input type="text" name="grossAdjustment" placeholder="+/- Sửa DT" title="Sửa doanh thu của dòng này: số dương để cộng thêm, số âm để trừ bớt" style="width:80px; font-size:11px;" />
                       <button type="submit" class="link-btn" style="font-size:11px;">Đã có HĐ bù</button>
                     </form>
                   <% } else if (l.matched) { %>
@@ -309,6 +310,7 @@
                       <input type="hidden" name="code" value="<%= l.code %>" />
                       <input type="text" name="invoiceNumbers" value="<%= l.invoiceNumbers.join(', ') %>" placeholder="Số HĐ" style="width:100px; font-size:11px;" />
                       <input type="text" name="amount" value="<%= l.invoiceTotal %>" placeholder="Số tiền" style="width:80px; font-size:11px;" />
+                      <input type="text" name="grossAdjustment" placeholder="+/- Sửa DT" title="Sửa doanh thu của dòng này: số dương để cộng thêm, số âm để trừ bớt" style="width:80px; font-size:11px;" />
                       <button type="submit" class="link-btn" style="font-size:11px;">Sửa HĐ</button>
                     </form>
                   <% } %>

@@ -1251,6 +1251,101 @@ router.post(
   }
 );
 
+// ---------- Import UNC file → backfill tenDoiUng cho giao dich chi ----------
+// Luyen, 2026-08-18: "sao nó hk có tên người thụ hưởng á trên gg sheet Đi ủy
+// nhiệm chi có mà bạn làm cho tôi luôn đi ns" -- file UNC Excel (vd "Tạo lệnh
+// UNC KVC MB.xlsx") co cot "Nội dung trên UNC" va "Tên đơn vị thụ hưởng".
+// Doc file nay, ghep voi giao dich Chi co tenDoiUng trong (dua tren noi dung
+// UNC la substring cua dien giai ngan hang + so tien khop), dien tenDoiUng.
+// Xu ly TAT CA sheet trong file (moi sheet la 1 tai khoan/thang UNC khac nhau).
+function normUncText(s) {
+  return String(s || "")
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/đ/gi, "d")
+    .replace(/[^a-z0-9 ]/gi, " ")
+    .replace(/\s+/g, " ")
+    .toLowerCase()
+    .trim();
+}
+
+router.post(
+  "/transactions/import-unc",
+  requireAdmin,
+  upload.single("unc_file"),
+  (req, res) => {
+    if (!req.file) return res.json({ ok: false, message: "Không có file." });
+    const store = load();
+
+    // Parse all sheets
+    const wb = XLSX.read(req.file.buffer, { type: "buffer" });
+    const uncRows = []; // { noiDung, tenThuHuong, amount }
+
+    for (const sheetName of wb.SheetNames) {
+      const ws = wb.Sheets[sheetName];
+      const grid = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: null });
+
+      // Find header row
+      let hdr = null;
+      let hdrIdx = -1;
+      for (let r = 0; r < Math.min(grid.length, 10); r++) {
+        const row = (grid[r] || []).map((c) => normUncText(String(c || "")));
+        const noiDungCol = row.findIndex((h) => h.includes("noi dung") && (h.includes("unc") || h.includes("tren")));
+        const tenCol = row.findIndex((h) => h.includes("ten") && (h.includes("thu huong") || h.includes("don vi")));
+        const amtCol = row.findIndex((h) => h.includes("so tien") || h === "tien");
+        if (noiDungCol >= 0 && tenCol >= 0) {
+          hdr = { noiDungCol, tenCol, amtCol };
+          hdrIdx = r;
+          break;
+        }
+      }
+      if (!hdr) continue;
+
+      for (let r = hdrIdx + 1; r < grid.length; r++) {
+        const row = grid[r] || [];
+        const noiDung = String(row[hdr.noiDungCol] || "").trim();
+        const tenThuHuong = String(row[hdr.tenCol] || "").trim();
+        if (!noiDung || !tenThuHuong) continue;
+        const amount = hdr.amtCol >= 0 ? Math.abs(Number(String(row[hdr.amtCol]).replace(/[^0-9.]/g, "")) || 0) : 0;
+        uncRows.push({ noiDung, tenThuHuong, amount, noiDungNorm: normUncText(noiDung) });
+      }
+    }
+
+    if (uncRows.length === 0) {
+      return res.json({ ok: false, message: "Không tìm thấy dữ liệu UNC trong file (cần cột 'Nội dung trên UNC' và 'Tên đơn vị thụ hưởng')." });
+    }
+
+    // Match against store.transactions
+    let filled = 0;
+    const MIN_MATCH_LEN = 10; // minimum UNC noi dung length to avoid false positives
+
+    for (const tx of store.transactions) {
+      if (tx.type !== "chi") continue;
+      if (tx.tenDoiUng && tx.tenDoiUng.trim()) continue; // already has name
+
+      const descNorm = normUncText(tx.description);
+
+      for (const unc of uncRows) {
+        if (unc.noiDungNorm.length < MIN_MATCH_LEN) continue;
+        if (!descNorm.includes(unc.noiDungNorm)) continue;
+        // Amount check: if UNC has amount, must match (exact)
+        if (unc.amount > 0 && tx.amount !== unc.amount) continue;
+        tx.tenDoiUng = unc.tenThuHuong;
+        filled++;
+        break;
+      }
+    }
+
+    if (filled > 0) save(store);
+    res.json({
+      ok: true,
+      uncRows: uncRows.length,
+      filled,
+      message: `Đã điền tên thụ hưởng cho ${filled} giao dịch (đọc ${uncRows.length} dòng UNC từ ${wb.SheetNames.length} sheet).`,
+    });
+  }
+);
+
 // One-time migration: rename KVC ROYAL -> PINBALL DA NANG in vnpay_khmoi
 // uploads for dates >= 2026-07-31 (Luyen, 2026-08-08).
 // Idempotent -- safe to call multiple times.

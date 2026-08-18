@@ -335,6 +335,39 @@
       </form>
       <% } %>
 
+      <% if (typeof isAdmin !== 'undefined' && isAdmin) { %>
+      <!-- Luyen, 2026-08-18: import UNC file → backfill tên người thụ hưởng -->
+      <div style="margin:6px 0 14px;">
+        <form id="uncImportForm" style="display:inline-flex; align-items:center; gap:8px;">
+          <label style="font-size:13px; color:#555;">Điền tên thụ hưởng từ file UNC:</label>
+          <input type="file" id="uncFileInput" accept=".xlsx,.xls" style="font-size:12px;" />
+          <button type="submit" class="btn btn-secondary" style="font-size:12px;">Import UNC</button>
+          <span id="uncImportMsg" style="font-size:12px; color:#555;"></span>
+        </form>
+      </div>
+      <script>
+      document.getElementById('uncImportForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        const fileInput = document.getElementById('uncFileInput');
+        const msgEl = document.getElementById('uncImportMsg');
+        if (!fileInput.files.length) { msgEl.textContent = 'Chọn file UNC trước.'; return; }
+        const fd = new FormData();
+        fd.append('unc_file', fileInput.files[0]);
+        msgEl.textContent = 'Đang xử lý...';
+        try {
+          const r = await fetch('/transactions/import-unc', { method: 'POST', body: fd });
+          const j = await r.json();
+          msgEl.textContent = j.message || (j.ok ? 'Xong!' : 'Lỗi.');
+          msgEl.style.color = j.ok ? '#2a7' : '#e33';
+          if (j.ok && j.filled > 0) setTimeout(() => location.reload(), 1200);
+        } catch(err) {
+          msgEl.textContent = 'Lỗi: ' + err.message;
+          msgEl.style.color = '#e33';
+        }
+      });
+      </script>
+      <% } %>
+
       <p class="muted" style="margin:6px 0 10px;">
         Mẹo: giữ <strong>Ctrl</strong> (hoặc <strong>Cmd</strong> trên Mac) rồi bấm vào nhiều dòng để cộng tổng số tiền các dòng đã chọn.
       </p>
