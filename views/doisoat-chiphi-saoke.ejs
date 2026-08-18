@@ -154,7 +154,7 @@
 
     <!-- Modal MISA: backdrop riêng + card riêng, đều position:fixed -->
     <div id="misaBackdrop" style="display:none;position:fixed;inset:0;z-index:9998;background:rgba(0,0,0,0.5);" onclick="closeMisaModal()"></div>
-    <div id="misaCard" style="display:none;position:fixed;top:20px;left:50%;transform:translateX(-50%);width:96%;max-width:1260px;z-index:9999;background:#fff;border-radius:10px;box-shadow:0 8px 40px rgba(0,0,0,0.3);display:none;flex-direction:column;max-height:calc(100vh - 40px);">
+    <div id="misaCard" style="position:fixed;top:66px;left:50%;transform:translateX(-50%);width:96%;max-width:1260px;z-index:9999;background:#fff;border-radius:10px;box-shadow:0 8px 40px rgba(0,0,0,0.3);display:none;flex-direction:column;max-height:calc(100vh - 76px);overflow:hidden;">
       <!-- Header cố định -->
       <div style="flex-shrink:0;padding:12px 18px;border-bottom:1px solid #e0e0e0;border-radius:10px 10px 0 0;background:#fff;">
         <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">
@@ -179,7 +179,7 @@
         </div>
       </div>
       <!-- Body cuộn -->
-      <div style="flex:1;overflow:auto;padding:0 4px 12px;">
+      <div style="flex:1;min-height:0;overflow:auto;padding:0 4px 12px;">
         <p id="misaLoading" style="text-align:center;color:#888;padding:20px;">Đang tải dữ liệu...</p>
         <table id="misaTable" style="display:none;width:100%;border-collapse:collapse;font-size:12px;">
           <thead>
@@ -199,6 +199,12 @@
           </thead>
           <tbody id="misaTbody"></tbody>
         </table>
+      </div>
+      <!-- Footer: nút xuất ở dưới -->
+      <div id="misaFooter" style="flex-shrink:0;padding:10px 18px;border-top:1px solid #e0e0e0;background:#f8f9fa;border-radius:0 0 10px 10px;display:flex;align-items:center;justify-content:flex-end;gap:12px;">
+        <span id="misaFooterCount" style="font-size:12px;color:#555;"></span>
+        <button onclick="exportMisa()" style="background:#1565c0;color:#fff;border:none;cursor:pointer;border-radius:6px;padding:8px 20px;font-size:14px;font-weight:700;">⬇ Tải MISA.xlsx</button>
+        <button onclick="closeMisaModal()" style="background:#eee;color:#333;border:none;cursor:pointer;border-radius:6px;padding:8px 14px;font-size:13px;">Đóng</button>
       </div>
     </div>
 
@@ -275,7 +281,9 @@
         tbody.appendChild(tr);
       });
       document.getElementById('misaTable').style.display = '';
-      document.getElementById('misaCount').textContent = _misaRows.length + ' dòng';
+      var countTxt = _misaRows.length + ' dòng';
+      document.getElementById('misaCount').textContent = countTxt;
+      document.getElementById('misaFooterCount').textContent = countTxt;
     }
 
     function updateMisaRow(el) {
