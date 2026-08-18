@@ -3051,6 +3051,54 @@ router.post("/doi-soat/vietqr/manual-match", requireDataEntry, (req, res) => {
   }
 });
 
+// Bulk save: nhieu dong cung luc tu bang Tong hop lech
+router.post("/doi-soat/vietqr/manual-match/bulk", requireDataEntry, (req, res) => {
+  const store = load();
+  ensureChannelShape(store);
+  try {
+    const toArr = (v) => (v === undefined || v === null) ? [] : Array.isArray(v) ? v : [v];
+    const channels       = toArr(req.body.channel);
+    const dates          = toArr(req.body.settlementDate);
+    const codes          = toArr(req.body.code);
+    const invNumbers     = toArr(req.body.invoiceNumbers);
+    const amounts        = toArr(req.body.amount);
+    const grossAdjs      = toArr(req.body.grossAdjustment);
+    const returnChannel  = req.body.returnChannel || "";
+
+    let savedCount = 0;
+    for (let i = 0; i < channels.length; i++) {
+      const ch   = channels[i];
+      const d    = dates[i];
+      const c    = codes[i];
+      if (!ch || !d || !c || !CHANNELS[ch]) continue;
+      const key = `${d}|${c}`;
+      const invoiceList = (invNumbers[i] || "").split(/[,\s]+/).map((s) => s.trim()).filter(Boolean);
+      const amt = amounts[i] ? Number(String(amounts[i]).replace(/[^\d]/g, "")) : null;
+      let grossAdj = 0;
+      if (grossAdjs[i]) {
+        const raw = String(grossAdjs[i]).trim();
+        const isNeg = raw.startsWith("-");
+        const digits = raw.replace(/[^\d]/g, "");
+        if (digits) grossAdj = (isNeg ? -1 : 1) * Number(digits);
+      }
+      if (!store.viet_qr_manual_matches[ch]) store.viet_qr_manual_matches[ch] = {};
+      store.viet_qr_manual_matches[ch][key] = {
+        invoiceNumbers: invoiceList,
+        amount: amt,
+        grossAdjustment: grossAdj || 0,
+        note: "",
+        created_at: new Date().toISOString(),
+      };
+      savedCount++;
+    }
+    save(store);
+    const base = "/doi-soat/vietqr" + (returnChannel ? "?channel=" + encodeURIComponent(returnChannel) : "");
+    res.redirect(base + (returnChannel ? "&" : "?") + "success=" + encodeURIComponent("Đã lưu " + savedCount + " dòng."));
+  } catch (e) {
+    res.redirect("/doi-soat/vietqr?error=" + encodeURIComponent(e.message));
+  }
+});
+
 router.post("/doi-soat/vietqr/manual-match/delete", requireAdmin, (req, res) => {
   const store = load();
   ensureChannelShape(store);

@@ -936,11 +936,13 @@
       <% } %>
 
       <%
-        // Tong hop tat ca dong bi lech (khong locked, khong SKIP)
+        // Tong hop tat ca dong bi lech (khong locked, khong SKIP, khong manualOverride)
+        // manualOverride = da bu tru roi -> an di khoi bang nay
         var lechRows = [];
         (reconciled[ch] || []).forEach(function(r) {
           (r.lines || []).forEach(function(l) {
             if (l.locked || l.tkCo === 'SKIP') return;
+            if (l.manualOverride) return;
             if (Math.abs(l.diff) < 1) return;
             lechRows.push({ date: r.settlementDate, l: l, ch: ch });
           });
@@ -951,68 +953,79 @@
         <summary style="font-weight:600; cursor:pointer; padding:6px 0;">
           ⚠️ Tổng hợp lệch — <%= lechRows.length %> dòng chưa khớp
         </summary>
-        <div style="overflow-x:auto; margin-top:8px;">
-        <table class="table" style="font-size:12px; min-width:700px;">
-          <thead>
+        <form method="POST" action="/doi-soat/vietqr/manual-match/bulk" id="bulkLechForm-<%= ch %>">
+          <input type="hidden" name="returnChannel" value="<%= ch %>">
+          <div style="display:flex; gap:10px; align-items:center; margin:8px 0;">
+            <button type="submit" style="font-size:12px; padding:5px 12px; background:#0d6efd; color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:600;">
+              💾 Lưu tất cả đã chọn
+            </button>
+            <label style="font-size:12px; cursor:pointer; display:flex; align-items:center; gap:4px;">
+              <input type="checkbox" id="selectAllLech-<%= ch %>"
+                onchange="toggleAllLech('<%= ch %>', this.checked)" checked>
+              Chọn tất cả
+            </label>
+            <span class="muted" style="font-size:11px;">Điền số HĐ / tiền HĐ / sửa DT rồi bấm Lưu. Hàng nào đã lưu sẽ tự biến mất.</span>
+          </div>
+          <div style="overflow-x:auto;">
+          <table class="table" style="font-size:12px; min-width:820px;">
+            <thead>
+              <tr>
+                <th style="width:28px;"></th>
+                <th style="white-space:nowrap;">Ngày</th>
+                <th>Mã công trình</th>
+                <th style="text-align:right;">DT (NH)</th>
+                <th style="text-align:right;">Tổng HĐ</th>
+                <th style="text-align:right;">Lệch</th>
+                <th>Số HĐ</th>
+                <th>Tiền HĐ</th>
+                <th>Sửa DT (+/-)</th>
+              </tr>
+            </thead>
+            <tbody>
+            <% lechRows.forEach(function(item, idx) { var l = item.l; var fid = ch + '_' + idx; %>
             <tr>
-              <th style="white-space:nowrap;">Ngày</th>
-              <th>Mã công trình</th>
-              <th style="text-align:right;">DT (Ngân hàng)</th>
-              <th style="text-align:right;">Tổng tiền HĐ</th>
-              <th style="text-align:right;">Lệch</th>
-              <th>Điều chỉnh DT</th>
-              <th>Điều chỉnh HĐ</th>
-            </tr>
-          </thead>
-          <tbody>
-          <% lechRows.forEach(function(item) { var l = item.l; %>
-          <tr>
-            <td style="white-space:nowrap;"><%= item.date %></td>
-            <td><%= l.maCongTrinh || l.code %></td>
-            <td style="text-align:right;"><%= l.gross.toLocaleString('vi-VN') %></td>
-            <td style="text-align:right;"><%= l.invoiceTotal.toLocaleString('vi-VN') %></td>
-            <td style="text-align:right;" class="<%= l.diff > 0 ? 'text-pos' : 'text-neg' %>"><%= l.diff.toLocaleString('vi-VN') %></td>
-            <td>
-              <% if (!l.manualOverride) { %>
-              <form method="POST" action="/doi-soat/vietqr/manual-match" style="display:flex; gap:4px; align-items:center;">
-                <input type="hidden" name="channel" value="<%= ch %>" />
-                <input type="hidden" name="settlementDate" value="<%= item.date %>" />
-                <input type="hidden" name="code" value="<%= l.code %>" />
-                <input type="hidden" name="invoiceNumbers" value="<%= (l.invoiceNumbers||[]).join(', ') %>" />
-                <input type="hidden" name="amount" value="<%= l.invoiceTotal %>" />
-                <input type="number" name="grossAdjustment" placeholder="+/- Sửa DT"
-                  title="Cộng/trừ vào doanh thu ngân hàng của dòng này"
-                  style="width:90px; font-size:11px;" />
-                <button type="submit" class="link-btn" style="font-size:11px; white-space:nowrap;">Lưu DT</button>
-              </form>
-              <% } else { %>
-              <span class="muted" style="font-size:11px;">Đã bù trừ</span>
-              <% } %>
-            </td>
-            <td>
-              <form method="POST" action="/doi-soat/vietqr/manual-match" style="display:flex; gap:4px; align-items:center;">
-                <input type="hidden" name="channel" value="<%= ch %>" />
-                <input type="hidden" name="settlementDate" value="<%= item.date %>" />
-                <input type="hidden" name="code" value="<%= l.code %>" />
-                <% if (l.manualOverride) { %>
-                <input type="hidden" name="invoiceNumbers" value="<%= (l.invoiceNumbers||[]).join(', ') %>" />
-                <input type="number" name="amount" placeholder="Số tiền HĐ"
-                  style="width:90px; font-size:11px;" />
-                <% } else { %>
+              <td>
+                <input type="checkbox" class="lech-sel-<%= ch %>"
+                  onchange="toggleLechRow('<%= fid %>', this.checked)" checked>
+              </td>
+              <td style="white-space:nowrap;"><%= item.date %></td>
+              <td><%= l.maCongTrinh || l.code %></td>
+              <td style="text-align:right;"><%= l.gross.toLocaleString('vi-VN') %></td>
+              <td style="text-align:right;"><%= l.invoiceTotal.toLocaleString('vi-VN') %></td>
+              <td style="text-align:right;" class="<%= l.diff > 0 ? 'text-pos' : 'text-neg' %>">
+                <%= l.diff.toLocaleString('vi-VN') %>
+              </td>
+              <td>
+                <input type="hidden" name="channel" value="<%= ch %>" class="lech-f-<%= fid %>">
+                <input type="hidden" name="settlementDate" value="<%= item.date %>" class="lech-f-<%= fid %>">
+                <input type="hidden" name="code" value="<%= l.code %>" class="lech-f-<%= fid %>">
                 <input type="text" name="invoiceNumbers" value="<%= (l.invoiceNumbers||[]).join(', ') %>"
-                  placeholder="Số HĐ" style="width:80px; font-size:11px;" />
+                  placeholder="Số HĐ" style="width:80px; font-size:11px;" class="lech-f-<%= fid %>">
+              </td>
+              <td>
                 <input type="number" name="amount" value="<%= l.invoiceTotal %>"
-                  placeholder="Số tiền" style="width:80px; font-size:11px;" />
-                <% } %>
-                <button type="submit" class="link-btn" style="font-size:11px; white-space:nowrap;">Lưu HĐ</button>
-              </form>
-            </td>
-          </tr>
-          <% }) %>
-          </tbody>
-        </table>
-        </div>
+                  placeholder="Tiền HĐ" style="width:80px; font-size:11px;" class="lech-f-<%= fid %>">
+              </td>
+              <td>
+                <input type="text" name="grossAdjustment" value=""
+                  placeholder="+/-" style="width:65px; font-size:11px;" class="lech-f-<%= fid %>">
+              </td>
+            </tr>
+            <% }) %>
+            </tbody>
+          </table>
+          </div>
+        </form>
       </details>
+      <script>
+      function toggleLechRow(fid, checked) {
+        document.querySelectorAll('.lech-f-' + fid).forEach(function(el) { el.disabled = !checked; });
+      }
+      function toggleAllLech(ch, checked) {
+        document.querySelectorAll('.lech-sel-' + ch).forEach(function(cb) { cb.checked = checked; });
+        document.querySelectorAll('[class*="lech-f-' + ch + '_"]').forEach(function(el) { el.disabled = !checked; });
+      }
+      </script>
       <% } %>
 
       <div style="margin-top:16px;">
