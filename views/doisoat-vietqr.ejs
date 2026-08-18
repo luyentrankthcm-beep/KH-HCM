@@ -836,12 +836,26 @@
         else if (!cell.invoiceNumbers || cell.invoiceNumbers.length === 0) statusHtml = '<span class="badge badge-chi">Chưa có HĐ</span>';
         else if (cell.matched) statusHtml = '<span class="badge badge-thu">Khớp</span>';
         else statusHtml = '<span class="badge badge-chi">Lệch ' + cell.diff.toLocaleString('vi-VN') + ' đ</span>';
+
+        var deleteBtn = '';
+        if (cell.manualOverride) {
+          var safeCode = (row.code || '').replace(/'/g, "\\'");
+          deleteBtn =
+            '<form method="POST" action="/doi-soat/vietqr/manual-match/delete" style="display:inline; margin-left:8px;"' +
+            ' onsubmit="vqrCloseModal(); return xoaBuTruConfirm(this, \'' + safeCode + '\', \'' + date + '\')">' +
+            '<input type="hidden" name="channel" value="' + ch + '" />' +
+            '<input type="hidden" name="settlementDate" value="' + date + '" />' +
+            '<input type="hidden" name="code" value="' + (row.code || '') + '" />' +
+            '<button type="submit" class="link-btn link-danger" style="font-size:11px; margin-left:4px;">Xoá bù trừ</button>' +
+            '</form>';
+        }
+
         body.innerHTML =
           '<p style="margin:0 0 8px;"><strong>' + row.maCongTrinh + (row.isCse ? ' (CSE)' : '') + '</strong> — Ngày ' + date + '</p>' +
           '<p style="margin:0;">TK Có: ' + (cell.tkCo === 'SKIP' ? '—' : cell.tkCo) +
           ' &nbsp;|&nbsp; Doanh thu: ' + cell.gross.toLocaleString('vi-VN') + ' đ</p>' +
           '<p style="margin:4px 0 0;">Tổng tiền HĐ: ' + cell.invoiceTotal.toLocaleString('vi-VN') + ' đ' +
-          ' &nbsp;|&nbsp; ' + statusHtml + '</p>' +
+          ' &nbsp;|&nbsp; ' + statusHtml + deleteBtn + '</p>' +
           '<p style="margin:8px 0 0;">Số HĐ khớp: ' + ((cell.invoiceNumbers && cell.invoiceNumbers.join(', ')) || '-') + '</p>';
         vqrOpenModal();
       }
@@ -1044,7 +1058,8 @@
                     <% } else { %>
                       <span class="badge badge-chi">Lệch (đã bù 1 phần) còn <%= l.diff.toLocaleString('vi-VN') %> đ</span>
                     <% } %>
-                    <form method="POST" action="/doi-soat/vietqr/manual-match/delete" style="display:inline;" onsubmit="return confirm('Xoá đánh dấu thủ công này?');">
+                    <form method="POST" action="/doi-soat/vietqr/manual-match/delete" style="display:inline;"
+                          onsubmit="return xoaBuTruConfirm(this, '<%= l.code.replace(/'/g,"\\'") %>', '<%= r.settlementDate %>');">
                       <input type="hidden" name="channel" value="<%= ch %>" />
                       <input type="hidden" name="settlementDate" value="<%= r.settlementDate %>" />
                       <input type="hidden" name="code" value="<%= l.code %>" />
@@ -1095,5 +1110,47 @@
       <div id="vqr-modal-body"></div>
     </div>
   </div>
+
+  <!-- Custom confirm modal cho Xoá bù trừ thủ công -->
+  <div id="xoa-bu-tru-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:9999; align-items:center; justify-content:center;">
+    <div style="background:#fff; border-radius:10px; padding:28px 32px; max-width:400px; width:90%; box-shadow:0 8px 32px rgba(0,0,0,.25); text-align:center;">
+      <div style="font-size:2rem; margin-bottom:8px;">⚠️</div>
+      <h3 style="margin:0 0 10px; color:#c0392b; font-size:1.1rem;">Xoá bù trừ thủ công</h3>
+      <p style="margin:0 0 6px; font-size:.95rem;" id="xoa-bu-tru-msg"></p>
+      <p style="margin:0 0 20px; font-size:.85rem; color:#888;">Sau khi xoá, gian sẽ trở về trạng thái lệch. Bạn có chắc không?</p>
+      <div style="display:flex; gap:12px; justify-content:center;">
+        <button onclick="xoaBuTruHuy()" style="padding:8px 24px; border:1px solid #ccc; border-radius:6px; background:#f5f5f5; cursor:pointer; font-size:.9rem;">Hủy</button>
+        <button onclick="xoaBuTruXacNhan()" style="padding:8px 24px; border:none; border-radius:6px; background:#c0392b; color:#fff; cursor:pointer; font-size:.9rem; font-weight:600;">Xoá</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    var _xoaBuTruForm = null;
+    function xoaBuTruConfirm(form, code, date) {
+      _xoaBuTruForm = form;
+      var msg = document.getElementById('xoa-bu-tru-msg');
+      msg.innerHTML = '<strong>' + code + '</strong> — Ngày ' + date;
+      var overlay = document.getElementById('xoa-bu-tru-overlay');
+      overlay.style.display = 'flex';
+      return false; // chặn submit ngay
+    }
+    function xoaBuTruHuy() {
+      _xoaBuTruForm = null;
+      document.getElementById('xoa-bu-tru-overlay').style.display = 'none';
+    }
+    function xoaBuTruXacNhan() {
+      document.getElementById('xoa-bu-tru-overlay').style.display = 'none';
+      if (_xoaBuTruForm) {
+        var f = _xoaBuTruForm;
+        _xoaBuTruForm = null;
+        f.removeAttribute('onsubmit');
+        f.submit();
+      }
+    }
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape' && document.getElementById('xoa-bu-tru-overlay').style.display !== 'none') xoaBuTruHuy();
+    });
+  </script>
 </body>
 </html>
