@@ -1430,6 +1430,20 @@ function buildChannelReconciliation(store, channelKey) {
     if (selfCandidates.length > 0) gianCandidates = gianCandidates.concat(selfCandidates);
   }
 
+  // Luyen, 2026-08-18: "xóa khỏi MB 11521268 ln đi á" -- sau khi gop
+  // selfCandidates, co the co candidate voi maCongTrinh la 1 ma DA MERGE
+  // (vd "SB PHU QUOC PHCM" duoc tao thanh selfCandidate vi store names co
+  // tenDiemBan = "SB PHU QUOC PHCM"). Apply gian_merge LAN NUA de dam bao
+  // KHONG CON candidate nao tro ve ma bi merge -- neu con, resolveGianGross
+  // se tra ve code "SB PHU QUOC PHCM" thay vi "CHKQT PHU QUOC", bypass ca
+  // buoc gop gross o duoi (lines 1529-1550).
+  if (mergeKeys.length > 0) {
+    gianCandidates = gianCandidates.map((c) => {
+      const merge = gianMerge[c.maCongTrinh];
+      return merge ? { ...c, maCongTrinh: merge.maCongTrinh } : c;
+    });
+  }
+
   // BIDV7702/VietQR MN: khop gian theo tien to ten cua hang (vd "AMTP 01"
   // -> "AMTP" ung voi ma cong trinh "AM TP KVCM"), khong dung fuzzy text
   // matcher nhu 3 kenh kia -- xem ghi chu tai CHANNELS.bidv7702 o tren.
