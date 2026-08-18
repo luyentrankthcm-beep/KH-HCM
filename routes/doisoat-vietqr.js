@@ -3508,6 +3508,81 @@ router.get("/doi-soat/vietqr/debug/:channel", requireAdmin, (req, res) => {
   });
 });
 
+// ---------- Danh muc: File MTT ----------
+// Trang rieng de upload file MTT va quan ly danh sach hoa don cho tat ca kenh.
+// Luyen, 2026-08-18: "thêm trong danh mục file MTT đi á xong tôi tải file đó
+// lên bạn cập nhật cho tôi Kh cũ và Kh mới tất cả đối soát cho tôi nhá"
+router.get("/danh-muc/file-mtt", requireLogin, (req, res) => {
+  const store = load();
+  ensureChannelShape(store);
+  const channelStats = CHANNEL_KEYS.map((ch) => ({
+    key: ch,
+    label: CHANNELS[ch].label,
+    company: CHANNELS[ch].company === "kh_moi" ? "KH Mới" : "KH Cũ",
+    count: (store.viet_qr_invoices[ch] || []).length,
+  }));
+  res.render("danh-muc-file-mtt", {
+    channelStats,
+    success: req.query.success || null,
+    error: req.query.error || null,
+    isAdmin: res.locals.isAdmin,
+    isDataEntry: res.locals.isDataEntry,
+    user: res.locals.user,
+  });
+});
+
+router.post("/danh-muc/file-mtt/upload", requireDataEntry, upload.single("file"), (req, res) => {
+  const store = load();
+  ensureChannelShape(store);
+  try {
+    if (!req.file) throw new Error("Vui lòng chọn 1 file để tải lên.");
+    const addedCounts = {};
+    let sheetName = null;
+    for (const ch of CHANNEL_KEYS) {
+      const parsed = parseInvoiceWorkbookByTag(req.file.buffer, CHANNELS[ch].tagPattern);
+      sheetName = parsed.sheetName;
+      const existingKeys = new Set(store.viet_qr_invoices[ch].map((i) => `${i.soHd}|${i.ngayHd}|${i.maDiem}`));
+      const existingDayDiem = new Set(
+        store.viet_qr_invoices[ch].map((i) => `${i.ngayHd}|${i.maDiem}|${(i.days || []).slice().sort().join(",")}`)
+      );
+      let added = 0;
+      for (const inv of parsed.invoices) {
+        const k = `${inv.soHd}|${inv.ngayHd}|${inv.maDiem}`;
+        if (existingKeys.has(k)) continue;
+        const k2 = `${inv.ngayHd}|${inv.maDiem}|${(inv.days || []).slice().sort().join(",")}`;
+        if (existingDayDiem.has(k2)) continue;
+        existingKeys.add(k);
+        existingDayDiem.add(k2);
+        store.viet_qr_invoices[ch].push(inv);
+        added++;
+      }
+      addedCounts[ch] = added;
+    }
+    save(store);
+    const summary = CHANNEL_KEYS.map((ch) => `${CHANNELS[ch].label}: +${addedCounts[ch]}`).join(", ");
+    res.redirect(
+      "/danh-muc/file-mtt?success=" +
+        encodeURIComponent(`Đã nạp sheet "${sheetName}" — thêm mới theo kênh: ${summary}.`)
+    );
+  } catch (e) {
+    res.redirect("/danh-muc/file-mtt?error=" + encodeURIComponent(e.message));
+  }
+});
+
+router.post("/danh-muc/file-mtt/xoa-het", requireAdmin, (req, res) => {
+  const store = load();
+  ensureChannelShape(store);
+  const { channel } = req.body;
+  if (channel && CHANNELS[channel]) {
+    store.viet_qr_invoices[channel] = [];
+  } else {
+    for (const ch of CHANNEL_KEYS) store.viet_qr_invoices[ch] = [];
+  }
+  save(store);
+  const label = channel ? CHANNELS[channel].label : "tất cả kênh";
+  res.redirect("/danh-muc/file-mtt?success=" + encodeURIComponent(`Đã xóa toàn bộ hóa đơn: ${label}.`));
+});
+
 // Exposed so routes/dashboard.js (Tong quan / Cong no) can reuse the exact
 // same per-channel reconciliation this page shows, without a second
 // implementation. CHANNELS/CHANNEL_KEYS let the caller loop over all 3 Viet

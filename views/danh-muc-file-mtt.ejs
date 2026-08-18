@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <%- include('partials/head') %>
+</head>
+<body>
+  <%- include('partials/nav') %>
+  <main class="container">
+    <h1>File MTT — Danh sách hóa đơn VietQR</h1>
+    <p class="muted" style="margin-top:-10px;margin-bottom:20px;">
+      Upload file MTT dùng chung để cập nhật hóa đơn cho <strong>tất cả kênh VietQR</strong> (KH Cũ + KH Mới) cùng lúc.
+    </p>
+
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+    <% if (success) { %><div class="alert alert-success"><%= success %></div><% } %>
+
+    <!-- Upload -->
+    <section class="panel" style="margin-bottom:16px;">
+      <div class="panel-head"><h2>&#128229; Tải lên file MTT</h2></div>
+      <form method="POST" action="/danh-muc/file-mtt/upload" enctype="multipart/form-data"
+            style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;padding-top:4px;">
+        <div>
+          <label style="display:block;font-size:12px;color:var(--muted);margin-bottom:3px;">Chọn file Excel MTT (.xlsx)</label>
+          <input type="file" name="file" accept=".xlsx,.xls" required style="min-width:280px;" />
+        </div>
+        <button type="submit" class="btn btn-primary">Tải lên &amp; cập nhật tất cả kênh</button>
+      </form>
+      <p style="font-size:12px;color:var(--muted);margin-top:8px;">
+        Hệ thống tự nhận dạng tag của từng kênh trong file và thêm hóa đơn mới (không xóa hóa đơn cũ, không thêm trùng).
+      </p>
+    </section>
+
+    <!-- Thống kê số hóa đơn theo kênh -->
+    <section class="panel" style="margin-bottom:16px;">
+      <div class="panel-head"><h2>Số hóa đơn hiện có theo kênh</h2></div>
+      <table class="table" style="margin-top:8px;">
+        <thead>
+          <tr>
+            <th>Kênh</th>
+            <th>Loại</th>
+            <th style="text-align:right;">Số hóa đơn</th>
+            <% if (typeof isAdmin !== 'undefined' && isAdmin) { %>
+            <th style="text-align:center;">Xóa</th>
+            <% } %>
+          </tr>
+        </thead>
+        <tbody>
+          <% channelStats.forEach(function(ch) { %>
+          <tr>
+            <td><%= ch.label %></td>
+            <td><span style="font-size:12px;color:var(--muted);"><%= ch.company %></span></td>
+            <td style="text-align:right;font-weight:600;"><%= ch.count.toLocaleString('vi-VN') %></td>
+            <% if (typeof isAdmin !== 'undefined' && isAdmin) { %>
+            <td style="text-align:center;">
+              <form method="POST" action="/danh-muc/file-mtt/xoa-het"
+                    onsubmit="return confirm('Xóa toàn bộ hóa đơn kênh <%= ch.label %>?')">
+                <input type="hidden" name="channel" value="<%= ch.key %>" />
+                <button type="submit" class="btn btn-danger" style="padding:2px 10px;font-size:12px;">Xóa hết</button>
+              </form>
+            </td>
+            <% } %>
+          </tr>
+          <% }); %>
+          <tr style="font-weight:700;border-top:2px solid var(--border);">
+            <td colspan="2">Tổng</td>
+            <td style="text-align:right;">
+              <%= channelStats.reduce(function(sum,ch){return sum+ch.count;},0).toLocaleString('vi-VN') %>
+            </td>
+            <% if (typeof isAdmin !== 'undefined' && isAdmin) { %>
+            <td style="text-align:center;">
+              <form method="POST" action="/danh-muc/file-mtt/xoa-het"
+                    onsubmit="return confirm('Xóa toàn bộ hóa đơn TẤT CẢ kênh?')">
+                <button type="submit" class="btn btn-danger" style="padding:2px 10px;font-size:12px;">Xóa tất cả</button>
+              </form>
+            </td>
+            <% } %>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <p style="font-size:12px;color:var(--muted);">
+      Sau khi tải lên, vào trang <a href="/doi-soat/vietqr">Đối soát VietQR</a> để xem kết quả cập nhật.
+    </p>
+  </main>
+</body>
+</html>
