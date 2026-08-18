@@ -1130,8 +1130,9 @@
                   <span style="display:inline-flex; align-items:center; gap:3px; margin-left:4px;">
                     <span title="<%= tx.description %>"><%= tx.amount.toLocaleString('vi-VN') %>đ</span>
                     <form method="POST" action="/doi-soat/vietqr/xoa-gd-ngoai" style="display:inline;"
-                          onsubmit="return confirm('Loại GD <%= tx.amount.toLocaleString('vi-VN') %>đ ngày <%= tx.date %> khỏi đối soát?');">
+                          onsubmit="return confirm('Cộng GD <%= tx.amount.toLocaleString('vi-VN') %>đ ngày <%= tx.date %> vào tổng ngân hàng (bỏ khỏi danh sách trừ)?');">
                       <input type="hidden" name="txId" value="<%= tx.id %>" />
+                      <input type="hidden" name="channel" value="<%= ch %>" />
                       <input type="hidden" name="returnUrl" value="/doi-soat/vietqr?channel=<%= ch %>" />
                       <button type="submit" class="link-btn link-danger" style="font-size:11px; padding:0 2px;" title="Loại khỏi đối soát">✕</button>
                     </form>

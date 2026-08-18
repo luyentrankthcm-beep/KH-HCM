@@ -850,6 +850,30 @@ function ensureChannelShape(store) {
   // (dung y "cái nào mới thì thông báo"). Xem tanPhuAutoApplied trong
   // buildChannelReconciliation va route /doi-soat/vietqr/tanphu-ack/:channel.
   if (!store.viet_qr_tanphu_ack) store.viet_qr_tanphu_ack = {};
+  // Luyen, 2026-08-18: nut X tren "(da tru Xd khong phai VietQR)" -- truoc day
+  // danh dau tx.excludeFromVietQrRecon=true lam tx bi loai KHOI CA 2 phia (bank
+  // total va excluded list) nen bank khong doi, van lech. Dung: giu tx trong
+  // bank total (settlements), chi bo khoi refUnmatchedBankTx de khong con hien
+  // "(da tru...)". Dung store.viet_qr_unmatched_ack[channel][txId] = true.
+  // Migration: chuyen cac tx.excludeFromVietQrRecon cu -> ack set.
+  if (!store.viet_qr_unmatched_ack) store.viet_qr_unmatched_ack = {};
+  {
+    const bankNameToChannel = {};
+    Object.entries(CHANNELS).forEach(([ch, cfg]) => { bankNameToChannel[cfg.bankName] = ch; });
+    const bankIdToName = {};
+    (store.banks || []).forEach((b) => { bankIdToName[b.id] = b.name; });
+    let migrated = false;
+    (store.transactions || []).forEach((tx) => {
+      if (!tx.excludeFromVietQrRecon) return;
+      const ch = bankNameToChannel[bankIdToName[tx.bank_id]];
+      if (!ch) return;
+      if (!store.viet_qr_unmatched_ack[ch]) store.viet_qr_unmatched_ack[ch] = {};
+      store.viet_qr_unmatched_ack[ch][String(tx.id)] = true;
+      delete tx.excludeFromVietQrRecon;
+      migrated = true;
+    });
+    if (migrated) save(store);
+  }
   // Luyen, 2026-08-14: doi tu fill-if-empty sang ghi de KHONG DIEU KIEN
   // (giong TEN_DIEM_MASTER_DEFAULTS o duoi, xem ly do tai ghi chu dong 869).
   // fill-if-empty khong bao gio sua duoc gia tri SAI da co san trong
@@ -1482,7 +1506,12 @@ function buildChannelReconciliation(store, channelKey) {
     resolved.codes = Array.from(filteredCodes);
     resolved.grossByCode = filteredGrossByCode;
 
-    refUnmatchedBankTx = refResolved.unmatchedBankTx;
+    // Loc bo cac tx da duoc ack (nguoi dung bam X, dong y giu trong bank total
+    // nhung bo khoi canh bao "(da tru khong phai VietQR)").
+    const _ackSet = new Set(Object.keys((store.viet_qr_unmatched_ack || {})[channelKey] || {}));
+    refUnmatchedBankTx = refResolved.unmatchedBankTx.filter(
+      (tx) => !_ackSet.has(String(tx.id))
+    );
     refLateMatches = refResolved.lateMatches;
     refUnmappedStoreCodes = refResolved.unmappedStoreCodes;
     refUnmappedTenDiem = refResolved.unmappedTenDiem;
@@ -3115,17 +3144,37 @@ router.post("/doi-soat/vietqr/manual-match/delete", requireAdmin, (req, res) => 
 });
 
 // ---------- Xóa giao dịch ngoài VietQR (đánh dấu excludeFromVietQrRecon) ----------
+// Giao dich ngan hang co trong "(da tru Xd khong phai VietQR)" -> bam X de:
+// KHONG con truoc day: danh dau excludeFromVietQrRecon (loai tx khoi ca 2 phia)
+// MAY GIO: them vao viet_qr_unmatched_ack -> tx VAN o trong bank total (settlements)
+// nhung KHONG con hien canh bao "(da tru...)". Ket qua: bank tang len dung so,
+// Lech Ngan hang<->Du lieu hien ro rang thay vi bi "an" mat.
 router.post("/doi-soat/vietqr/xoa-gd-ngoai", requireAdmin, (req, res) => {
   const store = load();
+  ensureChannelShape(store);
   try {
-    const { txId, returnUrl } = req.body;
+    const { txId, channel, returnUrl } = req.body;
     if (!txId) throw new Error("Thiếu txId");
     const tx = store.transactions.find((t) => String(t.id) === String(txId));
     if (!tx) throw new Error("Không tìm thấy giao dịch id=" + txId);
-    tx.excludeFromVietQrRecon = true;
+    // Xac dinh channel tu bank_id neu form khong gui channel
+    let ch = channel;
+    if (!ch) {
+      const bankNameToChannel = {};
+      Object.entries(CHANNELS).forEach(([c, cfg]) => { bankNameToChannel[cfg.bankName] = c; });
+      const bank = (store.banks || []).find((b) => b.id === tx.bank_id);
+      if (bank) ch = bankNameToChannel[bank.name];
+    }
+    if (!ch || !CHANNELS[ch]) throw new Error("Không xác định được kênh cho giao dịch này.");
+    // Them vao ack set (giu trong bank total, bo khoi "(da tru...)")
+    if (!store.viet_qr_unmatched_ack) store.viet_qr_unmatched_ack = {};
+    if (!store.viet_qr_unmatched_ack[ch]) store.viet_qr_unmatched_ack[ch] = {};
+    store.viet_qr_unmatched_ack[ch][String(txId)] = true;
+    // Revert excludeFromVietQrRecon neu da set truoc do (migration)
+    if (tx.excludeFromVietQrRecon) delete tx.excludeFromVietQrRecon;
     save(store);
     const redirect = returnUrl || "/doi-soat/vietqr";
-    res.redirect(redirect + (redirect.includes("?") ? "&" : "?") + "success=" + encodeURIComponent("Đã loại giao dịch " + (tx.amount || "").toLocaleString("vi-VN") + "đ khỏi đối soát."));
+    res.redirect(redirect + (redirect.includes("?") ? "&" : "?") + "success=" + encodeURIComponent("Đã cộng giao dịch " + Number(tx.amount || 0).toLocaleString("vi-VN") + "đ vào tổng ngân hàng ngày " + (tx.date || "") + "."));
   } catch (e) {
     res.redirect((req.body.returnUrl || "/doi-soat/vietqr") + "?error=" + encodeURIComponent(e.message));
   }
