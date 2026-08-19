@@ -468,8 +468,13 @@ router.post("/transactions/upload-statement", requireDataEntry, upload.single("f
   // luu) de co the SUA (backfill) truc tiep dong da co san, khong chi biet
   // "co roi" nhu Set truoc day.
   const existingByRef = new Map(bankTx.filter((t) => t.reference).map((t) => [t.reference, t]));
+  // Luyen, 2026-08-19: include description in dedup key so that multiple
+  // same-day same-amount transactions with different descriptions are NOT
+  // collapsed into one (e.g. 3 CTNB 490M on the same day for ACB).
+  // Previously only date|amount|type was used, which silently dropped rows 2+.
+  const _descKey = (d) => String(d || "").replace(/\s+/g, " ").trim().slice(0, 120);
   const existingKeys = new Set(
-    bankTx.filter((t) => !t.reference).map((t) => `${t.date}|${t.amount}|${t.type}`)
+    bankTx.filter((t) => !t.reference).map((t) => `${t.date}|${t.amount}|${t.type}|${_descKey(t.description)}`)
   );
 
   let added = 0;
@@ -504,7 +509,7 @@ router.post("/transactions/upload-statement", requireDataEntry, upload.single("f
         continue;
       }
     } else {
-      const key = `${c.date}|${c.amount}|${c.type}`;
+      const key = `${c.date}|${c.amount}|${c.type}|${_descKey(c.description)}`;
       if (existingKeys.has(key)) {
         skipped++;
         continue;
