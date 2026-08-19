@@ -1646,7 +1646,9 @@ function reconcileVietQr(settlements, grossData, invoiceData, gianMapping, manua
       }
       const iso = `${y}-${String(mo).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
       for (const diemKey of diemKeysToIndex) {
-        const key = `${diemKey}|${iso}`;
+        // Normalize to uppercase so maDiem từ invoice (normCode → uppercase)
+        // khớp được với bucketCode từ viet_qr_store_names (có thể mixed case).
+        const key = `${String(diemKey).toUpperCase()}|${iso}`;
         if (!invoicesByDiemDay[key]) invoicesByDiemDay[key] = [];
         invoicesByDiemDay[key].push(inv);
       }
@@ -1672,7 +1674,7 @@ function reconcileVietQr(settlements, grossData, invoiceData, gianMapping, manua
         }
         gianLines[bucketCode].gross += gross;
         const invLookupCode = (bucketCode === "__VANG_LAI__" && vangLaiCode) ? vangLaiCode : bucketCode;
-        const invs = invoicesByDiemDay[`${invLookupCode}|${day}`] || [];
+        const invs = invoicesByDiemDay[`${String(invLookupCode).toUpperCase()}|${day}`] || [];
         for (const inv of invs) gianLines[bucketCode].invoices.add(inv.soHd);
       }
     }
