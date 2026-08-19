@@ -215,7 +215,12 @@ router.get("/transactions", (req, res) => {
     duplicateSummary,
     bankStatementUploads: bankStatementUploadsFor(store, companyBankIds(store, activeCompany)),
     descGianRules: store.description_gian_rules || [],
-    uncSavedLinks: store.unc_saved_links || {},
+    // Luyen, 2026-08-19: default links pre-filled; user can override via "Luu link"
+    uncSavedLinks: Object.assign({
+      mn:     "https://docs.google.com/spreadsheets/d/17PdHu2ji8y1sO1KK6H-BOJTXhsbcSziEG9hHRd9-iL0/edit?gid=700223644#gid=700223644",
+      mtd_mb: "https://docs.google.com/spreadsheets/d/12QOccXdRPnhb3JmRXUfdbszHioMaumsz/edit?pli=1&gid=2036785981#gid=2036785981",
+      kvc_mb: "https://docs.google.com/spreadsheets/d/132gDgtxG_3X-WlkS4LLksLsuYd_7YRYNeUQoflsy2Ic/edit?gid=0#gid=0",
+    }, store.unc_saved_links || {}),
     error: req.query.error || null,
     success: req.query.success || null,
   });
