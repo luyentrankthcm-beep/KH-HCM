@@ -303,23 +303,59 @@ function resolveVendor(row) {
   return { vendor: "", vendorKnown: false };
 }
 
-// Detect a "site name" fragment from a rent-style description -- these
-// consistently follow a mall-brand keyword (VC/VINCOM/AEON/VINPEARL/...)
-// immediately before an "HD <ma hop dong>" token, e.g.:
-//   "... VC Royal HD VCRCP.2308.2025.POSH.KH ..."
-//   "... VINCOM PHAM HUNG  HD VCRVH10012026.KvaH..."
-// Returns null if the description doesn't look like a rent/site payment at
-// all (no such keyword pair found) -- other expense types (goods, salary,
-// tax, insurance, bank fees) are never even attempted for Ma cong trinh.
+// Detect a "site name" fragment from a rent-style description.
+//
+// Handles two input formats:
+//   1. Mall-brand → HD pattern (legacy) e.g.:
+//        "... VC Royal HD VCRCP.2308.2025.POSH.KH ..."
+//        "... VINCOM PHAM HUNG  HD VCRVH10012026.KvaH..."
+//   2. BIDV ND content (extracted from "BDR... ND [content] -CTLNHI...") e.g.:
+//        "Funzone thanh toan tien thue sanh thang 8.2026"
+//        "Phi thue sanh Farm Time thang 8.2026"
+//        "tt tien thue Go Vap thang 8.2026"
+//        "Phi thue sanh tau Royal thang 8.2026"
+//
+// Returns a fragment string for matchGianForFragment, or null.
+// Luyen, 2026-08-19: extended with BIDV ND keywords (Funzone/Farm/Go/Tau)
 const SITE_BRAND_KEYWORDS = /\b(VC|VINCOM|VINPEARL|AEON|AEONMALL|LOTTE|BIG ?C|ESPACE)\b/i;
 function extractSiteFragment(description) {
-  const m = String(description || "").match(
+  const desc = String(description || "");
+
+  // Step 1: try to pull ND content out of BIDV format first
+  // "BDR-TKThe :XXXXX| tai BANK. ND [content] -CTLNHIDO..."
+  const bidvNdM = desc.match(/\bND\s+(.+?)\s*-CTLNHI/i);
+  const workDesc = bidvNdM ? bidvNdM[1].trim() : desc;
+
+  // Step 2: existing mall-brand → HD pattern
+  const mallM = workDesc.match(
     /\b(?:VC|VINCOM|VINPEARL|AEON(?:MALL)?|LOTTE|BIG ?C|ESPACE)\s*[:.\-]?\s*([A-Za-zÀ-ỹ0-9 ]{2,40}?)\s+HD\b/i
   );
-  if (!m) return null;
-  const frag = m[1].trim();
-  if (frag.length < 2) return null;
-  return frag;
+  if (mallM) {
+    const frag = mallM[1].trim();
+    if (frag.length >= 2) return frag;
+  }
+
+  // Step 3: BIDV ND keyword patterns for known gian types
+  // --- Funzone ---
+  const funzoneM = workDesc.match(/funzone\s+([A-Za-zÀ-ỹ0-9 ]{2,30}?)(?:\s+(?:thang|hd|\d))/i);
+  if (funzoneM) return ("Funzone " + funzoneM[1]).trim();
+  if (/\bfunzone\b/i.test(workDesc)) return "Funzone";
+
+  // --- Farm (Farm Times City / Farm Da Nang / ...) ---
+  if (/\bfarm\s+time/i.test(workDesc)) return "Farm Times City";
+  const farmM = workDesc.match(/\bfarm\s+([A-Za-zÀ-ỹ0-9 ]{2,30}?)(?:\s+(?:thang|hd|\d))/i);
+  if (farmM) return ("Farm " + farmM[1]).trim();
+  if (/\bfarm\b/i.test(workDesc)) return "Farm";
+
+  // --- GO! / GO supermarket ---
+  const goM = workDesc.match(/\bGO\b\s+([A-Za-zÀ-ỹ0-9 ]{2,25}?)(?:\s+(?:thang|hd|\d)|$)/i);
+  if (goM) return ("GO " + goM[1]).trim();
+
+  // --- Tau / tau (tau Hue, tau Royal, tau Time...) ---
+  const tauM = workDesc.match(/\btau\s+(hue|royal|time|[A-Za-zÀ-ỹ]{3,20})/i);
+  if (tauM) return ("Tau " + tauM[1]).trim();
+
+  return null;
 }
 
 // Match a site-name fragment against the known gian list (reusing the SAME

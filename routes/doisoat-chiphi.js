@@ -228,6 +228,29 @@ function buildChannelChiPhi(store, channelKey, revenueStatusMap) {
   const invoiceIndex = buildInvoiceIndex(store.chi_phi_invoice_list);
   const uncIndex = buildUncIndex(store.chi_phi_unc_list);
 
+  // Luyen, 2026-08-19: xay dung nccGianIndex TRUOC lines.map de suggestGianByNcc
+  // co the dung lam fallback khi extractSiteFragment khong tim duoc gian.
+  // (cung logic voi nccGianIndex trong buildSaokeRows nhung phai lap lai vi
+  // 2 ham la 2 scope rieng biet)
+  const _nccGianIdx = {};
+  (store.hoa_don_dau_vao_gian_list || []).forEach((g) => {
+    if (!g.tenKhachHang || !g.gianHang) return;
+    const k = normText(g.tenKhachHang);
+    if (!_nccGianIdx[k]) _nccGianIdx[k] = [];
+    if (!_nccGianIdx[k].find((x) => x.gianHang === g.gianHang))
+      _nccGianIdx[k].push({ gianHang: g.gianHang, maDiemThue: g.maDiemThue || "" });
+  });
+  function suggestGianByNcc(tenDoiUng) {
+    const normDU = normText(tenDoiUng || "");
+    if (!normDU) return null;
+    let hits = [];
+    for (const [k, gians] of Object.entries(_nccGianIdx)) {
+      const words = k.split(/\s+/).filter((w) => w.length >= 5);
+      if (words.length > 0 && words.some((w) => normDU.includes(w))) hits = hits.concat(gians);
+    }
+    return hits.length === 1 ? hits[0] : null;
+  }
+
   const lines = merged
     .filter((r) => r.debit > 0) // chi ra -- credit-side rows (tien VAO tk chi phi, vd chuyen noi bo) khong thuoc pham vi trang nay
     .map((r) => {
@@ -236,7 +259,12 @@ function buildChannelChiPhi(store, channelKey, revenueStatusMap) {
       const siteFrag = extractSiteFragment(r.description);
       const { maCongTrinh: autoGian, candidates } = matchGianForFragment(siteFrag, gianList);
       const hasOverride = Object.prototype.hasOwnProperty.call(gianOverride, key);
-      const finalGian = hasOverride ? gianOverride[key] : autoGian || "";
+      // Luyen, 2026-08-19: fallback sang NCC→gian khi extractSiteFragment khong tim duoc
+      let finalGian = hasOverride ? gianOverride[key] : autoGian || "";
+      if (!finalGian && !hasOverride) {
+        const sug = suggestGianByNcc(r.tenDoiUng);
+        if (sug) finalGian = sug.maDiemThue || sug.gianHang || "";
+      }
 
       // Ma NCC: uu tien ban Luyen go tay (theo NCC), khong co thi tu tra theo
       // danh sach dang dung. Go tay van tra Ten NCC/MST tu danh sach neu ma do
@@ -811,20 +839,31 @@ router.post("/doi-soat/chi-phi/vendor-ncc", requireDataEntry, (req, res) => {
 // day du cot hoa don + lay Dien giai sach tu UNC; khong khop hoa don nao thi
 // thu rut so HD ngay tu dien giai; khong co gi ca thi de trong toan bo cot
 // hoa don nhung VAN xuat dong do (khong bo qua) theo yeu cau cua Luyen.
+// Luyen, 2026-08-19: tach noi dung ND tu diễn giải BIDV
+// Format BIDV: "BDR-TKThe :XXXXX| tai BANK. ND [noi dung] -CTLNHIDO..."
+function _extractBidvNd(desc) {
+  if (!desc) return null;
+  const m = String(desc).match(/\bND\s+(.+?)\s*-CTLNHI/i);
+  return m ? m[1].trim() : null;
+}
+
 function buildExportRows(lines, startNo, bankAccount, bankFullName, chiaSeTKSet, gianNameTkMap) {
   let seq = startNo;
   return lines
-    .filter((l) => l.debit > 0)
+    // Luyen, 2026-08-19: loc bo CTNB (chuyen tien noi bo giua cac TK cua cong ty)
+    .filter((l) => l.debit > 0 && !/\bCTNB\b/i.test(l.description || ""))
     .sort((a, b) => (a.date > b.date ? 1 : -1))
     .map((l) => {
       const soCt = "UNC" + String(seq).padStart(4, "0");
       seq++;
       const ngayDmy = isoToDmy(l.date);
-      // Uu tien Dien giai sach tu bang lenh chi UNC (khop Ten NCC + So tien)
-      // hon dong sao ke ngan hang thuc te -- UNC thuong da co san "theo so HD
-      // <n>" ro rang, con sao ke nhieu khi chi ghi ma but toan/FT... khong
-      // doc duoc.
-      const dienGiai = (l.uncDienGiai || l.description || "").replace(/\s+/g, " ").trim().slice(0, 250);
+      // Luyen, 2026-08-19: BIDV diễn giải co format "BDR... ND [noi dung] -CTLNHI..."
+      // → lay phan ND ra lam dien giai sach hon, bo ma but toan BIDV
+      // UNC dat uu tien cao nhat; neu khong co UNC thi thu BIDV ND; cuoi cung
+      // moi dung raw description.
+      const rawDesc = l.description || "";
+      const bidvNd = !l.uncDienGiai ? _extractBidvNd(rawDesc) : null;
+      const dienGiai = (l.uncDienGiai || bidvNd || rawDesc).replace(/\s+/g, " ").trim().slice(0, 250);
       const maDoiTuong = l.maNCC || "";
       const tenDoiTuong = l.tenNCC || l.vendor || "(chưa xác định NCC)";
       // Hoa don: khop duoc voi danh sach hoa don HDDV (Ten/MST NCC + So tien)
@@ -861,7 +900,8 @@ function buildExportRows(lines, startNo, bankAccount, bankFullName, chiaSeTKSet,
         "TK Nợ (*)": l.tkNo || getGianTK(l.finalGian, chiaSeTKSet, gianNameTkMap),
         "TK Có (*)": "1121",
         "Số tiền": l.debit,
-        "Tên người hưởng": l.vendor || "",
+        // Luyen, 2026-08-19: BIDV co tenDoiUng ro rang tren sao ke → uu tien hon vendor
+        "Tên người hưởng": l.tenDoiUng || l.vendor || "",
         "TK hưởng": l.taiKhoanDoiUng || "",
         "Tên NH thụ hưởng": l.nganHangDoiUng || "",
         "Tên chi nhánh NH thụ hưởng": "",
