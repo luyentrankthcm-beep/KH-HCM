@@ -341,27 +341,28 @@
         <button type="button" onclick="toggleAdminTools()" id="adminToolsToggle" style="font-size:12px;background:none;border:1px solid #bbb;border-radius:5px;padding:3px 10px;cursor:pointer;color:#555;">⚙ Công cụ admin ▾</button>
       </div>
       <div id="adminToolsPanel" style="display:none;">
-      <!-- Luyen, 2026-08-18: import UNC (file hoac GG Sheet link) → backfill tên thụ hưởng + gian -->
-      <!-- Luyen, 2026-08-19: them 2 link MB (BIDV 8651 + BIDV 8681) de lay gian tu UNC Mien Bac -->
+      <!-- Luyen, 2026-08-19: import UNC (3 link luu san: MN + MTD MB + KVC MB) → backfill ten thu huong + gian -->
       <div style="margin:6px 0 14px; padding:8px 12px; background:#f0f4ff; border:1px solid #c8d8f0; border-radius:8px;">
         <div style="font-size:13px; font-weight:600; margin-bottom:8px;">Điền tên người thụ hưởng từ file UNC</div>
+        <% const _uncLinks = locals.uncSavedLinks || {}; %>
         <div style="display:flex; flex-direction:column; gap:7px;">
           <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
             <span style="font-size:12px; color:#555; width:110px; flex-shrink:0;">MN (VPBank/ACB):</span>
-            <input type="text" id="uncGgUrl" placeholder="Paste link Google Sheet ĐI ỦY NHIỆM CHI Miền Nam..." style="width:340px; font-size:12px; padding:4px 7px;" />
+            <input type="text" id="uncGgUrl"  value="<%- _uncLinks.mn     || '' %>" placeholder="Link GG Sheet UNC Miền Nam..." style="width:340px; font-size:12px; padding:4px 7px;" />
             <span style="font-size:12px; color:#888;">hoặc</span>
             <input type="file" id="uncFileInput" accept=".xlsx,.xls" style="font-size:12px;" />
           </div>
           <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-            <span style="font-size:12px; color:#555; width:110px; flex-shrink:0;">MB – BIDV 8651:</span>
-            <input type="text" id="uncGgUrl2" placeholder="Paste link Google Sheet UNC Miền Bắc BIDV 8651..." style="width:340px; font-size:12px; padding:4px 7px;" />
+            <span style="font-size:12px; color:#555; width:110px; flex-shrink:0;">MB – MTD (8651):</span>
+            <input type="text" id="uncGgUrl2" value="<%- _uncLinks.mtd_mb || '' %>" placeholder="Link GG Sheet UNC MTD Miền Bắc..." style="width:340px; font-size:12px; padding:4px 7px;" />
           </div>
           <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-            <span style="font-size:12px; color:#555; width:110px; flex-shrink:0;">MB – BIDV 8681:</span>
-            <input type="text" id="uncGgUrl3" placeholder="Paste link Google Sheet UNC Miền Bắc BIDV 8681..." style="width:340px; font-size:12px; padding:4px 7px;" />
+            <span style="font-size:12px; color:#555; width:110px; flex-shrink:0;">MB – KVC (8681):</span>
+            <input type="text" id="uncGgUrl3" value="<%- _uncLinks.kvc_mb || '' %>" placeholder="Link GG Sheet UNC KVC Miền Bắc..." style="width:340px; font-size:12px; padding:4px 7px;" />
           </div>
           <div style="display:flex; align-items:center; gap:8px;">
             <button id="uncImportBtn" class="btn btn-secondary" style="font-size:12px;">Cập nhật</button>
+            <button id="uncSaveLinksBtn" class="btn btn-secondary" style="font-size:12px; background:#eef4ff;">Lưu link</button>
             <span id="uncImportMsg" style="font-size:12px; color:#555;"></span>
           </div>
         </div>
@@ -377,7 +378,7 @@
           msgEl.textContent = 'Nhập ít nhất 1 link GG Sheet hoặc chọn file.'; msgEl.style.color='#e33'; return;
         }
         const fd = new FormData();
-        if (ggUrl)  fd.append('ggsheet_url',  ggUrl);
+        if (ggUrl)  fd.append('ggsheet_url',   ggUrl);
         if (ggUrl2) fd.append('ggsheet_url_2', ggUrl2);
         if (ggUrl3) fd.append('ggsheet_url_3', ggUrl3);
         if (fileInput.files.length) fd.append('unc_file', fileInput.files[0]);
@@ -389,6 +390,16 @@
           msgEl.style.color = j.ok ? '#2a7' : '#e33';
           if (j.ok && j.filled > 0) setTimeout(() => location.reload(), 1200);
         } catch(err) { msgEl.textContent = 'Lỗi: ' + err.message; msgEl.style.color='#e33'; }
+      });
+      document.getElementById('uncSaveLinksBtn').addEventListener('click', function() {
+        const fd = new FormData();
+        fd.append('unc_link_mn',     document.getElementById('uncGgUrl').value.trim());
+        fd.append('unc_link_mtd_mb', document.getElementById('uncGgUrl2').value.trim());
+        fd.append('unc_link_kvc_mb', document.getElementById('uncGgUrl3').value.trim());
+        const form = document.createElement('form');
+        form.method = 'POST'; form.action = '/transactions/save-unc-links';
+        fd.forEach((v, k) => { const i = document.createElement('input'); i.type='hidden'; i.name=k; i.value=v; form.appendChild(i); });
+        document.body.appendChild(form); form.submit();
       });
       </script>
 

@@ -215,9 +215,22 @@ router.get("/transactions", (req, res) => {
     duplicateSummary,
     bankStatementUploads: bankStatementUploadsFor(store, companyBankIds(store, activeCompany)),
     descGianRules: store.description_gian_rules || [],
+    uncSavedLinks: store.unc_saved_links || {},
     error: req.query.error || null,
     success: req.query.success || null,
   });
+});
+
+// Luyen, 2026-08-19: luu 3 link UNC (MN + MTD MB + KVC MB) vao store de pre-fill form
+router.post("/transactions/save-unc-links", requireDataEntry, (req, res) => {
+  const store = load();
+  store.unc_saved_links = {
+    mn:      (req.body.unc_link_mn      || "").trim(),
+    mtd_mb:  (req.body.unc_link_mtd_mb  || "").trim(),
+    kvc_mb:  (req.body.unc_link_kvc_mb  || "").trim(),
+  };
+  save(store);
+  res.redirect("/transactions?success=" + encodeURIComponent("Đã lưu 3 link UNC."));
 });
 
 router.post("/transactions", requireDataEntry, (req, res) => {
