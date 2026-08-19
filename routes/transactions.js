@@ -1359,40 +1359,69 @@ async function processUncBuffer(buffer, store) {
     };
 }
 
+// Luyen, 2026-08-19: helper – download 1 GG Sheet va tra ve buffer
+async function _fetchGgSheet(url) {
+  const m = url.match(/\/spreadsheets\/d\/([\w-]+)/);
+  if (!m) throw new Error(`Link Google Sheet không hợp lệ: ${url.slice(0, 60)}`);
+  const exportUrl = `https://docs.google.com/spreadsheets/d/${m[1]}/export?format=xlsx`;
+  const resp = await fetch(exportUrl, { redirect: "follow" });
+  if (!resp.ok) throw new Error(`Không tải được Google Sheet (${resp.status}). Kiểm tra quyền chia sẻ (phải là "Bất kỳ ai có link").`);
+  return Buffer.from(await resp.arrayBuffer());
+}
+
 router.post(
   "/transactions/import-unc",
   requireAdmin,
   upload.single("unc_file"),
   async (req, res) => {
     const store = load();
-    let buffer;
 
-    // Support both: ggsheet_url (Google Sheet link) or file upload
-    const ggUrl = (req.body && req.body.ggsheet_url) ? req.body.ggsheet_url.trim() : "";
-    if (ggUrl) {
-      // Extract sheet ID from Google Sheet URL and build export URL
-      const m = ggUrl.match(/\/spreadsheets\/d\/([\w-]+)/);
-      if (!m) return res.json({ ok: false, message: "Link Google Sheet không hợp lệ." });
-      const exportUrl = `https://docs.google.com/spreadsheets/d/${m[1]}/export?format=xlsx`;
+    // Collect all buffers to process (file + up to 3 GG Sheet links)
+    const buffers = [];
+    const errors = [];
+
+    const urls = [
+      req.body && req.body.ggsheet_url   ? req.body.ggsheet_url.trim()   : "",
+      req.body && req.body.ggsheet_url_2 ? req.body.ggsheet_url_2.trim() : "",
+      req.body && req.body.ggsheet_url_3 ? req.body.ggsheet_url_3.trim() : "",
+    ].filter(Boolean);
+
+    for (const url of urls) {
       try {
-        const resp = await fetch(exportUrl, { redirect: "follow" });
-        if (!resp.ok) return res.json({ ok: false, message: `Không tải được Google Sheet (${resp.status}). Kiểm tra quyền chia sẻ (phải là "Bất kỳ ai có link").` });
-        buffer = Buffer.from(await resp.arrayBuffer());
+        buffers.push(await _fetchGgSheet(url));
       } catch (e) {
-        return res.json({ ok: false, message: "Lỗi kết nối Google Sheet: " + e.message });
+        errors.push(e.message);
       }
-    } else if (req.file) {
-      buffer = req.file.buffer;
-    } else {
+    }
+    if (req.file) buffers.push(req.file.buffer);
+
+    if (buffers.length === 0 && errors.length === 0) {
       return res.json({ ok: false, message: "Cần nhập link Google Sheet hoặc chọn file." });
     }
-
-    try {
-      const result = await processUncBuffer(buffer, store);
-      res.json(result);
-    } catch (e) {
-      res.json({ ok: false, message: "Lỗi đọc file: " + e.message });
+    if (buffers.length === 0) {
+      return res.json({ ok: false, message: errors.join("; ") });
     }
+
+    // Process each buffer sequentially; accumulate filled count
+    let totalFilled = 0;
+    let totalRows = 0;
+    const partialErrors = [...errors];
+    for (const buf of buffers) {
+      try {
+        const result = await processUncBuffer(buf, store);
+        if (result.ok) { totalFilled += result.filled || 0; totalRows += result.uncRows || 0; }
+        else partialErrors.push(result.message);
+      } catch (e) {
+        partialErrors.push("Lỗi đọc file: " + e.message);
+      }
+    }
+
+    const ok = totalFilled > 0 || (buffers.length > 0 && partialErrors.length === 0);
+    const msg = [
+      totalFilled > 0 ? `Đã điền cho ${totalFilled} giao dịch (${totalRows} dòng UNC từ ${buffers.length} file).` : "Không khớp thêm giao dịch nào.",
+      ...partialErrors,
+    ].join(" ");
+    res.json({ ok, filled: totalFilled, message: msg });
   }
 );
 
