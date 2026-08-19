@@ -1827,13 +1827,34 @@ router.get("/phap-danh/hop-dong-thue-gian-tong", (req, res) => {
           : "kvc-mn";
     const sheetInfo = HOP_DONG_THUE_TONG_SHEETS.find((s) => s.key === sheetParam);
     const todayStr = new Date().toISOString().slice(0, 10);
-  
+
+    // Luyen, 2026-08-19: build lookup tienThueThang tu phap_danh_hop_dong_thue
+    // (cac hop dong chi tiet da nhap / dong bo tu sheet HCM) de hien thi tien thue
+    // trong bang hop dong tong ma khong can them cot vao GG Sheet.
+    // Join theo maCongTrinh (normalize uppercase + trim).
+    // Neu nhieu gian cung maCongTrinh → lay max (thuong la gian lon nhat / hop dong chinh).
+    const normMa = (v) => String(v || "").toUpperCase().replace(/\s+/g, " ").trim();
+    const tienThueByMa = {};
+    for (const h of store.phap_danh_hop_dong_thue || []) {
+      const ma = normMa(h.maCongTrinh);
+      if (!ma || !h.tienThueThang) continue;
+      const amt = Number(h.tienThueThang) || 0;
+      if (amt <= 0) continue;
+      // Sum: mot maCongTrinh co the co nhieu dong (nhieu gian o cung 1 diem)
+      tienThueByMa[ma] = (tienThueByMa[ma] || 0) + amt;
+    }
+
     let rows = store.phap_danh_hop_dong_thue_tong.filter(
           (r) => r.sheetKey === sheetInfo.storeKey && (r.congTy === activeCompany || r.congTy === "ca_2")
               );
 if (thangFilter) rows = rows.filter((r) => monthOverlapsThueTong(r, thangFilter));
     rows.forEach((r) => {
           r.trangThaiMau = computeTrangThaiThueTong(r, todayStr);
+          // Enrich tienThueThang tu hop dong chi tiet neu chua co
+          if (!r.tienThueThang) {
+            const ma = normMa(r.maCongTrinh);
+            r.tienThueThang = tienThueByMa[ma] || 0;
+          }
     });
   
     const counts = {};
