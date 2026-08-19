@@ -1566,13 +1566,16 @@ function buildChannelReconciliation(store, channelKey) {
   seedGianMappingDefaults(store, resolved.codes);
 
   const manualMatches = store.viet_qr_manual_matches[channelKey] || {};
+  if (!store.viet_qr_vang_lai_gian) store.viet_qr_vang_lai_gian = {};
+  const vangLaiCode = store.viet_qr_vang_lai_gian[channelKey] || null;
   const reconciled = reconcileVietQr(
     settlements,
     resolved,
     { invoices },
     store.gian_mapping,
     manualMatches,
-    store.invoice_diem_alias
+    store.invoice_diem_alias,
+    vangLaiCode
   );
 
   // Chi Nhan, 2026-07-30: "các đối soát tất cả các trang điều xếp theo ngày
@@ -2277,6 +2280,7 @@ function renderVietQrPage(req, res, activeKeys, pageTitle, pageSubtitle) {
     exportTuDefault: monthBounds(selectedMonth).first,
     exportDenDefault: monthBounds(selectedMonth).last,
     gianMapping: store.gian_mapping,
+    vangLaiGian: store.viet_qr_vang_lai_gian || {},
     allCodes: Array.from(allCodes).sort(),
     allUnmappedStores,
     allUnmappedBlankRows,
@@ -2407,6 +2411,30 @@ router.post("/doi-soat/vietqr/partner-bank-id/:channel", requireDataEntry, (req,
     res.redirect(
       "/doi-soat/vietqr?success=" + encodeURIComponent(`Da luu bankId cho ${CHANNELS[channelKey].label}.`)
     );
+  } catch (e) {
+    res.redirect("/doi-soat/vietqr?error=" + encodeURIComponent(e.message));
+  }
+});
+
+// Luyen: "cái chỗ vãng lai này nè cho chỗ map với mã công trình nha" -- luu
+// ma cong trinh thuc cua giao dich vang lai cho tung kenh, de doi soat hoa
+// don dung code thuc thay vi __VANG_LAI__ (khong bao gio khop hoa don duoc).
+router.post("/doi-soat/vietqr/set-vang-lai-gian/:channel", requireDataEntry, (req, res) => {
+  const store = load();
+  ensureChannelShape(store);
+  const channelKey = req.params.channel;
+  try {
+    if (!CHANNELS[channelKey]) throw new Error("Kenh khong hop le.");
+    if (!store.viet_qr_vang_lai_gian) store.viet_qr_vang_lai_gian = {};
+    const code = (req.body.vangLaiCode || "").trim();
+    if (code) {
+      store.viet_qr_vang_lai_gian[channelKey] = code;
+    } else {
+      delete store.viet_qr_vang_lai_gian[channelKey];
+    }
+    save(store);
+    const msg = code ? `Vãng lai kênh ${CHANNELS[channelKey].label} → ${code}` : `Đã xóa mapping vãng lai kênh ${CHANNELS[channelKey].label}.`;
+    res.redirect("/doi-soat/vietqr?success=" + encodeURIComponent(msg));
   } catch (e) {
     res.redirect("/doi-soat/vietqr?error=" + encodeURIComponent(e.message));
   }

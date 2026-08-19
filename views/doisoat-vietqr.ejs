@@ -1187,7 +1187,17 @@
               <% r.lines.forEach(function(l) { %>
               <% if (l.skipLine) return; /* an dong da bi Xoa khoi doi soat */ %>
               <tr<%= l.tkCo === 'SKIP' ? ' style="opacity:0.6;"' : '' %>>
-                <td><%= l.maCongTrinh %><%= l.code.endsWith('__FF') ? ' (CSE)' : '' %></td>
+                <td>
+                  <%= l.maCongTrinh %><%= l.code.endsWith('__FF') ? ' (CSE)' : '' %>
+                  <% if (l.code === '__VANG_LAI__') { %>
+                  <form method="POST" action="/doi-soat/vietqr/set-vang-lai-gian/<%= ch %>" style="display:inline-flex;align-items:center;gap:4px;margin-left:6px;">
+                    <input type="text" name="vangLaiCode" value="<%= (vangLaiGian && vangLaiGian[ch]) || '' %>"
+                           list="dl-ma-cong-trinh-full" autocomplete="off"
+                           placeholder="Map → Mã CT" style="width:110px;font-size:11px;padding:1px 4px;" />
+                    <button type="submit" class="link-btn" style="font-size:11px;">Lưu</button>
+                  </form>
+                  <% } %>
+                </td>
                 <td><%= l.tkCo === 'SKIP' ? '—' : l.tkCo %></td>
                 <td><%= l.gross.toLocaleString('vi-VN') %> đ</td>
                 <td><%= l.invoiceNumbers.join(', ') || '-' %></td>
