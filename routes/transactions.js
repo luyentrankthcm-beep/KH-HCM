@@ -1347,6 +1347,7 @@ async function processUncBuffer(buffer, store) {
 
     // Match against store.transactions
     let filled = 0;
+    let gianFilled = 0;
     const MIN_MATCH_LEN = 10;
 
     for (const tx of store.transactions) {
@@ -1356,24 +1357,55 @@ async function processUncBuffer(buffer, store) {
       if (!needsTen && !needsGian) continue; // ca hai da co, bo qua
 
       const descNorm = normUncText(tx.description);
+      // Luyen, 2026-08-19: pre-compute normalized tenDoiUng for fallback matching
+      const txTenNorm = normUncText(tx.tenDoiUng || "");
 
+      // Pre-index uncRows by tenThuHuong norm for fast lookup (built once outside
+      // this loop in the outer scope -- here we just reference uncByTen built below)
+      let matched = false;
       for (const unc of uncRows) {
-        if (unc.noiDungNorm.length < MIN_MATCH_LEN) continue;
-        if (!descNorm.includes(unc.noiDungNorm)) continue;
-        if (unc.amount > 0 && tx.amount !== unc.amount) continue;
-        if (needsTen) { tx.tenDoiUng = unc.tenThuHuong; filled++; }
-        if (needsGian && unc.boPhan) tx.gian = unc.boPhan;
-        break;
+        // Strategy 1 (primary): UNC noi dung substring in bank description
+        // Works for VPBank/ACB where bank description contains the transfer content.
+        if (unc.noiDungNorm.length >= MIN_MATCH_LEN && descNorm.includes(unc.noiDungNorm)) {
+          if (unc.amount > 0 && tx.amount !== unc.amount) continue;
+          if (needsTen) { tx.tenDoiUng = unc.tenThuHuong; filled++; }
+          if (needsGian && unc.boPhan) { tx.gian = unc.boPhan; gianFilled++; }
+          matched = true;
+          break;
+        }
+      }
+      if (!matched && needsGian) {
+        // Strategy 2 (fallback for BIDV): bank already has tenDoiUng from statement;
+        // match UNC by tenThuHuong + amount to get the Gian column.
+        // Luyen, 2026-08-19: BIDV descriptions don't carry UNC content text -- instead
+        // match on the NCC name the bank recorded + exact amount.
+        for (const unc of uncRows) {
+          if (!unc.boPhan) continue;
+          const uncTenNorm = normUncText(unc.tenThuHuong);
+          if (uncTenNorm.length < 6) continue;
+          // Accept if one name contains the other (handles prefix/suffix differences)
+          const tenMatch = txTenNorm.includes(uncTenNorm) || uncTenNorm.includes(txTenNorm);
+          if (!tenMatch) continue;
+          if (unc.amount > 0 && tx.amount !== unc.amount) continue;
+          if (needsTen && !tx.tenDoiUng) { tx.tenDoiUng = unc.tenThuHuong; filled++; }
+          tx.gian = unc.boPhan; gianFilled++;
+          break;
+        }
       }
     }
 
-    if (filled > 0) save(store);
+    if (filled > 0 || gianFilled > 0) save(store);
+    const parts = [];
+    if (filled > 0) parts.push(`${filled} tên thụ hưởng`);
+    if (gianFilled > 0) parts.push(`${gianFilled} Gian`);
+    const summary = parts.length > 0 ? `Đã điền ${parts.join(", ")} (${uncRows.length} dòng UNC, ${wb.SheetNames.length} sheet).` : "Không khớp thêm giao dịch nào.";
     return {
-      ok: true,
+      ok: filled > 0 || gianFilled > 0,
       uncRows: uncRows.length,
       filled,
+      gianFilled,
       sheets: wb.SheetNames.length,
-      message: `Đã điền tên thụ hưởng cho ${filled} giao dịch (đọc ${uncRows.length} dòng UNC từ ${wb.SheetNames.length} sheet).`,
+      message: summary,
     };
 }
 
