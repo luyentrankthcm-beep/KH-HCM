@@ -237,9 +237,34 @@
         <% channels.forEach(function(chInfo, i) { %><strong><%= chInfo.label %>: <%= invoiceCounts[chInfo.key] %> HĐ</strong><%= i < channels.length - 1 ? ', ' : '' %><% }) %>.
         Tải file mới sẽ tự thêm dòng chưa có, không trùng lặp.
       </p>
+      <% if (vietqrInvoiceUploads && vietqrInvoiceUploads.length > 0) { %>
+      <details style="margin-top:8px;">
+        <summary class="muted" style="cursor:pointer;">Đã tải <%= vietqrInvoiceUploads.length %> lần (bấm để xem / xóa)</summary>
+        <table class="table" style="margin-top:8px;font-size:12px;">
+          <thead><tr><th>File</th><th>Sheet</th><th>Thời gian</th><th>Số HĐ thêm</th><% if (isAdmin) { %><th></th><% } %></tr></thead>
+          <tbody>
+          <% vietqrInvoiceUploads.forEach(function(u) { %>
+          <tr>
+            <td><%= u.file_name %></td>
+            <td><%= u.sheet_name || '' %></td>
+            <td class="muted"><%= u.uploaded_at ? u.uploaded_at.replace('T',' ').slice(0,16) : '' %></td>
+            <td><% channels.forEach(function(chInfo, i) { %><%= chInfo.label %>: <%= (u.counts && u.counts[chInfo.key]) || 0 %><%= i < channels.length-1 ? ', ' : '' %><% }) %></td>
+            <% if (isAdmin) { %>
+            <td>
+              <form method="POST" action="/doi-soat/vietqr/invoice-upload/<%= u.id %>/delete" onsubmit="return confirm('Xóa lần upload này? Chỉ xóa HĐ đã thêm lần đó, HĐ cũ hơn giữ nguyên.');" style="display:inline;">
+                <button type="submit" class="link-btn link-danger" style="font-size:11px;">Xóa</button>
+              </form>
+            </td>
+            <% } %>
+          </tr>
+          <% }) %>
+          </tbody>
+        </table>
+      </details>
+      <% } %>
       <% var totalInv = channels.reduce(function(s, c) { return s + invoiceCounts[c.key]; }, 0); %>
-      <% if (totalInv > 0) { %>
-      <form method="POST" action="/doi-soat/vietqr/invoices/clear" onsubmit="return confirm('Xoá toàn bộ hóa đơn Viet QR đã nạp (cả 3 kênh)?');">
+      <% if (totalInv > 0 && isAdmin) { %>
+      <form method="POST" action="/doi-soat/vietqr/invoices/clear" onsubmit="return confirm('Xoá toàn bộ hóa đơn Viet QR đã nạp (cả 3 kênh)?');" style="margin-top:6px;">
         <button type="submit" class="btn btn-secondary">Xoá hết hóa đơn đã nạp</button>
       </form>
       <% } %>

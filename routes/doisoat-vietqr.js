@@ -2294,6 +2294,8 @@ function renderVietQrPage(req, res, activeKeys, pageTitle, pageSubtitle) {
     allTanPhuAutoApplied,
     maCongTrinhOptions: (store.ma_cong_trinh_master && store.ma_cong_trinh_master[activeCompany] && store.ma_cong_trinh_master[activeCompany].rows) || [],
     partnerBankId: store.viet_qr_partner_bank_id || {},
+    vietqrInvoiceUploads: (store.viet_qr_invoice_uploads || []).slice().reverse(), // moi nhat len dau
+    isAdmin: req.session.role === "admin",
     error: req.query.error || null,
     success: req.query.success || null,
     pageTitle,
@@ -2908,9 +2910,12 @@ router.post("/doi-soat/vietqr/nocode-assign/:channel/:vqrCode/delete", requireAd
 router.post("/doi-soat/vietqr/upload-hoadon", requireDataEntry, upload.single("file"), (req, res) => {
   const store = load();
   ensureChannelShape(store);
+  if (!store.viet_qr_invoice_uploads) store.viet_qr_invoice_uploads = [];
   try {
     if (!req.file) throw new Error("Vui long chon 1 file de tai len.");
     const addedCounts = {};
+    // Track keys added per channel for this upload (for delete later)
+    const addedKeys = {};
     let sheetName = null;
     for (const ch of CHANNEL_KEYS) {
       const parsed = parseInvoiceWorkbookByTag(req.file.buffer, CHANNELS[ch].tagPattern);
@@ -2930,6 +2935,7 @@ router.post("/doi-soat/vietqr/upload-hoadon", requireDataEntry, upload.single("f
         store.viet_qr_invoices[ch].map((i) => `${i.ngayHd}|${i.maDiem}|${(i.days || []).slice().sort().join(",")}`)
       );
       let added = 0;
+      addedKeys[ch] = [];
       for (const inv of parsed.invoices) {
         const k = `${inv.soHd}|${inv.ngayHd}|${inv.maDiem}`;
         if (existingKeys.has(k)) continue;
@@ -2938,10 +2944,21 @@ router.post("/doi-soat/vietqr/upload-hoadon", requireDataEntry, upload.single("f
         existingKeys.add(k);
         existingDayDiem.add(k2);
         store.viet_qr_invoices[ch].push(inv);
+        addedKeys[ch].push(k);
         added++;
       }
       addedCounts[ch] = added;
     }
+    // Luu lich su upload -- Luyen, 2026-08-20: "cho cai lich su tai di"
+    const uploadId = Date.now();
+    store.viet_qr_invoice_uploads.push({
+      id: uploadId,
+      file_name: req.file.originalname,
+      sheet_name: sheetName,
+      uploaded_at: new Date().toISOString(),
+      counts: addedCounts,
+      keys: addedKeys, // { ch: ["soHd|ngayHd|maDiem", ...] }
+    });
     save(store);
     const summary = CHANNEL_KEYS.map((ch) => `${CHANNELS[ch].label}: ${addedCounts[ch]}`).join(", ");
     res.redirect(
@@ -2951,6 +2968,28 @@ router.post("/doi-soat/vietqr/upload-hoadon", requireDataEntry, upload.single("f
   } catch (e) {
     res.redirect("/doi-soat/vietqr?error=" + encodeURIComponent(e.message));
   }
+});
+
+// ---------- Xoa tung lan upload MTT (chi xoa cac HĐ nap lan do, HĐ co san giu nguyen) ----------
+router.post("/doi-soat/vietqr/invoice-upload/:id/delete", requireAdmin, (req, res) => {
+  const store = load();
+  if (!store.viet_qr_invoice_uploads) store.viet_qr_invoice_uploads = [];
+  const id = Number(req.params.id);
+  const uploadEntry = store.viet_qr_invoice_uploads.find((u) => u.id === id);
+  if (!uploadEntry) return res.redirect("/doi-soat/vietqr?error=" + encodeURIComponent("Không tìm thấy lần upload này."));
+  // Xoa cac HĐ thuoc lan upload nay khoi store
+  const keysToRemove = uploadEntry.keys || {};
+  for (const ch of CHANNEL_KEYS) {
+    const removeSet = new Set(keysToRemove[ch] || []);
+    if (removeSet.size > 0) {
+      store.viet_qr_invoices[ch] = store.viet_qr_invoices[ch].filter(
+        (i) => !removeSet.has(`${i.soHd}|${i.ngayHd}|${i.maDiem}`)
+      );
+    }
+  }
+  store.viet_qr_invoice_uploads = store.viet_qr_invoice_uploads.filter((u) => u.id !== id);
+  save(store);
+  res.redirect("/doi-soat/vietqr?success=" + encodeURIComponent(`Đã xóa file "${uploadEntry.file_name}" (${uploadEntry.sheet_name}).`));
 });
 
 router.post("/doi-soat/vietqr/mapping", requireAdmin, (req, res) => {
