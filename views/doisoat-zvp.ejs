@@ -725,7 +725,24 @@ Dùng khi hóa đơn cũ/trùng bị cộng nhầm vào đối soát (giống b�
                 <td><%= l.maCongTrinh %><%= l.code.endsWith('__FF') ? ' (CSE)' : '' %></td>
                 <td><%= l.tkCo === 'SKIP' ? '—' : l.tkCo %></td>
                 <td><%= l.gross.toLocaleString('vi-VN') %> đ</td>
-                <td><%= l.net.toLocaleString('vi-VN') %> đ</td>
+                <td>
+                  <%= l.net.toLocaleString('vi-VN') %> đ
+                  <% if (l.netOverridden) { %><span class="muted" style="font-size:10px;" title="Gốc: <%= l.netOriginal.toLocaleString('vi-VN') %> đ"> ✏️</span><% } %>
+                  <% if (isAdmin && !l.locked && l.tkCo !== 'SKIP') { %>
+                  <span>
+                    <button type="button" onclick="var f=this.nextElementSibling;f.style.display=f.style.display==='none'?'block':'none';" style="font-size:10px;padding:1px 4px;" class="btn btn-secondary">✏️</button>
+                    <form method="POST" action="/doi-soat/zvp/net-override" style="display:none;margin-top:2px;">
+                      <input type="hidden" name="channel" value="<%= ch %>" />
+                      <input type="hidden" name="date" value="<%= r.settlementDate %>" />
+                      <input type="hidden" name="code" value="<%= l.code %>" />
+                      <input type="hidden" name="returnMonth" value="<%= selectedMonth %>" />
+                      <input type="number" name="amount" placeholder="Net mới" value="<%= l.netOverridden ? l.net : '' %>" style="width:120px;font-size:11px;" />
+                      <button type="submit" class="btn btn-primary" style="font-size:10px;padding:1px 6px;">Lưu</button>
+                      <% if (l.netOverridden) { %><button type="submit" onclick="this.form.querySelector('[name=amount]').value='';" class="link-btn link-danger" style="font-size:10px;">Xóa</button><% } %>
+                    </form>
+                  </span>
+                  <% } %>
+                </td>
                 <td><%= l.invoiceNumbers.join(', ') || '-' %></td>
                 <td><%= l.invoiceTotal.toLocaleString('vi-VN') %> đ</td>
                 <td>

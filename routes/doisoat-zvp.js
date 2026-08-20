@@ -690,15 +690,35 @@ router.get("/doi-soat/zvp", (req, res) => {
   // hoac sai (vd khoang cach giua khoang ve ngan hang va khoang doanh thu).
   // Luu trong store.zvp_bank_amount_override[ch][date] = amount (number).
   const bankOverride = store.zvp_bank_amount_override || {};
+  // Luyen, 2026-08-20: "mỗi cột điều có chỗ chỉnh sửa số" -- cho admin sua
+  // tay tung dong "Tien ve NH (net)" cua tung gian trong ngay.
+  // Luu trong store.zvp_net_override[ch][date][code] = amount (number).
+  const netOverride = store.zvp_net_override || {};
   ["online", "offline", "payoo"].forEach((ch) => {
-    const overrideMap = bankOverride[ch] || {};
+    const bankMap = bankOverride[ch] || {};
+    const netMap = netOverride[ch] || {};
     reconciled[ch].forEach((r) => {
-      if (overrideMap[r.settlementDate] !== undefined && !r.pendingBank) {
+      // Apply net override per line first, then recalc totalNetComputed
+      const dayNetMap = netMap[r.settlementDate] || {};
+      let netChanged = false;
+      r.lines.forEach((l) => {
+        if (dayNetMap[l.code] !== undefined) {
+          l.netOriginal = l.net;
+          l.net = dayNetMap[l.code];
+          l.netOverridden = true;
+          netChanged = true;
+        }
+      });
+      if (netChanged) {
+        r.totalNetComputed = r.lines.filter((l) => l.tkCo !== "SKIP").reduce((s, l) => s + (l.net || 0), 0);
+      }
+      // Apply bankAmount override
+      if (bankMap[r.settlementDate] !== undefined && !r.pendingBank) {
         r.bankAmountOverridden = true;
         r.bankAmountOriginal = r.bankAmount;
-        r.bankAmount = overrideMap[r.settlementDate];
-        r.diffVsBank = r.totalNetComputed - r.bankAmount;
+        r.bankAmount = bankMap[r.settlementDate];
       }
+      if (!r.pendingBank) r.diffVsBank = r.totalNetComputed - r.bankAmount;
     });
   });
 
@@ -735,6 +755,27 @@ router.get("/doi-soat/zvp", (req, res) => {
     error: built.error || req.query.error || null,
     success: req.query.success || null,
   });
+});
+
+// ---------- Admin: sua tay "Tien ve NH (net)" cho tung dong gian ----------
+router.post("/doi-soat/zvp/net-override", requireAdmin, (req, res) => {
+  const store = load();
+  const { channel, date, code, amount } = req.body;
+  const validChannels = ["online", "offline", "payoo"];
+  if (!validChannels.includes(channel)) return res.redirect("/doi-soat/zvp?error=" + encodeURIComponent("Kênh không hợp lệ."));
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return res.redirect("/doi-soat/zvp?error=" + encodeURIComponent("Ngày không hợp lệ."));
+  if (!store.zvp_net_override) store.zvp_net_override = {};
+  if (!store.zvp_net_override[channel]) store.zvp_net_override[channel] = {};
+  if (!store.zvp_net_override[channel][date]) store.zvp_net_override[channel][date] = {};
+  const amtStr = String(amount || "").replace(/[^\d]/g, "");
+  if (amtStr === "") {
+    delete store.zvp_net_override[channel][date][code];
+  } else {
+    store.zvp_net_override[channel][date][code] = Number(amtStr);
+  }
+  save(store);
+  const qs = req.body.returnMonth ? `?month=${req.body.returnMonth}` : "";
+  res.redirect("/doi-soat/zvp" + qs + "&success=" + encodeURIComponent(`Đã cập nhật Tiền NH (net) kênh ${channel} ngày ${date}.`));
 });
 
 // ---------- Admin: sua tay so "Ngan hang" cho tung ngay/kenh ----------
