@@ -1989,6 +1989,11 @@ async function fetchHopDongThueTongSheet(storeKey) {
                         tenKhachHang: gvizCol(r, idx, "Tên khách hàng"),
                         mstKhachHang: gvizCol(r, idx, "MST khách hàng"),
                         hinhThucThue: gvizCol(r, idx, "Hình Thức Hợp Tác"),
+                        tienThueThang: (function() {
+                          const raw = gvizCol(r, idx, "Tiền thuê/tháng") || gvizCol(r, idx, "Tien thue/thang") || "";
+                          const n = Number(String(raw).replace(/[^\d]/g, ""));
+                          return isNaN(n) ? 0 : n;
+                        })(),
                         thoiHanThueRaw,
                         ngayBatDauThue: start,
                         ngayHetHanThue: end,

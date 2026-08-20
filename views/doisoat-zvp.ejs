@@ -691,6 +691,22 @@ Dùng khi hóa đơn cũ/trùng bị cộng nhầm vào đối soát (giống b�
               Tính từ dữ liệu tải lên: <strong><%= r.totalNetComputed.toLocaleString('vi-VN') %> đ</strong>
               <% } else { %>
               Ngân hàng: <strong><%= r.bankAmount.toLocaleString('vi-VN') %> đ</strong>
+              <% if (r.bankAmountOverridden) { %><span class="muted" style="font-size:11px;" title="Gốc: <%= r.bankAmountOriginal.toLocaleString('vi-VN') %> đ"> (đã sửa tay)</span><% } %>
+              <% if (isAdmin && !r.locked) { %>
+              <span style="margin-left:4px;">
+                <button type="button" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'inline-flex':'none';this.style.display='none';" style="font-size:11px;padding:1px 6px;" class="btn btn-secondary">✏️</button>
+                <form method="POST" action="/doi-soat/zvp/bank-amount-override" style="display:none;gap:4px;align-items:center;" onsubmit="return confirm('Cập nhật số Ngân hàng kênh <%= ch %> ngày <%= r.settlementDate %>?');">
+                  <input type="hidden" name="channel" value="<%= ch %>" />
+                  <input type="hidden" name="date" value="<%= r.settlementDate %>" />
+                  <input type="hidden" name="returnMonth" value="<%= selectedMonth %>" />
+                  <input type="number" name="amount" placeholder="Số tiền NH" value="<%= r.bankAmountOverridden ? r.bankAmount : '' %>" style="width:150px;font-size:12px;" />
+                  <button type="submit" class="btn btn-primary" style="font-size:11px;padding:2px 8px;">Lưu</button>
+                  <% if (r.bankAmountOverridden) { %>
+                  <button type="submit" form="" onclick="this.form.querySelector('[name=amount]').value='';return true;" class="link-btn link-danger" style="font-size:11px;" title="Xóa override, dùng lại số NH gốc">Xóa</button>
+                  <% } %>
+                </form>
+              </span>
+              <% } %>
               &nbsp;|&nbsp; Tính từ dữ liệu tải lên: <strong><%= r.totalNetComputed.toLocaleString('vi-VN') %> đ</strong>
               &nbsp;|&nbsp;
               <span class="<%= Math.abs(r.diffVsBank) < 1000 ? 'text-pos' : 'text-neg' %>">

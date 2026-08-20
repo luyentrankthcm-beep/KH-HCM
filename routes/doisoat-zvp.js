@@ -685,8 +685,26 @@ router.get("/doi-soat/zvp", (req, res) => {
       : monthFiltered[ch];
   });
 
+  // Luyen, 2026-08-20: "thêm cái chỉnh sửa ngân hàng đi chỉ admin mới thấy"
+  // -- cho admin sua tay so "Ngan hang" cua tung ngay/kenh neu so ke chua ve
+  // hoac sai (vd khoang cach giua khoang ve ngan hang va khoang doanh thu).
+  // Luu trong store.zvp_bank_amount_override[ch][date] = amount (number).
+  const bankOverride = store.zvp_bank_amount_override || {};
+  ["online", "offline", "payoo"].forEach((ch) => {
+    const overrideMap = bankOverride[ch] || {};
+    reconciled[ch].forEach((r) => {
+      if (overrideMap[r.settlementDate] !== undefined && !r.pendingBank) {
+        r.bankAmountOverridden = true;
+        r.bankAmountOriginal = r.bankAmount;
+        r.bankAmount = overrideMap[r.settlementDate];
+        r.diffVsBank = r.totalNetComputed - r.bankAmount;
+      }
+    });
+  });
+
   res.render("doisoat-zvp", {
     userName: req.session.userName,
+    isAdmin: req.session.role === "admin",
     onlineUploads: store.zvp_online_uploads,
     offlineUploads: store.zvp_offline_uploads,
     payooUploads: store.zvp_payoo_uploads,
@@ -717,6 +735,27 @@ router.get("/doi-soat/zvp", (req, res) => {
     error: built.error || req.query.error || null,
     success: req.query.success || null,
   });
+});
+
+// ---------- Admin: sua tay so "Ngan hang" cho tung ngay/kenh ----------
+router.post("/doi-soat/zvp/bank-amount-override", requireAdmin, (req, res) => {
+  const store = load();
+  const { channel, date, amount } = req.body;
+  const validChannels = ["online", "offline", "payoo"];
+  if (!validChannels.includes(channel)) return res.redirect("/doi-soat/zvp?error=" + encodeURIComponent("Kênh không hợp lệ."));
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return res.redirect("/doi-soat/zvp?error=" + encodeURIComponent("Ngày không hợp lệ."));
+  if (!store.zvp_bank_amount_override) store.zvp_bank_amount_override = {};
+  if (!store.zvp_bank_amount_override[channel]) store.zvp_bank_amount_override[channel] = {};
+  const amtStr = String(amount || "").replace(/[^\d]/g, "");
+  if (amtStr === "") {
+    // Xoa override (tra ve so tu ngan hang)
+    delete store.zvp_bank_amount_override[channel][date];
+  } else {
+    store.zvp_bank_amount_override[channel][date] = Number(amtStr);
+  }
+  save(store);
+  const qs = req.body.returnMonth ? `?month=${req.body.returnMonth}` : "";
+  res.redirect("/doi-soat/zvp" + qs + "&success=" + encodeURIComponent(`Đã cập nhật số Ngân hàng kênh ${channel} ngày ${date}.`));
 });
 
 // ---------- Khoa so (giong VietQR/Momo) -- gui lockDate rong de mo khoa lai. ----------
