@@ -673,6 +673,7 @@ router.get("/doi-soat/momo", (req, res) => {
     lockDate: built.lockDate || "",
     error,
     success: req.query.success || null,
+    isAdmin: req.session.role === "admin",
   });
 });
 
