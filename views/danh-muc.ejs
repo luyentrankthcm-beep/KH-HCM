@@ -7,9 +7,23 @@
   <%- include('partials/nav') %>
   <main class="container">
     <h1><%= page.title %></h1>
-    <p class="muted" style="margin-top:-10px;margin-bottom:20px;">
+    <p class="muted" style="margin-top:-10px;margin-bottom:12px;">
       Danh mục <%= page.title.toLowerCase() %> — dùng làm mã tham chiếu trong hóa đơn, chi phí, đối soát.
     </p>
+
+    <!-- Tab chon cong ty -->
+    <div style="display:flex;gap:0;margin-bottom:18px;border-bottom:2px solid #e0e0e0;">
+      <a href="/danh-muc/<%= slug %>?company=kh_cu"
+         style="padding:7px 20px;font-size:13px;font-weight:600;text-decoration:none;border-radius:6px 6px 0 0;
+                <%= company === 'kh_cu' ? 'background:#1565c0;color:#fff;border-bottom:2px solid #1565c0;' : 'color:#555;' %>">
+        KH Cũ
+      </a>
+      <a href="/danh-muc/<%= slug %>?company=kh_moi"
+         style="padding:7px 20px;font-size:13px;font-weight:600;text-decoration:none;border-radius:6px 6px 0 0;
+                <%= company === 'kh_moi' ? 'background:#1565c0;color:#fff;border-bottom:2px solid #1565c0;' : 'color:#555;' %>">
+        KH Mới
+      </a>
+    </div>
 
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
     <% if (success) { %><div class="alert alert-success"><%= success %></div><% } %>
@@ -19,8 +33,9 @@
       <div class="panel-head"><h2>&#128229; Đồng bộ từ Excel</h2></div>
       <form method="POST" action="/danh-muc/<%= slug %>/upload-excel" enctype="multipart/form-data"
             style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;padding-top:4px;">
+        <input type="hidden" name="company" value="<%= company %>" />
         <div>
-          <label style="display:block;font-size:12px;color:var(--muted);margin-bottom:3px;">Chọn file Excel (.xlsx)</label>
+          <label style="display:block;font-size:12px;color:var(--muted);margin-bottom:3px;">Chọn file Excel (.xlsx) — <strong><%= company === 'kh_moi' ? 'KH Mới' : 'KH Cũ' %></strong></label>
           <input type="file" name="file" accept=".xlsx,.xls" required style="min-width:260px;" />
         </div>
         <button type="submit" class="btn btn-secondary">Đồng bộ</button>
@@ -34,6 +49,7 @@
     <section class="panel" style="margin-bottom:16px;">
       <div class="panel-head"><h2>+ Thêm mới</h2></div>
       <form method="POST" action="/danh-muc/<%= slug %>/them" style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;padding-top:4px;">
+        <input type="hidden" name="company" value="<%= company %>" />
         <div>
           <label style="display:block;font-size:12px;color:var(--muted);margin-bottom:3px;"><%= page.colLabel %> <span style="color:var(--color-chi)">*</span></label>
           <input type="text" name="ma" placeholder="Ví dụ: KVC001" required style="min-width:160px;" />
@@ -55,9 +71,10 @@
       <div class="panel-head">
         <h2>Danh sách (<%= rows.length %> mục)</h2>
         <form method="GET" action="/danh-muc/<%= slug %>" style="display:flex;gap:8px;align-items:center;">
+          <input type="hidden" name="company" value="<%= company %>" />
           <input type="text" name="q" value="<%= searchQ %>" placeholder="Tìm kiếm..." style="width:200px;" />
           <button type="submit" class="btn btn-secondary" style="padding:6px 12px;">Tìm</button>
-          <% if (searchQ) { %><a href="/danh-muc/<%= slug %>" class="link-btn">✕ Bỏ lọc</a><% } %>
+          <% if (searchQ) { %><a href="/danh-muc/<%= slug %>?company=<%= company %>" class="link-btn">✕ Bỏ lọc</a><% } %>
         </form>
       </div>
       <% if (rows.length === 0) { %>
@@ -91,6 +108,7 @@
                 <!-- Nut xoa -->
                 <form method="POST" action="/danh-muc/<%= slug %>/xoa/<%= r.id %>" style="display:inline;"
                   onsubmit="return confirm('Xóa mã &quot;<%= r.ma %>&quot;?')">
+                  <input type="hidden" name="company" value="<%= company %>" />
                   <button type="submit" class="link-btn" style="color:var(--color-chi);">Xóa</button>
                 </form>
               </td>
@@ -99,6 +117,7 @@
             <tr id="editRow_<%= r.id %>" style="display:none;background:var(--bg-hover,rgba(0,120,212,0.06));">
               <td colspan="5">
                 <form method="POST" action="/danh-muc/<%= slug %>/sua/<%= r.id %>" style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;padding:8px 0;">
+                  <input type="hidden" name="company" value="<%= company %>" />
                   <div>
                     <label style="display:block;font-size:12px;color:var(--muted);margin-bottom:3px;"><%= page.colLabel %> *</label>
                     <input type="text" name="ma" id="editMa_<%= r.id %>" required style="min-width:160px;" />

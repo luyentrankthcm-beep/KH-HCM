@@ -20,11 +20,14 @@ const SEED_KEYS = {
   "ma-nha-cung-cap": "ma_nha_cung_cap",
 };
 
-function seedIfEmpty(store, slug) {
+function seedIfEmpty(store, slug, company) {
   const page = PAGES[slug];
   if (!page) return;
-  ensureList(store, page.storeKey);
-  if (store[page.storeKey].length > 0) return; // da co du lieu
+  const storeKey = getStoreKey(page, company);
+  ensureList(store, storeKey);
+  // Chi seed cho KH Cu (du lieu goc di kem app la KH Cu)
+  if (company !== "kh_cu") return;
+  if (store[storeKey].length > 0) return; // da co du lieu
   let seedData;
   try {
     seedData = require(SEED_FILE);
@@ -35,7 +38,7 @@ function seedIfEmpty(store, slug) {
   const rows = seedData[seedKey] || [];
   rows.forEach((r) => {
     if (!r.ma) return;
-    store[page.storeKey].push({
+    store[storeKey].push({
       id: nextId(store),
       ma: r.ma,
       ten: r.ten || "",
@@ -46,12 +49,20 @@ function seedIfEmpty(store, slug) {
   });
 }
 
-// Moi trang dung 1 store key + 1 URL prefix + 1 view name -- cau hinh chung
+// Moi trang dung 1 base key, tach thanh _cu / _moi theo cong ty.
+// Luyen, 2026-08-21: KH Cu va KH Moi la 2 cong ty khac nhau trong MISA nen
+// ma cong trinh, ma KH, ma NCC cung khac nhau hoan toan.
 const PAGES = {
-  "ma-cong-trinh":   { storeKey: "danh_muc_ma_cong_trinh",   title: "Mã Công Trình",    colLabel: "Mã công trình" },
-  "ma-khach-hang":   { storeKey: "danh_muc_ma_khach_hang",   title: "Mã Khách Hàng",    colLabel: "Mã khách hàng" },
-  "ma-nha-cung-cap": { storeKey: "danh_muc_ma_nha_cung_cap", title: "Mã Nhà Cung Cấp",  colLabel: "Mã nhà cung cấp" },
+  "ma-cong-trinh":   { baseKey: "danh_muc_ma_cong_trinh",   title: "Mã Công Trình",    colLabel: "Mã công trình" },
+  "ma-khach-hang":   { baseKey: "danh_muc_ma_khach_hang",   title: "Mã Khách Hàng",    colLabel: "Mã khách hàng" },
+  "ma-nha-cung-cap": { baseKey: "danh_muc_ma_nha_cung_cap", title: "Mã Nhà Cung Cấp",  colLabel: "Mã nhà cung cấp" },
 };
+
+// Tra ve store key theo cong ty (kh_cu / kh_moi)
+function getStoreKey(page, company) {
+  const suffix = company === "kh_moi" ? "_moi" : "_cu";
+  return page.baseKey + suffix;
+}
 
 function ensureList(store, key) {
   if (!Array.isArray(store[key])) store[key] = [];
@@ -73,14 +84,16 @@ router.get("/danh-muc/map-nh-gian", requireLogin, (req, res) => {
 router.get("/danh-muc/:slug", requireLogin, (req, res) => {
   const page = PAGES[req.params.slug];
   if (!page) return res.status(404).send("Không tìm thấy trang.");
+  const company = req.query.company === "kh_moi" ? "kh_moi" : "kh_cu";
+  const storeKey = getStoreKey(page, company);
   const store = load();
-  ensureList(store, page.storeKey);
-  // Tu dong seed du lieu ban dau neu danh sach con trong
-  const beforeSeed = store[page.storeKey].length;
-  seedIfEmpty(store, req.params.slug);
-  if (store[page.storeKey].length > beforeSeed) save(store);
+  ensureList(store, storeKey);
+  // Tu dong seed du lieu ban dau neu danh sach con trong (chi KH Cu)
+  const beforeSeed = store[storeKey].length;
+  seedIfEmpty(store, req.params.slug, company);
+  if (store[storeKey].length > beforeSeed) save(store);
   const searchQ = (req.query.q || "").trim().toLowerCase();
-  let rows = store[page.storeKey];
+  let rows = store[storeKey];
   if (searchQ) {
     rows = rows.filter((r) =>
       [r.ma, r.ten, r.ghiChu].some((v) => v && String(v).toLowerCase().includes(searchQ))
@@ -89,6 +102,7 @@ router.get("/danh-muc/:slug", requireLogin, (req, res) => {
   res.render("danh-muc", {
     slug: req.params.slug,
     page,
+    company,
     rows,
     searchQ: req.query.q || "",
     success: req.query.success || "",
@@ -101,15 +115,16 @@ router.get("/danh-muc/:slug", requireLogin, (req, res) => {
 router.post("/danh-muc/:slug/them", requireDataEntry, (req, res) => {
   const page = PAGES[req.params.slug];
   if (!page) return res.status(404).send("Không tìm thấy trang.");
+  const company = req.body.company === "kh_moi" ? "kh_moi" : "kh_cu";
+  const storeKey = getStoreKey(page, company);
   const store = load();
-  ensureList(store, page.storeKey);
+  ensureList(store, storeKey);
   const ma = (req.body.ma || "").trim();
   const ten = (req.body.ten || "").trim();
-  if (!ma) return res.redirect(`/danh-muc/${req.params.slug}?error=` + encodeURIComponent("Mã không được để trống."));
-  // Kiem tra trung ma
-  const dup = store[page.storeKey].find((r) => r.ma.toLowerCase() === ma.toLowerCase());
-  if (dup) return res.redirect(`/danh-muc/${req.params.slug}?error=` + encodeURIComponent(`Mã "${ma}" đã tồn tại.`));
-  store[page.storeKey].push({
+  if (!ma) return res.redirect(`/danh-muc/${req.params.slug}?company=${company}&error=` + encodeURIComponent("Mã không được để trống."));
+  const dup = store[storeKey].find((r) => r.ma.toLowerCase() === ma.toLowerCase());
+  if (dup) return res.redirect(`/danh-muc/${req.params.slug}?company=${company}&error=` + encodeURIComponent(`Mã "${ma}" đã tồn tại.`));
+  store[storeKey].push({
     id: nextId(store),
     ma,
     ten: ten || "",
@@ -117,41 +132,44 @@ router.post("/danh-muc/:slug/them", requireDataEntry, (req, res) => {
     createdAt: new Date().toISOString(),
   });
   save(store);
-  res.redirect(`/danh-muc/${req.params.slug}?success=` + encodeURIComponent(`Đã thêm mã "${ma}".`));
+  res.redirect(`/danh-muc/${req.params.slug}?company=${company}&success=` + encodeURIComponent(`Đã thêm mã "${ma}".`));
 });
 
 // POST /danh-muc/:slug/sua/:id
 router.post("/danh-muc/:slug/sua/:id", requireDataEntry, (req, res) => {
   const page = PAGES[req.params.slug];
   if (!page) return res.status(404).send("Không tìm thấy trang.");
+  const company = req.body.company === "kh_moi" ? "kh_moi" : "kh_cu";
+  const storeKey = getStoreKey(page, company);
   const store = load();
-  ensureList(store, page.storeKey);
+  ensureList(store, storeKey);
   const id = Number(req.params.id);
-  const row = store[page.storeKey].find((r) => r.id === id);
-  if (!row) return res.redirect(`/danh-muc/${req.params.slug}?error=Không tìm thấy mục.`);
+  const row = store[storeKey].find((r) => r.id === id);
+  if (!row) return res.redirect(`/danh-muc/${req.params.slug}?company=${company}&error=Không tìm thấy mục.`);
   const ma = (req.body.ma || "").trim();
-  if (!ma) return res.redirect(`/danh-muc/${req.params.slug}?error=` + encodeURIComponent("Mã không được để trống."));
-  // Kiem tra trung ma (loai tru chinh no)
-  const dup = store[page.storeKey].find((r) => r.id !== id && r.ma.toLowerCase() === ma.toLowerCase());
-  if (dup) return res.redirect(`/danh-muc/${req.params.slug}?error=` + encodeURIComponent(`Mã "${ma}" đã tồn tại.`));
+  if (!ma) return res.redirect(`/danh-muc/${req.params.slug}?company=${company}&error=` + encodeURIComponent("Mã không được để trống."));
+  const dup = store[storeKey].find((r) => r.id !== id && r.ma.toLowerCase() === ma.toLowerCase());
+  if (dup) return res.redirect(`/danh-muc/${req.params.slug}?company=${company}&error=` + encodeURIComponent(`Mã "${ma}" đã tồn tại.`));
   row.ma = ma;
   row.ten = (req.body.ten || "").trim();
   row.ghiChu = (req.body.ghiChu || "").trim();
   row.updatedAt = new Date().toISOString();
   save(store);
-  res.redirect(`/danh-muc/${req.params.slug}?success=` + encodeURIComponent(`Đã cập nhật mã "${ma}".`));
+  res.redirect(`/danh-muc/${req.params.slug}?company=${company}&success=` + encodeURIComponent(`Đã cập nhật mã "${ma}".`));
 });
 
 // POST /danh-muc/:slug/xoa/:id
 router.post("/danh-muc/:slug/xoa/:id", requireAdmin, (req, res) => {
   const page = PAGES[req.params.slug];
   if (!page) return res.status(404).send("Không tìm thấy trang.");
+  const company = req.body.company === "kh_moi" ? "kh_moi" : "kh_cu";
+  const storeKey = getStoreKey(page, company);
   const store = load();
-  ensureList(store, page.storeKey);
+  ensureList(store, storeKey);
   const id = Number(req.params.id);
-  store[page.storeKey] = store[page.storeKey].filter((r) => r.id !== id);
+  store[storeKey] = store[storeKey].filter((r) => r.id !== id);
   save(store);
-  res.redirect(`/danh-muc/${req.params.slug}?success=Đã xóa mục.`);
+  res.redirect(`/danh-muc/${req.params.slug}?company=${company}&success=Đã xóa mục.`);
 });
 
 // POST /danh-muc/:slug/upload-excel
@@ -160,6 +178,8 @@ router.post("/danh-muc/:slug/xoa/:id", requireAdmin, (req, res) => {
 router.post("/danh-muc/:slug/upload-excel", requireDataEntry, upload.single("file"), (req, res) => {
   const page = PAGES[req.params.slug];
   if (!page) return res.status(404).send("Không tìm thấy trang.");
+  // company duoc gui qua hidden input trong form
+  // (da duoc them vao view danh-muc.ejs)
   if (!req.file) {
     return res.redirect(`/danh-muc/${req.params.slug}?error=` + encodeURIComponent("Chưa chọn file."));
   }
@@ -193,9 +213,11 @@ router.post("/danh-muc/:slug/upload-excel", requireDataEntry, upload.single("fil
     return res.redirect(`/danh-muc/${req.params.slug}?error=` + encodeURIComponent("File không có dữ liệu hợp lệ."));
   }
 
+  const company = req.body.company === "kh_moi" ? "kh_moi" : "kh_cu";
+  const storeKey = getStoreKey(page, company);
   const store = load();
-  ensureList(store, page.storeKey);
-  const list = store[page.storeKey];
+  ensureList(store, storeKey);
+  const list = store[storeKey];
 
   // Tao map ma (lowercase) -> row de upsert nhanh
   const excelMap = new Map();
@@ -224,16 +246,17 @@ router.post("/danh-muc/:slug/upload-excel", requireDataEntry, upload.single("fil
   });
 
   // Xoa: cac dong co fromExcel=true nhung khong con trong file moi
-  const before = store[page.storeKey].length;
-  store[page.storeKey] = store[page.storeKey].filter((r) => {
+  const before = store[storeKey].length;
+  store[storeKey] = store[storeKey].filter((r) => {
     if (!r.fromExcel) return true; // giu nguyen dong them tay
     return excelMap.has(r.ma.toLowerCase());
   });
-  deleted = before - store[page.storeKey].length;
+  deleted = before - store[storeKey].length;
 
   save(store);
-  const msg = `Đồng bộ xong: +${added} mới, ~${updated} cập nhật, -${deleted} xóa (tổng ${store[page.storeKey].length} mục).`;
-  res.redirect(`/danh-muc/${req.params.slug}?success=` + encodeURIComponent(msg));
+  const label = company === "kh_moi" ? "KH Mới" : "KH Cũ";
+  const msg = `[${label}] Đồng bộ xong: +${added} mới, ~${updated} cập nhật, -${deleted} xóa (tổng ${store[storeKey].length} mục).`;
+  res.redirect(`/danh-muc/${req.params.slug}?company=${company}&success=` + encodeURIComponent(msg));
 });
 
 module.exports = router;

@@ -175,7 +175,10 @@ function activeNccList(store, company) {
       ? store.chi_phi_ncc_list_cu
       : (store.chi_phi_ncc_list && store.chi_phi_ncc_list.length ? store.chi_phi_ncc_list : DEFAULT_NCC_LIST);
   }
-  const extra = (store.danh_muc_ma_nha_cung_cap || [])
+  // Luyen, 2026-08-21: doc tu danh muc rieng theo cong ty (_cu / _moi)
+  const danhMucKey = company === "kh_moi" ? "danh_muc_ma_nha_cung_cap_moi" : "danh_muc_ma_nha_cung_cap_cu";
+  const extraSrc = store[danhMucKey] || store.danh_muc_ma_nha_cung_cap || [];
+  const extra = extraSrc
     .filter((r) => r.ma && r.ten)
     .map((r) => ({ maNCC: r.ma, tenNCC: r.ten, tenKhongDau: r.ten, mst: r.ghiChu || "" }));
   if (!extra.length) return base;
