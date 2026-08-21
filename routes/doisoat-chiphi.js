@@ -303,6 +303,49 @@ function buildChannelChiPhi(store, channelKey, revenueStatusMap) {
         tenNCC = nccMatch.tenNCC || "";
         mstNCC = nccMatch.mstNCC || "";
         nccAmbiguous = nccMatch.candidates.length > 1;
+
+        // Luyen, 2026-08-21: khi nhieu ung vien NCC cung ten (vd AEON nhieu chi
+        // nhanh cung MST), thu phan biet bang 2 buoc:
+        // B1. Keyword tu ten NCC co trong dien giai khong?
+        // B2. Tra so HD tu dien giai -> tim hoa don -> dung Ten NCC cua hoa don
+        if (!maNCC && nccAmbiguous) {
+          const descNorm = normText(r.description || "");
+          const candidateRecs = nccList.filter((rec) => nccMatch.candidates.includes(rec.maNCC));
+
+          // B1: keyword matching
+          const scoreOf = (rec) => {
+            const words = normText(rec.tenNCC || "").split(/\s+/).filter((w) => w.length >= 2);
+            return words.filter((w) => descNorm.includes(w)).length;
+          };
+          const scored = candidateRecs.map((rec) => ({ rec, score: scoreOf(rec) }))
+            .filter((x) => x.score > 0)
+            .sort((a, b) => b.score - a.score);
+          if (scored.length > 0 && scored[0].score > (scored[1] ? scored[1].score : 0)) {
+            // Chi co 1 ung vien dat score cao nhat -- dung no
+            maNCC = scored[0].rec.maNCC; tenNCC = scored[0].rec.tenNCC; mstNCC = scored[0].rec.mst;
+            nccAmbiguous = false;
+          } else {
+            // B2: so HD tu dien giai -> hoa don -> Ten NCC chinh xac
+            const hdNum = extractHdNumberFromText(r.description || "");
+            if (hdNum) {
+              const matchedInv = (store.chi_phi_invoice_list || []).find((inv) =>
+                String(inv.soHoaDon || "").trim() === hdNum
+              );
+              if (matchedInv && matchedInv.tenNguoiBan) {
+                const invNameNorm = normText(matchedInv.tenNguoiBan);
+                const invWords = invNameNorm.split(/\s+/).filter((w) => w.length >= 2);
+                const invScored = candidateRecs.map((rec) => ({
+                  rec,
+                  score: invWords.filter((w) => normText(rec.tenNCC || "").includes(w)).length,
+                })).filter((x) => x.score > 0).sort((a, b) => b.score - a.score);
+                if (invScored.length > 0 && invScored[0].score > (invScored[1] ? invScored[1].score : 0)) {
+                  maNCC = invScored[0].rec.maNCC; tenNCC = invScored[0].rec.tenNCC; mstNCC = invScored[0].rec.mst;
+                  nccAmbiguous = false;
+                }
+              }
+            }
+          }
+        }
       }
 
       // Khop voi bang lenh chi UNC (Ten NCC + So tien) de lay Dien giai sach
@@ -1311,7 +1354,29 @@ router.get("/doi-soat/chi-phi-saoke/preview-misa", requireDataEntry, (req, res) 
         maNCC = nccMatch.maNCC || "";
         tenNCC = nccMatch.tenNCC || "";
         mstNCC = nccMatch.mstNCC || "";
-        // Neu khong khop chinh xac, thu tim rong hon theo tu khoa
+        // Neu nhieu ung vien (vd nhieu chi nhanh cung ten), thu phan biet qua keyword + HD
+        if (!maNCC && nccMatch.candidates.length > 1) {
+          const descNorm = normText(r.description || "");
+          const candidateRecs = nccList.filter((rec) => nccMatch.candidates.includes(rec.maNCC));
+          const scoreOf = (rec) => normText(rec.tenNCC || "").split(/\s+/).filter((w) => w.length >= 2).filter((w) => descNorm.includes(w)).length;
+          const scored = candidateRecs.map((rec) => ({ rec, score: scoreOf(rec) })).filter((x) => x.score > 0).sort((a, b) => b.score - a.score);
+          if (scored.length > 0 && scored[0].score > (scored[1] ? scored[1].score : 0)) {
+            maNCC = scored[0].rec.maNCC; tenNCC = scored[0].rec.tenNCC; mstNCC = scored[0].rec.mst;
+          } else {
+            const hdNum = extractHdNumberFromText(r.description || "");
+            if (hdNum) {
+              const matchedInv = (store.chi_phi_invoice_list || []).find((inv) => String(inv.soHoaDon || "").trim() === hdNum);
+              if (matchedInv && matchedInv.tenNguoiBan) {
+                const invWords = normText(matchedInv.tenNguoiBan).split(/\s+/).filter((w) => w.length >= 2);
+                const invScored = candidateRecs.map((rec) => ({ rec, score: invWords.filter((w) => normText(rec.tenNCC || "").includes(w)).length })).filter((x) => x.score > 0).sort((a, b) => b.score - a.score);
+                if (invScored.length > 0 && invScored[0].score > (invScored[1] ? invScored[1].score : 0)) {
+                  maNCC = invScored[0].rec.maNCC; tenNCC = invScored[0].rec.tenNCC; mstNCC = invScored[0].rec.mst;
+                }
+              }
+            }
+          }
+        }
+        // Neu van khong khop, thu tim rong hon theo tu khoa
         if (!maNCC) {
           const broad = broadMatchNcc(vendorForNcc, nccList);
           if (broad) { maNCC = broad.maNCC || ""; tenNCC = broad.tenNCC || ""; mstNCC = broad.mst || ""; }
