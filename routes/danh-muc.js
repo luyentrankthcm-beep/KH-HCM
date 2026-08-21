@@ -57,6 +57,18 @@ function ensureList(store, key) {
   if (!Array.isArray(store[key])) store[key] = [];
 }
 
+// GET /danh-muc/map-nh-gian -- danh sach rules keyword → gian tu dien gian
+router.get("/danh-muc/map-nh-gian", requireLogin, (req, res) => {
+  const store = load();
+  const rules = store.description_gian_rules || [];
+  res.render("danh-muc-map-nh-gian", {
+    rules,
+    success: req.query.success || "",
+    error: req.query.error || "",
+    userName: req.session.userName || "",
+  });
+});
+
 // GET /danh-muc/:slug
 router.get("/danh-muc/:slug", requireLogin, (req, res) => {
   const page = PAGES[req.params.slug];

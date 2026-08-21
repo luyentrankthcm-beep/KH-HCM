@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <%- include('partials/head') %>
+</head>
+<body>
+  <%- include('partials/nav') %>
+  <main class="container">
+    <h1>Map NH gian — Tự điền Gian từ Diễn giải</h1>
+    <p class="muted" style="margin-top:-10px;margin-bottom:20px;">
+      Khi keyword xuất hiện trong diễn giải hoặc tên đối ứng của giao dịch, hệ thống tự điền tên Gian tương ứng.
+    </p>
+
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+    <% if (success) { %><div class="alert alert-success"><%= success %></div><% } %>
+
+    <div id="msg-box" style="display:none;margin-bottom:12px;padding:8px 12px;border-radius:4px;font-size:13px;"></div>
+
+    <!-- Thêm rule mới -->
+    <section class="panel" style="margin-bottom:16px;">
+      <div class="panel-head"><h2>Thêm / Cập nhật rule</h2></div>
+      <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;padding-top:4px;">
+        <div>
+          <label style="display:block;font-size:12px;color:var(--muted);margin-bottom:3px;">Keyword (trong diễn giải/tên đối ứng)</label>
+          <input type="text" id="inp-keyword" placeholder="vd: VNPAY CTT 18.08" style="width:260px;" />
+        </div>
+        <div>
+          <label style="display:block;font-size:12px;color:var(--muted);margin-bottom:3px;">Tên Gian</label>
+          <input type="text" id="inp-gian" placeholder="vd: POSH MB" style="width:200px;" />
+        </div>
+        <button class="btn btn-primary" onclick="saveRule()">Lưu</button>
+      </div>
+    </section>
+
+    <!-- Danh sách rules -->
+    <section class="panel">
+      <div class="panel-head" style="display:flex;justify-content:space-between;align-items:center;">
+        <h2>Danh sách rules (<span id="rule-count"><%= rules.length %></span>)</h2>
+        <button class="btn btn-secondary btn-sm" onclick="applyAll()" style="font-size:12px;">Áp dụng cho tất cả GD</button>
+      </div>
+      <table class="table" style="margin-top:8px;" id="rules-table">
+        <thead>
+          <tr>
+            <th style="width:40px;">#</th>
+            <th>Keyword</th>
+            <th>Gian</th>
+            <th style="width:160px;">Thao tác</th>
+          </tr>
+        </thead>
+        <tbody id="rules-body">
+          <% rules.forEach(function(r, i) { %>
+          <tr id="row-<%= i %>">
+            <td style="color:var(--muted);"><%= i + 1 %></td>
+            <td>
+              <span class="val-keyword"><%= r.keyword %></span>
+              <input class="edit-keyword" type="text" value="<%= r.keyword %>" style="display:none;width:220px;" />
+            </td>
+            <td>
+              <span class="val-gian"><%= r.gian %></span>
+              <input class="edit-gian" type="text" value="<%= r.gian %>" style="display:none;width:160px;" />
+            </td>
+            <td>
+              <button class="btn btn-secondary btn-sm" onclick="editRow(<%= i %>)">Sửa</button>
+              <button class="btn btn-primary btn-sm save-btn" onclick="saveEdit(<%= i %>)" style="display:none;">Lưu</button>
+              <button class="btn btn-secondary btn-sm cancel-btn" onclick="cancelEdit(<%= i %>)" style="display:none;">Hủy</button>
+              <button class="btn btn-danger btn-sm" onclick="deleteRule('<%= r.keyword.replace(/'/g, "\\'") %>')">Xóa</button>
+            </td>
+          </tr>
+          <% }) %>
+          <% if (!rules.length) { %>
+          <tr id="empty-row"><td colspan="4" style="text-align:center;color:var(--muted);padding:20px;">Chưa có rule nào.</td></tr>
+          <% } %>
+        </tbody>
+      </table>
+    </section>
+  </main>
+
+  <script>
+  function showMsg(msg, ok) {
+    const box = document.getElementById('msg-box');
+    box.textContent = msg;
+    box.style.display = 'block';
+    box.style.background = ok ? '#d4edda' : '#f8d7da';
+    box.style.color = ok ? '#155724' : '#721c24';
+    box.style.border = ok ? '1px solid #c3e6cb' : '1px solid #f5c6cb';
+    setTimeout(() => box.style.display = 'none', 4000);
+  }
+
+  async function callApi(body) {
+    const r = await fetch('/transactions/set-desc-gian-rule', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(body)
+    });
+    return r.json();
+  }
+
+  function renderRules(rules) {
+    const tbody = document.getElementById('rules-body');
+    document.getElementById('rule-count').textContent = rules.length;
+    if (!rules.length) {
+      tbody.innerHTML = '<tr id="empty-row"><td colspan="4" style="text-align:center;color:var(--muted);padding:20px;">Chưa có rule nào.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = rules.map((r, i) => `
+      <tr id="row-${i}">
+        <td style="color:var(--muted);">${i + 1}</td>
+        <td>
+          <span class="val-keyword">${escHtml(r.keyword)}</span>
+          <input class="edit-keyword" type="text" value="${escHtml(r.keyword)}" style="display:none;width:220px;" />
+        </td>
+        <td>
+          <span class="val-gian">${escHtml(r.gian)}</span>
+          <input class="edit-gian" type="text" value="${escHtml(r.gian)}" style="display:none;width:160px;" />
+        </td>
+        <td>
+          <button class="btn btn-secondary btn-sm" onclick="editRow(${i})">Sửa</button>
+          <button class="btn btn-primary btn-sm save-btn" onclick="saveEdit(${i})" style="display:none;">Lưu</button>
+          <button class="btn btn-secondary btn-sm cancel-btn" onclick="cancelEdit(${i})" style="display:none;">Hủy</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteRule('${escJs(r.keyword)}')">Xóa</button>
+        </td>
+      </tr>`).join('');
+  }
+
+  function escHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+  function escJs(s)   { return String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'"); }
+
+  async function saveRule() {
+    const kw = document.getElementById('inp-keyword').value.trim();
+    const gian = document.getElementById('inp-gian').value.trim();
+    if (!kw || !gian) return showMsg('Vui lòng nhập đủ Keyword và Gian.', false);
+    const res = await callApi({ keyword: kw, gian });
+    showMsg(res.message, res.ok);
+    if (res.ok) {
+      document.getElementById('inp-keyword').value = '';
+      document.getElementById('inp-gian').value = '';
+      renderRules(res.rules);
+    }
+  }
+
+  function editRow(i) {
+    const row = document.getElementById('row-' + i);
+    row.querySelectorAll('.val-keyword,.val-gian').forEach(el => el.style.display = 'none');
+    row.querySelectorAll('.edit-keyword,.edit-gian').forEach(el => el.style.display = '');
+    row.querySelector('.btn-secondary').style.display = 'none';
+    row.querySelector('.save-btn').style.display = '';
+    row.querySelector('.cancel-btn').style.display = '';
+  }
+
+  function cancelEdit(i) {
+    const row = document.getElementById('row-' + i);
+    row.querySelectorAll('.val-keyword,.val-gian').forEach(el => el.style.display = '');
+    row.querySelectorAll('.edit-keyword,.edit-gian').forEach(el => el.style.display = 'none');
+    row.querySelector('.btn-secondary').style.display = '';
+    row.querySelector('.save-btn').style.display = 'none';
+    row.querySelector('.cancel-btn').style.display = 'none';
+  }
+
+  async function saveEdit(i) {
+    const row = document.getElementById('row-' + i);
+    const oldKw = row.querySelector('.val-keyword').textContent;
+    const newKw = row.querySelector('.edit-keyword').value.trim();
+    const newGian = row.querySelector('.edit-gian').value.trim();
+    if (!newKw || !newGian) return showMsg('Keyword và Gian không được để trống.', false);
+    // If keyword changed, delete old first
+    if (oldKw !== newKw) {
+      await callApi({ keyword: oldKw, action: 'delete' });
+    }
+    const res = await callApi({ keyword: newKw, gian: newGian });
+    showMsg(res.message, res.ok);
+    if (res.ok) renderRules(res.rules);
+  }
+
+  async function deleteRule(kw) {
+    if (!confirm('Xóa rule "' + kw + '"?')) return;
+    const res = await callApi({ keyword: kw, action: 'delete' });
+    showMsg(res.message, res.ok);
+    if (res.ok) renderRules(res.rules);
+  }
+
+  async function applyAll() {
+    const r = await fetch('/transactions/apply-desc-gian-rules', {method:'POST', headers:{'Content-Type':'application/json'}});
+    const res = await r.json();
+    showMsg(res.message, res.ok);
+  }
+  </script>
+</body>
+</html>
