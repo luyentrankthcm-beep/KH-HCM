@@ -1118,8 +1118,10 @@ function buildSaokeRows(store, activeCompany, selectedMonth, selectedBankName, s
     const cpGian = (cp && cp.gian) || "";
     const cpTk = cp ? (store.chi_phi_gian_tk_manual[String(cp.id)] || getGianTK(cp.gian, chiaSeTKSet, gianNameTkMap)) : "";
     const ovr = saokGianOvr[String(t.id)] || null;
-    const finalGian = cpGian || (ovr && ovr.gian) || "";
-    const finalTk = cpTk || (ovr && ovr.tk) || "";
+    // Luyen, 2026-08-21: dung gian tu giao dich (t.gian, da gan tren trang sao ke)
+    // lam fallback neu chua co tu chi_phi hoac override tay.
+    const finalGian = cpGian || (ovr && ovr.gian) || t.gian || "";
+    const finalTk = cpTk || (ovr && ovr.tk) || (t.gian ? getGianTK(t.gian, chiaSeTKSet, gianNameTkMap) : "") || "";
     const bankOpLabel = detectBankOp(t.description, t.tenDoiUng);
     let suggestedGian = "", suggestedTk = "";
     if (!finalGian && t.type === "chi" && !bankOpLabel) {
