@@ -427,10 +427,12 @@
                 <% } %>
               </td>
               <td><%= r.soHoaDon || '' %></td>
-              <td style="max-width:160px;white-space:nowrap;" title="<%= r.gian || r.suggestedGian %>">
+              <td style="max-width:160px;white-space:nowrap;" title="<%= r.gian || r.suggestedGian || r.bankOpLabel %>">
                 <% if (r.gian) { %>
                   <span style="overflow:hidden;text-overflow:ellipsis;display:inline-block;max-width:120px;vertical-align:middle;" title="<%= r.gian %>"><%= r.gian %></span>
                   <% if (r.hasOvr) { %><span title="Gán tay trên saoke" style="font-size:10px;color:var(--color-muted,#aaa);margin-left:2px;">✏️</span><% } %>
+                <% } else if (r.bankOpLabel) { %>
+                  <span style="color:#b08000;font-size:11px;font-style:italic;" title="Phí/nghiệp vụ ngân hàng — không tính vào chi phí gian">🏦 <%= r.bankOpLabel %></span>
                 <% } else if (r.suggestedGian) { %>
                   <span style="color:var(--color-muted,#888);font-size:11px;font-style:italic;" title="Gợi ý từ NCC">≈ <%= r.suggestedGian %></span>
                   <form method="POST" action="/doi-soat/chi-phi-saoke/set-gian-banktx" style="display:inline-block;margin-left:3px;">

@@ -1035,6 +1035,25 @@ function buildSaokeRows(store, activeCompany, selectedMonth, selectedBankName, s
   const DATE_WIN_MS = 7 * 86400000;
   function dateMs(d) { return new Date(d + "T00:00:00").getTime(); }
 
+  // Nhan dien giao dich "ngan hang tu sinh" (phi dich vu, rut tien mat, ...)
+  // -- KHONG tu dong goi y gian cho cac giao dich nay vi chung la phi NH /
+  // rut tien noi bo, khong phai chi phi gian hang.
+  const BANK_OP_PATTERNS = [
+    { re: /THU\s+PHI\s+SMS|PHI\s+(DICH\s+VU\s+)?SMS|PHI\s+NHAN\s+TIN/i, label: "Phí SMS ngân hàng" },
+    { re: /PHI\s+QUAN\s+LY\s+TAI\s+KHOAN|PHI\s+DICH\s+VU\s+NH|PHI\s+DICH\s+VU\s+NGAN\s+HANG/i, label: "Phí dịch vụ NH" },
+    { re: /PHI\s+CHUYEN\s+(TIEN|KHOAN)|PHI\s+GD|PHI\s+GIAO\s+DICH/i, label: "Phí chuyển khoản" },
+    { re: /RUT\s+TIEN\s+MAT|RUT\s+SET\b|RUT\s+TIEN\b|ATM\s+RUT|GIAO\s+DICH\s+ATM/i, label: "Rút tiền mặt" },
+    { re: /THU\s+PHI\s+TANG\s+HAN|PHI\s+TANG\s+HAN/i, label: "Phí gia hạn NH" },
+    { re: /THU\s+PHI\s+PHAT\s+HANH|PHI\s+PHAT\s+HANH\s+THE/i, label: "Phí phát hành thẻ" },
+  ];
+  function detectBankOp(description, tenDoiUng) {
+    const src = normText((description || "") + " " + (tenDoiUng || ""));
+    for (const { re, label } of BANK_OP_PATTERNS) {
+      if (re.test(src)) return label;
+    }
+    return null;
+  }
+
   // Lookup so hoa don tu hoa_don_dau_vao khi chi_phi khong co soHoaDon.
   // Khop: ten NCC (>= 1 tu >= 5 ky tu chung) + tong tien (sau thue) +-5000 + ngay +-60 ngay.
   const hdForCompany = (store.hoa_don_dau_vao || []).filter(
@@ -1101,8 +1120,9 @@ function buildSaokeRows(store, activeCompany, selectedMonth, selectedBankName, s
     const ovr = saokGianOvr[String(t.id)] || null;
     const finalGian = cpGian || (ovr && ovr.gian) || "";
     const finalTk = cpTk || (ovr && ovr.tk) || "";
+    const bankOpLabel = detectBankOp(t.description, t.tenDoiUng);
     let suggestedGian = "", suggestedTk = "";
-    if (!finalGian && t.type === "chi") {
+    if (!finalGian && t.type === "chi" && !bankOpLabel) {
       const sug = suggestGianForTx(t.tenDoiUng, t.description);
       if (sug) { suggestedGian = sug.gianHang; suggestedTk = getGianTK(sug.gianHang, chiaSeTKSet, gianNameTkMap); }
     }
@@ -1112,7 +1132,7 @@ function buildSaokeRows(store, activeCompany, selectedMonth, selectedBankName, s
       soHoaDon: (cp && cp.soHoaDon) || findSoHoaDonFromHD(t.tenDoiUng, t.amount, t.date),
       gian: finalGian, ncc: (cp && cp.ncc) || "",
       daHachToan: cp ? !!cp.daHachToan : false, chiPhiId: (cp && cp.id) || "",
-      matchType, tk: finalTk, hasOvr: !!ovr, suggestedGian, suggestedTk,
+      matchType, tk: finalTk, hasOvr: !!ovr, suggestedGian, suggestedTk, bankOpLabel: bankOpLabel || "",
     };
   }).sort((a, b) => a.date.localeCompare(b.date));
 
