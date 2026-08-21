@@ -99,11 +99,13 @@ router.get("/danh-muc/:slug", requireLogin, (req, res) => {
       [r.ma, r.ten, r.ghiChu].some((v) => v && String(v).toLowerCase().includes(searchQ))
     );
   }
+  const uploadMeta = ((store.danh_muc_upload_meta || {})[req.params.slug] || {})[company] || null;
   res.render("danh-muc", {
     slug: req.params.slug,
     page,
     company,
     rows,
+    uploadMeta,
     searchQ: req.query.q || "",
     success: req.query.success || "",
     error: req.query.error || "",
@@ -253,10 +255,38 @@ router.post("/danh-muc/:slug/upload-excel", requireDataEntry, upload.single("fil
   });
   deleted = before - store[storeKey].length;
 
+  // Luu lich su upload
+  if (!store.danh_muc_upload_meta) store.danh_muc_upload_meta = {};
+  if (!store.danh_muc_upload_meta[req.params.slug]) store.danh_muc_upload_meta[req.params.slug] = {};
+  store.danh_muc_upload_meta[req.params.slug][company] = {
+    uploaded_at: new Date().toISOString(),
+    file_name: req.file.originalname,
+    count: store[storeKey].length,
+  };
   save(store);
   const label = company === "kh_moi" ? "KH Mới" : "KH Cũ";
   const msg = `[${label}] Đồng bộ xong: +${added} mới, ~${updated} cập nhật, -${deleted} xóa (tổng ${store[storeKey].length} mục).`;
   res.redirect(`/danh-muc/${req.params.slug}?company=${company}&success=` + encodeURIComponent(msg));
+});
+
+// POST /danh-muc/:slug/xoa-het -- xoa toan bo danh sach (chi dong fromExcel) theo cong ty
+router.post("/danh-muc/:slug/xoa-het", requireAdmin, (req, res) => {
+  const page = PAGES[req.params.slug];
+  if (!page) return res.status(404).send("Không tìm thấy trang.");
+  const company = req.body.company === "kh_moi" ? "kh_moi" : "kh_cu";
+  const storeKey = getStoreKey(page, company);
+  const store = load();
+  ensureList(store, storeKey);
+  const before = store[storeKey].length;
+  store[storeKey] = store[storeKey].filter((r) => !r.fromExcel);
+  // Xoa meta upload
+  if (store.danh_muc_upload_meta && store.danh_muc_upload_meta[req.params.slug]) {
+    delete store.danh_muc_upload_meta[req.params.slug][company];
+  }
+  save(store);
+  const label = company === "kh_moi" ? "KH Mới" : "KH Cũ";
+  const deleted = before - store[storeKey].length;
+  res.redirect(`/danh-muc/${req.params.slug}?company=${company}&success=` + encodeURIComponent(`[${label}] Đã xóa ${deleted} mục từ Excel.`));
 });
 
 module.exports = router;

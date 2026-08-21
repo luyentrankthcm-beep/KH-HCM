@@ -43,6 +43,16 @@
           Tự động thêm mới, cập nhật tên, và xóa mã đã xóa khỏi file (chỉ xóa dòng nhập từ Excel).
         </span>
       </form>
+      <% if (uploadMeta) { %>
+      <div style="margin-top:10px;padding:8px 12px;background:#f8f9fa;border-radius:6px;display:flex;align-items:center;gap:12px;font-size:12px;color:var(--muted);">
+        <span>📁 Lần tải gần nhất: <strong><%= uploadMeta.file_name %></strong> — <%= new Date(uploadMeta.uploaded_at).toLocaleString('vi-VN') %> — <%= uploadMeta.count %> mục</span>
+        <form method="POST" action="/danh-muc/<%= slug %>/xoa-het" style="display:inline;"
+          onsubmit="return confirm('Xóa toàn bộ danh sách <%= company === \"kh_moi\" ? \"KH Mới\" : \"KH Cũ\" %> từ Excel?')">
+          <input type="hidden" name="company" value="<%= company %>" />
+          <button type="submit" class="btn btn-danger btn-sm" style="font-size:11px;padding:3px 10px;">Xóa danh sách</button>
+        </form>
+      </div>
+      <% } %>
     </section>
 
     <!-- Form them moi -->
