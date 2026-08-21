@@ -198,6 +198,7 @@
         <table id="misaTable" style="display:none;border-collapse:collapse;font-size:12px;">
           <thead>
             <tr style="background:#f0f4ff;position:sticky;top:0;z-index:2;">
+              <th style="padding:6px 6px;text-align:center;border:1px solid #ddd;width:28px;"><input type="checkbox" id="misaChkAll" title="Chọn/bỏ tất cả" checked onchange="toggleAllMisa(this.checked)"></th>
               <th style="padding:6px 6px;text-align:center;border:1px solid #ddd;width:36px;">#<div class="col-rsz"></div></th>
               <th style="padding:6px 6px;border:1px solid #ddd;width:88px;">Ngày CT<div class="col-rsz"></div></th>
               <th style="padding:6px 6px;border:1px solid #ddd;width:90px;">Số CT<div class="col-rsz"></div></th>
@@ -271,17 +272,23 @@
       tbody.innerHTML = '';
       var start = parseInt(document.getElementById('misaStartNo').value) || 1;
       var prefix = document.getElementById('misaPrefix').value || 'UNC';
+      var seqNo = 0;
       _misaRows.forEach(function(r, i) {
-        var soCt = prefix + String(start + i).padStart(4, '0');
+        var excluded = !!r.excluded;
+        if (!excluded) seqNo++;
+        var soCt = excluded ? '—' : prefix + String(start + seqNo - 1).padStart(4, '0');
         var amtFmt = r.amount ? r.amount.toLocaleString('vi-VN') + ' đ' : '';
         var tkOpts = ['331','1388','1121'].map(function(v) {
           return '<option value="' + v + '"' + (String(r.tk) === v ? ' selected' : '') + '>' + v + '</option>';
         }).join('');
-        var matchBg = r.matchType === 'exact' ? '#f0fff4' : r.matchType === 'fuzzy' ? '#fffbf0' : '#fff';
+        var matchBg = excluded ? '#f5f5f5' : (r.matchType === 'exact' ? '#f0fff4' : r.matchType === 'fuzzy' ? '#fffbf0' : '#fff');
         var tr = document.createElement('tr');
+        tr.id = 'misa-tr-' + i;
+        if (excluded) tr.style.opacity = '0.4';
         tr.style.background = matchBg;
         tr.innerHTML =
-          '<td style="padding:4px 6px;border:1px solid #ddd;text-align:center;">' + (i+1) + '</td>' +
+          '<td style="padding:4px 6px;border:1px solid #ddd;text-align:center;"><input type="checkbox" ' + (excluded ? '' : 'checked') + ' onchange="toggleMisaRow(this,' + i + ')"></td>' +
+          '<td style="padding:4px 6px;border:1px solid #ddd;text-align:center;">' + (excluded ? '—' : seqNo) + '</td>' +
           '<td style="padding:4px 6px;border:1px solid #ddd;white-space:nowrap;">' + r.date + '</td>' +
           '<td style="padding:4px 6px;border:1px solid #ddd;white-space:nowrap;">' + soCt + '</td>' +
           '<td style="padding:4px 6px;border:1px solid #ddd;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + (r.description||'').replace(/"/g,'&quot;') + '">' + (r.description||'') + '</td>' +
@@ -295,9 +302,27 @@
         tbody.appendChild(tr);
       });
       document.getElementById('misaTable').style.display = '';
-      var countTxt = _misaRows.length + ' dòng';
+      updateMisaCount();
+    }
+
+    function updateMisaCount() {
+      var total = _misaRows.length;
+      var included = _misaRows.filter(function(r){ return !r.excluded; }).length;
+      var countTxt = included + '/' + total + ' dòng';
       document.getElementById('misaCount').textContent = countTxt;
       document.getElementById('misaFooterCount').textContent = countTxt;
+    }
+
+    function toggleMisaRow(cb, idx) {
+      _misaRows[idx].excluded = !cb.checked;
+      // Re-render để cập nhật số thứ tự và màu sắc
+      renderMisaTable();
+      // Restore scroll nếu cần (browser giữ tự động)
+    }
+
+    function toggleAllMisa(checked) {
+      _misaRows.forEach(function(r){ r.excluded = !checked; });
+      renderMisaTable();
     }
 
     function updateMisaRow(el) {
@@ -308,7 +333,8 @@
     document.getElementById('misaStartNo').addEventListener('input', renderMisaTable);
 
     async function exportMisa() {
-      if (!_misaRows.length) { alert('Chưa có dữ liệu.'); return; }
+      var rowsToExport = _misaRows.filter(function(r){ return !r.excluded; });
+      if (!rowsToExport.length) { alert('Chưa có dữ liệu (tất cả đã bị loại).'); return; }
       var btn = document.getElementById('misaExportBtn');
       btn.textContent = 'Đang xuất...'; btn.disabled = true;
       try {
@@ -316,7 +342,7 @@
           method:'POST',
           headers:{'Content-Type':'application/json'},
           body: JSON.stringify({
-            rows: _misaRows,
+            rows: rowsToExport,
             startNo: document.getElementById('misaStartNo').value || '1',
             prefix: document.getElementById('misaPrefix').value || 'UNC'
           })
