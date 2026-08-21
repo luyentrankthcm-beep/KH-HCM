@@ -127,6 +127,10 @@
         Tải lại nếu chị có bản NCC mới hơn (thêm NCC, sửa tên, đổi mã...) — cần cột "Mã nhà cung cấp" và "Tên nhà cung cấp".
       </p>
       <form method="POST" action="/doi-soat/chi-phi/upload-ncc" enctype="multipart/form-data" class="form-inline">
+        <select name="company" style="font-size:13px;padding:4px 8px;border:1px solid #ccc;border-radius:4px;">
+          <option value="kh_cu">KH Cũ</option>
+          <option value="kh_moi">KH Mới</option>
+        </select>
         <input type="file" name="file" accept=".xls,.xlsx" required />
         <button type="submit" class="btn btn-secondary">Cập nhật danh sách NCC</button>
       </form>

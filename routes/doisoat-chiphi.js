@@ -135,6 +135,11 @@ function ensureShape(store) {
   if (!store.chi_phi_vendor_ncc_map) store.chi_phi_vendor_ncc_map = {}; // NCC go tay khi khong tu khop duoc
   if (!store.chi_phi_ncc_list) store.chi_phi_ncc_list = null; // null = dung danh sach goc 884 NCC di kem app
   if (!store.chi_phi_ncc_meta) store.chi_phi_ncc_meta = null; // { uploaded_at, file_name, count }
+  // Luyen, 2026-08-21: tach NCC theo cong ty (KH Cu vs KH Moi) vi ma NCC khac nhau
+  if (!store.chi_phi_ncc_list_cu) store.chi_phi_ncc_list_cu = null;
+  if (!store.chi_phi_ncc_meta_cu) store.chi_phi_ncc_meta_cu = null;
+  if (!store.chi_phi_ncc_list_moi) store.chi_phi_ncc_list_moi = null;
+  if (!store.chi_phi_ncc_meta_moi) store.chi_phi_ncc_meta_moi = null;
   if (!store.chi_phi_invoice_list) store.chi_phi_invoice_list = []; // danh sach hoa don NCC (sheet HDDV KH CU) -- doi chieu Ten NCC+So tien
   if (!store.chi_phi_invoice_meta) store.chi_phi_invoice_meta = null; // { uploaded_at, file_name, count, sheetName }
   if (!store.chi_phi_saoke_gian_override) store.chi_phi_saoke_gian_override = {}; // bankTxId -> {gian, tk} khi user xac nhan go tay tren trang saoke
@@ -155,8 +160,21 @@ function ensureShape(store) {
 // (store.danh_muc_ma_nha_cung_cap, cau truc {ma, ten}) -- convert sang dinh
 // dang chi_phi_ncc_list ({maNCC, tenNCC}) roi append vao sau. NCC co trong
 // danh muc se upsert (ghi de) neu ma trung voi ban co.
-function activeNccList(store) {
-  const base = store.chi_phi_ncc_list && store.chi_phi_ncc_list.length ? store.chi_phi_ncc_list : DEFAULT_NCC_LIST;
+function activeNccList(store, company) {
+  // Luyen, 2026-08-21: uu tien danh sach rieng theo cong ty (kh_cu / kh_moi).
+  // Neu chua co danh sach rieng, fallback ve danh sach chung (chi_phi_ncc_list)
+  // roi moi den DEFAULT_NCC_LIST (884 NCC KH Cu di kem app).
+  let base;
+  if (company === "kh_moi") {
+    base = store.chi_phi_ncc_list_moi && store.chi_phi_ncc_list_moi.length
+      ? store.chi_phi_ncc_list_moi
+      : (store.chi_phi_ncc_list && store.chi_phi_ncc_list.length ? store.chi_phi_ncc_list : DEFAULT_NCC_LIST);
+  } else {
+    // kh_cu hoac khong ro -- uu tien chi_phi_ncc_list_cu
+    base = store.chi_phi_ncc_list_cu && store.chi_phi_ncc_list_cu.length
+      ? store.chi_phi_ncc_list_cu
+      : (store.chi_phi_ncc_list && store.chi_phi_ncc_list.length ? store.chi_phi_ncc_list : DEFAULT_NCC_LIST);
+  }
   const extra = (store.danh_muc_ma_nha_cung_cap || [])
     .filter((r) => r.ma && r.ten)
     .map((r) => ({ maNCC: r.ma, tenNCC: r.ten, tenKhongDau: r.ten, mst: r.ghiChu || "" }));
@@ -222,7 +240,7 @@ function buildChannelChiPhi(store, channelKey, revenueStatusMap) {
   const vendorTkMap = store.chi_phi_vendor_tk_map || {};
   const gianOverride = store.chi_phi_gian_override || {};
   const gianList = store.zvp_gian_list || [];
-  const nccList = activeNccList(store);
+  const nccList = activeNccList(store, cfg.company);
   const nccIndex = buildNccIndex(nccList);
   const vendorNccMap = store.chi_phi_vendor_ncc_map || {};
   const invoiceIndex = buildInvoiceIndex(store.chi_phi_invoice_list);
@@ -534,9 +552,9 @@ router.get("/doi-soat/chi-phi", (req, res) => {
     selectedInvoiceStatus,
     selectedRevenueStatus,
     totalAmount,
-    nccCount: activeNccList(store).length,
+    nccCount: activeNccList(store, activeCompany).length,
     nccIsCustom: !!(store.chi_phi_ncc_list && store.chi_phi_ncc_list.length),
-    nccMeta: store.chi_phi_ncc_meta,
+    nccMeta: activeCompany === "kh_moi" ? (store.chi_phi_ncc_meta_moi || store.chi_phi_ncc_meta) : (store.chi_phi_ncc_meta_cu || store.chi_phi_ncc_meta),
     invoiceMeta: store.chi_phi_invoice_meta,
     invoiceCount: (store.chi_phi_invoice_list || []).length,
     uncMeta: store.chi_phi_unc_meta,
@@ -695,24 +713,32 @@ router.post("/doi-soat/chi-phi/upload/:channel/:id/delete", requireAdmin, (req, 
   res.redirect("/doi-soat/chi-phi");
 });
 
-// ---------- Uploat lai danh sach NCC (Ma NCC/Ten NCC/MST) -- thay the ban 884
-// NCC "KH cu" di kem app khi Luyen co ban moi hon (them NCC, sua ten, doi ma...) ----------
+// ---------- Uploat lai danh sach NCC (Ma NCC/Ten NCC/MST).
+// Luyen, 2026-08-21: ho tro truyen them field "company" (kh_cu | kh_moi) de luu
+// vao danh sach rieng cho tung cong ty, tranh lan NCC KH Cu vao KH Moi. ----------
 router.post("/doi-soat/chi-phi/upload-ncc", requireDataEntry, upload.single("file"), (req, res) => {
   const store = load();
   ensureShape(store);
   try {
     if (!req.file) throw new Error("Vui long chon 1 file de tai len.");
     const list = parseNccWorkbook(req.file.buffer);
-    store.chi_phi_ncc_list = list;
-    store.chi_phi_ncc_meta = {
-      uploaded_at: new Date().toISOString(),
-      file_name: req.file.originalname,
-      count: list.length,
-    };
+    const company = req.body.company || "kh_cu"; // "kh_cu" hoac "kh_moi"
+    const meta = { uploaded_at: new Date().toISOString(), file_name: req.file.originalname, count: list.length };
+    if (company === "kh_moi") {
+      store.chi_phi_ncc_list_moi = list;
+      store.chi_phi_ncc_meta_moi = meta;
+    } else {
+      store.chi_phi_ncc_list_cu = list;
+      store.chi_phi_ncc_meta_cu = meta;
+      // Tuong thich nguoc: ghi de ca ban chung de khong bi ghi de boi DEFAULT
+      store.chi_phi_ncc_list = list;
+      store.chi_phi_ncc_meta = meta;
+    }
     save(store);
+    const label = company === "kh_moi" ? "KH Mới" : "KH Cũ";
     res.redirect(
       "/doi-soat/chi-phi?success=" +
-        encodeURIComponent(`Da cap nhat danh sach NCC: ${list.length} nha cung cap.${UPDATED_NOTE}`)
+        encodeURIComponent(`Da cap nhat danh sach NCC ${label}: ${list.length} nha cung cap.${UPDATED_NOTE}`)
     );
   } catch (e) {
     res.redirect("/doi-soat/chi-phi?error=" + encodeURIComponent(e.message));
@@ -1269,7 +1295,7 @@ router.get("/doi-soat/chi-phi-saoke/preview-misa", requireDataEntry, (req, res) 
     if (fromDate) rows = rows.filter((r) => r.date >= fromDate);
     if (toDate) rows = rows.filter((r) => r.date <= toDate);
 
-    const nccList = activeNccList(store);
+    const nccList = activeNccList(store, activeCompany);
     const nccIndex = buildNccIndex(nccList);
     const vendorNccMap = store.chi_phi_vendor_ncc_map || {};
 
