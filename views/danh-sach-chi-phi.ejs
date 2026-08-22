@@ -2,20 +2,37 @@
 <html lang="vi">
 <head>
   <%- include('partials/head') %>
+  <style>
+    .dsch-row { cursor:pointer; transition:background 0.15s; }
+    .dsch-row:hover { background: rgba(21,101,192,0.07) !important; }
+    .dsch-row.da-hach-toan { background: rgba(56,142,60,0.10) !important; }
+    .dsch-row.da-hach-toan:hover { background: rgba(56,142,60,0.18) !important; }
+    .dsch-cell { max-width:0; overflow:hidden; }
+    .dsch-cell-1 { display:-webkit-box; -webkit-line-clamp:1; -webkit-box-orient:vertical; overflow:hidden; }
+    .dsch-cell-2 { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+    /* Modal */
+    #dschOverlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.45); z-index:9000; align-items:center; justify-content:center; }
+    #dschOverlay.open { display:flex; }
+    #dschModal { background:#fff; border-radius:10px; padding:24px 28px; width:580px; max-width:95vw; max-height:88vh; overflow-y:auto; box-shadow:0 8px 32px rgba(0,0,0,0.22); }
+    .dsch-field { display:flex; gap:10px; margin-bottom:8px; font-size:13px; }
+    .dsch-field label { min-width:130px; color:var(--muted); font-weight:600; flex-shrink:0; }
+    .dsch-field span { word-break:break-word; }
+    .dsch-ht-row { display:flex; align-items:center; gap:10px; margin-top:14px; padding-top:14px; border-top:1px solid #eee; }
+  </style>
 </head>
 <body>
   <%- include('partials/nav') %>
   <main class="container">
     <h1>Danh Sách Chi Phí <%= mienLabel %></h1>
     <p class="muted" style="margin-top:-10px;margin-bottom:12px;">
-      Toàn bộ thông tin chi phí <%= mienLabel %> từ file Đi UNC.
+      Toàn bộ thông tin chi phí <%= mienLabel %> từ file Đi UNC. Bấm vào dòng để xem chi tiết &amp; hạch toán.
       <a href="/chi-phi/mien-<%= mien === 'nam' ? 'nam' : 'bac' %>" style="margin-left:8px;font-size:13px;">← Quay lại Chi Phí <%= mienLabel %></a>
     </p>
 
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
     <% if (success) { %><div class="alert alert-success"><%= success %></div><% } %>
 
-    <!-- Bo loc + Tim kiem -->
+    <!-- Bo loc -->
     <form method="GET" action="/chi-phi/mien-<%= mien === 'nam' ? 'nam' : 'bac' %>/danh-sach"
           style="display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:14px;">
       <label style="display:flex;align-items:center;gap:6px;font-size:13px;">
@@ -29,78 +46,81 @@
           <% }) %>
         </select>
       </label>
-      <input type="text" name="q" value="<%= q %>" placeholder="Tìm diễn giải, NCC, số HĐ, số UNC, ngày..."
-             style="width:280px;font-size:13px;" />
-      <button type="submit" class="btn btn-secondary" style="padding:6px 14px;">Tìm</button>
+      <input type="text" name="q" value="<%= q %>" placeholder="Tìm diễn giải, NCC, số HĐ, UNC..."
+             style="width:250px;font-size:13px;" />
+      <button type="submit" class="btn btn-secondary" style="padding:5px 12px;">Tìm</button>
       <% if (q || thangFilter) { %>
         <a href="/chi-phi/mien-<%= mien === 'nam' ? 'nam' : 'bac' %>/danh-sach" class="link-btn">✕ Bỏ lọc</a>
       <% } %>
       <span class="muted" style="font-size:13px;margin-left:auto;">
-        <%= rows.length %> dòng &nbsp;|&nbsp;
-        Tổng: <strong><%= tongTien.toLocaleString('vi-VN') %> đ</strong>
+        <%= rows.length %> dòng &nbsp;|&nbsp; Tổng: <strong><%= tongTien.toLocaleString('vi-VN') %> đ</strong>
       </span>
     </form>
 
-    <!-- Bang chi phi day du -->
-    <section class="panel">
+    <section class="panel" style="padding:0;">
       <% if (rows.length === 0) { %>
-        <p class="muted" style="padding:14px 0;">Không có dữ liệu<% if (q || thangFilter) { %> khớp bộ lọc<% } %>.</p>
+        <p class="muted" style="padding:14px;">Không có dữ liệu<% if (q || thangFilter) { %> khớp bộ lọc<% } %>.</p>
       <% } else { %>
       <div class="table-scroll">
-        <table class="table" style="font-size:12px;">
+        <table class="table" style="font-size:12px;table-layout:fixed;width:100%;">
+          <colgroup>
+            <col style="width:82px;">
+            <col style="width:120px;">
+            <col style="width:46px;">
+            <col style="width:160px;">
+            <col style="width:68px;">
+            <col style="width:76px;">
+            <col style="width:90px;">
+            <col><!-- dien giai -->
+            <col style="width:110px;">
+            <col style="width:38px;">
+            <col style="width:36px;">
+          </colgroup>
           <thead>
             <tr>
-              <th>Ngày</th>
-              <th>Gian</th>
-              <th>TK</th>
-              <th>NCC</th>
-              <th>Số HĐ</th>
-              <th>Số UNC</th>
-              <th>Chứng từ LQ</th>
+              <th>Ngày</th><th>Gian</th><th>TK</th><th>NCC</th>
+              <th>Số HĐ</th><th>Số UNC</th><th>CT LQ</th>
               <th>Diễn giải</th>
               <th style="text-align:right;">Số tiền</th>
-              <th style="text-align:center;">Đã chi</th>
+              <th style="text-align:center;" title="Đã chi">Chi</th>
+              <th style="text-align:center;" title="Đã hạch toán">HT</th>
             </tr>
           </thead>
           <tbody>
             <% rows.forEach(function(r) { %>
-            <tr>
+            <tr class="dsch-row <%= r.daHachToan ? 'da-hach-toan' : '' %>"
+                id="dsch-tr-<%= r.id %>"
+                onclick="openDschModal(<%- JSON.stringify(r) %>)">
               <td style="white-space:nowrap;color:var(--muted);">
                 <%= r.ngay ? new Date(r.ngay).toLocaleDateString('vi-VN') : '—' %>
               </td>
-              <td><%= r.gian || '—' %></td>
+              <td class="dsch-cell"><div class="dsch-cell-1" title="<%= r.gian || '' %>"><%= r.gian || '—' %></div></td>
               <td style="color:var(--muted);white-space:nowrap;"><%= r.taiKhoan || '—' %></td>
-              <td><%= r.ncc || '—' %></td>
-              <td><%= r.soHoaDon || '—' %></td>
+              <td class="dsch-cell"><div class="dsch-cell-2" title="<%= r.ncc || '' %>"><%= r.ncc || '—' %></div></td>
+              <td style="white-space:nowrap;"><%= r.soHoaDon || '—' %></td>
               <td style="color:var(--muted);white-space:nowrap;"><%= r.soUNC || '—' %></td>
-              <td style="color:var(--muted);"><%= r.soChungTuLienQuan || '—' %></td>
-              <td>
+              <td class="dsch-cell"><div class="dsch-cell-1" style="color:var(--muted);" title="<%= r.soChungTuLienQuan || '' %>"><%= r.soChungTuLienQuan || '—' %></div></td>
+              <td class="dsch-cell"><div class="dsch-cell-2" title="<%= (r.dienGiai || '') %>">
                 <%= r.dienGiai || '—' %>
-                <% if (r.trangThaiHoaDon) { %>
-                  <br/><span style="font-size:10px;color:#e65100;"><%= r.trangThaiHoaDon %></span>
-                <% } %>
-              </td>
+                <% if (r.trangThaiHoaDon) { %><br/><span style="font-size:10px;color:#e65100;"><%= r.trangThaiHoaDon %></span><% } %>
+              </div></td>
               <td style="text-align:right;font-weight:600;white-space:nowrap;">
                 <%= (r.soTien || 0).toLocaleString('vi-VN') %> đ
-                <% if (r.soTienHoaDonGoc && r.soTienHoaDonGoc !== r.soTien) { %>
-                  <br/><span style="font-size:10px;color:var(--muted);">HĐ: <%= r.soTienHoaDonGoc.toLocaleString('vi-VN') %></span>
-                <% } %>
               </td>
               <td style="text-align:center;">
-                <% if (r.daChi) { %>
-                  <span style="color:#388e3c;font-weight:700;">✓</span>
-                <% } else { %>
-                  <span style="color:#bbb;">—</span>
-                <% } %>
+                <% if (r.daChi) { %><span style="color:#388e3c;">✓</span><% } else { %><span style="color:#ddd;">—</span><% } %>
+              </td>
+              <td style="text-align:center;" id="dsch-ht-<%= r.id %>">
+                <% if (r.daHachToan) { %><span style="color:#388e3c;font-weight:700;">☑</span><% } else { %><span style="color:#ccc;">☐</span><% } %>
               </td>
             </tr>
             <% }) %>
           </tbody>
           <tfoot>
             <tr style="background:var(--bg-hover,#f5f5f5);font-weight:700;">
-              <td colspan="8" style="text-align:right;padding-right:12px;">Tổng cộng:</td>
+              <td colspan="8" style="text-align:right;padding-right:10px;">Tổng cộng:</td>
               <td style="text-align:right;white-space:nowrap;"><%= tongTien.toLocaleString('vi-VN') %> đ</td>
-              <td></td>
+              <td colspan="2"></td>
             </tr>
           </tfoot>
         </table>
@@ -108,6 +128,109 @@
       <% } %>
     </section>
   </main>
+
+  <!-- Modal chi tiet -->
+  <div id="dschOverlay" onclick="if(event.target===this)closeDschModal()">
+    <div id="dschModal">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+        <h3 style="margin:0;font-size:16px;">Chi tiết khoản chi</h3>
+        <button type="button" class="link-btn" onclick="closeDschModal()" style="font-size:20px;line-height:1;">×</button>
+      </div>
+      <div id="dschContent"></div>
+      <div class="dsch-ht-row">
+        <label style="display:flex;align-items:center;gap:8px;font-size:14px;font-weight:600;cursor:pointer;">
+          <input type="checkbox" id="dschHtCheck" style="width:18px;height:18px;" onchange="toggleDschHachToan(this)" />
+          Đã hạch toán
+        </label>
+        <span id="dschHtStatus" style="font-size:12px;color:var(--muted);"></span>
+      </div>
+    </div>
+  </div>
+
+  <script>
+  var _dschCurrentId = null;
+  var _dschCurrentMien = '<%= mien %>';
+
+  function fmt(v) { return v || '—'; }
+  function fmtMoney(v) { return v ? Number(v).toLocaleString('vi-VN') + ' đ' : '—'; }
+  function fmtDate(v) { return v ? new Date(v).toLocaleDateString('vi-VN') : '—'; }
+
+  function openDschModal(r) {
+    _dschCurrentId = r.id;
+    var fields = [
+      ['Ngày', fmtDate(r.ngay)],
+      ['Gian', fmt(r.gian)],
+      ['Tài khoản', fmt(r.taiKhoan)],
+      ['NCC', fmt(r.ncc)],
+      ['Số hóa đơn', fmt(r.soHoaDon)],
+      ['Số UNC', fmt(r.soUNC)],
+      ['Chứng từ liên quan', fmt(r.soChungTuLienQuan)],
+      ['Diễn giải', fmt(r.dienGiai)],
+      ['Số tiền', fmtMoney(r.soTien)],
+      ['HĐ gốc', r.soTienHoaDonGoc ? fmtMoney(r.soTienHoaDonGoc) : null],
+      ['Loại chi phí', fmt(r.loaiChiPhi)],
+      ['Nguồn', fmt(r.nguon)],
+      ['Ghi chú', fmt(r.ghiChu)],
+      ['Trạng thái HĐ', r.trangThaiHoaDon || null],
+      ['Link hóa đơn', r.linkHoaDon ? '<a href="'+r.linkHoaDon+'" target="_blank" rel="noopener">Xem hóa đơn</a>' : null],
+      ['Đã chi', r.daChi ? '✓ Đã chi' : 'Chưa chi'],
+    ];
+    var html = '';
+    fields.forEach(function(f) {
+      if (f[1] === null || f[1] === undefined) return;
+      html += '<div class="dsch-field"><label>'+f[0]+'</label><span>'+f[1]+'</span></div>';
+    });
+    document.getElementById('dschContent').innerHTML = html;
+    document.getElementById('dschHtCheck').checked = !!r.daHachToan;
+    document.getElementById('dschHtStatus').textContent = r.daHachToan ? 'Đã hạch toán' : '';
+    document.getElementById('dschOverlay').classList.add('open');
+  }
+
+  function closeDschModal() {
+    document.getElementById('dschOverlay').classList.remove('open');
+    _dschCurrentId = null;
+  }
+
+  function toggleDschHachToan(cb) {
+    var id = _dschCurrentId;
+    if (!id) return;
+    var newVal = cb.checked ? '1' : '0';
+    var status = document.getElementById('dschHtStatus');
+    status.textContent = 'Đang lưu...';
+    var body = new URLSearchParams();
+    body.append('daHachToan', newVal);
+    fetch('/chi-phi/' + id + '/hach-toan', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-Requested-With': 'XMLHttpRequest' },
+      body: body.toString()
+    })
+    .then(function(r){ return r.json(); })
+    .then(function(data) {
+      if (data.success) {
+        var isDone = data.daHachToan;
+        status.textContent = isDone ? '✓ Đã hạch toán' : '';
+        // cap nhat hang ngoai bang
+        var tr = document.getElementById('dsch-tr-' + id);
+        var htCell = document.getElementById('dsch-ht-' + id);
+        if (tr) {
+          if (isDone) { tr.classList.add('da-hach-toan'); }
+          else { tr.classList.remove('da-hach-toan'); }
+        }
+        if (htCell) {
+          htCell.innerHTML = isDone
+            ? '<span style="color:#388e3c;font-weight:700;">☑</span>'
+            : '<span style="color:#ccc;">☐</span>';
+        }
+      } else {
+        status.textContent = 'Lỗi, thử lại.';
+        cb.checked = !cb.checked;
+      }
+    })
+    .catch(function() { status.textContent = 'Lỗi kết nối.'; cb.checked = !cb.checked; });
+  }
+
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape') closeDschModal(); });
+  </script>
   <%- include('partials/scroll-restore') %>
 </body>
 </html>
