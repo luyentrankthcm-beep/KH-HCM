@@ -170,7 +170,7 @@
           <thead>
             <tr>
               <th>Ngày</th><th>Gian</th><th>Tài khoản</th><th>NCC</th><th>Số hóa đơn</th><th>Số UNC</th><th>Chứng từ liên quan</th><th>Diễn giải</th>
-              <th>Số tiền</th><th>Link hóa đơn</th><th>Đã hạch toán</th>
+              <th>Số tiền</th><th>Link hóa đơn</th><th>Đã chi</th><th>Đã hạch toán</th>
             </tr>
           </thead>
           <tbody id="cpTableBody">
@@ -275,6 +275,19 @@
                   <span class="cp-save-flash" style="font-size:11px; color:#1a7f37; display:none;">✓</span>
                 </form>
               </td>
+              <!-- Luyen, 2026-08-22: cot Da Chi moi, doc lap voi Da Hach Toan -->
+              <td>
+                <form method="POST" action="/chi-phi/<%= r.id %>/da-chi" class="cp-ajax-form" data-kind="da-chi" style="display:inline;">
+                  <input type="hidden" name="daChi" value="<%= r.daChi ? '0' : '1' %>" />
+                  <input type="hidden" name="hachToan" value="<%= hachToanFilter %>" />
+                  <input type="hidden" name="thang" value="<%= thangFilter %>" />
+                  <input type="hidden" name="hoaDon" value="<%= hoaDonFilter %>" />
+                  <input type="hidden" name="mien" value="<%= mien %>" />
+                  <button type="submit" class="link-btn" title="Bấm để đổi trạng thái đã chi" style="font-size:16px;">
+                    <%= r.daChi ? '☑' : '☐' %>
+                  </button>
+                </form>
+              </td>
               <td>
                 <form method="POST" action="/chi-phi/<%= r.id %>/hach-toan" class="cp-ajax-form" data-kind="hach-toan" style="display:inline;">
                   <input type="hidden" name="daHachToan" value="<%= r.daHachToan ? '0' : '1' %>" />
@@ -290,7 +303,7 @@
             </tr>
             <% }) %>
             <% if (rows.length === 0) { %>
-            <tr><td colspan="11" class="muted">Chưa có khoản chi nào.</td></tr>
+            <tr><td colspan="12" class="muted">Chưa có khoản chi nào.</td></tr>
             <% } %>
           </tbody>
         </table>
@@ -454,6 +467,10 @@
                 var btn = form.querySelector('button[type="submit"]');
                 btn.textContent = data.daHachToan ? '☑' : '☐';
                 form.querySelector('input[name="daHachToan"]').value = data.daHachToan ? '0' : '1';
+              } else if (kind === 'da-chi') {
+                var btn2 = form.querySelector('button[type="submit"]');
+                btn2.textContent = data.daChi ? '☑' : '☐';
+                form.querySelector('input[name="daChi"]').value = data.daChi ? '0' : '1';
               } else if (kind === 'so-hoa-don') {
                 var trangThaiEl = document.getElementById('trangThai-' + rowId);
                 if (trangThaiEl) {

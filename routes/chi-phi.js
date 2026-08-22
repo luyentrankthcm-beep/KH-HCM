@@ -109,6 +109,10 @@ function ensureChiPhiDefaults(row) {
       linkHoaDon: "",
       trangThaiHoaDon: "",
       daHachToan: false,
+      // Luyen, 2026-08-22: "thêm 1 cột mới... cột đã chi á xong tích đó riêng"
+      // -- tach biet voi daHachToan (hach toan tren MISA), daChi la tien da
+      // thuc su chuyen/tra (da di ra khoi tai khoan ngan hang/tien mat).
+      daChi: false,
       nguon: "",
       ghiChu: "",
     },
@@ -316,6 +320,28 @@ router.post("/chi-phi/:id/hach-toan", requireDataEntry, (req, res) => {
   if (req.body.thang !== undefined) qs.push("thang=" + encodeURIComponent(req.body.thang));
   if (req.body.hoaDon) qs.push("hoaDon=" + encodeURIComponent(req.body.hoaDon));
   qs.push("success=" + encodeURIComponent("Đã cập nhật trạng thái hạch toán."));
+  res.redirect("/chi-phi/" + mienSeg(r ? r.mien : req.body.mien) + "?" + qs.join("&"));
+});
+
+// Luyen, 2026-08-22: "thêm 1 cột mới... cột đã chi á xong tích đó riêng" --
+// toggle daChi doc lap voi daHachToan, AJAX hoac form POST.
+router.post("/chi-phi/:id/da-chi", requireDataEntry, (req, res) => {
+  const store = load();
+  ensureShape(store);
+  const r = store.chi_phi.find((x) => String(x.id) === req.params.id);
+  if (r) {
+    r.daChi = req.body.daChi === "1";
+    save(store);
+  }
+  if (isAjaxChiPhiRequest(req)) {
+    if (!r) return res.status(404).json({ error: "Không tìm thấy khoản chi này." });
+    return res.json({ success: true, daChi: r.daChi });
+  }
+  const qs = [];
+  if (req.body.hachToan) qs.push("hachToan=" + encodeURIComponent(req.body.hachToan));
+  if (req.body.thang !== undefined) qs.push("thang=" + encodeURIComponent(req.body.thang));
+  if (req.body.hoaDon) qs.push("hoaDon=" + encodeURIComponent(req.body.hoaDon));
+  qs.push("success=" + encodeURIComponent("Đã cập nhật trạng thái đã chi."));
   res.redirect("/chi-phi/" + mienSeg(r ? r.mien : req.body.mien) + "?" + qs.join("&"));
 });
 
