@@ -5,8 +5,6 @@
   <style>
     .dsch-row { cursor:pointer; transition:background 0.15s; }
     .dsch-row:hover { background: rgba(21,101,192,0.07) !important; }
-    .dsch-row.da-hach-toan { background: rgba(56,142,60,0.10) !important; }
-    .dsch-row.da-hach-toan:hover { background: rgba(56,142,60,0.18) !important; }
     .dsch-cell { max-width:0; overflow:hidden; }
     .dsch-cell-1 { display:-webkit-box; -webkit-line-clamp:1; -webkit-box-orient:vertical; overflow:hidden; }
     .dsch-cell-2 { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
@@ -74,7 +72,6 @@
             <col><!-- dien giai -->
             <col style="width:110px;">
             <col style="width:38px;">
-            <col style="width:36px;">
           </colgroup>
           <thead>
             <tr>
@@ -83,12 +80,11 @@
               <th>Diễn giải</th>
               <th style="text-align:right;">Số tiền</th>
               <th style="text-align:center;" title="Đã chi">Chi</th>
-              <th style="text-align:center;" title="Đã hạch toán">HT</th>
             </tr>
           </thead>
           <tbody>
             <% rows.forEach(function(r) { %>
-            <tr class="dsch-row <%= r.daHachToan ? 'da-hach-toan' : '' %>"
+            <tr class="dsch-row"
                 id="dsch-tr-<%= r.id %>"
                 onclick="openDschModal(<%- JSON.stringify(r) %>)">
               <td style="white-space:nowrap;color:var(--muted);">
@@ -110,9 +106,6 @@
               <td style="text-align:center;">
                 <% if (r.daChi) { %><span style="color:#388e3c;">✓</span><% } else { %><span style="color:#ddd;">—</span><% } %>
               </td>
-              <td style="text-align:center;" id="dsch-ht-<%= r.id %>">
-                <% if (r.daHachToan) { %><span style="color:#388e3c;font-weight:700;">☑</span><% } else { %><span style="color:#ccc;">☐</span><% } %>
-              </td>
             </tr>
             <% }) %>
           </tbody>
@@ -120,7 +113,7 @@
             <tr style="background:var(--bg-hover,#f5f5f5);font-weight:700;">
               <td colspan="8" style="text-align:right;padding-right:10px;">Tổng cộng:</td>
               <td style="text-align:right;white-space:nowrap;"><%= tongTien.toLocaleString('vi-VN') %> đ</td>
-              <td colspan="2"></td>
+              <td></td>
             </tr>
           </tfoot>
         </table>
@@ -137,19 +130,11 @@
         <button type="button" class="link-btn" onclick="closeDschModal()" style="font-size:20px;line-height:1;">×</button>
       </div>
       <div id="dschContent"></div>
-      <div class="dsch-ht-row">
-        <label style="display:flex;align-items:center;gap:8px;font-size:14px;font-weight:600;cursor:pointer;">
-          <input type="checkbox" id="dschHtCheck" style="width:18px;height:18px;" onchange="toggleDschHachToan(this)" />
-          Đã hạch toán
-        </label>
-        <span id="dschHtStatus" style="font-size:12px;color:var(--muted);"></span>
-      </div>
     </div>
   </div>
 
   <script>
   var _dschCurrentId = null;
-  var _dschCurrentMien = '<%= mien %>';
 
   function fmt(v) { return v || '—'; }
   function fmtMoney(v) { return v ? Number(v).toLocaleString('vi-VN') + ' đ' : '—'; }
@@ -181,52 +166,12 @@
       html += '<div class="dsch-field"><label>'+f[0]+'</label><span>'+f[1]+'</span></div>';
     });
     document.getElementById('dschContent').innerHTML = html;
-    document.getElementById('dschHtCheck').checked = !!r.daHachToan;
-    document.getElementById('dschHtStatus').textContent = r.daHachToan ? 'Đã hạch toán' : '';
     document.getElementById('dschOverlay').classList.add('open');
   }
 
   function closeDschModal() {
     document.getElementById('dschOverlay').classList.remove('open');
     _dschCurrentId = null;
-  }
-
-  function toggleDschHachToan(cb) {
-    var id = _dschCurrentId;
-    if (!id) return;
-    var newVal = cb.checked ? '1' : '0';
-    var status = document.getElementById('dschHtStatus');
-    status.textContent = 'Đang lưu...';
-    var body = new URLSearchParams();
-    body.append('daHachToan', newVal);
-    fetch('/chi-phi/' + id + '/hach-toan', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-Requested-With': 'XMLHttpRequest' },
-      body: body.toString()
-    })
-    .then(function(r){ return r.json(); })
-    .then(function(data) {
-      if (data.success) {
-        var isDone = data.daHachToan;
-        status.textContent = isDone ? '✓ Đã hạch toán' : '';
-        // cap nhat hang ngoai bang
-        var tr = document.getElementById('dsch-tr-' + id);
-        var htCell = document.getElementById('dsch-ht-' + id);
-        if (tr) {
-          if (isDone) { tr.classList.add('da-hach-toan'); }
-          else { tr.classList.remove('da-hach-toan'); }
-        }
-        if (htCell) {
-          htCell.innerHTML = isDone
-            ? '<span style="color:#388e3c;font-weight:700;">☑</span>'
-            : '<span style="color:#ccc;">☐</span>';
-        }
-      } else {
-        status.textContent = 'Lỗi, thử lại.';
-        cb.checked = !cb.checked;
-      }
-    })
-    .catch(function() { status.textContent = 'Lỗi kết nối.'; cb.checked = !cb.checked; });
   }
 
   document.addEventListener('keydown', function(e){ if(e.key==='Escape') closeDschModal(); });
