@@ -190,6 +190,39 @@ router.get("/chi-phi/:mien(mien-nam|mien-bac)", (req, res) => {
   });
 });
 
+// Luyen, 2026-08-22: "thêm cho tôi chỗ này 1 mục nữa là danh sách chi phí
+// miền nam nhá" -- trang danh sach don gian: hien thi toan bo chi phi cua
+// mien duoc chon (khong loc theo thang), co the tim kiem nhanh theo dien giai
+// hoac ten NCC. Chi hien miền Nam theo yeu cau.
+router.get("/chi-phi/:mien(mien-nam|mien-bac)/danh-sach", (req, res) => {
+  const store = load();
+  ensureShape(store);
+  const activeCompany = getCompany(req);
+  const mien = mienFromSeg(req.params.mien);
+  const q = (req.query.q || "").trim().toLowerCase();
+  let rows = store.chi_phi.map(ensureChiPhiDefaults).filter((r) => r.congTy === activeCompany && r.mien === mien);
+  rows.sort((a, b) => (a.ngay < b.ngay ? 1 : -1));
+  if (q) {
+    rows = rows.filter((r) =>
+      (r.dienGiai || "").toLowerCase().includes(q) ||
+      (r.tenNCC || "").toLowerCase().includes(q) ||
+      (r.soHoaDon || "").toLowerCase().includes(q) ||
+      (r.ngay || "").includes(q)
+    );
+  }
+  const tongTien = rows.reduce((s, r) => s + (r.soTien || 0), 0);
+  res.render("danh-sach-chi-phi", {
+    userName: req.session.userName,
+    mien,
+    mienLabel: mien === "bac" ? "Miền Bắc" : "Miền Nam",
+    rows,
+    tongTien,
+    q,
+    error: req.query.error || null,
+    success: req.query.success || null,
+  });
+});
+
 // Chi Nhan, 2026-07-22: "thêm chỗ xuất ra excel nhá" -- xuat danh sach DANG
 // XEM (theo cong ty + bo loc hach toan/thang/so hoa don dang chon tren man
 // hinh, giong cach lam voi trang Hop Dong Thue Gian Hang) ra file Excel.
