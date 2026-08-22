@@ -1567,7 +1567,9 @@ function buildChannelReconciliation(store, channelKey) {
 
   const manualMatches = store.viet_qr_manual_matches[channelKey] || {};
   if (!store.viet_qr_vang_lai_gian) store.viet_qr_vang_lai_gian = {};
-  const vangLaiCode = store.viet_qr_vang_lai_gian[channelKey] || null;
+  // Luyen, 2026-08-21: mac dinh vang lai cua bidv7702 la "AM TP PHCM"
+  const VANG_LAI_DEFAULTS = { bidv7702: "AM TP PHCM" };
+  const vangLaiCode = store.viet_qr_vang_lai_gian[channelKey] || VANG_LAI_DEFAULTS[channelKey] || null;
   const reconciled = reconcileVietQr(
     settlements,
     resolved,
