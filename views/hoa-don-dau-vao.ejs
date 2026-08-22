@@ -175,9 +175,14 @@
         <!-- Luyen, 2026-08-10: "thêm cái lọc theo hóa đơn tìm nhanh" -->
         <label class="form-inline-tight" style="gap:6px;">Số HĐ
           <input type="text" name="soHd" value="<%= soHdFilter %>" placeholder="Tìm số HĐ..." style="width:120px;" />
-          <button type="submit" class="btn btn-sm">Tìm</button>
           <% if (soHdFilter) { %><a href="?<%= baseQs.replace(/&?soHd=[^&]*/g,'') %>" class="btn btn-sm" style="background:#e0e0e0;color:#333;">✕</a><% } %>
         </label>
+        <!-- Luyen, 2026-08-22: "cho cái tìm theo NCC nữa nhá" -->
+        <label class="form-inline-tight" style="gap:6px;">NCC
+          <input type="text" name="ncc" value="<%= nccFilter %>" placeholder="Tìm tên NCC..." style="width:140px;" />
+          <% if (nccFilter) { %><a href="?<%= baseQs.replace(/&?ncc=[^&]*/g,'') %>" class="btn btn-sm" style="background:#e0e0e0;color:#333;">✕</a><% } %>
+        </label>
+        <button type="submit" class="btn btn-sm">Tìm</button>
       </form>
       <div style="margin-bottom:10px;">
         <a class="btn" href="/hoa-don-dau-vao/export.xlsx?thang=<%= encodeURIComponent(thangFilter) %>&hachToan=<%= encodeURIComponent(hachToanFilter) %>">⬇ Xuất Excel (mỗi mặt hàng 1 dòng)</a>
