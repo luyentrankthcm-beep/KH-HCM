@@ -1196,6 +1196,35 @@ router.post("/chi-phi/:mien(mien-nam|mien-bac)/cap-nhat-da-chi-ngan-hang", requi
   }
 });
 
+// Luyen, 2026-08-22: "thêm cho tôi 1 chỗ xóa tất cả bộ lọc chọn rồi bạn
+// chọn thời gian rồi hiển thị khung cảnh báo rồi bấm xác nhận" -- xoa tat
+// ca record khop bo loc (hachToan + thang + hoaDon) cua cong ty + mien hien tai.
+router.post("/chi-phi/:mien(mien-nam|mien-bac)/xoa-het", requireDataEntry, (req, res) => {
+  const store = load();
+  ensureShape(store);
+  const activeCompany = getCompany(req);
+  const mien = mienFromSeg(req.params.mien);
+  const hachToanFilter = req.body.hachToan || "";
+  const thangFilter = req.body.thang || "";
+  const hoaDonFilter = req.body.hoaDon || "";
+
+  const before = store.chi_phi.length;
+  store.chi_phi = store.chi_phi.filter((r) => {
+    // Giu lai neu khong thuoc cong ty + mien nay
+    if (r.congTy !== activeCompany || (r.mien || "nam") !== mien) return true;
+    // Ap dung cac bo loc -- dong nao KHOP thi xoa (return false)
+    if (hachToanFilter === "1" && !r.daHachToan) return true;
+    if (hachToanFilter === "0" && r.daHachToan) return true;
+    if (thangFilter && (r.ngay || "").slice(0, 7) !== thangFilter) return true;
+    if (hoaDonFilter === "1" && !(r.soHoaDon || "").trim()) return true;
+    if (hoaDonFilter === "0" && (r.soHoaDon || "").trim()) return true;
+    return false; // xoa dong nay
+  });
+  const deleted = before - store.chi_phi.length;
+  save(store);
+  res.redirect("/chi-phi/" + mienSeg(mien) + "?success=" + encodeURIComponent("Đã xóa " + deleted + " khoản chi."));
+});
+
 module.exports = router;
 // Chi Nhan, 2026-07-29: cho routes/hoa-don-dau-vao.js dung LAI (khong doan
 // lai) logic doc+gop 3 Google Sheet UNC vao store.chi_phi -- "Cập nhật Gian

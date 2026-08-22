@@ -135,7 +135,36 @@
             <option value="1" <%= hoaDonFilter === "1" ? "selected" : "" %>>Đã có số hóa đơn</option>
           </select>
         </label>
+        <!-- Luyen, 2026-08-22: "thêm cho tôi 1 chỗ xóa tất cả bộ lọc chọn
+             rồi bạn chọn thời gian rồi hiển thị khung cảnh báo rồi bấm xác nhận"
+             -- nut Xoa tat ca xuat hien bên cạnh bộ lọc, mo modal canh bao
+             hien thi bo loc dang chon + so dong se bi xoa, can bam Xac nhan. -->
+        <div style="display:flex;align-items:flex-end;padding-bottom:2px;">
+          <button type="button" class="btn btn-danger btn-sm" style="white-space:nowrap;"
+                  onclick="openXoaHetModal()">🗑 Xóa tất cả theo bộ lọc</button>
+        </div>
       </div>
+
+      <!-- Modal canh bao xoa het -->
+      <div id="xoaHetOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:9000;align-items:center;justify-content:center;">
+        <div style="background:#fff;border-radius:10px;padding:28px 32px;max-width:420px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,0.22);">
+          <h3 style="margin:0 0 10px;color:#c62828;">⚠️ Xóa tất cả khoản chi</h3>
+          <p style="margin:0 0 14px;font-size:14px;color:#444;">Bộ lọc đang chọn:</p>
+          <div id="xoaHetFilterSummary" style="background:#fff3e0;border:1px solid #ffb74d;border-radius:6px;padding:10px 14px;font-size:13px;margin-bottom:14px;"></div>
+          <p id="xoaHetCount" style="font-size:14px;font-weight:700;color:#c62828;margin:0 0 18px;"></p>
+          <p style="font-size:13px;color:#666;margin:0 0 20px;">Thao tác này <strong>không thể hoàn tác</strong>. Dữ liệu sẽ bị xóa vĩnh viễn.</p>
+          <div style="display:flex;gap:10px;justify-content:flex-end;">
+            <button type="button" class="btn btn-secondary" onclick="closeXoaHetModal()">Hủy</button>
+            <form id="xoaHetForm" method="POST" action="" style="display:inline;">
+              <input type="hidden" name="hachToan" id="xoaHetHachToan" value="" />
+              <input type="hidden" name="thang" id="xoaHetThang" value="" />
+              <input type="hidden" name="hoaDon" id="xoaHetHoaDon" value="" />
+              <button type="submit" class="btn btn-danger">Xác nhận xóa</button>
+            </form>
+          </div>
+        </div>
+      </div>
+
       <div class="table-scroll">
         <table class="table">
           <thead>
@@ -294,6 +323,37 @@
         else url.searchParams.delete('hoaDon');
         window.location.href = url.toString();
       };
+      // Luyen, 2026-08-22: modal xoa het theo bo loc
+      var _xoaHetRows = <%- JSON.stringify(rows.map(function(r){ return r.id; })) %>;
+      window.openXoaHetModal = function () {
+        var hachToan = document.getElementById('cpHachToanFilter').value;
+        var thang = document.getElementById('cpThangFilter').value;
+        var hoaDon = document.getElementById('cpHoaDonFilter').value;
+        // Dem so dong dang hien thi (da loc client-side)
+        var visibleRows = document.querySelectorAll('#cpTableBody tr.cp-row:not([style*="display: none"]):not([style*="display:none"])');
+        var count = visibleRows.length;
+        // Tom tat bo loc
+        var hachToanLabels = {'': 'Tất cả', '0': 'Chưa hạch toán', '1': 'Đã hạch toán'};
+        var hoaDonLabels = {'': 'Tất cả', '0': 'Chưa có số HĐ', '1': 'Đã có số HĐ'};
+        var thangLabel = thang ? ('Tháng ' + Number(thang.slice(5,7)) + '/' + thang.slice(0,4)) : 'Tất cả các tháng';
+        document.getElementById('xoaHetFilterSummary').innerHTML =
+          '<b>Hạch toán:</b> ' + (hachToanLabels[hachToan] || hachToan) +
+          ' &nbsp;|&nbsp; <b>Tháng:</b> ' + thangLabel +
+          ' &nbsp;|&nbsp; <b>Số HĐ:</b> ' + (hoaDonLabels[hoaDon] || hoaDon);
+        document.getElementById('xoaHetCount').textContent = 'Sẽ xóa ' + count + ' khoản chi đang hiển thị.';
+        document.getElementById('xoaHetHachToan').value = hachToan;
+        document.getElementById('xoaHetThang').value = thang;
+        document.getElementById('xoaHetHoaDon').value = hoaDon;
+        document.getElementById('xoaHetForm').action = '/chi-phi/mien-<%= mien %>/xoa-het';
+        var overlay = document.getElementById('xoaHetOverlay');
+        overlay.style.display = 'flex';
+      };
+      window.closeXoaHetModal = function () {
+        document.getElementById('xoaHetOverlay').style.display = 'none';
+      };
+      document.getElementById('xoaHetOverlay').addEventListener('click', function(e) {
+        if (e.target === this) closeXoaHetModal();
+      });
       window.cpChangePage = function (delta) {
         page += delta;
         render();
