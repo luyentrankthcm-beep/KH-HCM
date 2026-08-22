@@ -92,6 +92,9 @@ function ensureDefaults(row) {
   return Object.assign(
     {
       congTy: "kh_cu",
+      // Luyen, 2026-08-22: "chia ra Nam bắc luôn nha từ hóa đơn" -- tuong tu
+      // Chi Phi, mac dinh "nam" cho toan bo du lieu cu.
+      mien: "nam",
       ngayHD: "",
       tenNCC: "",
       mstNCC: "",
@@ -291,10 +294,13 @@ router.get("/hoa-don-dau-vao", (req, res) => {
   // Luyen, 2026-08-22: "cho cái tìm theo NCC nữa nhá" -- text search theo
   // tenNguoiBan, khop partial, khong phan biet hoa thuong.
   const nccFilter = (req.query.ncc || "").trim();
+  // Luyen, 2026-08-22: "chia ra Nam bắc luôn nha từ hóa đơn" -- loc theo mien
+  // (nam/bac). Mac dinh "nam" de giu hanh vi cu (toan bo du lieu cu la nam).
+  const mienFilter = req.query.mien || "nam";
   const page = Math.max(1, parseInt(req.query.page, 10) || 1);
   const PAGE_SIZE = 30;
 
-  const allRows = store.hoa_don_dau_vao.map(ensureDefaults).filter((r) => r.congTy === activeCompany);
+  const allRows = store.hoa_don_dau_vao.map(ensureDefaults).filter((r) => r.congTy === activeCompany && (r.mien || "nam") === mienFilter);
   const totalForCompany = groupRowsByInvoice(allRows).length;
 
   const monthSet = new Set();
@@ -338,6 +344,7 @@ router.get("/hoa-don-dau-vao", (req, res) => {
   if (daChiFilter) qs.push("daChi=" + encodeURIComponent(daChiFilter));
   if (soHdFilter) qs.push("soHd=" + encodeURIComponent(soHdFilter));
   if (nccFilter) qs.push("ncc=" + encodeURIComponent(nccFilter));
+  qs.push("mien=" + encodeURIComponent(mienFilter));
   const baseQs = qs.join("&");
 
   const nccMeta = store.hoa_don_dau_vao_ncc_meta;
@@ -358,6 +365,7 @@ router.get("/hoa-don-dau-vao", (req, res) => {
     daChiFilter,
     soHdFilter,
     nccFilter,
+    mienFilter,
     availableMonths,
     availableTkNo,
     tongTien,

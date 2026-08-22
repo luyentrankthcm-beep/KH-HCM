@@ -123,6 +123,20 @@
       </section>
     </details>
 
+    <!-- Luyen, 2026-08-22: "chia ra Nam bắc luôn nha từ hóa đơn" -- tab Nam/Bac -->
+    <div style="display:flex;gap:0;margin-bottom:18px;border-bottom:2px solid #e0e0e0;">
+      <a href="/hoa-don-dau-vao?mien=nam"
+         style="padding:7px 20px;font-size:13px;font-weight:600;text-decoration:none;border-radius:6px 6px 0 0;
+                <%= mienFilter === 'nam' ? 'background:#1565c0;color:#fff;border-bottom:2px solid #1565c0;' : 'color:#555;' %>">
+        Miền Nam
+      </a>
+      <a href="/hoa-don-dau-vao?mien=bac"
+         style="padding:7px 20px;font-size:13px;font-weight:600;text-decoration:none;border-radius:6px 6px 0 0;
+                <%= mienFilter === 'bac' ? 'background:#1565c0;color:#fff;border-bottom:2px solid #1565c0;' : 'color:#555;' %>">
+        Miền Bắc
+      </a>
+    </div>
+
     <section class="panel">
       <div class="panel-head">
         <h2>Danh sách (<%= totalMatching %> hóa đơn<% if (totalMatching !== totalForCompany) { %>, tổng <%= totalForCompany %><% } %>)</h2>
@@ -132,6 +146,7 @@
            lay dong theo du lieu thuc te dang co, Gian: da co/chua co), doi
            select nao cung tu submit lai form (giu nguyen cac bo loc khac). -->
       <form method="GET" action="/hoa-don-dau-vao" class="form-inline-tight" style="margin-bottom:10px;">
+        <input type="hidden" name="mien" value="<%= mienFilter %>" />
         <label class="form-inline-tight" style="gap:6px;">Tháng
           <select name="thang" onchange="this.form.submit()">
             <option value="">Tất cả</option>
@@ -177,13 +192,23 @@
           <input type="text" name="soHd" value="<%= soHdFilter %>" placeholder="Tìm số HĐ..." style="width:120px;" />
           <% if (soHdFilter) { %><a href="?<%= baseQs.replace(/&?soHd=[^&]*/g,'') %>" class="btn btn-sm" style="background:#e0e0e0;color:#333;">✕</a><% } %>
         </label>
-        <!-- Luyen, 2026-08-22: "cho cái tìm theo NCC nữa nhá" -->
+        <!-- Luyen, 2026-08-22: "cho cái tìm theo NCC nữa nhá ... lọc tiếp khỏi nhấn chữ tìm" -->
         <label class="form-inline-tight" style="gap:6px;">NCC
-          <input type="text" name="ncc" value="<%= nccFilter %>" placeholder="Tìm tên NCC..." style="width:140px;" />
+          <input type="text" name="ncc" id="nccSearchInput" value="<%= nccFilter %>" placeholder="Tìm tên NCC..." style="width:140px;"
+                 oninput="hdDebounceNcc(this)" />
           <% if (nccFilter) { %><a href="?<%= baseQs.replace(/&?ncc=[^&]*/g,'') %>" class="btn btn-sm" style="background:#e0e0e0;color:#333;">✕</a><% } %>
         </label>
         <button type="submit" class="btn btn-sm">Tìm</button>
       </form>
+      <script>
+        (function(){
+          var _nccTimer;
+          window.hdDebounceNcc = function(input) {
+            clearTimeout(_nccTimer);
+            _nccTimer = setTimeout(function(){ input.form.submit(); }, 500);
+          };
+        })();
+      </script>
       <div style="margin-bottom:10px;">
         <a class="btn" href="/hoa-don-dau-vao/export.xlsx?thang=<%= encodeURIComponent(thangFilter) %>&hachToan=<%= encodeURIComponent(hachToanFilter) %>">⬇ Xuất Excel (mỗi mặt hàng 1 dòng)</a>
       </div>
