@@ -23,7 +23,7 @@
   <main class="container">
     <h1>Danh Sách Chi Phí <%= mienLabel %></h1>
     <p class="muted" style="margin-top:-10px;margin-bottom:12px;">
-      Toàn bộ thông tin chi phí <%= mienLabel %> từ file Đi UNC. Bấm vào dòng để xem chi tiết &amp; hạch toán.
+      Toàn bộ thông tin chi phí <%= mienLabel %> từ file Đi UNC. Bấm vào dòng để xem chi tiết.
       <a href="/chi-phi/mien-<%= mien === 'nam' ? 'nam' : 'bac' %>" style="margin-left:8px;font-size:13px;">← Quay lại Chi Phí <%= mienLabel %></a>
     </p>
 
@@ -86,7 +86,7 @@
             <% rows.forEach(function(r) { %>
             <tr class="dsch-row"
                 id="dsch-tr-<%= r.id %>"
-                onclick="openDschModal(<%- JSON.stringify(r) %>)">
+                onclick="openDschModal(<%= r.id %>)">
               <td style="white-space:nowrap;color:var(--muted);">
                 <%= r.ngay ? new Date(r.ngay).toLocaleDateString('vi-VN') : '—' %>
               </td>
@@ -134,14 +134,19 @@
   </div>
 
   <script>
+  var _dschRows = <%- JSON.stringify(rows) %>;
+  var _dschMap = {};
+  _dschRows.forEach(function(r){ _dschMap[r.id] = r; });
   var _dschCurrentId = null;
 
   function fmt(v) { return v || '—'; }
   function fmtMoney(v) { return v ? Number(v).toLocaleString('vi-VN') + ' đ' : '—'; }
   function fmtDate(v) { return v ? new Date(v).toLocaleDateString('vi-VN') : '—'; }
 
-  function openDschModal(r) {
-    _dschCurrentId = r.id;
+  function openDschModal(id) {
+    var r = _dschMap[id];
+    if (!r) return;
+    _dschCurrentId = id;
     var fields = [
       ['Ngày', fmtDate(r.ngay)],
       ['Gian', fmt(r.gian)],
