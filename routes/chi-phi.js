@@ -67,6 +67,20 @@ function ensureShape(store) {
   // Luyen, 2026-08-22: "đưa nó qua bắc luôn đi" -- JP GO DA NANG + bat ky
   // gian nao co "da nang"/"đà nẵng" bi gan nham mien=nam khi import, can
   // chuyen sang mien=bac. Chay mot lan roi danh dau flag de khong chay lai.
+  // Luyen, 2026-08-22: "đã hạch toán thì bạn làm cho tôi trống hết tháng 8"
+  // -- reset daHachToan=false cho toan bo chi phi thang 8/2026, dong thoi
+  // copy daHachToan->daChi cho cac dong co bankTxId (tien da qua ngan hang).
+  if (!store.migrated_t8_hach_toan_reset) {
+    (store.chi_phi || []).forEach((r) => {
+      if ((r.ngay || "").startsWith("2026-08")) {
+        // Neu co bankTxId (tu quet ngan hang) thi coi nhu da chi
+        if (r.bankTxId && r.daHachToan) r.daChi = true;
+        r.daHachToan = false;
+      }
+    });
+    store.migrated_t8_hach_toan_reset = true;
+    save(store);
+  }
   if (!store.migrated_danang_mien_bac) {
     let changed = 0;
     (store.chi_phi || []).forEach((r) => {
@@ -952,8 +966,10 @@ router.post("/chi-phi/:mien(mien-nam|mien-bac)/quet-ngan-hang", requireDataEntry
           ? `CẢNH BÁO: số tiền ${t.amount.toLocaleString("vi-VN")}đ bất thường so với các tháng trước -- chị kiểm tra lại sao kê gốc.`
           : "",
         // Luyen, 2026-08-09: tien da chay qua ngan hang roi nen danh dau ngay
-        // la da chi (khong can cho Luyen tick tay nua).
-        daHachToan: true,
+        // la da chi. Luyen, 2026-08-22: tach thanh cot daChi rieng (daHachToan
+        // de Luyen tu tick sau khi hach toan tren MISA).
+        daChi: true,
+        daHachToan: false,
         nguon: `Ngân hàng ${bank.name}`,
         ghiChu: `Tự động liên kết từ giao dịch ngân hàng "${bank.name}" ngày ${t.date} (mã GD #${t.id}), khớp gian qua diễn giải "${gianText}".`,
         createdAt: new Date().toISOString(),
