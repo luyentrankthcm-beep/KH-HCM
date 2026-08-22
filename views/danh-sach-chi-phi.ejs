@@ -50,16 +50,16 @@
         <table class="table" style="font-size:12px;">
           <thead>
             <tr>
-              <th style="width:82px;">Ngày</th>
-              <th style="width:110px;">Gian</th>
-              <th style="width:60px;">TK</th>
-              <th style="width:130px;">NCC</th>
-              <th style="width:70px;">Số HĐ</th>
-              <th style="width:70px;">Số UNC</th>
-              <th style="width:90px;">Chứng từ LQ</th>
+              <th>Ngày</th>
+              <th>Gian</th>
+              <th>TK</th>
+              <th>NCC</th>
+              <th>Số HĐ</th>
+              <th>Số UNC</th>
+              <th>Chứng từ LQ</th>
               <th>Diễn giải</th>
-              <th style="width:105px;text-align:right;">Số tiền</th>
-              <th style="width:55px;text-align:center;">Đã chi</th>
+              <th style="text-align:right;">Số tiền</th>
+              <th style="text-align:center;">Đã chi</th>
             </tr>
           </thead>
           <tbody>
@@ -68,19 +68,13 @@
               <td style="white-space:nowrap;color:var(--muted);">
                 <%= r.ngay ? new Date(r.ngay).toLocaleDateString('vi-VN') : '—' %>
               </td>
-              <td style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:110px;" title="<%= r.gian || '' %>">
-                <%= r.gian || '—' %>
-              </td>
-              <td style="color:var(--muted);"><%= r.taiKhoan || '—' %></td>
-              <td style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:130px;" title="<%= r.ncc || '' %>">
-                <%= r.ncc || '—' %>
-              </td>
+              <td><%= r.gian || '—' %></td>
+              <td style="color:var(--muted);white-space:nowrap;"><%= r.taiKhoan || '—' %></td>
+              <td><%= r.ncc || '—' %></td>
               <td><%= r.soHoaDon || '—' %></td>
-              <td style="color:var(--muted);"><%= r.soUNC || '—' %></td>
-              <td style="color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:90px;" title="<%= r.soChungTuLienQuan || '' %>">
-                <%= r.soChungTuLienQuan || '—' %>
-              </td>
-              <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="<%= r.dienGiai || '' %>">
+              <td style="color:var(--muted);white-space:nowrap;"><%= r.soUNC || '—' %></td>
+              <td style="color:var(--muted);"><%= r.soChungTuLienQuan || '—' %></td>
+              <td>
                 <%= r.dienGiai || '—' %>
                 <% if (r.trangThaiHoaDon) { %>
                   <br/><span style="font-size:10px;color:#e65100;"><%= r.trangThaiHoaDon %></span>
