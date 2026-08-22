@@ -64,6 +64,24 @@ const upload = multer({
 // prefix YYYY-MM cua truong ngay) o day, tuong tu bo loc hachToan.
 function ensureShape(store) {
   if (!store.chi_phi) store.chi_phi = [];
+  // Luyen, 2026-08-22: "đưa nó qua bắc luôn đi" -- JP GO DA NANG + bat ky
+  // gian nao co "da nang"/"đà nẵng" bi gan nham mien=nam khi import, can
+  // chuyen sang mien=bac. Chay mot lan roi danh dau flag de khong chay lai.
+  if (!store.migrated_danang_mien_bac) {
+    let changed = 0;
+    (store.chi_phi || []).forEach((r) => {
+      const gianUpper = (r.gian || "").toUpperCase();
+      if (r.mien === "nam" && (gianUpper.includes("DA NANG") || gianUpper.includes("ĐÀ NẴNG") || gianUpper.includes("DANANG"))) {
+        r.mien = "bac";
+        changed++;
+      }
+    });
+    store.migrated_danang_mien_bac = true;
+    if (changed > 0) {
+      const { save } = require("../store");
+      save(store);
+    }
+  }
 }
 
 function ensureChiPhiDefaults(row) {
