@@ -8,70 +8,103 @@
   <main class="container">
     <h1>Danh Sách Chi Phí <%= mienLabel %></h1>
     <p class="muted" style="margin-top:-10px;margin-bottom:12px;">
-      Toàn bộ chi phí <%= mienLabel %> — tất cả các tháng, sắp xếp mới nhất trước.
-      <a href="/chi-phi/<%= mien === 'nam' ? 'mien-nam' : 'mien-bac' %>" style="margin-left:8px;font-size:13px;">← Quay lại Chi Phí <%= mienLabel %></a>
+      Toàn bộ thông tin chi phí <%= mienLabel %> từ file Đi UNC.
+      <a href="/chi-phi/mien-<%= mien === 'nam' ? 'nam' : 'bac' %>" style="margin-left:8px;font-size:13px;">← Quay lại Chi Phí <%= mienLabel %></a>
     </p>
 
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
     <% if (success) { %><div class="alert alert-success"><%= success %></div><% } %>
 
-    <!-- Tim kiem -->
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
-      <form method="GET" action="/chi-phi/<%= mien === 'nam' ? 'mien-nam' : 'mien-bac' %>/danh-sach"
-            style="display:flex;gap:8px;align-items:center;">
-        <input type="text" name="q" value="<%= q %>" placeholder="Tìm theo diễn giải, NCC, số HĐ, ngày..."
-               style="width:320px;" />
-        <button type="submit" class="btn btn-secondary" style="padding:6px 14px;">Tìm</button>
-        <% if (q) { %>
-          <a href="/chi-phi/<%= mien === 'nam' ? 'mien-nam' : 'mien-bac' %>/danh-sach" class="link-btn">✕ Bỏ lọc</a>
-        <% } %>
-      </form>
+    <!-- Bo loc + Tim kiem -->
+    <form method="GET" action="/chi-phi/mien-<%= mien === 'nam' ? 'nam' : 'bac' %>/danh-sach"
+          style="display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:14px;">
+      <label style="display:flex;align-items:center;gap:6px;font-size:13px;">
+        Tháng
+        <select name="thang" onchange="this.form.submit()" style="font-size:13px;">
+          <option value="">Tất cả</option>
+          <% availableMonths.forEach(function(m) { %>
+          <option value="<%= m %>" <%= thangFilter === m ? 'selected' : '' %>>
+            Tháng <%= Number(m.slice(5,7)) %>/<%= m.slice(0,4) %>
+          </option>
+          <% }) %>
+        </select>
+      </label>
+      <input type="text" name="q" value="<%= q %>" placeholder="Tìm diễn giải, NCC, số HĐ, số UNC, ngày..."
+             style="width:280px;font-size:13px;" />
+      <button type="submit" class="btn btn-secondary" style="padding:6px 14px;">Tìm</button>
+      <% if (q || thangFilter) { %>
+        <a href="/chi-phi/mien-<%= mien === 'nam' ? 'nam' : 'bac' %>/danh-sach" class="link-btn">✕ Bỏ lọc</a>
+      <% } %>
       <span class="muted" style="font-size:13px;margin-left:auto;">
         <%= rows.length %> dòng &nbsp;|&nbsp;
         Tổng: <strong><%= tongTien.toLocaleString('vi-VN') %> đ</strong>
       </span>
-    </div>
+    </form>
 
-    <!-- Bang chi phi -->
+    <!-- Bang chi phi day du -->
     <section class="panel">
       <% if (rows.length === 0) { %>
-        <p class="muted" style="padding:14px 0;">Không có dữ liệu<% if (q) { %> khớp tìm kiếm "<%= q %>"<% } %>.</p>
+        <p class="muted" style="padding:14px 0;">Không có dữ liệu<% if (q || thangFilter) { %> khớp bộ lọc<% } %>.</p>
       <% } else { %>
       <div class="table-scroll">
-        <table class="table" style="font-size:13px;">
+        <table class="table" style="font-size:12px;">
           <thead>
             <tr>
-              <th style="width:90px;">Ngày</th>
-              <th style="width:120px;">Gian</th>
+              <th style="width:82px;">Ngày</th>
+              <th style="width:110px;">Gian</th>
+              <th style="width:60px;">TK</th>
+              <th style="width:130px;">NCC</th>
+              <th style="width:70px;">Số HĐ</th>
+              <th style="width:70px;">Số UNC</th>
+              <th style="width:90px;">Chứng từ LQ</th>
               <th>Diễn giải</th>
-              <th style="width:110px;">NCC</th>
-              <th style="width:100px;">Số HĐ</th>
-              <th style="width:110px;text-align:right;">Số tiền</th>
-              <th style="width:90px;text-align:center;">Hạch toán</th>
+              <th style="width:105px;text-align:right;">Số tiền</th>
+              <th style="width:55px;text-align:center;">Đã chi</th>
+              <th style="width:55px;text-align:center;">Đã HT</th>
             </tr>
           </thead>
           <tbody>
             <% rows.forEach(function(r) { %>
-            <tr style="<%= !r.daHachToan ? 'background:rgba(255,152,0,0.06);' : '' %>">
-              <td style="white-space:nowrap;color:var(--muted);font-size:12px;">
+            <tr>
+              <td style="white-space:nowrap;color:var(--muted);">
                 <%= r.ngay ? new Date(r.ngay).toLocaleDateString('vi-VN') : '—' %>
               </td>
-              <td style="font-size:12px;"><%= r.gian || '—' %></td>
-              <td style="max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="<%= r.dienGiai || '' %>">
-                <%= r.dienGiai || '—' %>
+              <td style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:110px;" title="<%= r.gian || '' %>">
+                <%= r.gian || '—' %>
               </td>
-              <td style="font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:110px;" title="<%= r.ncc || '' %>">
+              <td style="color:var(--muted);"><%= r.taiKhoan || '—' %></td>
+              <td style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:130px;" title="<%= r.ncc || '' %>">
                 <%= r.ncc || '—' %>
               </td>
-              <td style="font-size:12px;color:var(--muted);"><%= r.soHoaDon || '—' %></td>
+              <td><%= r.soHoaDon || '—' %></td>
+              <td style="color:var(--muted);"><%= r.soUNC || '—' %></td>
+              <td style="color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:90px;" title="<%= r.soChungTuLienQuan || '' %>">
+                <%= r.soChungTuLienQuan || '—' %>
+              </td>
+              <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="<%= r.dienGiai || '' %>">
+                <%= r.dienGiai || '—' %>
+                <% if (r.trangThaiHoaDon) { %>
+                  <br/><span style="font-size:10px;color:#e65100;"><%= r.trangThaiHoaDon %></span>
+                <% } %>
+              </td>
               <td style="text-align:right;font-weight:600;white-space:nowrap;">
                 <%= (r.soTien || 0).toLocaleString('vi-VN') %> đ
+                <% if (r.soTienHoaDonGoc && r.soTienHoaDonGoc !== r.soTien) { %>
+                  <br/><span style="font-size:10px;color:var(--muted);">HĐ: <%= r.soTienHoaDonGoc.toLocaleString('vi-VN') %></span>
+                <% } %>
+              </td>
+              <td style="text-align:center;">
+                <% if (r.daChi) { %>
+                  <span style="color:#388e3c;font-weight:700;">✓</span>
+                <% } else { %>
+                  <span style="color:#bbb;">—</span>
+                <% } %>
               </td>
               <td style="text-align:center;">
                 <% if (r.daHachToan) { %>
-                  <span style="color:#388e3c;font-size:12px;font-weight:600;">✓ Đã HT</span>
+                  <span style="color:#388e3c;font-weight:700;">✓</span>
                 <% } else { %>
-                  <span style="color:#f57c00;font-size:12px;">Chưa</span>
+                  <span style="color:#f57c00;font-size:11px;">Chưa</span>
                 <% } %>
               </td>
             </tr>
@@ -79,9 +112,9 @@
           </tbody>
           <tfoot>
             <tr style="background:var(--bg-hover,#f5f5f5);font-weight:700;">
-              <td colspan="5" style="text-align:right;padding-right:12px;">Tổng cộng:</td>
+              <td colspan="8" style="text-align:right;padding-right:12px;">Tổng cộng:</td>
               <td style="text-align:right;white-space:nowrap;"><%= tongTien.toLocaleString('vi-VN') %> đ</td>
-              <td></td>
+              <td colspan="2"></td>
             </tr>
           </tfoot>
         </table>

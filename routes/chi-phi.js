@@ -236,16 +236,33 @@ router.get("/chi-phi/:mien(mien-nam|mien-bac)/danh-sach", (req, res) => {
   const activeCompany = getCompany(req);
   const mien = mienFromSeg(req.params.mien);
   const q = (req.query.q || "").trim().toLowerCase();
+  const thangFilter = req.query.thang || "";
+
   let rows = store.chi_phi.map(ensureChiPhiDefaults).filter((r) => r.congTy === activeCompany && r.mien === mien);
+
+  // Danh sach thang co du lieu
+  const monthSet = new Set();
+  rows.forEach((r) => { const m = (r.ngay || "").slice(0, 7); if (m) monthSet.add(m); });
+  const availableMonths = [...monthSet].sort().reverse();
+
+  if (thangFilter) rows = rows.filter((r) => (r.ngay || "").slice(0, 7) === thangFilter);
   rows.sort((a, b) => (a.ngay < b.ngay ? 1 : -1));
+
   if (q) {
     rows = rows.filter((r) =>
       (r.dienGiai || "").toLowerCase().includes(q) ||
-      (r.tenNCC || "").toLowerCase().includes(q) ||
+      (r.ncc || "").toLowerCase().includes(q) ||
       (r.soHoaDon || "").toLowerCase().includes(q) ||
+      (r.soUNC || "").toLowerCase().includes(q) ||
       (r.ngay || "").includes(q)
     );
   }
+
+  // Tinh taiKhoan
+  const gianListForTaiKhoan = store.phap_danh_hop_dong_thue || [];
+  const aliasIndexForTaiKhoan = buildGianAliasIndex(gianListForTaiKhoan);
+  rows.forEach((r) => { r.taiKhoan = computeTaiKhoanChiPhi(r, gianListForTaiKhoan, aliasIndexForTaiKhoan); });
+
   const tongTien = rows.reduce((s, r) => s + (r.soTien || 0), 0);
   res.render("danh-sach-chi-phi", {
     userName: req.session.userName,
@@ -254,6 +271,8 @@ router.get("/chi-phi/:mien(mien-nam|mien-bac)/danh-sach", (req, res) => {
     rows,
     tongTien,
     q,
+    thangFilter,
+    availableMonths,
     error: req.query.error || null,
     success: req.query.success || null,
   });
