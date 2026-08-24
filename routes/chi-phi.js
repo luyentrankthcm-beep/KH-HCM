@@ -569,8 +569,12 @@ router.post("/chi-phi/:id/link-hoa-don", requireDataEntry, (req, res) => {
 });
 
 // De xuat so hoa don tu hoa_don_dau_vao cho cac dong chi_phi chua co soHoaDon
-const NCC_STOP = new Set(["CÔNG","TY","TNHH","CHI","NHÁNH","CỔ","PHẦN","MTV","HỮU","HẠN","TRÁCH","NHIỆM","VIỆT","NAM","ĐẦU","TƯ","THƯƠNG","MẠI","SẢN","XUẤT","VÀ","CÁC","TAI","TẠI","NỘI","HCM","HỒ","CHÍ","MINH"]);
-function nccWords(s){ return (s||'').toUpperCase().replace(/[^A-ZÀÁÂÃÈÉÊÌÍÒÓÔÕÙÚÝĂĐƠƯ0-9 ]/g,' ').split(/\s+/).filter(w=>w.length>2&&!NCC_STOP.has(w)); }
+const NCC_STOP = new Set(["CÔNG","TY","TNHH","CHI","NHÁNH","CỔ","PHẦN","MTV","HỮU","HẠN","TRÁCH","NHIỆM","VIỆT","NAM","ĐẦU","TƯ","THƯƠNG","MẠI","SẢN","XUẤT","VÀ","CÁC","TAI","TẠI","NỘI","HCM","HỒ","CHÍ","MINH","CONG","NHANH","CO","PHAN","HUU","HAN","VIET","DAU","THUONG","MAI","XUAT","CAC","NOI","HO"]);
+function nccWords(s){
+  // Giữ toàn bộ ký tự Unicode (kể cả tiếng Việt có dấu), chỉ bỏ ký tự đặc biệt
+  const up = (s||'').toUpperCase().replace(/[^\p{L}0-9 ]/gu,' ');
+  return up.split(/\s+/).filter(w=>w.length>2&&!NCC_STOP.has(w));
+}
 function matchNccScore(a,b){ const bW=new Set(nccWords(b)); return nccWords(a).filter(w=>bW.has(w)).length; }
 
 router.get("/chi-phi/:mien(mien-nam|mien-bac)/de-xuat-hoa-don", requireDataEntry, (req, res) => {
