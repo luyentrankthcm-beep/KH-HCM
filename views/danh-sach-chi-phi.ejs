@@ -17,10 +17,10 @@
     .dsch-field span { word-break:break-word; }
     .dsch-ht-row { display:flex; align-items:center; gap:10px; margin-top:14px; padding-top:14px; border-top:1px solid #eee; }
     /* Panel Map Gian */
-    #mapGianOverlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.4); z-index:8500; align-items:flex-start; justify-content:flex-end; padding:60px 16px 16px; }
+    #mapGianOverlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.4); z-index:8500; align-items:center; justify-content:center; }
     #mapGianOverlay.open { display:flex; }
-    #mapGianPanel { background:#fff; border-radius:10px; padding:20px 22px; width:560px; max-width:96vw; max-height:85vh; overflow-y:auto; box-shadow:0 8px 32px rgba(0,0,0,0.22); }
-    .mgian-row { display:grid; grid-template-columns:1fr 1fr auto; gap:8px; align-items:center; padding:6px 0; border-bottom:1px solid #f0f0f0; font-size:13px; }
+    #mapGianPanel { background:#fff; border-radius:10px; padding:22px 26px; width:720px; max-width:97vw; max-height:88vh; overflow-y:auto; box-shadow:0 8px 32px rgba(0,0,0,0.22); }
+    .mgian-row { display:grid; grid-template-columns:160px 1fr auto; gap:10px; align-items:center; padding:6px 0; border-bottom:1px solid #f0f0f0; font-size:13px; }
     .mgian-row:last-child { border-bottom:none; }
     .mgian-status { font-size:11px; color:#388e3c; }
   </style>
@@ -444,26 +444,34 @@
   var _gianAliasMap = <%- JSON.stringify(gianAliasMap).replace(/<\//g, '<\\/') %>;
 
   function openMapGian() {
-    // Lấy unique gian từ rows hiện tại (đã render trong _dschRows)
     var seen = {}, gians = [];
     _dschRows.forEach(function(r) {
       var g = r.gian || '';
       if (g && !seen[g]) { seen[g] = true; gians.push(g); }
     });
     gians.sort();
-    var html = '<div style="display:grid;grid-template-columns:1fr 1fr auto;gap:6px;font-size:12px;font-weight:600;color:var(--muted);padding-bottom:6px;border-bottom:2px solid #eee;margin-bottom:4px;">'
+
+    var html = '';
+    // "Map tất cả" row
+    html += '<div style="background:#f5f0ff;border-radius:8px;padding:10px 14px;margin-bottom:14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">'
+      + '<span style="font-size:13px;font-weight:600;white-space:nowrap;">Điền cho tất cả:</span>'
+      + '<input type="text" id="mgianMapAll" list="mgianSuggest" placeholder="Nhập mã công trình..." style="flex:1;min-width:200px;font-size:13px;padding:5px 8px;border:1px solid #ccc;border-radius:4px;" />'
+      + '<button type="button" onclick="mapGianTatCa()" style="background:var(--color-primary,#d46a9f);color:#fff;border:none;border-radius:4px;padding:5px 14px;cursor:pointer;font-size:13px;white-space:nowrap;">→ Map tất cả</button>'
+      + '</div>';
+
+    html += '<div style="display:grid;grid-template-columns:160px 1fr auto;gap:6px;font-size:12px;font-weight:600;color:var(--muted);padding-bottom:6px;border-bottom:2px solid #eee;margin-bottom:4px;">'
       + '<span>Gian</span><span>Mã công trình</span><span></span></div>';
     gians.forEach(function(g) {
       var cur = _gianAliasMap[g] || '';
       var eid = 'mgian-' + g.replace(/[^a-zA-Z0-9]/g,'_');
       html += '<div class="mgian-row" id="mgrow-'+eid+'">'
-        + '<span style="font-weight:500;">'+esc2(g)+'</span>'
+        + '<span style="font-weight:500;word-break:break-word;">'+esc2(g)+'</span>'
         + '<input type="text" id="'+eid+'" value="'+esc2(cur)+'" list="mgianSuggest" placeholder="Nhập hoặc chọn..." style="font-size:13px;padding:4px 6px;border:1px solid #ccc;border-radius:4px;width:100%;" />'
         + '<button type="button" onclick="saveGianAlias(\''+esc2(g)+'\',\''+eid+'\')" style="background:var(--color-primary,#d46a9f);color:#fff;border:none;border-radius:4px;padding:4px 10px;cursor:pointer;font-size:13px;">✓</button>'
         + '</div>';
     });
-    if (gians.length === 0) html = '<p class="muted">Không có gian nào trong bộ lọc hiện tại.</p>';
-    // Existing mappings not in current list
+    if (gians.length === 0) html += '<p class="muted">Không có gian nào trong bộ lọc hiện tại.</p>';
+
     var existingKeys = Object.keys(_gianAliasMap).filter(function(k){ return !seen[k]; });
     if (existingKeys.length > 0) {
       html += '<div style="margin-top:16px;padding-top:12px;border-top:1px dashed #ddd;font-size:12px;color:var(--muted);font-weight:600;margin-bottom:6px;">Mapping đã lưu (gian không có trong bộ lọc hiện tại)</div>';
@@ -477,6 +485,15 @@
     }
     document.getElementById('mapGianList').innerHTML = html;
     document.getElementById('mapGianOverlay').classList.add('open');
+  }
+
+  function mapGianTatCa() {
+    var target = (document.getElementById('mgianMapAll').value || '').trim();
+    if (!target) { alert('Chưa nhập mã công trình.'); return; }
+    // Điền vào tất cả input trống trong danh sách
+    document.querySelectorAll('#mapGianList input[id^="mgian-"]').forEach(function(inp) {
+      if (!inp.value.trim()) inp.value = target;
+    });
   }
 
   function closeMapGian() {
