@@ -264,6 +264,14 @@ router.get("/chi-phi/:mien(mien-nam|mien-bac)/danh-sach", (req, res) => {
   rows.forEach((r) => { r.taiKhoan = computeTaiKhoanChiPhi(r, gianListForTaiKhoan, aliasIndexForTaiKhoan); });
 
   const tongTien = rows.reduce((s, r) => s + (r.soTien || 0), 0);
+
+  // Gian alias map cho chi phi
+  const gianAliasMap = store.chi_phi_gian_alias || {};
+  // Toan bo gian suggestions tu toan bo chi_phi (deduplicated, sorted)
+  const allGianSet = new Set();
+  (store.chi_phi || []).forEach((r) => { if (r.gian) allGianSet.add(r.gian); });
+  const allGianSuggestions = [...allGianSet].sort();
+
   res.render("danh-sach-chi-phi", {
     userName: req.session.userName,
     mien,
@@ -273,9 +281,35 @@ router.get("/chi-phi/:mien(mien-nam|mien-bac)/danh-sach", (req, res) => {
     q,
     thangFilter,
     availableMonths,
+    gianAliasMap,
+    allGianSuggestions,
     error: req.query.error || null,
     success: req.query.success || null,
   });
+});
+
+// Luu gian alias (map gian → mã công trình)
+router.post("/chi-phi/gian-alias", requireDataEntry, (req, res) => {
+  const store = load();
+  ensureShape(store);
+  const { from: src, to: target } = req.body;
+  if (!src || !target) return res.status(400).json({ error: "Thiếu dữ liệu." });
+  if (!store.chi_phi_gian_alias) store.chi_phi_gian_alias = {};
+  store.chi_phi_gian_alias[src.trim()] = target.trim();
+  save(store);
+  return res.json({ success: true, from: src.trim(), to: target.trim() });
+});
+
+// Xoa gian alias
+router.post("/chi-phi/gian-alias/delete", requireDataEntry, (req, res) => {
+  const store = load();
+  ensureShape(store);
+  const src = (req.body.from || "").trim();
+  if (store.chi_phi_gian_alias && src) {
+    delete store.chi_phi_gian_alias[src];
+    save(store);
+  }
+  return res.json({ success: true });
 });
 
 // Chi Nhan, 2026-07-22: "thêm chỗ xuất ra excel nhá" -- xuat danh sach DANG

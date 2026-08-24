@@ -8,7 +8,7 @@
     .dsch-cell { max-width:0; overflow:hidden; }
     .dsch-cell-1 { display:-webkit-box; -webkit-line-clamp:1; -webkit-box-orient:vertical; overflow:hidden; }
     .dsch-cell-2 { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
-    /* Modal */
+    /* Modal chi tiet */
     #dschOverlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.45); z-index:9000; align-items:center; justify-content:center; }
     #dschOverlay.open { display:flex; }
     #dschModal { background:#fff; border-radius:10px; padding:24px 28px; width:580px; max-width:95vw; max-height:88vh; overflow-y:auto; box-shadow:0 8px 32px rgba(0,0,0,0.22); }
@@ -16,6 +16,13 @@
     .dsch-field label { min-width:130px; color:var(--muted); font-weight:600; flex-shrink:0; }
     .dsch-field span { word-break:break-word; }
     .dsch-ht-row { display:flex; align-items:center; gap:10px; margin-top:14px; padding-top:14px; border-top:1px solid #eee; }
+    /* Panel Map Gian */
+    #mapGianOverlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.4); z-index:8500; align-items:flex-start; justify-content:flex-end; padding:60px 16px 16px; }
+    #mapGianOverlay.open { display:flex; }
+    #mapGianPanel { background:#fff; border-radius:10px; padding:20px 22px; width:560px; max-width:96vw; max-height:85vh; overflow-y:auto; box-shadow:0 8px 32px rgba(0,0,0,0.22); }
+    .mgian-row { display:grid; grid-template-columns:1fr 1fr auto; gap:8px; align-items:center; padding:6px 0; border-bottom:1px solid #f0f0f0; font-size:13px; }
+    .mgian-row:last-child { border-bottom:none; }
+    .mgian-status { font-size:11px; color:#388e3c; }
   </style>
 </head>
 <body>
@@ -53,6 +60,7 @@
       <span class="muted" style="font-size:13px;margin-left:auto;">
         <%= rows.length %> dòng &nbsp;|&nbsp; Tổng: <strong><%= tongTien.toLocaleString('vi-VN') %> đ</strong>
       </span>
+      <button type="button" class="btn btn-secondary" onclick="openMapGian()" style="padding:5px 12px;white-space:nowrap;">🗂 Map Gian</button>
     </form>
 
     <section class="panel" style="padding:0;">
@@ -310,6 +318,110 @@
 
   document.addEventListener('keydown', function(e){ if(e.key==='Escape') closeDschModal(); });
   </script>
+  <!-- Panel Map Gian -->
+  <div id="mapGianOverlay" onclick="if(event.target===this)closeMapGian()">
+    <div id="mapGianPanel">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+        <h3 style="margin:0;font-size:15px;">🗂 Map Gian → Mã công trình</h3>
+        <button type="button" class="link-btn" onclick="closeMapGian()" style="font-size:20px;line-height:1;">×</button>
+      </div>
+      <p class="muted" style="font-size:12px;margin-bottom:12px;">
+        Tất cả gian xuất hiện trong trang hiện tại (không trùng). Điền mã công trình tương ứng, bấm ✓ để lưu.
+      </p>
+      <datalist id="mgianSuggest">
+        <% allGianSuggestions.forEach(function(g) { %><option value="<%= g %>"><% }) %>
+      </datalist>
+      <div id="mapGianList"></div>
+    </div>
+  </div>
+
+  <script>
+  var _gianAliasMap = <%- JSON.stringify(gianAliasMap).replace(/<\//g, '<\\/') %>;
+
+  function openMapGian() {
+    // Lấy unique gian từ rows hiện tại (đã render trong _dschRows)
+    var seen = {}, gians = [];
+    _dschRows.forEach(function(r) {
+      var g = r.gian || '';
+      if (g && !seen[g]) { seen[g] = true; gians.push(g); }
+    });
+    gians.sort();
+    var html = '<div style="display:grid;grid-template-columns:1fr 1fr auto;gap:6px;font-size:12px;font-weight:600;color:var(--muted);padding-bottom:6px;border-bottom:2px solid #eee;margin-bottom:4px;">'
+      + '<span>Gian</span><span>Mã công trình</span><span></span></div>';
+    gians.forEach(function(g) {
+      var cur = _gianAliasMap[g] || '';
+      var eid = 'mgian-' + g.replace(/[^a-zA-Z0-9]/g,'_');
+      html += '<div class="mgian-row" id="mgrow-'+eid+'">'
+        + '<span style="font-weight:500;">'+esc2(g)+'</span>'
+        + '<input type="text" id="'+eid+'" value="'+esc2(cur)+'" list="mgianSuggest" placeholder="Nhập hoặc chọn..." style="font-size:13px;padding:4px 6px;border:1px solid #ccc;border-radius:4px;width:100%;" />'
+        + '<button type="button" onclick="saveGianAlias(\''+esc2(g)+'\',\''+eid+'\')" style="background:var(--color-primary,#d46a9f);color:#fff;border:none;border-radius:4px;padding:4px 10px;cursor:pointer;font-size:13px;">✓</button>'
+        + '</div>';
+    });
+    if (gians.length === 0) html = '<p class="muted">Không có gian nào trong bộ lọc hiện tại.</p>';
+    // Existing mappings not in current list
+    var existingKeys = Object.keys(_gianAliasMap).filter(function(k){ return !seen[k]; });
+    if (existingKeys.length > 0) {
+      html += '<div style="margin-top:16px;padding-top:12px;border-top:1px dashed #ddd;font-size:12px;color:var(--muted);font-weight:600;margin-bottom:6px;">Mapping đã lưu (gian không có trong bộ lọc hiện tại)</div>';
+      existingKeys.forEach(function(k) {
+        html += '<div class="mgian-row">'
+          + '<span style="color:#999;">'+esc2(k)+'</span>'
+          + '<span>→ '+esc2(_gianAliasMap[k])+'</span>'
+          + '<button type="button" onclick="deleteGianAlias(\''+esc2(k)+'\')" style="background:none;border:1px solid #e57373;color:#e57373;border-radius:4px;padding:3px 8px;cursor:pointer;font-size:12px;">✕</button>'
+          + '</div>';
+      });
+    }
+    document.getElementById('mapGianList').innerHTML = html;
+    document.getElementById('mapGianOverlay').classList.add('open');
+  }
+
+  function closeMapGian() {
+    document.getElementById('mapGianOverlay').classList.remove('open');
+  }
+
+  function esc2(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+
+  function saveGianAlias(gian, inputId) {
+    var val = document.getElementById(inputId).value.trim();
+    if (!val) return;
+    var body = new URLSearchParams();
+    body.append('from', gian);
+    body.append('to', val);
+    fetch('/chi-phi/gian-alias', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-Requested-With': 'XMLHttpRequest' },
+      body: body.toString()
+    })
+    .then(function(r){ return r.json(); })
+    .then(function(data) {
+      if (data.success) {
+        _gianAliasMap[data.from] = data.to;
+        var row = document.getElementById('mgrow-' + inputId);
+        if (row) { row.style.background = 'rgba(56,142,60,0.08)'; setTimeout(function(){ row.style.background=''; }, 1200); }
+      }
+    });
+  }
+
+  function deleteGianAlias(gian) {
+    if (!confirm('Xóa mapping cho gian "' + gian + '"?')) return;
+    var body = new URLSearchParams();
+    body.append('from', gian);
+    fetch('/chi-phi/gian-alias/delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-Requested-With': 'XMLHttpRequest' },
+      body: body.toString()
+    })
+    .then(function(r){ return r.json(); })
+    .then(function(data) {
+      if (data.success) {
+        delete _gianAliasMap[gian];
+        openMapGian(); // re-render
+      }
+    });
+  }
+
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ closeMapGian(); closeDschModal(); } });
+  </script>
+
   <%- include('partials/scroll-restore') %>
 </body>
 </html>
