@@ -618,10 +618,24 @@ router.post("/chi-phi/:id/link-hoa-don", requireDataEntry, (req, res) => {
 });
 
 // De xuat so hoa don tu hoa_don_dau_vao cho cac dong chi_phi chua co soHoaDon
-const NCC_STOP = new Set(["CÔNG","TY","TNHH","CHI","NHÁNH","CỔ","PHẦN","MTV","HỮU","HẠN","TRÁCH","NHIỆM","VIỆT","NAM","ĐẦU","TƯ","THƯƠNG","MẠI","SẢN","XUẤT","VÀ","CÁC","TAI","TẠI","NỘI","HCM","HỒ","CHÍ","MINH","CONG","NHANH","CO","PHAN","HUU","HAN","VIET","DAU","THUONG","MAI","XUAT","CAC","NOI","HO"]);
+const NCC_STOP = new Set([
+  // Loại hình doanh nghiệp (có dấu)
+  "CÔNG","TY","TNHH","CHI","NHÁNH","CỔ","PHẦN","MTV","HỮU","HẠN","TRÁCH","NHIỆM",
+  "VIỆT","NAM","ĐẦU","TƯ","THƯƠNG","MẠI","SẢN","XUẤT","VÀ","CÁC","TAI","TẠI",
+  "NỘI","HCM","HỒ","CHÍ","MINH","HỘ","KINH","DOANH","NHÂN","HỢP","TÁC","XÃ",
+  "DOANH","NGHIỆP","PHÁT","TRIỂN","PHÂN","PHỐI","DỊCH","VỤ",
+  // Không dấu (sau chuẩn hóa NFD)
+  "CONG","NHANH","CO","PHAN","HUU","HAN","VIET","DAU","THUONG","MAI","XUAT","CAC","NOI","HO",
+  "KINH","DOANH","NHAN","HOP","TAC","XA","NGHIEP","PHAT","TRIEN","PHAN","PHOI","DICH","VU",
+  // Viết tắt phổ biến
+  "HKD","DNTN","HTX","TMDV","SXKD","KDTM","KDTH",
+]);
+// Chuẩn hóa: bỏ dấu tiếng Việt để so khớp "TUAN" == "TUẤN"
+function normAccent(s){
+  return s.normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[đĐ]/g,c=>c==='đ'?'d':'D');
+}
 function nccWords(s){
-  // Giữ toàn bộ ký tự Unicode (kể cả tiếng Việt có dấu), chỉ bỏ ký tự đặc biệt
-  const up = (s||'').toUpperCase().replace(/[^\p{L}0-9 ]/gu,' ');
+  const up = normAccent((s||'').toUpperCase()).replace(/[^\p{L}0-9 ]/gu,' ');
   return up.split(/\s+/).filter(w=>w.length>2&&!NCC_STOP.has(w));
 }
 function matchNccScore(a,b){ const bW=new Set(nccWords(b)); return nccWords(a).filter(w=>bW.has(w)).length; }
