@@ -190,6 +190,7 @@
         var isHidden = row.style.display === 'none' || !row.style.display;
         row.style.display = isHidden ? 'table-row' : 'none';
         if (caret) caret.textContent = isHidden ? '▼' : '▶';
+        if (isHidden) setTimeout(function(){ row.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }, 50);
       }
     </script>
 
