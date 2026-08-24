@@ -225,6 +225,16 @@ router.get("/cong-no/ncc", (req, res) => {
     // danh), khong con gop chung 2 cong ty + dropdown loc thu cong nhu ban
     // dau nua.
     invoices = invoicesAllCompanies.filter((i) => i.company === activeCompany);
+
+    // Danh sach cac thang co hoa don (YYYY-MM), moi nhat truoc
+    const monthSet = new Set();
+    invoices.forEach((i) => { const m = (i.ngayHD || "").slice(0,7); if (m) monthSet.add(m); });
+    const availableMonths = [...monthSet].sort().reverse();
+
+    // Loc theo thang neu co
+    const thangFilter = (req.query.thang || "").trim();
+    if (thangFilter) invoices = invoices.filter((i) => (i.ngayHD || "").slice(0,7) === thangFilter);
+
     nccSummary = summarizeByNcc(invoices);
     missingInvoiceChi = built.missingInvoiceChi.filter((m) => m.company === activeCompany);
     missingInvoiceSummary = summarizeMissingInvoiceByNcc(missingInvoiceChi);
@@ -281,6 +291,7 @@ router.get("/cong-no/ncc", (req, res) => {
   const pageRows = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
   const qs = [];
+  if (thangFilter) qs.push("thang=" + encodeURIComponent(thangFilter));
   if (daChiFilter) qs.push("daChi=" + encodeURIComponent(daChiFilter));
   if (nccFilter) qs.push("ncc=" + encodeURIComponent(nccFilter));
   const baseQs = qs.join("&");
@@ -301,6 +312,8 @@ router.get("/cong-no/ncc", (req, res) => {
     currentPage,
     totalPages,
     baseQs,
+    thangFilter,
+    availableMonths,
     daChiFilter,
     nccFilter,
     grandTotalHoaDon,

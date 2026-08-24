@@ -98,9 +98,37 @@
     </section>
     <% } %>
 
+    <!-- Filter bar -->
+    <form method="GET" action="/cong-no/ncc" style="display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:14px;">
+      <label style="display:flex;align-items:center;gap:6px;font-size:13px;">
+        Tháng HĐ
+        <select name="thang" onchange="this.form.submit()" style="font-size:13px;">
+          <option value="">Tất cả</option>
+          <% availableMonths.forEach(function(m) { %>
+          <option value="<%= m %>" <%= thangFilter === m ? 'selected' : '' %>>
+            Tháng <%= Number(m.slice(5,7)) %>/<%= m.slice(0,4) %>
+          </option>
+          <% }) %>
+        </select>
+      </label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:13px;">
+        Tình trạng
+        <select name="daChi" onchange="this.form.submit()" style="font-size:13px;">
+          <option value="">Tất cả</option>
+          <option value="0" <%= daChiFilter==='0'?'selected':'' %>>Chưa chi</option>
+          <option value="1" <%= daChiFilter==='1'?'selected':'' %>>Đã chi</option>
+        </select>
+      </label>
+      <input type="text" name="ncc" value="<%= nccFilter %>" placeholder="Tìm tên NCC..." style="font-size:13px;width:220px;" />
+      <button type="submit" class="btn btn-secondary" style="padding:5px 12px;">Lọc</button>
+      <% if (thangFilter || daChiFilter || nccFilter) { %>
+        <a href="/cong-no/ncc" class="link-btn">✕ Bỏ lọc</a>
+      <% } %>
+    </form>
+
     <section class="panel">
       <div class="panel-head">
-        <h2>Tổng hợp theo NCC (<%= nccSummary.length %> nhà cung cấp)</h2>
+        <h2>Tổng hợp theo NCC (<%= nccSummary.length %> nhà cung cấp<% if (thangFilter) { %> — T<%= Number(thangFilter.slice(5,7)) %>/<%= thangFilter.slice(0,4) %><% } %>)</h2>
       </div>
       <p class="muted">Bấm vào 1 dòng NCC để xem/ẩn ngay tại chỗ chi tiết từng hóa đơn của NCC đó (đã chi hay chưa, chi ngày nào, tài khoản nào) — không tải lại trang.</p>
       <div class="table-scroll">
