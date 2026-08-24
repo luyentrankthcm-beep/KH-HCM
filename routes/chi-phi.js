@@ -267,10 +267,10 @@ router.get("/chi-phi/:mien(mien-nam|mien-bac)/danh-sach", (req, res) => {
 
   // Gian alias map cho chi phi
   const gianAliasMap = store.chi_phi_gian_alias || {};
-  // Toan bo gian suggestions tu toan bo chi_phi (deduplicated, sorted)
-  const allGianSet = new Set();
-  (store.chi_phi || []).forEach((r) => { if (r.gian) allGianSet.add(r.gian); });
-  const allGianSuggestions = [...allGianSet].sort();
+  // Danh sach ma cong trinh chuan tu phap_danh (deduplicated, sorted)
+  const maCTSet = new Set();
+  (store.phap_danh_hop_dong_thue || []).forEach((r) => { if (r.maCongTrinh) maCTSet.add(r.maCongTrinh); });
+  const allGianSuggestions = [...maCTSet].sort();
 
   res.render("danh-sach-chi-phi", {
     userName: req.session.userName,
