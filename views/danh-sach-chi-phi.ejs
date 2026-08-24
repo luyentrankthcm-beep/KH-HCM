@@ -385,10 +385,18 @@
   function toggleDschHachToan(cb) {
     var id = _dschCurrentId;
     if (!id) return;
+    var checked = cb.checked;
     var status = document.getElementById('dschHtStatus');
-    status.textContent = 'Đang lưu...';
+    // Cập nhật UI ngay lập tức (optimistic)
+    status.textContent = checked ? '✓ Đã hạch toán' : '';
+    var tr = document.getElementById('dsch-tr-' + id);
+    if (tr) tr.style.background = checked ? 'rgba(56,142,60,0.07)' : '';
+    var htCb = document.getElementById('ht-' + id);
+    if (htCb) htCb.checked = checked;
+    if (_dschMap[id]) _dschMap[id].daHachToan = checked;
+    // Lưu lên server
     var body = new URLSearchParams();
-    body.append('daHachToan', cb.checked ? '1' : '0');
+    body.append('daHachToan', checked ? '1' : '0');
     fetch('/chi-phi/' + id + '/hach-toan', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-Requested-With': 'XMLHttpRequest' },
@@ -396,19 +404,20 @@
     })
     .then(function(r){ return r.json(); })
     .then(function(data) {
-      if (data.success) {
-        _dschMap[id].daHachToan = data.daHachToan;
-        status.textContent = data.daHachToan ? '✓ Đã hạch toán' : '';
-        var tr = document.getElementById('dsch-tr-' + id);
-        if (tr) tr.style.background = data.daHachToan ? 'rgba(56,142,60,0.07)' : '';
-        var htCb = document.getElementById('ht-' + id);
-        if (htCb) htCb.checked = data.daHachToan;
-      } else {
+      if (!data.success) {
+        // Rollback nếu server lỗi
         status.textContent = 'Lỗi, thử lại.';
-        cb.checked = !cb.checked;
+        cb.checked = !checked;
+        if (htCb) htCb.checked = !checked;
+        if (tr) tr.style.background = !checked ? 'rgba(56,142,60,0.07)' : '';
+        if (_dschMap[id]) _dschMap[id].daHachToan = !checked;
       }
     })
-    .catch(function() { status.textContent = 'Lỗi kết nối.'; cb.checked = !cb.checked; });
+    .catch(function() {
+      status.textContent = 'Lỗi kết nối.';
+      cb.checked = !checked;
+      if (htCb) htCb.checked = !checked;
+    });
   }
 
   document.addEventListener('keydown', function(e){ if(e.key==='Escape') closeDschModal(); });
