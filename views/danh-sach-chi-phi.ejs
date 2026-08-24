@@ -62,6 +62,8 @@
       </span>
       <button type="button" class="btn btn-secondary" onclick="openMapGian()" style="padding:5px 12px;white-space:nowrap;">🗂 Map Gian</button>
       <button type="button" class="btn btn-secondary" onclick="openDeXuatHD()" style="padding:5px 12px;white-space:nowrap;">🔍 Gợi ý số HĐ</button>
+      <button type="button" class="btn btn-secondary" id="autoMapHDBtn" onclick="autoMapHD()" style="padding:5px 12px;white-space:nowrap;" title="Tự động tìm và áp dụng tất cả gợi ý số HĐ">⚡ Tự động map HĐ</button>
+      <span id="autoMapStatus" style="font-size:12px;color:#388e3c;"></span>
     </form>
 
     <section class="panel" style="padding:0;">
@@ -376,6 +378,51 @@
 
   function closeDeXuatHD() {
     document.getElementById('hdGợiYOverlay').style.display = 'none';
+  }
+
+  function autoMapHD() {
+    var btn = document.getElementById('autoMapHDBtn');
+    var status = document.getElementById('autoMapStatus');
+    btn.disabled = true;
+    status.textContent = 'Đang tìm...';
+    var url = '/chi-phi/mien-' + _hdGoiYMien + '/de-xuat-hoa-don';
+    if (_hdGoiYThang) url += '?thang=' + encodeURIComponent(_hdGoiYThang);
+    fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+      .then(function(r){ return r.json(); })
+      .then(function(data) {
+        if (!data.success || !data.matches || data.matches.length === 0) {
+          btn.disabled = false;
+          status.textContent = 'Không có gợi ý mới.';
+          setTimeout(function(){ status.textContent = ''; }, 3000);
+          return;
+        }
+        status.textContent = 'Tìm được ' + data.matches.length + ' gợi ý, đang lưu...';
+        var items = [];
+        data.matches.forEach(function(m) {
+          var ids = m.chiPhiIds || (m.chiPhiId ? [m.chiPhiId] : []);
+          ids.forEach(function(id){ items.push({ chiPhiId: id, soHoaDon: m.soHoaDonGoiY }); });
+        });
+        return fetch('/chi-phi/cap-nhat-hoa-don-hang-loat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+          body: JSON.stringify({ items: items })
+        }).then(function(r){ return r.json(); }).then(function(res) {
+          btn.disabled = false;
+          if (res.success) {
+            status.textContent = '✓ Đã cập nhật ' + res.updated + ' dòng.';
+            // Cập nhật lại bảng hiển thị
+            items.forEach(function(it) {
+              if (_dschMap[it.chiPhiId]) _dschMap[it.chiPhiId].soHoaDon = it.soHoaDon;
+              var tr = document.getElementById('dsch-tr-' + it.chiPhiId);
+              if (tr) { var cells = tr.querySelectorAll('td'); if (cells[4]) cells[4].textContent = it.soHoaDon; }
+            });
+            setTimeout(function(){ status.textContent = ''; }, 5000);
+          } else {
+            status.textContent = 'Lỗi: ' + (res.error || 'Thử lại.');
+          }
+        });
+      })
+      .catch(function(){ btn.disabled = false; status.textContent = 'Lỗi kết nối.'; });
   }
 
   function renderDeXuat(matches, total) {
