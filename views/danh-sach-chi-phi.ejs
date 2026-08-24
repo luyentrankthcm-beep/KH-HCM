@@ -223,7 +223,11 @@
   function renderDschView(r) {
     var fields = [
       ['Ngày', fmtDate(r.ngay)],
-      ['Gian', fmt(r.gian)],
+      ['Gian', (function(){
+        if (r.gian) return esc(r.gian);
+        var s = r.suggestedGian ? '<span style="color:#aaa;">—</span> <span style="font-size:11px;background:#fff8e1;color:#e65100;padding:2px 7px;border-radius:4px;margin-left:4px;">💡 Gợi ý từ diễn giải: <strong>'+esc(r.suggestedGian)+'</strong></span> <button type="button" onclick="applyGianSuggestion('+r.id+',\''+esc(r.suggestedGian)+'\')" style="font-size:11px;padding:2px 8px;background:#e65100;color:#fff;border:none;border-radius:4px;cursor:pointer;margin-left:4px;">Dùng luôn</button>' : '—';
+        return s;
+      })()],
       ['NCC', fmt(r.ncc)],
       ['Số hóa đơn', fmt(r.soHoaDon)],
       ['Phân loại', (function(){
@@ -294,6 +298,27 @@
     document.getElementById('dschViewPane').style.display = 'none';
     document.getElementById('dschEditPane').style.display = '';
     document.getElementById('dschSaveStatus').textContent = '';
+  }
+
+  function applyGianSuggestion(id, gian) {
+    if (!confirm('Lưu gian "' + gian + '" cho khoản chi này?')) return;
+    fetch('/chi-phi/' + id + '/gian', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-Requested-With': 'XMLHttpRequest' },
+      body: 'gian=' + encodeURIComponent(gian)
+    })
+    .then(function(r){ return r.json(); })
+    .then(function(data) {
+      if (data.success) {
+        if (_dschMap[id]) { _dschMap[id].gian = data.gian; _dschMap[id].suggestedGian = ''; }
+        // update cell in table
+        var tr = document.getElementById('dsch-tr-' + id);
+        if (tr) { var gc = tr.querySelector('.dsch-cell-1'); if (gc) gc.textContent = data.gian; }
+        // re-render modal if still open
+        if (_dschCurrentId == id) renderDschView(_dschMap[id]);
+      }
+    })
+    .catch(function(e){ alert('Lỗi: ' + e.message); });
   }
 
   function toggleHtRow(id, cb) {

@@ -210,6 +210,18 @@ router.get("/chi-phi/:mien(mien-nam|mien-bac)", (req, res) => {
   const gianListForTaiKhoan = store.phap_danh_hop_dong_thue || [];
   const aliasIndexForTaiKhoan = buildGianAliasIndex(gianListForTaiKhoan);
   rows.forEach((r) => { r.taiKhoan = computeTaiKhoanChiPhi(r, gianListForTaiKhoan, aliasIndexForTaiKhoan); });
+
+  // Luyen, 2026-08-24: "trong diễn giải có BD bạn từ đó lấy ra cho tôi nha" --
+  // voi cac dong gian trong, thu fuzzy-match dienGiai voi danh sach gian hien
+  // co, de ra goi y gian (r.suggestedGian) hien thi trong modal.
+  rows.forEach((r) => {
+    if (r.gian || !r.dienGiai) return;
+    const matched = matchGianRecord(r.dienGiai, gianListForTaiKhoan);
+    if (matched) {
+      r.suggestedGian = matched.gian || matched.tenDiemNoiBo || "";
+    }
+  });
+
   res.render("chi-phi", {
     userName: req.session.userName,
     mien,
@@ -470,6 +482,17 @@ router.get("/chi-phi/:mien(mien-nam|mien-bac)/export.xlsx", (req, res) => {
 function isAjaxChiPhiRequest(req) {
   return req.get("X-Requested-With") === "XMLHttpRequest";
 }
+
+// Luyen, 2026-08-24: luu gian tu goi y dien giai
+router.post("/chi-phi/:id/gian", requireDataEntry, (req, res) => {
+  const store = load();
+  ensureShape(store);
+  const r = store.chi_phi.find((x) => String(x.id) === req.params.id);
+  if (!r) return res.status(404).json({ error: "Không tìm thấy khoản chi." });
+  r.gian = (req.body.gian || "").trim();
+  save(store);
+  return res.json({ success: true, gian: r.gian });
+});
 
 router.post("/chi-phi/:id/hach-toan", requireDataEntry, (req, res) => {
   const store = load();
