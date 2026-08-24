@@ -228,6 +228,31 @@ router.get("/cong-no/ncc", (req, res) => {
     nccSummary = summarizeByNcc(invoices);
     missingInvoiceChi = built.missingInvoiceChi.filter((m) => m.company === activeCompany);
     missingInvoiceSummary = summarizeMissingInvoiceByNcc(missingInvoiceChi);
+
+    // Enrich nccSummary voi maNCC tu danh_muc_ma_nha_cung_cap
+    const danhMucKey = activeCompany === "kh_moi" ? "danh_muc_ma_nha_cung_cap_moi" : "danh_muc_ma_nha_cung_cap_cu";
+    const danhMucSrc = store[danhMucKey] || store.danh_muc_ma_nha_cung_cap || [];
+    // Index: normalized(ten) → {ma, ten}
+    const nccDMIndex = new Map();
+    danhMucSrc.filter((r) => r.ma && r.ten).forEach((r) => {
+      nccDMIndex.set(normVN(r.ten), { ma: r.ma, ten: r.ten });
+    });
+    nccSummary.forEach((s) => {
+      const norm = normVN(s.tenNCC || "");
+      // Khớp chính xác trước
+      if (nccDMIndex.has(norm)) {
+        s.maNCC = nccDMIndex.get(norm).ma;
+        return;
+      }
+      // Khớp mờ: tìm danh mục entry mà tên chứa ít nhất 2 từ chung có nghĩa
+      const words = norm.split(/\s+/).filter((w) => w.length >= 3);
+      let bestScore = 0, bestMa = "";
+      nccDMIndex.forEach((v, k) => {
+        const score = words.filter((w) => k.includes(w)).length;
+        if (score >= 2 && score > bestScore) { bestScore = score; bestMa = v.ma; }
+      });
+      if (bestMa) s.maNCC = bestMa;
+    });
   } catch (e) {
     error = e.message;
     console.error("Loi tinh cong no NCC:", e);

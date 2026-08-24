@@ -108,6 +108,7 @@
           <thead>
             <tr>
               <th></th>
+              <th>Mã NCC</th>
               <th>Tên NCC</th>
               <th>Số hóa đơn</th>
               <th>Tổng hóa đơn</th>
@@ -119,6 +120,9 @@
             <% nccSummary.forEach(function (r, idx) { %>
             <tr class="ncc-summary-row" style="cursor:pointer" onclick="toggleNccDetail('ncc-detail-<%= idx %>')">
               <td><span class="ncc-toggle-caret" id="ncc-caret-<%= idx %>">▶</span></td>
+              <td style="white-space:nowrap;font-size:12px;color:var(--muted);">
+                <% if (r.maNCC) { %><span style="background:#e8f5e9;color:#2e7d32;padding:2px 6px;border-radius:4px;font-weight:600;"><%= r.maNCC %></span><% } else { %>—<% } %>
+              </td>
               <td><%= r.tenNCC %></td>
               <td><%= r.soHoaDon %> <span class="muted">(<%= r.soChuaChi %> chưa chi)</span></td>
               <td><%= r.tongHoaDon.toLocaleString('vi-VN') %> đ</td>
@@ -126,7 +130,7 @@
               <td class="<%= Math.abs(r.conNo) < 1000 ? 'text-pos' : 'text-neg' %>"><%= r.conNo.toLocaleString('vi-VN') %> đ</td>
             </tr>
             <tr class="ncc-detail-row" id="ncc-detail-<%= idx %>" style="display:none;">
-              <td colspan="6" style="padding:0 0 14px 0; background:rgba(0,0,0,0.02);">
+              <td colspan="7" style="padding:0 0 14px 0; background:rgba(0,0,0,0.02);">
                 <table class="table" style="margin:0;">
                   <thead>
                     <tr>
@@ -163,7 +167,7 @@
             </tr>
             <% }) %>
             <% if (nccSummary.length === 0) { %>
-            <tr><td colspan="6" class="muted">Chưa có dữ liệu — cần có hóa đơn ở trang "Hóa Đơn Đầu Vào" trước.</td></tr>
+            <tr><td colspan="7" class="muted">Chưa có dữ liệu — cần có hóa đơn ở trang "Hóa Đơn Đầu Vào" trước.</td></tr>
             <% } %>
           </tbody>
         </table>
