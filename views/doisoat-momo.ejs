@@ -161,132 +161,182 @@
     <% if (allCodes.length > 0) { %>
     <section class="panel">
       <h2>3. TK Có theo từng mã công trình (131 = thông thường, 1388 = doanh thu chia sẻ, "Chưa xuất MISA" = khách mới)</h2>
-      <p class="muted">
-        Chọn "Chưa xuất MISA (KH mới)" cho các gian là khách hàng mới chưa lên MISA — dòng đối soát vẫn hiện
-        trên trang này để theo dõi, nhưng sẽ KHÔNG được đưa vào file xuất Excel ở mục 4. Nếu 1 gian thực ra
-        KHÔNG thuộc công ty đang xem (sẽ xuất hóa đơn ở công ty kia), bấm "Ẩn" ở cột cuối để gian đó không
-        hiện trên trang này nữa (chỉ ẩn ở công ty này, không ảnh hưởng công ty kia).
-      </p>
-      <form method="POST" action="/doi-soat/momo/mapping" id="tkCoForm">
+      <!-- VIEW MODE -->
+      <div id="tkCoViewDiv">
         <table class="table">
-          <thead><tr><th>Mã công trình</th><th>TK Có</th><th></th></tr></thead>
+          <thead><tr><th>Mã công trình</th><th>TK Có</th></tr></thead>
           <tbody>
-            <% allCodes.forEach(function(code) { %>
+            <% allCodes.forEach(function(code) { var _tk = gianMapping[code] || '131'; %>
             <tr>
               <td><%= code.endsWith('__FF') ? code.replace('__FF', '') + ' (gian FF - chia sẻ)' : code %></td>
-              <td>
-                <select name="tkco_<%= code %>">
-                  <option value="131" <%= (gianMapping[code] || '131') === '131' ? 'selected' : '' %>>131</option>
-                  <option value="1388" <%= gianMapping[code] === '1388' ? 'selected' : '' %>>1388 (chia sẻ)</option>
-                  <option value="SKIP" <%= gianMapping[code] === 'SKIP' ? 'selected' : '' %>>Chưa xuất MISA (KH mới)</option>
-                </select>
-              </td>
-              <td></td>
+              <td><%= _tk === '1388' ? '1388 (chia sẻ)' : _tk === 'SKIP' ? 'Chưa xuất MISA (KH mới)' : '131' %></td>
             </tr>
             <% }) %>
           </tbody>
         </table>
-        <button type="submit" class="btn btn-secondary">Lưu bảng TK Có</button>
-        <span id="tkCoSaveFlash" style="font-size:13px; color:#1a7f37; display:none; margin-left:8px;">✓ Đã lưu</span>
-      </form>
+        <button type="button" class="btn btn-secondary" onclick="mDsToggle('tkCo',true)" style="margin-top:8px;">✏️ Chỉnh sửa</button>
+      </div>
+      <!-- EDIT MODE -->
+      <div id="tkCoEditDiv" style="display:none;">
+        <p class="muted">
+          Chọn "Chưa xuất MISA (KH mới)" cho các gian là khách hàng mới chưa lên MISA — dòng đối soát vẫn hiện
+          trên trang này để theo dõi, nhưng sẽ KHÔNG được đưa vào file xuất Excel ở mục 4.
+        </p>
+        <form method="POST" action="/doi-soat/momo/mapping" id="tkCoForm">
+          <table class="table">
+            <thead><tr><th>Mã công trình</th><th>TK Có</th></tr></thead>
+            <tbody>
+              <% allCodes.forEach(function(code) { %>
+              <tr>
+                <td><%= code.endsWith('__FF') ? code.replace('__FF', '') + ' (gian FF - chia sẻ)' : code %></td>
+                <td>
+                  <select name="tkco_<%= code %>">
+                    <option value="131" <%= (gianMapping[code] || '131') === '131' ? 'selected' : '' %>>131</option>
+                    <option value="1388" <%= gianMapping[code] === '1388' ? 'selected' : '' %>>1388 (chia sẻ)</option>
+                    <option value="SKIP" <%= gianMapping[code] === 'SKIP' ? 'selected' : '' %>>Chưa xuất MISA (KH mới)</option>
+                  </select>
+                </td>
+              </tr>
+              <% }) %>
+            </tbody>
+          </table>
+          <button type="submit" class="btn btn-secondary">💾 Lưu bảng TK Có</button>
+          <button type="button" class="btn btn-secondary" onclick="mDsToggle('tkCo',false)" style="margin-left:8px;">Hủy</button>
+          <span id="tkCoSaveFlash" style="font-size:13px; color:#1a7f37; display:none; margin-left:8px;">✓ Đã lưu</span>
+        </form>
+      </div>
     </section>
     <% } %>
 
     <% if ((allCodes.length > 0) || (gianHidden && gianHidden.length > 0)) { %>
     <section class="panel">
       <h2>3c. Ẩn gian không thuộc công ty này khỏi trang đối soát</h2>
-      <p class="muted">
-        Dùng khi doanh thu 1 gian bị gộp nhầm vào file tải lên của công ty đang xem, nhưng gian đó thực ra
-        thuộc công ty kia (sẽ xuất hóa đơn ở bên đó). Ẩn ở đây CHỈ ẩn khỏi trang này, không xóa dữ liệu, không
-        ảnh hưởng công ty kia nếu họ dùng chung mã.
-      </p>
-      <% if (allCodes.length > 0) { %>
-      <form method="POST" action="/doi-soat/momo/gian-hidden" class="form-inline">
-        <select name="code" required>
-          <option value="">-- Chọn mã công trình cần ẩn --</option>
-          <% allCodes.forEach(function(code) { %>
-          <option value="<%= code %>"><%= code.endsWith('__FF') ? code.replace('__FF', '') + ' (gian FF - chia sẻ)' : code %></option>
-          <% }) %>
-        </select>
-        <button type="submit" class="btn btn-secondary">Ẩn gian này</button>
-      </form>
-      <% } %>
-      <% if (gianHidden && gianHidden.length > 0) { %>
-      <table class="table" style="margin-top:12px;">
-        <thead><tr><th>Đã ẩn khỏi trang này</th><th></th></tr></thead>
-        <tbody>
-          <% gianHidden.forEach(function(code) { %>
-          <tr>
-            <td><%= code %></td>
-            <td>
-              <form method="POST" action="/doi-soat/momo/gian-hidden/delete" onsubmit="return confirm('Hiện lại gian này trên trang?');">
-                <input type="hidden" name="code" value="<%= code %>" />
-                <button type="submit" class="link-btn link-danger">Hiện lại</button>
-              </form>
-            </td>
-          </tr>
-          <% }) %>
-        </tbody>
-      </table>
-      <% } %>
+      <!-- VIEW MODE -->
+      <div id="gianHiddenViewDiv">
+        <% if (gianHidden && gianHidden.length > 0) { %>
+        <table class="table">
+          <thead><tr><th>Đã ẩn khỏi trang này</th></tr></thead>
+          <tbody>
+            <% gianHidden.forEach(function(code) { %><tr><td><%= code %></td></tr><% }) %>
+          </tbody>
+        </table>
+        <% } else { %>
+        <p class="muted">Chưa ẩn gian nào.</p>
+        <% } %>
+        <button type="button" class="btn btn-secondary" onclick="mDsToggle('gianHidden',true)" style="margin-top:8px;">✏️ Chỉnh sửa</button>
+      </div>
+      <!-- EDIT MODE -->
+      <div id="gianHiddenEditDiv" style="display:none;">
+        <p class="muted">
+          Dùng khi doanh thu 1 gian bị gộp nhầm vào file tải lên của công ty đang xem, nhưng gian đó thực ra
+          thuộc công ty kia. Ẩn ở đây CHỈ ẩn khỏi trang này, không xóa dữ liệu.
+        </p>
+        <% if (allCodes.length > 0) { %>
+        <form method="POST" action="/doi-soat/momo/gian-hidden" class="form-inline">
+          <select name="code" required>
+            <option value="">-- Chọn mã công trình cần ẩn --</option>
+            <% allCodes.forEach(function(code) { %>
+            <option value="<%= code %>"><%= code.endsWith('__FF') ? code.replace('__FF', '') + ' (gian FF - chia sẻ)' : code %></option>
+            <% }) %>
+          </select>
+          <button type="submit" class="btn btn-secondary">Ẩn gian này</button>
+        </form>
+        <% } %>
+        <% if (gianHidden && gianHidden.length > 0) { %>
+        <table class="table" style="margin-top:12px;">
+          <thead><tr><th>Đã ẩn khỏi trang này</th><th></th></tr></thead>
+          <tbody>
+            <% gianHidden.forEach(function(code) { %>
+            <tr>
+              <td><%= code %></td>
+              <td>
+                <form method="POST" action="/doi-soat/momo/gian-hidden/delete" onsubmit="return confirm('Hiện lại gian này trên trang?');">
+                  <input type="hidden" name="code" value="<%= code %>" />
+                  <button type="submit" class="link-btn link-danger">Hiện lại</button>
+                </form>
+              </td>
+            </tr>
+            <% }) %>
+          </tbody>
+        </table>
+        <% } %>
+        <button type="button" class="btn btn-secondary" onclick="mDsToggle('gianHidden',false)" style="margin-top:8px;">Hủy</button>
+      </div>
     </section>
     <% } %>
 
     <% if ((unmatchedInvoiceCodes && unmatchedInvoiceCodes.length > 0) || (invoiceDiemAlias && Object.keys(invoiceDiemAlias).length > 0)) { %>
     <section class="panel">
       <h2>3b. Ánh xạ tên/mã điểm khác trên hóa đơn về đúng Mã công trình</h2>
-      <p class="muted">
-        Một số hóa đơn ghi "Mã điểm" là tên riêng của 1 góc/thương hiệu con (vd "SNOWFUN TÂN PHÚ") thay vì đúng
-        Mã công trình bên doanh thu (vd "AM TP KVCM") — nên web không tự dò khớp được, khiến dòng "Lệch" hiện ra
-        dù tiền hóa đơn thực ra vẫn có. Ánh xạ tên này về đúng Mã công trình bên dưới, áp dụng ngay không cần tải lại hóa đơn.
-      </p>
-      <% if (unmatchedInvoiceCodes && unmatchedInvoiceCodes.length > 0) { %>
-      <datalist id="dl-ma-cong-trinh">
-        <% allCodes.forEach(function(c) { %>
-        <option value="<%= c %>"><%= c.endsWith('__FF') ? c.replace('__FF', '') + ' (gian FF - chia sẻ)' : c %></option>
-        <% }) %>
-      </datalist>
-      <table class="table">
-        <thead><tr><th>Tên/Mã điểm trên hóa đơn (chưa khớp)</th><th>Ánh xạ về Mã công trình</th><th></th></tr></thead>
-        <tbody>
-          <% unmatchedInvoiceCodes.forEach(function(code) { %>
-          <tr>
-            <td><%= code %></td>
-            <td colspan="2">
-              <form method="POST" action="/doi-soat/momo/diem-alias" class="form-inline">
-                <input type="hidden" name="sourceCode" value="<%= code %>" />
-                <input type="text" name="targetCode" list="dl-ma-cong-trinh" autocomplete="off"
-                  placeholder="Gõ để lọc, chọn mã có sẵn hoặc nhập mã công trình mới..." style="min-width:280px;" required />
-                <button type="submit" class="btn btn-secondary">Lưu ánh xạ</button>
-              </form>
-            </td>
-          </tr>
+      <!-- VIEW MODE -->
+      <div id="diemAliasViewDiv">
+        <% if (invoiceDiemAlias && Object.keys(invoiceDiemAlias).length > 0) { %>
+        <table class="table">
+          <thead><tr><th>Tên/Mã điểm trên HĐ</th><th>Ánh xạ về</th></tr></thead>
+          <tbody>
+            <% Object.keys(invoiceDiemAlias).forEach(function(src) { %>
+            <tr><td><%= src %></td><td><%= invoiceDiemAlias[src] %></td></tr>
+            <% }) %>
+          </tbody>
+        </table>
+        <% } else { %>
+        <p class="muted">Chưa có ánh xạ nào.</p>
+        <% } %>
+        <% if (unmatchedInvoiceCodes && unmatchedInvoiceCodes.length > 0) { %>
+        <p class="muted" style="margin-top:6px;">Có <strong><%= unmatchedInvoiceCodes.length %></strong> mã điểm chưa khớp cần ánh xạ.</p>
+        <% } %>
+        <button type="button" class="btn btn-secondary" onclick="mDsToggle('diemAlias',true)" style="margin-top:8px;">✏️ Chỉnh sửa</button>
+      </div>
+      <!-- EDIT MODE -->
+      <div id="diemAliasEditDiv" style="display:none;">
+        <p class="muted">
+          Ánh xạ tên điểm trên hóa đơn (vd "SNOWFUN TÂN PHÚ") về đúng Mã công trình (vd "AM TP KVCM") để web tự khớp được.
+        </p>
+        <% if (unmatchedInvoiceCodes && unmatchedInvoiceCodes.length > 0) { %>
+        <datalist id="dl-ma-cong-trinh">
+          <% allCodes.forEach(function(c) { %>
+          <option value="<%= c %>"><%= c.endsWith('__FF') ? c.replace('__FF', '') + ' (gian FF - chia sẻ)' : c %></option>
           <% }) %>
-        </tbody>
-      </table>
-      <p class="muted" style="margin-top:-4px;">
-        Gõ vài chữ để lọc danh sách gian có sẵn (cả KH Cũ và KH Mới). Nếu gian này thật sự chưa có trong hệ thống,
-        gõ hẳn tên Mã công trình mới rồi lưu — hệ thống sẽ tự tạo mã đó (mặc định TK Có 131).
-      </p>
-      <% } %>
-      <% if (invoiceDiemAlias && Object.keys(invoiceDiemAlias).length > 0) { %>
-      <table class="table" style="margin-top:12px;">
-        <thead><tr><th>Đã ánh xạ</th><th></th><th></th></tr></thead>
-        <tbody>
-          <% Object.keys(invoiceDiemAlias).forEach(function(src) { %>
-          <tr>
-            <td><%= src %> → <%= invoiceDiemAlias[src] %></td>
-            <td>
-              <form method="POST" action="/doi-soat/momo/diem-alias/delete" onsubmit="return confirm('Xoá ánh xạ này?');">
-                <input type="hidden" name="sourceCode" value="<%= src %>" />
-                <button type="submit" class="link-btn link-danger">Xoá</button>
-              </form>
-            </td>
-          </tr>
-          <% }) %>
-        </tbody>
-      </table>
-      <% } %>
+        </datalist>
+        <table class="table">
+          <thead><tr><th>Tên/Mã điểm trên hóa đơn (chưa khớp)</th><th>Ánh xạ về Mã công trình</th></tr></thead>
+          <tbody>
+            <% unmatchedInvoiceCodes.forEach(function(code) { %>
+            <tr>
+              <td><%= code %></td>
+              <td>
+                <form method="POST" action="/doi-soat/momo/diem-alias" class="form-inline">
+                  <input type="hidden" name="sourceCode" value="<%= code %>" />
+                  <input type="text" name="targetCode" list="dl-ma-cong-trinh" autocomplete="off"
+                    placeholder="Gõ để lọc hoặc nhập mã công trình..." style="min-width:260px;" required />
+                  <button type="submit" class="btn btn-secondary">💾 Lưu</button>
+                </form>
+              </td>
+            </tr>
+            <% }) %>
+          </tbody>
+        </table>
+        <% } %>
+        <% if (invoiceDiemAlias && Object.keys(invoiceDiemAlias).length > 0) { %>
+        <table class="table" style="margin-top:12px;">
+          <thead><tr><th>Đã ánh xạ</th><th></th></tr></thead>
+          <tbody>
+            <% Object.keys(invoiceDiemAlias).forEach(function(src) { %>
+            <tr>
+              <td><%= src %> → <%= invoiceDiemAlias[src] %></td>
+              <td>
+                <form method="POST" action="/doi-soat/momo/diem-alias/delete" onsubmit="return confirm('Xoá ánh xạ này?');">
+                  <input type="hidden" name="sourceCode" value="<%= src %>" />
+                  <button type="submit" class="link-btn link-danger">Xoá</button>
+                </form>
+              </td>
+            </tr>
+            <% }) %>
+          </tbody>
+        </table>
+        <% } %>
+        <button type="button" class="btn btn-secondary" onclick="mDsToggle('diemAlias',false)" style="margin-top:8px;">Hủy</button>
+      </div>
     </section>
     <% } %>
 
@@ -501,6 +551,14 @@ File xuất chỉ gồm các khoản có ngày về ngân hàng nằm trong kho�
         }
       } catch (e) {}
     })();
+
+    // View/Edit toggle for sections 3, 3b, 3c
+    window.mDsToggle = function(id, editMode) {
+      var viewDiv = document.getElementById(id + 'ViewDiv');
+      var editDiv = document.getElementById(id + 'EditDiv');
+      if (viewDiv) viewDiv.style.display = editMode ? 'none' : '';
+      if (editDiv) editDiv.style.display = editMode ? '' : 'none';
+    };
   </script>
 </body>
 </html>

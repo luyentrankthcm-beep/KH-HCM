@@ -63,7 +63,12 @@
     // dinh AN lan dau roi nho trang thai lan sau nhu Nhan/Luyen tung yeu cau
     // truoc do). Nut Ẩn/Hiện van hoat dong binh thuong de xem tam trong luc
     // dang o trang, chi la lan TAI TRANG SAU khong bi ket o trang thai an nua.
-    var ALWAYS_EXPANDED_TITLES = ["Danh sách giao dịch"];
+    var ALWAYS_EXPANDED_TITLES = [
+      "Danh sách giao dịch",
+      "3. TK Có theo từng mã công trình (131 = thông thường, 1388 = doanh thu chia sẻ, \"Chưa xuất MISA\" = khách mới)",
+      "3c. Ẩn gian không thuộc công ty này khỏi trang đối soát",
+      "3b. Ánh xạ tên/mã điểm khác trên hóa đơn về đúng Mã công trình"
+    ];
     var panels = document.querySelectorAll("section.panel");
     panels.forEach(function (panel, idx) {
       var h2 = panel.querySelector("h2");
