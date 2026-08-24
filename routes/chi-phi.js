@@ -295,7 +295,6 @@ router.get("/chi-phi/:mien(mien-nam|mien-bac)/danh-sach", (req, res) => {
   (store.hoa_don_dau_vao || []).forEach((h) => { if (h.soHoaDon) hdByHD[h.soHoaDon.trim()] = h; });
   let _phanLoaiChanged = false;
   rows.forEach((r) => {
-    if (r.phanLoai) return; // đã set tay → giữ nguyên
     const soHD = (r.soHoaDon || "").trim();
     let autoVal;
     if (soHD && hdByHD[soHD] && hdByHD[soHD].phanLoai) {
@@ -306,9 +305,12 @@ router.get("/chi-phi/:mien(mien-nam|mien-bac)/danh-sach", (req, res) => {
       autoVal = "DV";
     }
     r._phanLoaiAuto = autoVal;
-    // Lưu vào store để lần sau import lại vẫn nhớ
     const storeRec = store.chi_phi.find((x) => x.id === r.id);
-    if (storeRec && !storeRec.phanLoai) {
+    if (!storeRec) return;
+    // Lưu nếu chưa có, HOẶC nếu đang là DV nhưng tín hiệu gian '-' chỉ rõ HH
+    const shouldUpdate = !storeRec.phanLoai ||
+      (storeRec.phanLoai === "DV" && autoVal === "HH" && (r.gian||"").includes("-"));
+    if (shouldUpdate) {
       storeRec.phanLoai = autoVal;
       r.phanLoai = autoVal;
       _phanLoaiChanged = true;
