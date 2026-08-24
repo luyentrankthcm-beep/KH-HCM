@@ -568,6 +568,71 @@ router.post("/chi-phi/:id/link-hoa-don", requireDataEntry, (req, res) => {
   res.redirect("/chi-phi/" + mienSeg(r.mien) + "?" + qs.join("&"));
 });
 
+// De xuat so hoa don tu hoa_don_dau_vao cho cac dong chi_phi chua co soHoaDon
+const NCC_STOP = new Set(["CÔNG","TY","TNHH","CHI","NHÁNH","CỔ","PHẦN","MTV","HỮU","HẠN","TRÁCH","NHIỆM","VIỆT","NAM","ĐẦU","TƯ","THƯƠNG","MẠI","SẢN","XUẤT","VÀ","CÁC","TAI","TẠI","NỘI","HCM","HỒ","CHÍ","MINH"]);
+function nccWords(s){ return (s||'').toUpperCase().replace(/[^A-ZÀÁÂÃÈÉÊÌÍÒÓÔÕÙÚÝĂĐƠƯ0-9 ]/g,' ').split(/\s+/).filter(w=>w.length>2&&!NCC_STOP.has(w)); }
+function matchNccScore(a,b){ const bW=new Set(nccWords(b)); return nccWords(a).filter(w=>bW.has(w)).length; }
+
+router.get("/chi-phi/:mien(mien-nam|mien-bac)/de-xuat-hoa-don", requireDataEntry, (req, res) => {
+  const store = load();
+  ensureShape(store);
+  const activeCompany = getCompany(req);
+  const mien = mienFromSeg(req.params.mien);
+  const thangFilter = req.query.thang || "";
+
+  let chiPhiRows = (store.chi_phi || [])
+    .map(ensureChiPhiDefaults)
+    .filter((r) => r.congTy === activeCompany && r.mien === mien && !(r.soHoaDon || "").trim());
+  if (thangFilter) chiPhiRows = chiPhiRows.filter((r) => (r.ngay || "").slice(0, 7) === thangFilter);
+
+  const hdPool = (store.hoa_don_dau_vao || []).filter((h) => h.congTy === activeCompany && (h.soHoaDon || "").trim() && h.soTien);
+
+  const results = [];
+  chiPhiRows.forEach((r) => {
+    if (!r.soTien || !r.ncc) return;
+    // Match by amount (±1000) then NCC score
+    const byAmt = hdPool.filter((h) => Math.abs(h.soTien - r.soTien) <= 1000);
+    if (byAmt.length === 0) return;
+    const scored = byAmt
+      .map((h) => ({ h, score: matchNccScore(r.ncc, h.tenNCC) }))
+      .filter((x) => x.score >= 2)
+      .sort((a, b) => b.score - a.score);
+    if (scored.length === 0) return;
+    const best = scored[0];
+    results.push({
+      chiPhiId: r.id,
+      ngay: r.ngay,
+      gian: r.gian,
+      ncc: r.ncc,
+      soTien: r.soTien,
+      soHoaDonGoiY: best.h.soHoaDon,
+      kyHieu: best.h.kyHieuHD || "",
+      tenNccHD: best.h.tenNCC,
+      ngayHD: best.h.ngayHD,
+      dienGiaiHD: best.h.dienGiai || "",
+      score: best.score,
+      hdId: best.h.id,
+    });
+  });
+
+  return res.json({ success: true, matches: results, total: chiPhiRows.length });
+});
+
+// Bulk cap nhat soHoaDon tu de xuat
+router.post("/chi-phi/cap-nhat-hoa-don-hang-loat", requireDataEntry, (req, res) => {
+  const store = load();
+  ensureShape(store);
+  const items = req.body.items; // [{chiPhiId, soHoaDon}]
+  if (!Array.isArray(items) || items.length === 0) return res.status(400).json({ error: "Không có dữ liệu." });
+  let updated = 0;
+  items.forEach(({ chiPhiId, soHoaDon }) => {
+    const r = store.chi_phi.find((x) => String(x.id) === String(chiPhiId));
+    if (r && soHoaDon) { r.soHoaDon = String(soHoaDon).trim(); updated++; }
+  });
+  save(store);
+  return res.json({ success: true, updated });
+});
+
 // Inline update từ modal danh-sach-chi-phi: cập nhật các trường có thể sửa tay
 router.post("/chi-phi/:id/update", requireDataEntry, (req, res) => {
   const store = load();

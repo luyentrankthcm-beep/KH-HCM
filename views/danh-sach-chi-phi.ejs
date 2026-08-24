@@ -61,6 +61,7 @@
         <%= rows.length %> dòng &nbsp;|&nbsp; Tổng: <strong><%= tongTien.toLocaleString('vi-VN') %> đ</strong>
       </span>
       <button type="button" class="btn btn-secondary" onclick="openMapGian()" style="padding:5px 12px;white-space:nowrap;">🗂 Map Gian</button>
+      <button type="button" class="btn btn-secondary" onclick="openDeXuatHD()" style="padding:5px 12px;white-space:nowrap;">🔍 Gợi ý số HĐ</button>
     </form>
 
     <section class="panel" style="padding:0;">
@@ -318,6 +319,110 @@
 
   document.addEventListener('keydown', function(e){ if(e.key==='Escape') closeDschModal(); });
   </script>
+  <!-- Modal Gợi ý số HĐ -->
+  <div id="hdGợiYOverlay" onclick="if(event.target===this)closeDeXuatHD()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:9100;align-items:center;justify-content:center;">
+    <div style="background:#fff;border-radius:10px;padding:22px 24px;width:900px;max-width:97vw;max-height:90vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,0.22);">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+        <h3 style="margin:0;font-size:15px;">🔍 Gợi ý số hóa đơn từ HĐ Đầu Vào</h3>
+        <button type="button" class="link-btn" onclick="closeDeXuatHD()" style="font-size:20px;line-height:1;">×</button>
+      </div>
+      <div id="hdGợiYContent" style="font-size:13px;">
+        <p class="muted">Đang tìm kiếm...</p>
+      </div>
+    </div>
+  </div>
+
+  <script>
+  var _hdGoiYMien = '<%= mien %>';
+  var _hdGoiYThang = '<%= thangFilter %>';
+
+  function openDeXuatHD() {
+    document.getElementById('hdGợiYOverlay').style.display = 'flex';
+    document.getElementById('hdGợiYContent').innerHTML = '<p class="muted">Đang tìm kiếm...</p>';
+    var url = '/chi-phi/mien-' + _hdGoiYMien + '/de-xuat-hoa-don';
+    if (_hdGoiYThang) url += '?thang=' + encodeURIComponent(_hdGoiYThang);
+    fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+      .then(function(r){ return r.json(); })
+      .then(function(data) {
+        if (!data.success) { document.getElementById('hdGợiYContent').innerHTML = '<p class="muted">Lỗi tải dữ liệu.</p>'; return; }
+        renderDeXuat(data.matches, data.total);
+      })
+      .catch(function(){ document.getElementById('hdGợiYContent').innerHTML = '<p class="muted">Lỗi kết nối.</p>'; });
+  }
+
+  function closeDeXuatHD() {
+    document.getElementById('hdGợiYOverlay').style.display = 'none';
+  }
+
+  function renderDeXuat(matches, total) {
+    if (matches.length === 0) {
+      document.getElementById('hdGợiYContent').innerHTML = '<p class="muted">Không tìm thấy gợi ý nào ('+total+' dòng chưa có số HĐ, nhưng không khớp được với HĐ đầu vào).</p>';
+      return;
+    }
+    var html = '<p class="muted" style="margin-bottom:10px;">Tìm được <strong>'+matches.length+'</strong> gợi ý (trong '+total+' dòng chưa có số HĐ). Xem kỹ rồi tích chọn dòng muốn áp dụng.</p>';
+    html += '<div style="margin-bottom:10px;display:flex;gap:8px;align-items:center;">'
+      + '<label style="font-size:13px;cursor:pointer;"><input type="checkbox" id="hdSelectAll" onchange="hdToggleAll(this)"> Chọn tất cả</label>'
+      + '<button type="button" class="btn btn-primary" onclick="apDungDeXuat()" id="hdApDungBtn" style="padding:4px 14px;">✓ Áp dụng đã chọn</button>'
+      + '<span id="hdApDungStatus" style="font-size:12px;color:#388e3c;"></span>'
+      + '</div>';
+    html += '<div style="overflow-x:auto;"><table class="table" style="font-size:12px;min-width:800px;">'
+      + '<thead><tr><th style="width:32px;"></th><th>Ngày</th><th>Gian</th><th>NCC (chi phí)</th><th style="text-align:right;">Số tiền</th>'
+      + '<th>Số HĐ gợi ý</th><th>NCC trên HĐ</th><th>Ngày HĐ</th></tr></thead><tbody>';
+    matches.forEach(function(m) {
+      html += '<tr>'
+        + '<td><input type="checkbox" class="hd-check" data-id="'+m.chiPhiId+'" data-so="'+esc2(m.soHoaDonGoiY)+'" checked /></td>'
+        + '<td style="white-space:nowrap;">'+fmtDate(m.ngay)+'</td>'
+        + '<td><div style="max-width:100px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;" title="'+esc2(m.gian)+'">'+esc2(m.gian||'—')+'</div></td>'
+        + '<td><div style="max-width:140px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;" title="'+esc2(m.ncc)+'">'+esc2(m.ncc||'—')+'</div></td>'
+        + '<td style="text-align:right;white-space:nowrap;font-weight:600;">'+Number(m.soTien).toLocaleString('vi-VN')+' đ</td>'
+        + '<td style="font-weight:600;color:#1565c0;">'+esc2(m.soHoaDonGoiY)+(m.kyHieu?' ('+esc2(m.kyHieu)+')':'')+'</td>'
+        + '<td><div style="max-width:160px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;" title="'+esc2(m.tenNccHD)+'">'+esc2(m.tenNccHD||'—')+'</div></td>'
+        + '<td style="white-space:nowrap;color:#666;">'+fmtDate(m.ngayHD)+'</td>'
+        + '</tr>';
+    });
+    html += '</tbody></table></div>';
+    document.getElementById('hdGợiYContent').innerHTML = html;
+  }
+
+  function hdToggleAll(cb) {
+    document.querySelectorAll('.hd-check').forEach(function(c){ c.checked = cb.checked; });
+  }
+
+  function apDungDeXuat() {
+    var checks = document.querySelectorAll('.hd-check:checked');
+    if (checks.length === 0) { alert('Chưa chọn dòng nào.'); return; }
+    var btn = document.getElementById('hdApDungBtn');
+    var status = document.getElementById('hdApDungStatus');
+    btn.disabled = true;
+    status.textContent = 'Đang lưu...';
+    var items = [];
+    checks.forEach(function(c){ items.push({ chiPhiId: c.dataset.id, soHoaDon: c.dataset.so }); });
+    fetch('/chi-phi/cap-nhat-hoa-don-hang-loat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+      body: JSON.stringify({ items: items })
+    })
+    .then(function(r){ return r.json(); })
+    .then(function(data) {
+      btn.disabled = false;
+      if (data.success) {
+        status.textContent = '✓ Đã lưu ' + data.updated + ' dòng.';
+        // Cập nhật lại _dschMap và bảng
+        items.forEach(function(it) {
+          if (_dschMap[it.chiPhiId]) _dschMap[it.chiPhiId].soHoaDon = it.soHoaDon;
+          var tr = document.getElementById('dsch-tr-' + it.chiPhiId);
+          if (tr) { var cells = tr.querySelectorAll('td'); if (cells[4]) cells[4].textContent = it.soHoaDon; }
+        });
+        // Xóa các dòng đã lưu khỏi danh sách
+        checks.forEach(function(c){ c.closest('tr').style.opacity = '0.4'; });
+      } else {
+        status.textContent = 'Lỗi: ' + (data.error || 'Thử lại.');
+      }
+    })
+    .catch(function(){ btn.disabled = false; status.textContent = 'Lỗi kết nối.'; });
+  }
+  </script>
+
   <!-- Panel Map Gian -->
   <div id="mapGianOverlay" onclick="if(event.target===this)closeMapGian()">
     <div id="mapGianPanel">
