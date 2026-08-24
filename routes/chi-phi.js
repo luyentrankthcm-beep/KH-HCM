@@ -248,13 +248,15 @@ router.get("/chi-phi/:mien(mien-nam|mien-bac)/danh-sach", (req, res) => {
   if (thangFilter) rows = rows.filter((r) => (r.ngay || "").slice(0, 7) === thangFilter);
   rows.sort((a, b) => (a.ngay < b.ngay ? 1 : -1));
 
-  // Dedup: bỏ qua các dòng trùng ngày + gian + soTien
+  // Dedup: bỏ qua các dòng trùng trong cùng tháng + gian + soTien
+  // (dùng YYYY-MM thay vì ngày đầy đủ để bắt trùng khác ngày trong tháng)
   // Merge tất cả fields từ các bản trùng vào 1 dòng (không mất dữ liệu)
   (function dedup() {
     const seen = new Map();
     const MERGE_FIELDS = ["soHoaDon","soUNC","soChungTuLienQuan","ghiChu","linkHoaDon","ncc","loaiChiPhi","trangThaiHoaDon","phanLoai"];
     rows.forEach((r) => {
-      const key = (r.ngay||"") + "|" + (r.gian||"") + "|" + (r.soTien||0);
+      const thang = (r.ngay||"").slice(0,7); // YYYY-MM
+      const key = thang + "|" + (r.gian||"") + "|" + (r.soTien||0);
       if (!seen.has(key)) {
         seen.set(key, Object.assign({}, r));
       } else {
@@ -263,6 +265,8 @@ router.get("/chi-phi/:mien(mien-nam|mien-bac)/danh-sach", (req, res) => {
         MERGE_FIELDS.forEach((f) => {
           if (!(existing[f]||"").trim() && (r[f]||"").trim()) existing[f] = r[f];
         });
+        // Giữ ngày sớm hơn
+        if ((r.ngay||"") < (existing.ngay||"")) existing.ngay = r.ngay;
       }
     });
     rows = [...seen.values()];
