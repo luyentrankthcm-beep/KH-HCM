@@ -76,6 +76,7 @@
             <col style="width:82px;">
             <col style="width:120px;">
             <col style="width:46px;">
+            <col style="width:44px;"><!-- TK KT 331/1388 -->
             <col style="width:160px;">
             <col style="width:68px;">
             <col style="width:40px;"><!-- loai HH/DV -->
@@ -87,7 +88,7 @@
           </colgroup>
           <thead>
             <tr>
-              <th>Ngày</th><th>Gian</th><th>TK</th><th>NCC</th>
+              <th>Ngày</th><th>Gian</th><th>TK</th><th title="TK kế toán: 331 = phải trả NCC, 1388 = doanh thu chia sẻ. Bấm để đổi.">TK KT</th><th>NCC</th>
               <th>Số HĐ</th><th title="Hàng hóa / Dịch vụ">Loại</th><th>Số UNC</th><th>CT LQ</th>
               <th>Diễn giải</th>
               <th style="text-align:right;">Số tiền</th>
@@ -104,6 +105,11 @@
               </td>
               <td class="dsch-cell"><div class="dsch-cell-1" title="<%= r.gian || '' %>"><%= r.gian || '—' %></div></td>
               <td style="color:var(--muted);white-space:nowrap;"><%= r.taiKhoan || '—' %></td>
+              <td style="text-align:center;" onclick="event.stopPropagation(); toggleTkKT(<%= r.id %>, this)" title="Bấm để đổi 331 ↔ 1388">
+                <span id="tkkt-<%= r.id %>" style="font-size:10px;font-weight:700;padding:2px 5px;border-radius:99px;cursor:pointer;<%= r.dtChiaSe ? 'background:#fff3e0;color:#e65100;' : 'background:#f3f3f3;color:#555;' %>">
+                  <%= r.dtChiaSe ? '1388' : '331' %>
+                </span>
+              </td>
               <td class="dsch-cell"><div class="dsch-cell-2" title="<%= r.ncc || '' %>"><%= r.ncc || '—' %></div></td>
               <td style="white-space:nowrap;"><%= r.soHoaDon || '—' %></td>
               <td style="text-align:center;">
@@ -130,7 +136,7 @@
           </tbody>
           <tfoot>
             <tr style="background:var(--bg-hover,#f5f5f5);font-weight:700;">
-              <td colspan="9" style="text-align:right;padding-right:10px;">Tổng cộng:</td>
+              <td colspan="10" style="text-align:right;padding-right:10px;">Tổng cộng:</td>
               <td style="text-align:right;white-space:nowrap;"><%= tongTien.toLocaleString('vi-VN') %> đ</td>
               <td></td>
             </tr>
@@ -208,6 +214,7 @@
         var note = r.phanLoai ? ' <span style="font-size:10px;color:#999;">(đã sửa tay)</span>' : ' <span style="font-size:10px;color:#bbb;">(tự động)</span>';
         return '<span style="font-weight:700;color:'+color+';background:'+bg+';padding:2px 8px;border-radius:99px;">'+label+'</span>'+note;
       })()],
+      ['TK kế toán', r.dtChiaSe ? '<span style="font-weight:700;color:#e65100;background:#fff3e0;padding:2px 8px;border-radius:99px;">1388 — Doanh thu chia sẻ</span>' : '<span style="font-weight:700;color:#555;background:#f3f3f3;padding:2px 8px;border-radius:99px;">331 — Phải trả NCC</span>'],
       ['Số UNC', fmt(r.soUNC)],
       ['Chứng từ liên quan', fmt(r.soChungTuLienQuan)],
       ['Diễn giải', fmt(r.dienGiai)],
@@ -265,6 +272,21 @@
     document.getElementById('dschSaveStatus').textContent = '';
   }
 
+  function toggleTkKT(id, tdEl) {
+    var span = document.getElementById('tkkt-' + id);
+    if (!span) return;
+    var isDT = span.textContent.trim() === '1388';
+    var newDT = !isDT;
+    span.textContent = newDT ? '1388' : '331';
+    span.style.background = newDT ? '#fff3e0' : '#f3f3f3';
+    span.style.color = newDT ? '#e65100' : '#555';
+    fetch('/chi-phi/' + id + '/toggle-dt-chia-se', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ dtChiaSe: newDT }) })
+      .then(function(res){ return res.json(); })
+      .then(function(data){ if (data.error) { alert(data.error); span.textContent = isDT ? '1388' : '331'; } })
+      .catch(function(){ alert('Lỗi kết nối'); });
+    if (_dschMap[id]) _dschMap[id].dtChiaSe = newDT;
+  }
+
   function dschExitEdit() {
     document.getElementById('dschEditPane').style.display = 'none';
     document.getElementById('dschViewPane').style.display = '';
@@ -295,18 +317,18 @@
         if (tr && data.record) {
           var r = data.record;
           var cells = tr.querySelectorAll('td');
-          // cells: 0=ngày,1=gian,2=tk,3=ncc,4=soHD,5=Loại(phanLoai),6=soUNC,7=CTLQ,8=dienGiai,9=soTien,10=chi
-          if (cells[3]) cells[3].querySelector('div').textContent = r.ncc || '—';
-          if (cells[4]) cells[4].textContent = r.soHoaDon || '—';
-          if (cells[5]) {
+          // cells: 0=ngày,1=gian,2=tk,3=tkKT,4=ncc,5=soHD,6=Loại(phanLoai),7=soUNC,8=CTLQ,9=dienGiai,10=soTien,11=chi
+          if (cells[4]) cells[4].querySelector('div').textContent = r.ncc || '—';
+          if (cells[5]) cells[5].textContent = r.soHoaDon || '—';
+          if (cells[6]) {
             var pl = r.phanLoai || r._phanLoaiAuto || 'DV';
             var plColor = pl==='HH' ? '#2e7d32' : '#1565c0';
             var plBg = pl==='HH' ? '#e8f5e9' : '#e3f2fd';
             var plTitle = (pl==='HH' ? 'Hàng hóa' : 'Dịch vụ') + (r.phanLoai ? ' (đã sửa tay)' : ' (tự động)');
-            cells[5].innerHTML = '<span style="font-size:10px;font-weight:700;padding:2px 5px;border-radius:99px;background:'+plBg+';color:'+plColor+'" title="'+plTitle+'">'+pl+'</span>';
+            cells[6].innerHTML = '<span style="font-size:10px;font-weight:700;padding:2px 5px;border-radius:99px;background:'+plBg+';color:'+plColor+'" title="'+plTitle+'">'+pl+'</span>';
           }
-          if (cells[6]) cells[6].textContent = r.soUNC || '—';
-          if (cells[8]) cells[8].querySelector('div').textContent = r.dienGiai || '—';
+          if (cells[7]) cells[7].textContent = r.soUNC || '—';
+          if (cells[9]) cells[9].querySelector('div').textContent = r.dienGiai || '—';
         }
         dschExitEdit();
         renderDschView(_dschMap[id]);

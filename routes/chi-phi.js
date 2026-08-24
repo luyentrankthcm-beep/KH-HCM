@@ -819,6 +819,16 @@ router.post("/chi-phi/:id/update", requireDataEntry, (req, res) => {
   return res.json({ success: true, record: r });
 });
 
+router.post("/chi-phi/:id/toggle-dt-chia-se", requireDataEntry, (req, res) => {
+  const store = load();
+  ensureShape(store);
+  const r = store.chi_phi.find((x) => String(x.id) === req.params.id);
+  if (!r) return res.status(404).json({ error: "Không tìm thấy khoản chi." });
+  r.dtChiaSe = req.body.dtChiaSe === true || req.body.dtChiaSe === "true" || req.body.dtChiaSe === 1;
+  save(store);
+  return res.json({ success: true, dtChiaSe: r.dtChiaSe });
+});
+
 router.post("/chi-phi/:mien(mien-nam|mien-bac)", requireDataEntry, (req, res) => {
   const store = load();
   ensureShape(store);
