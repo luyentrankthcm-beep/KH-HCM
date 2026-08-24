@@ -1112,13 +1112,41 @@ router.get("/phap-danh/hop-dong-ncc", (req, res) => {
   const activeCompany = getCompany(req);
   const todayStr = new Date().toISOString().slice(0, 10);
   let rows = store.phap_danh_hop_dong_ncc.map(ensureNccDefaults);
-  // Hop dong nhap tay cu (khung rong ban dau) co the chua co congTy -- van
-  // hien thi o ca 2 cong ty thay vi an mat, cho den khi Luyen bo sung.
   rows = rows.filter((r) => !r.congTy || r.congTy === activeCompany);
   rows.forEach((r) => {
     r.trangThaiNCC = computeTrangThaiNCC(r, todayStr);
   });
   rows.sort((a, b) => (a.ngayHetHan < b.ngayHetHan ? 1 : a.ngayHetHan > b.ngayHetHan ? -1 : a.tenNCC.localeCompare(b.tenNCC)));
+
+  // Luyen, 2026-08-24: build hoaDonDaThanhToan dong tu chi_phi -- join theo
+  // tenNCC (normalize lowercase trim), lay cac dong daChi=true, tra them
+  // linkHoaDon + mien de modal co the mo file HĐ truc tiep va link chi phi
+  // chi hien 1 ban ghi (soloId).
+  const norm = (v) => (v || "").trim().toLowerCase();
+  // Build lookup: tenNCC -> [chi_phi records]
+  const chiPhiByNcc = {};
+  (store.chi_phi || []).forEach((cp) => {
+    const key = norm(cp.ncc);
+    if (!key) return;
+    if (!chiPhiByNcc[key]) chiPhiByNcc[key] = [];
+    chiPhiByNcc[key].push(cp);
+  });
+  rows.forEach((r) => {
+    const key = norm(r.tenNCC);
+    const matched = chiPhiByNcc[key] || [];
+    r.hoaDonDaThanhToan = matched
+      .filter((cp) => cp.daChi)
+      .sort((a, b) => (a.ngay < b.ngay ? 1 : -1))
+      .map((cp) => ({
+        ngay: cp.ngay || "",
+        soHoaDon: cp.soHoaDon || "",
+        soTien: cp.soTien || 0,
+        chiPhiId: cp.id,
+        linkHoaDon: cp.linkHoaDon || "",
+        mien: cp.mien || "nam",
+      }));
+  });
+
   res.render("phapdanh-hopdong-ncc", {
     userName: req.session.userName,
     rows,

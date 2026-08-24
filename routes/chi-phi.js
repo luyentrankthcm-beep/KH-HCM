@@ -176,12 +176,14 @@ router.get("/chi-phi/:mien(mien-nam|mien-bac)", (req, res) => {
   ensureShape(store);
   const activeCompany = getCompany(req);
   const mien = mienFromSeg(req.params.mien);
-  const hachToanFilter = req.query.hachToan || ""; // "" = tat ca, "1" = da hach toan, "0" = chua hach toan
-  // Luyen, 2026-07-21: "thêm chỗ lọc chưa có số hóa đơn" -- loc theo con thieu
-  // soHoaDon hay khong, giup tim nhanh cac dong con can dien so hoa don (thu
-  // cong hoac tra cuu them) thay vi phai doc het danh sach.
-  const hoaDonFilter = req.query.hoaDon || ""; // "" = tat ca, "1" = da co so HD, "0" = chua co so HD
+  const hachToanFilter = req.query.hachToan || "";
+  const hoaDonFilter = req.query.hoaDon || "";
+  const soloId = req.query.soloId || ""; // Luyen, 2026-08-24: chi hien 1 ban ghi
   let rows = store.chi_phi.map(ensureChiPhiDefaults).filter((r) => r.congTy === activeCompany && r.mien === mien);
+  // Neu co soloId, loc ngay, bo qua cac filter khac
+  if (soloId) {
+    rows = rows.filter((r) => String(r.id) === String(soloId));
+  }
   const totalForCompany = rows.length;
   const chuaHachToanCount = rows.filter((r) => !r.daHachToan).length;
   const chuaSoHoaDonCount = rows.filter((r) => !(r.soHoaDon || "").trim()).length;
@@ -195,11 +197,13 @@ router.get("/chi-phi/:mien(mien-nam|mien-bac)", (req, res) => {
   const defaultMonth = availableMonths[0] || "";
   const thangFilter = req.query.thang !== undefined ? req.query.thang : defaultMonth;
 
-  if (hachToanFilter === "1") rows = rows.filter((r) => r.daHachToan);
-  else if (hachToanFilter === "0") rows = rows.filter((r) => !r.daHachToan);
-  if (thangFilter) rows = rows.filter((r) => (r.ngay || "").slice(0, 7) === thangFilter);
-  if (hoaDonFilter === "1") rows = rows.filter((r) => (r.soHoaDon || "").trim());
-  else if (hoaDonFilter === "0") rows = rows.filter((r) => !(r.soHoaDon || "").trim());
+  if (!soloId) {
+    if (hachToanFilter === "1") rows = rows.filter((r) => r.daHachToan);
+    else if (hachToanFilter === "0") rows = rows.filter((r) => !r.daHachToan);
+    if (thangFilter) rows = rows.filter((r) => (r.ngay || "").slice(0, 7) === thangFilter);
+    if (hoaDonFilter === "1") rows = rows.filter((r) => (r.soHoaDon || "").trim());
+    else if (hoaDonFilter === "0") rows = rows.filter((r) => !(r.soHoaDon || "").trim());
+  }
 
   rows.sort((a, b) => (a.ngay < b.ngay ? 1 : -1));
   const tongTien = rows.reduce((s, r) => s + (r.soTien || 0), 0);
