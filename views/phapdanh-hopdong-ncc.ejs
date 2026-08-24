@@ -39,6 +39,7 @@
       <h2>Thêm hợp đồng mới (nhập tay)</h2>
       <form method="POST" action="/phap-danh/hop-dong-ncc" class="form-grid">
         <label>Tên NCC <input type="text" name="tenNCC" required /></label>
+        <label>Tên trên hợp đồng <input type="text" name="tenTrenHD" placeholder="Tên đầy đủ ghi trong HĐ..." /></label>
         <label>Hàng hóa mua <input type="text" name="hangHoaMua" /></label>
         <label>Nội dung hợp đồng <input type="text" name="noiDung" /></label>
         <label>Phân loại HĐ <input type="text" name="phanLoaiHD" placeholder="vd HĐ mua bán, BBNT..." /></label>
@@ -66,7 +67,7 @@
             <tr>
               <th>Tên NCC</th>
               <th>Hàng hóa mua</th>
-              <th>Nội dung chính</th>
+              <th>Tên trên HĐ</th>
               <th>Phân loại HĐ</th>
               <th>Tổng tiền HĐ</th>
               <th>Hạn</th>
@@ -79,7 +80,7 @@
             <tr class="ncc-row" id="ncc-<%= r.id %>" data-search="<%= (r.tenNCC + ' ' + r.hangHoaMua + ' ' + r.noiDung + ' ' + r.soHopDong + ' ' + r.phanLoaiHD).toLowerCase().replace(/"/g,'&quot;') %>">
               <td><%= r.tenNCC %></td>
               <td><%= r.hangHoaMua %></td>
-              <td><%= r.noiDung %></td>
+              <td><%= r.tenTrenHD || r.tenNCC %></td>
               <td><%= r.phanLoaiHD %></td>
               <td>
                 <% if (r.giaTriHopDong) { %>

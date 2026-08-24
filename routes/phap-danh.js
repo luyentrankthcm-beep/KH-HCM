@@ -1331,12 +1331,13 @@ router.post("/phap-danh/hop-dong-ncc", requireAdmin, (req, res) => {
   ensureShape(store);
   const activeCompany = getCompany(req);
   try {
-    const { tenNCC, noiDung, hangHoaMua, phanLoaiHD, soHopDong, ngayKy, ngayHetHan, giaTriHopDong, linkHopDong, ghiChu } = req.body;
+    const { tenNCC, tenTrenHD, noiDung, hangHoaMua, phanLoaiHD, soHopDong, ngayKy, ngayHetHan, giaTriHopDong, linkHopDong, ghiChu } = req.body;
     if (!tenNCC || !tenNCC.trim()) throw new Error("Thiếu Tên NCC.");
     const amt = giaTriHopDong ? Number(String(giaTriHopDong).replace(/[^\d]/g, "")) : 0;
     store.phap_danh_hop_dong_ncc.push({
       id: nextId(store, "phap_danh_hop_dong_ncc_seq") || Date.now(),
       tenNCC: tenNCC.trim(),
+      tenTrenHD: (tenTrenHD || "").trim(),
       congTy: activeCompany,
       hangHoaMua: (hangHoaMua || "").trim(),
       noiDung: (noiDung || "").trim(),
