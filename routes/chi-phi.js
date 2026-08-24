@@ -534,6 +534,20 @@ router.post("/chi-phi/:id/link-hoa-don", requireDataEntry, (req, res) => {
   res.redirect("/chi-phi/" + mienSeg(r.mien) + "?" + qs.join("&"));
 });
 
+// Inline update từ modal danh-sach-chi-phi: cập nhật các trường có thể sửa tay
+router.post("/chi-phi/:id/update", requireDataEntry, (req, res) => {
+  const store = load();
+  ensureShape(store);
+  const r = store.chi_phi.find((x) => String(x.id) === req.params.id);
+  if (!r) return res.status(404).json({ error: "Không tìm thấy khoản chi." });
+  const editableFields = ["ncc", "soHoaDon", "soUNC", "soChungTuLienQuan", "dienGiai", "loaiChiPhi", "ghiChu", "linkHoaDon", "trangThaiHoaDon"];
+  editableFields.forEach((f) => {
+    if (req.body[f] !== undefined) r[f] = (req.body[f] || "").trim();
+  });
+  save(store);
+  return res.json({ success: true, record: r });
+});
+
 router.post("/chi-phi/:mien(mien-nam|mien-bac)", requireDataEntry, (req, res) => {
   const store = load();
   ensureShape(store);

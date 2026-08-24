@@ -125,17 +125,30 @@
   <!-- Modal chi tiet -->
   <div id="dschOverlay" onclick="if(event.target===this)closeDschModal()">
     <div id="dschModal">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
         <h3 style="margin:0;font-size:16px;">Chi tiết khoản chi</h3>
         <button type="button" class="link-btn" onclick="closeDschModal()" style="font-size:20px;line-height:1;">×</button>
       </div>
-      <div id="dschContent"></div>
-      <div style="margin-top:16px;padding-top:14px;border-top:1px solid #eee;display:flex;align-items:center;gap:10px;">
-        <label style="display:flex;align-items:center;gap:8px;font-size:14px;font-weight:600;cursor:pointer;">
-          <input type="checkbox" id="dschHtCheck" style="width:18px;height:18px;" onchange="toggleDschHachToan(this)" />
-          Đã hạch toán
-        </label>
-        <span id="dschHtStatus" style="font-size:12px;color:#388e3c;"></span>
+      <!-- VIEW -->
+      <div id="dschViewPane">
+        <div id="dschContent"></div>
+        <div style="margin-top:14px;padding-top:12px;border-top:1px solid #eee;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+          <label style="display:flex;align-items:center;gap:8px;font-size:14px;font-weight:600;cursor:pointer;">
+            <input type="checkbox" id="dschHtCheck" style="width:18px;height:18px;" onchange="toggleDschHachToan(this)" />
+            Đã hạch toán
+          </label>
+          <span id="dschHtStatus" style="font-size:12px;color:#388e3c;"></span>
+          <button type="button" class="btn btn-secondary" onclick="dschEnterEdit()" style="margin-left:auto;">✏️ Sửa</button>
+        </div>
+      </div>
+      <!-- EDIT -->
+      <div id="dschEditPane" style="display:none;">
+        <div id="dschEditContent"></div>
+        <div style="margin-top:14px;padding-top:12px;border-top:1px solid #eee;display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+          <button type="button" class="btn btn-primary" onclick="dschSaveEdit()" id="dschSaveBtn">💾 Lưu</button>
+          <button type="button" class="btn btn-secondary" onclick="dschExitEdit()">Hủy</button>
+          <span id="dschSaveStatus" style="font-size:12px;color:#388e3c;"></span>
+        </div>
       </div>
     </div>
   </div>
@@ -149,11 +162,19 @@
   function fmt(v) { return v || '—'; }
   function fmtMoney(v) { return v ? Number(v).toLocaleString('vi-VN') + ' đ' : '—'; }
   function fmtDate(v) { return v ? new Date(v).toLocaleDateString('vi-VN') : '—'; }
+  function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;'); }
 
   function openDschModal(id) {
     var r = _dschMap[id];
     if (!r) return;
     _dschCurrentId = id;
+    renderDschView(r);
+    document.getElementById('dschViewPane').style.display = '';
+    document.getElementById('dschEditPane').style.display = 'none';
+    document.getElementById('dschOverlay').classList.add('open');
+  }
+
+  function renderDschView(r) {
     var fields = [
       ['Ngày', fmtDate(r.ngay)],
       ['Gian', fmt(r.gian)],
@@ -164,10 +185,9 @@
       ['Chứng từ liên quan', fmt(r.soChungTuLienQuan)],
       ['Diễn giải', fmt(r.dienGiai)],
       ['Số tiền', fmtMoney(r.soTien)],
-      ['HĐ gốc', r.soTienHoaDonGoc ? fmtMoney(r.soTienHoaDonGoc) : null],
-      ['Loại chi phí', fmt(r.loaiChiPhi)],
-      ['Nguồn', fmt(r.nguon)],
-      ['Ghi chú', fmt(r.ghiChu)],
+      ['Loại chi phí', r.loaiChiPhi || null],
+      ['Nguồn', r.nguon || null],
+      ['Ghi chú', r.ghiChu || null],
       ['Trạng thái HĐ', r.trangThaiHoaDon || null],
       ['Link hóa đơn', r.linkHoaDon ? '<a href="'+r.linkHoaDon+'" target="_blank" rel="noopener">Xem hóa đơn</a>' : null],
       ['Đã chi', r.daChi ? '✓ Đã chi' : 'Chưa chi'],
@@ -180,7 +200,80 @@
     document.getElementById('dschContent').innerHTML = html;
     document.getElementById('dschHtCheck').checked = !!r.daHachToan;
     document.getElementById('dschHtStatus').textContent = r.daHachToan ? '✓ Đã hạch toán' : '';
-    document.getElementById('dschOverlay').classList.add('open');
+  }
+
+  function dschEnterEdit() {
+    var r = _dschMap[_dschCurrentId];
+    if (!r) return;
+    var inp = function(name, val, ph) {
+      return '<input type="text" name="'+name+'" value="'+esc(val||'')+'" placeholder="'+(ph||'')+'" style="width:100%;font-size:13px;padding:4px 6px;border:1px solid #ccc;border-radius:4px;" />';
+    };
+    var ta = function(name, val, ph) {
+      return '<textarea name="'+name+'" placeholder="'+(ph||'')+'" rows="2" style="width:100%;font-size:13px;padding:4px 6px;border:1px solid #ccc;border-radius:4px;resize:vertical;">'+esc(val||'')+'</textarea>';
+    };
+    var ro = function(val) { return '<span style="color:#666;">'+fmt(val)+'</span>'; };
+    var html = '';
+    html += '<div class="dsch-field"><label>Ngày</label>'+ro(fmtDate(r.ngay))+'</div>';
+    html += '<div class="dsch-field"><label>Gian</label>'+ro(r.gian)+'</div>';
+    html += '<div class="dsch-field"><label>Số tiền</label>'+ro(fmtMoney(r.soTien))+'</div>';
+    html += '<div class="dsch-field"><label>NCC</label>'+inp('ncc', r.ncc, 'Nhà cung cấp...')+'</div>';
+    html += '<div class="dsch-field"><label>Số hóa đơn</label>'+inp('soHoaDon', r.soHoaDon, 'Số HĐ...')+'</div>';
+    html += '<div class="dsch-field"><label>Số UNC</label>'+inp('soUNC', r.soUNC, 'UNC...')+'</div>';
+    html += '<div class="dsch-field"><label>Chứng từ LQ</label>'+inp('soChungTuLienQuan', r.soChungTuLienQuan, 'Số chứng từ...')+'</div>';
+    html += '<div class="dsch-field"><label>Diễn giải</label>'+ta('dienGiai', r.dienGiai, 'Diễn giải...')+'</div>';
+    html += '<div class="dsch-field"><label>Loại chi phí</label>'+inp('loaiChiPhi', r.loaiChiPhi, 'VD: Tiền thuê, Hàng hóa...')+'</div>';
+    html += '<div class="dsch-field"><label>Ghi chú</label>'+inp('ghiChu', r.ghiChu, 'Ghi chú...')+'</div>';
+    html += '<div class="dsch-field"><label>Link hóa đơn</label>'+inp('linkHoaDon', r.linkHoaDon, 'https://...')+'</div>';
+    document.getElementById('dschEditContent').innerHTML = html;
+    document.getElementById('dschViewPane').style.display = 'none';
+    document.getElementById('dschEditPane').style.display = '';
+    document.getElementById('dschSaveStatus').textContent = '';
+  }
+
+  function dschExitEdit() {
+    document.getElementById('dschEditPane').style.display = 'none';
+    document.getElementById('dschViewPane').style.display = '';
+  }
+
+  function dschSaveEdit() {
+    var id = _dschCurrentId;
+    if (!id) return;
+    var btn = document.getElementById('dschSaveBtn');
+    var status = document.getElementById('dschSaveStatus');
+    btn.disabled = true;
+    status.textContent = 'Đang lưu...';
+    var inputs = document.querySelectorAll('#dschEditContent [name]');
+    var body = new URLSearchParams();
+    inputs.forEach(function(el) { body.append(el.name, el.value); });
+    fetch('/chi-phi/' + id + '/update', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-Requested-With': 'XMLHttpRequest' },
+      body: body.toString()
+    })
+    .then(function(r){ return r.json(); })
+    .then(function(data) {
+      btn.disabled = false;
+      if (data.success) {
+        Object.assign(_dschMap[id], data.record);
+        // cập nhật lại row trong table
+        var tr = document.getElementById('dsch-tr-' + id);
+        if (tr && data.record) {
+          var r = data.record;
+          var cells = tr.querySelectorAll('td');
+          // cells: 0=ngày,1=gian,2=tk,3=ncc,4=soHD,5=soUNC,6=CTLQ,7=dienGiai,8=soTien,9=chi
+          if (cells[3]) cells[3].querySelector('div').textContent = r.ncc || '—';
+          if (cells[4]) cells[4].textContent = r.soHoaDon || '—';
+          if (cells[5]) cells[5].textContent = r.soUNC || '—';
+          if (cells[7]) cells[7].querySelector('div').textContent = r.dienGiai || '—';
+        }
+        dschExitEdit();
+        renderDschView(_dschMap[id]);
+        status.textContent = '';
+      } else {
+        status.textContent = 'Lỗi: ' + (data.error || 'Thử lại.');
+      }
+    })
+    .catch(function() { btn.disabled = false; status.textContent = 'Lỗi kết nối.'; });
   }
 
   function closeDschModal() {
