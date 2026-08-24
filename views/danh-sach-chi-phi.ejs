@@ -85,6 +85,7 @@
             <col style="width:110px;">
             <col style="width:38px;">
             <col style="width:38px;"><!-- HT -->
+            <col style="width:110px;"><!-- Ma cong trinh -->
           </colgroup>
           <thead>
             <tr>
@@ -94,6 +95,7 @@
               <th style="text-align:right;">Số tiền</th>
               <th style="text-align:center;" title="Đã chi">Chi</th>
               <th style="text-align:center;" title="Đã hạch toán MISA">HT</th>
+              <th title="Mã công trình (MAP GIAN)">Mã CT</th>
             </tr>
           </thead>
           <tbody>
@@ -138,6 +140,16 @@
                   title="Đã hạch toán MISA"
                   onchange="toggleHtRow(<%= r.id %>, this)" />
               </td>
+              <% var _maCT = gianAliasMap && r.gian ? (gianAliasMap[r.gian] || gianAliasMap[(r.gian||'').trim()] || '') : ''; %>
+              <td style="font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:110px;" title="<%= _maCT || 'Chưa map gian' %>">
+                <% if (_maCT) { %>
+                  <span style="background:#e8f5e9;color:#2e7d32;padding:1px 5px;border-radius:4px;font-size:10px;font-weight:600;"><%= _maCT %></span>
+                <% } else if (r.gian) { %>
+                  <span style="color:#bbb;font-size:10px;">—</span>
+                <% } else { %>
+                  <span style="color:#eee;font-size:10px;">—</span>
+                <% } %>
+              </td>
             </tr>
             <% }) %>
           </tbody>
@@ -145,6 +157,7 @@
             <tr style="background:var(--bg-hover,#f5f5f5);font-weight:700;">
               <td colspan="9" style="text-align:right;padding-right:10px;">Tổng cộng:</td>
               <td style="text-align:right;white-space:nowrap;"><%= tongTien.toLocaleString('vi-VN') %> đ</td>
+              <td></td>
               <td></td>
               <td></td>
             </tr>
