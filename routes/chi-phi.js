@@ -585,7 +585,8 @@ router.get("/chi-phi/:mien(mien-nam|mien-bac)/de-xuat-hoa-don", requireDataEntry
     .filter((r) => r.congTy === activeCompany && r.mien === mien && !(r.soHoaDon || "").trim());
   if (thangFilter) chiPhiRows = chiPhiRows.filter((r) => (r.ngay || "").slice(0, 7) === thangFilter);
 
-  const hdPool = (store.hoa_don_dau_vao || []).filter((h) => h.congTy === activeCompany && (h.soHoaDon || "").trim() && h.soTien);
+  // HD pool: khong loc theo congTy vi HD dau vao co the duoc nhap vao bat ky cong ty nao
+  const hdPool = (store.hoa_don_dau_vao || []).filter((h) => (h.soHoaDon || "").trim() && h.soTien);
 
   const matchedIds = new Set();
   const results = [];
