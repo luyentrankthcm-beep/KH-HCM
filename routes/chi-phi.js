@@ -312,6 +312,27 @@ router.get("/chi-phi/:mien(mien-nam|mien-bac)/danh-sach", (req, res) => {
   });
   if (_phanLoaiChanged) save(store);
 
+  // Tự trích số HĐ từ dienGiai nếu chưa có soHoaDon
+  // VD: "theo hóa đơn 4594", "theo hd 106541", "hd so 4594", "HĐ 4594"
+  const _hdDGPattern = /(?:theo\s+)?(?:h[oóô]a?\s*đơn|háo\s*đơn|hd|hđ)(?:\s+s[oố])?\s*([A-Z0-9][A-Z0-9\/\-]*[0-9])/gi;
+  let _hdDGChanged = false;
+  rows.forEach((r) => {
+    if ((r.soHoaDon || "").trim()) return; // đã có số HĐ
+    const dg = (r.dienGiai || "");
+    _hdDGPattern.lastIndex = 0;
+    const m = _hdDGPattern.exec(dg);
+    if (m && m[1]) {
+      const extracted = m[1].trim();
+      r.soHoaDon = extracted;
+      const storeRec = store.chi_phi.find((x) => x.id === r.id);
+      if (storeRec && !(storeRec.soHoaDon || "").trim()) {
+        storeRec.soHoaDon = extracted;
+        _hdDGChanged = true;
+      }
+    }
+  });
+  if (_hdDGChanged) save(store);
+
   const tongTien = rows.reduce((s, r) => s + (r.soTien || 0), 0);
 
   // Gian alias map cho chi phi
