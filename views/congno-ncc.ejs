@@ -42,9 +42,7 @@
 
     <% if (missingInvoiceSummary.length > 0) { %>
     <section class="panel">
-      <div class="panel-head">
-        <h2>⚠ Giao dịch chi CHƯA có hóa đơn (<%= missingInvoiceSummary.length %> nhà cung cấp cần bổ sung)</h2>
-      </div>
+      <h2>⚠ Giao dịch chi CHƯA có hóa đơn (<%= missingInvoiceSummary.length %> nhà cung cấp cần bổ sung)</h2>
       <p class="muted">
         Tiền đã chi thật ra khỏi 2 tài khoản Chi của <%= COMPANIES[activeCompany].label %> (khớp Tên đối ứng), nhưng
         KHÔNG tìm thấy hóa đơn nào ở trang "Hóa Đơn Đầu Vào" khớp với khoản này -- có thể do quét Gmail lấy hóa đơn
