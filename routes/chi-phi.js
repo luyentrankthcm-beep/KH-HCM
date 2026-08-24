@@ -288,28 +288,28 @@ router.get("/chi-phi/:mien(mien-nam|mien-bac)/danh-sach", (req, res) => {
   rows.forEach((r) => { r.taiKhoan = computeTaiKhoanChiPhi(r, gianListForTaiKhoan, aliasIndexForTaiKhoan); });
 
   // Tinh phanLoai: HH hoac DV
-  // 1) Neu co soHoaDon → tra cuu HD dau vao lay phanLoai
-  // 2) Neu gian co dau '-' (vd "FZ SC-nuoc suoi") → HH
-  // 3) Con lai → DV
+  // Ưu tiên: 1) gian có dấu '-' → luôn HH (tín hiệu mạnh nhất, ví dụ "FZ SC-nước suối")
+  //           2) Tra cứu HD đầu vào theo soHoaDon
+  //           3) Mặc định → DV
   const hdByHD = {};
   (store.hoa_don_dau_vao || []).forEach((h) => { if (h.soHoaDon) hdByHD[h.soHoaDon.trim()] = h; });
   let _phanLoaiChanged = false;
   rows.forEach((r) => {
     const soHD = (r.soHoaDon || "").trim();
     let autoVal;
-    if (soHD && hdByHD[soHD] && hdByHD[soHD].phanLoai) {
+    if ((r.gian || "").includes("-")) {
+      autoVal = "HH"; // gian có '-' = bán hàng hóa, ưu tiên cao nhất
+    } else if (soHD && hdByHD[soHD] && hdByHD[soHD].phanLoai) {
       autoVal = hdByHD[soHD].phanLoai === "Hàng hóa" ? "HH" : "DV";
-    } else if ((r.gian || "").includes("-")) {
-      autoVal = "HH";
     } else {
       autoVal = "DV";
     }
     r._phanLoaiAuto = autoVal;
     const storeRec = store.chi_phi.find((x) => x.id === r.id);
     if (!storeRec) return;
-    // Lưu nếu chưa có, HOẶC nếu đang là DV nhưng tín hiệu gian '-' chỉ rõ HH
+    // Lưu nếu chưa có, HOẶC nếu đang là DV nhưng autoVal là HH (nâng cấp)
     const shouldUpdate = !storeRec.phanLoai ||
-      (storeRec.phanLoai === "DV" && autoVal === "HH" && (r.gian||"").includes("-"));
+      (storeRec.phanLoai === "DV" && autoVal === "HH");
     if (shouldUpdate) {
       storeRec.phanLoai = autoVal;
       r.phanLoai = autoVal;
