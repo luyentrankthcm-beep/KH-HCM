@@ -76,6 +76,7 @@
             <col style="width:46px;">
             <col style="width:160px;">
             <col style="width:68px;">
+            <col style="width:40px;"><!-- loai HH/DV -->
             <col style="width:76px;">
             <col style="width:90px;">
             <col><!-- dien giai -->
@@ -85,7 +86,7 @@
           <thead>
             <tr>
               <th>Ngày</th><th>Gian</th><th>TK</th><th>NCC</th>
-              <th>Số HĐ</th><th>Số UNC</th><th>CT LQ</th>
+              <th>Số HĐ</th><th title="Hàng hóa / Dịch vụ">Loại</th><th>Số UNC</th><th>CT LQ</th>
               <th>Diễn giải</th>
               <th style="text-align:right;">Số tiền</th>
               <th style="text-align:center;" title="Đã chi">Chi</th>
@@ -103,6 +104,13 @@
               <td style="color:var(--muted);white-space:nowrap;"><%= r.taiKhoan || '—' %></td>
               <td class="dsch-cell"><div class="dsch-cell-2" title="<%= r.ncc || '' %>"><%= r.ncc || '—' %></div></td>
               <td style="white-space:nowrap;"><%= r.soHoaDon || '—' %></td>
+              <td style="text-align:center;">
+                <% var pl = r.phanLoai || r._phanLoaiAuto || 'DV'; %>
+                <span style="font-size:10px;font-weight:700;padding:2px 5px;border-radius:99px;<%= pl==='HH' ? 'background:#e8f5e9;color:#2e7d32;' : 'background:#e3f2fd;color:#1565c0;' %>"
+                      title="<%= pl==='HH' ? 'Hàng hóa' : 'Dịch vụ' %><%= r.phanLoai ? ' (đã sửa tay)' : ' (tự động)' %>">
+                  <%= pl %>
+                </span>
+              </td>
               <td style="color:var(--muted);white-space:nowrap;"><%= r.soUNC || '—' %></td>
               <td class="dsch-cell"><div class="dsch-cell-1" style="color:var(--muted);" title="<%= r.soChungTuLienQuan || '' %>"><%= r.soChungTuLienQuan || '—' %></div></td>
               <td class="dsch-cell"><div class="dsch-cell-2" title="<%= (r.dienGiai || '') %>">
@@ -120,7 +128,7 @@
           </tbody>
           <tfoot>
             <tr style="background:var(--bg-hover,#f5f5f5);font-weight:700;">
-              <td colspan="8" style="text-align:right;padding-right:10px;">Tổng cộng:</td>
+              <td colspan="9" style="text-align:right;padding-right:10px;">Tổng cộng:</td>
               <td style="text-align:right;white-space:nowrap;"><%= tongTien.toLocaleString('vi-VN') %> đ</td>
               <td></td>
             </tr>
@@ -190,6 +198,14 @@
       ['Tài khoản', fmt(r.taiKhoan)],
       ['NCC', fmt(r.ncc)],
       ['Số hóa đơn', fmt(r.soHoaDon)],
+      ['Phân loại', (function(){
+        var pl = r.phanLoai || r._phanLoaiAuto || 'DV';
+        var label = pl === 'HH' ? 'Hàng hóa (HH)' : 'Dịch vụ (DV)';
+        var color = pl === 'HH' ? '#2e7d32' : '#1565c0';
+        var bg = pl === 'HH' ? '#e8f5e9' : '#e3f2fd';
+        var note = r.phanLoai ? ' <span style="font-size:10px;color:#999;">(đã sửa tay)</span>' : ' <span style="font-size:10px;color:#bbb;">(tự động)</span>';
+        return '<span style="font-weight:700;color:'+color+';background:'+bg+';padding:2px 8px;border-radius:99px;">'+label+'</span>'+note;
+      })()],
       ['Số UNC', fmt(r.soUNC)],
       ['Chứng từ liên quan', fmt(r.soChungTuLienQuan)],
       ['Diễn giải', fmt(r.dienGiai)],
@@ -231,6 +247,14 @@
     html += '<div class="dsch-field"><label>Chứng từ LQ</label>'+inp('soChungTuLienQuan', r.soChungTuLienQuan, 'Số chứng từ...')+'</div>';
     html += '<div class="dsch-field"><label>Diễn giải</label>'+ta('dienGiai', r.dienGiai, 'Diễn giải...')+'</div>';
     html += '<div class="dsch-field"><label>Loại chi phí</label>'+inp('loaiChiPhi', r.loaiChiPhi, 'VD: Tiền thuê, Hàng hóa...')+'</div>';
+    var plVal = r.phanLoai || '';
+    var plAutoLabel = (r._phanLoaiAuto || 'DV') === 'HH' ? 'Tự động: Hàng hóa' : 'Tự động: Dịch vụ';
+    html += '<div class="dsch-field"><label>Phân loại HH/DV</label>'
+      + '<select name="phanLoai" style="font-size:13px;padding:4px 6px;border:1px solid #ccc;border-radius:4px;">'
+      + '<option value="" '+(plVal===''?'selected':'')+'>'+plAutoLabel+'</option>'
+      + '<option value="HH" '+(plVal==='HH'?'selected':'')+'>Hàng hóa (HH)</option>'
+      + '<option value="DV" '+(plVal==='DV'?'selected':'')+'>Dịch vụ (DV)</option>'
+      + '</select></div>';
     html += '<div class="dsch-field"><label>Ghi chú</label>'+inp('ghiChu', r.ghiChu, 'Ghi chú...')+'</div>';
     html += '<div class="dsch-field"><label>Link hóa đơn</label>'+inp('linkHoaDon', r.linkHoaDon, 'https://...')+'</div>';
     document.getElementById('dschEditContent').innerHTML = html;

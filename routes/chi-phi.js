@@ -263,6 +263,24 @@ router.get("/chi-phi/:mien(mien-nam|mien-bac)/danh-sach", (req, res) => {
   const aliasIndexForTaiKhoan = buildGianAliasIndex(gianListForTaiKhoan);
   rows.forEach((r) => { r.taiKhoan = computeTaiKhoanChiPhi(r, gianListForTaiKhoan, aliasIndexForTaiKhoan); });
 
+  // Tinh phanLoai: HH hoac DV
+  // 1) Neu co soHoaDon → tra cuu HD dau vao lay phanLoai
+  // 2) Neu gian co dau '-' (vd "FZ SC-nuoc suoi") → HH
+  // 3) Con lai → DV
+  const hdByHD = {};
+  (store.hoa_don_dau_vao || []).forEach((h) => { if (h.soHoaDon) hdByHD[h.soHoaDon.trim()] = h; });
+  rows.forEach((r) => {
+    if (r.phanLoai) return; // đã set tay → giữ nguyên
+    const soHD = (r.soHoaDon || "").trim();
+    if (soHD && hdByHD[soHD] && hdByHD[soHD].phanLoai) {
+      r._phanLoaiAuto = hdByHD[soHD].phanLoai === "Hàng hóa" ? "HH" : "DV";
+    } else if ((r.gian || "").includes("-")) {
+      r._phanLoaiAuto = "HH";
+    } else {
+      r._phanLoaiAuto = "DV";
+    }
+  });
+
   const tongTien = rows.reduce((s, r) => s + (r.soTien || 0), 0);
 
   // Gian alias map cho chi phi
@@ -711,7 +729,7 @@ router.post("/chi-phi/:id/update", requireDataEntry, (req, res) => {
   ensureShape(store);
   const r = store.chi_phi.find((x) => String(x.id) === req.params.id);
   if (!r) return res.status(404).json({ error: "Không tìm thấy khoản chi." });
-  const editableFields = ["ncc", "soHoaDon", "soUNC", "soChungTuLienQuan", "dienGiai", "loaiChiPhi", "ghiChu", "linkHoaDon", "trangThaiHoaDon"];
+  const editableFields = ["ncc", "soHoaDon", "soUNC", "soChungTuLienQuan", "dienGiai", "loaiChiPhi", "ghiChu", "linkHoaDon", "trangThaiHoaDon", "phanLoai"];
   editableFields.forEach((f) => {
     if (req.body[f] !== undefined) r[f] = (req.body[f] || "").trim();
   });
