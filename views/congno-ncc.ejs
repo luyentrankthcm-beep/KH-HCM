@@ -159,9 +159,10 @@
             </tr>
             <tr class="ncc-detail-row" id="ncc-detail-<%= idx %>" style="display:none;">
               <td colspan="7" style="padding:0 0 14px 0; background:rgba(0,0,0,0.02);">
-                <table class="table" style="margin:0;">
+                <table class="table" style="margin:0;" id="inv-table-<%= idx %>">
                   <thead>
                     <tr>
+                      <th style="width:32px;"><input type="checkbox" title="Chọn tất cả chưa chi" onchange="toggleAllInv(<%= idx %>, this.checked)" /></th>
                       <th>Ngày HĐ</th>
                       <th>Số HĐ</th>
                       <th>Số tiền</th>
@@ -172,8 +173,13 @@
                     </tr>
                   </thead>
                   <tbody>
-                    <% r.invoices.forEach(function (inv) { %>
+                    <% r.invoices.forEach(function (inv, invIdx) { %>
                     <tr>
+                      <td style="text-align:center;">
+                        <% if (!inv.daChi) { %>
+                        <input type="checkbox" class="inv-chk" data-ncc-idx="<%= idx %>" data-amount="<%= inv.soTien %>" data-so-hd="<%= inv.soHoaDon || '' %>" data-ngay="<%= inv.ngayHD || '' %>" onchange="recalcInv(<%= idx %>)" />
+                        <% } %>
+                      </td>
                       <td><%= inv.ngayHD %></td>
                       <td><%= inv.soHoaDon %><% if (inv.kyHieuHD) { %> <span class="muted">(<%= inv.kyHieuHD %>)</span><% } %></td>
                       <td><%= inv.soTien.toLocaleString('vi-VN') %> đ</td>
@@ -191,6 +197,10 @@
                     <% }) %>
                   </tbody>
                 </table>
+                <div id="inv-sum-<%= idx %>" style="display:none; padding:8px 12px; background:#fffde7; border-top:1px solid #ffe082; display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+                  <span id="inv-sum-label-<%= idx %>" style="font-weight:600;"></span>
+                  <button type="button" class="btn btn-secondary" style="padding:4px 12px; font-size:13px;" onclick="lapUNC(<%= idx %>, '<%= r.tenNCC.replace(/'/g, "\\'") %>')">📋 Lập UNC gộp</button>
+                </div>
               </td>
             </tr>
             <% }) %>
@@ -201,6 +211,18 @@
         </table>
       </div>
     </section>
+
+    <!-- Modal UNC gop -->
+    <div id="unc-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;align-items:center;justify-content:center;">
+      <div style="background:#fff;border-radius:10px;padding:28px 32px;max-width:480px;width:95%;box-shadow:0 8px 32px rgba(0,0,0,.18);">
+        <h3 style="margin:0 0 16px;">📋 Lập UNC gộp</h3>
+        <div id="unc-modal-body" style="font-size:14px;line-height:1.8;"></div>
+        <div style="margin-top:18px;display:flex;gap:10px;">
+          <button class="btn btn-primary" onclick="copyUNC()">📋 Sao chép</button>
+          <button class="btn btn-secondary" onclick="document.getElementById('unc-modal').style.display='none'">Đóng</button>
+        </div>
+      </div>
+    </div>
 
     <script>
       // Chi Nhan, 2026-07-30: bam 1 dong NCC o bang tong hop -- hien/an ngay
@@ -221,6 +243,53 @@
         row.style.display = isHidden ? 'table-row' : 'none';
         if (caret) caret.textContent = isHidden ? '▼' : '▶';
         if (isHidden) setTimeout(function(){ row.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }, 50);
+      }
+
+      function recalcInv(idx) {
+        var chks = document.querySelectorAll('.inv-chk[data-ncc-idx="' + idx + '"]:checked');
+        var sumBar = document.getElementById('inv-sum-' + idx);
+        var sumLabel = document.getElementById('inv-sum-label-' + idx);
+        if (!sumBar || !sumLabel) return;
+        if (chks.length === 0) { sumBar.style.display = 'none'; return; }
+        var total = 0;
+        chks.forEach(function(c){ total += parseInt(c.dataset.amount, 10) || 0; });
+        sumLabel.textContent = 'Đã chọn ' + chks.length + ' hóa đơn — Tổng: ' + total.toLocaleString('vi-VN') + ' đ';
+        sumBar.style.display = 'flex';
+      }
+
+      function toggleAllInv(idx, checked) {
+        document.querySelectorAll('.inv-chk[data-ncc-idx="' + idx + '"]').forEach(function(c){ c.checked = checked; });
+        recalcInv(idx);
+      }
+
+      function lapUNC(idx, tenNCC) {
+        var chks = document.querySelectorAll('.inv-chk[data-ncc-idx="' + idx + '"]:checked');
+        if (chks.length === 0) { alert('Chưa chọn hóa đơn nào.'); return; }
+        var total = 0; var lines = [];
+        chks.forEach(function(c){
+          total += parseInt(c.dataset.amount, 10) || 0;
+          lines.push((c.dataset.ngay || '') + ' — Số HĐ: ' + (c.dataset.soHd || '?') + ' — ' + (parseInt(c.dataset.amount,10)||0).toLocaleString('vi-VN') + ' đ');
+        });
+        var body = document.getElementById('unc-modal-body');
+        body.innerHTML =
+          '<table style="width:100%;border-collapse:collapse;font-size:13px;">' +
+          '<tr><td style="color:#888;padding:3px 0;width:120px;">Tên NCC</td><td><strong>' + tenNCC + '</strong></td></tr>' +
+          '<tr><td style="color:#888;padding:3px 0;">Số tiền gộp</td><td><strong style="font-size:16px;color:#c0392b;">' + total.toLocaleString('vi-VN') + ' đ</strong></td></tr>' +
+          '<tr><td style="color:#888;padding:3px 0;vertical-align:top;">Hóa đơn</td><td>' + lines.map(function(l){ return '<div>• ' + l + '</div>'; }).join('') + '</td></tr>' +
+          '<tr><td style="color:#888;padding:3px 0;">Nội dung CK</td><td><span id="unc-nd">Thanh toán ' + chks.length + ' HĐ ' + tenNCC.substring(0,30) + '</span></td></tr>' +
+          '</table>';
+        document.getElementById('unc-modal').style.display = 'flex';
+      }
+
+      function copyUNC() {
+        var nd = document.getElementById('unc-nd');
+        if (!nd) return;
+        navigator.clipboard.writeText(nd.textContent).then(function(){
+          nd.style.background='#c8e6c9'; setTimeout(function(){ nd.style.background=''; }, 1200);
+        }).catch(function(){
+          var t = document.createElement('textarea'); t.value = nd.textContent;
+          document.body.appendChild(t); t.select(); document.execCommand('copy'); document.body.removeChild(t);
+        });
       }
     </script>
 
