@@ -216,6 +216,8 @@ router.get("/cong-no/ncc", (req, res) => {
   let nccSummary = [];
   let missingInvoiceChi = [];
   let missingInvoiceSummary = [];
+  let availableMonths = [];
+  const thangFilter = (req.query.thang || "").trim();
   try {
     const built = buildInvoiceDebt(store);
     invoicesAllCompanies = built.invoices;
@@ -229,10 +231,9 @@ router.get("/cong-no/ncc", (req, res) => {
     // Danh sach cac thang co hoa don (YYYY-MM), moi nhat truoc
     const monthSet = new Set();
     invoices.forEach((i) => { const m = (i.ngayHD || "").slice(0,7); if (m) monthSet.add(m); });
-    const availableMonths = [...monthSet].sort().reverse();
+    availableMonths = [...monthSet].sort().reverse();
 
     // Loc theo thang neu co
-    const thangFilter = (req.query.thang || "").trim();
     if (thangFilter) invoices = invoices.filter((i) => (i.ngayHD || "").slice(0,7) === thangFilter);
 
     nccSummary = summarizeByNcc(invoices);
