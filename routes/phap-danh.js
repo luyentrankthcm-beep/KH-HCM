@@ -2017,16 +2017,52 @@ router.post("/phap-danh/hop-dong-thue-gian-tong/cap-nhat-tu-sheet", requireAdmin
                   perSheetCounts[s.key] = rows.length;
                   allNewRows = allNewRows.concat(rows);
           }
-          const otherRows = store.phap_danh_hop_dong_thue_tong.filter(
-                  (r) => !HOP_DONG_THUE_TONG_SHEETS.some((s) => s.storeKey === r.sheetKey)
-                        );
-          allNewRows.forEach((r) => {
-                  r.id = nextId(store, "phap_danh_hop_dong_thue_tong_seq") || Date.now();
+
+          // Luyen, 2026-08-24: thay vi replace toan bo, merge: giu du lieu cu,
+          // chi bu vao cac field dang rong tu sheet moi. Dong moi (chua co trong
+          // store) duoc them vao. Dong cu khong co trong sheet van duoc giu.
+          // Key = sheetKey + "|" + tenNoiBo (Mã Điểm Nội Bộ).
+          const FILL_FIELDS = [
+            "congTy", "congTyRaw", "khuVuc", "dichVu", "maCongTrinh", "diaDiem",
+            "tenKhachHang", "mstKhachHang", "hinhThucThue", "tienThueThang",
+            "thoiHanThueRaw", "ngayBatDauThue", "ngayHetHanThue",
+            "ghiChu", "linkHopDong", "trangThaiRaw",
+          ];
+          const existingMap = {};
+          store.phap_danh_hop_dong_thue_tong.forEach((r) => {
+            if (r.sheetKey && r.tenNoiBo) {
+              existingMap[r.sheetKey + "|" + r.tenNoiBo] = r;
+            }
           });
-          store.phap_danh_hop_dong_thue_tong = otherRows.concat(allNewRows);
+
+          let added = 0, filled = 0;
+          allNewRows.forEach((newRow) => {
+            const key = newRow.sheetKey + "|" + newRow.tenNoiBo;
+            const existing = existingMap[key];
+            if (existing) {
+              // bu vao cac field dang rong trong ban ghi cu
+              let changed = false;
+              FILL_FIELDS.forEach((f) => {
+                const newVal = newRow[f];
+                const oldVal = existing[f];
+                // "co du lieu" = khong rong va khac 0 (cho tienThueThang)
+                const newHasData = newVal !== undefined && newVal !== null && newVal !== "" && newVal !== 0;
+                const oldEmpty = oldVal === undefined || oldVal === null || oldVal === "" || oldVal === 0;
+                if (newHasData && oldEmpty) { existing[f] = newVal; changed = true; }
+              });
+              if (changed) filled++;
+            } else {
+              // dong moi hoan toan
+              newRow.id = nextId(store, "phap_danh_hop_dong_thue_tong_seq") || Date.now();
+              store.phap_danh_hop_dong_thue_tong.push(newRow);
+              existingMap[key] = newRow;
+              added++;
+            }
+          });
+
           save(store);
           const msg =
-                  `Đã cập nhật từ Google Sheet: ${allNewRows.length} dòng (` +
+                  `Đã đồng bộ từ Google Sheet: ${added} dòng mới, ${filled} dòng được bù thêm dữ liệu (` +
                   HOP_DONG_THUE_TONG_SHEETS.map((s) => `${s.label} ${perSheetCounts[s.key]}`).join(", ") +
                   `).`;
           res.redirect("/phap-danh/hop-dong-thue-gian-tong?success=" + encodeURIComponent(msg));
