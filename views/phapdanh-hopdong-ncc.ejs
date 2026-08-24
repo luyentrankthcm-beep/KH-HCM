@@ -99,17 +99,19 @@
                 <% } %>
               </td>
               <td>
-                <details>
-                  <summary class="link-btn">Chi tiết</summary>
-                  <div style="padding:10px; background:#fafafa; border-radius:8px; margin-top:6px; font-size:13px;">
-                    <p><strong>Tên đầy đủ NCC:</strong> <%= r.tenDayDuNCC || '—' %></p>
-                    <p><strong>MST:</strong> <%= r.mstNCC || '—' %> &nbsp; <strong>Địa chỉ:</strong> <%= r.diaChiNCC || '—' %></p>
-                    <p><strong>Số HĐ (gốc):</strong> <%= r.soHopDong || '—' %> &nbsp; <strong>Ngày ký:</strong> <%= r.ngayKy || '—' %> &nbsp; <strong>Bắt đầu:</strong> <%= r.ngayBatDauHD || '—' %></p>
-                    <% if (r.soTKNH) { %><p><strong>Số TK NH:</strong> <%= r.soTKNH %> — <%= r.khachMoTaiNH %></p><% } %>
-                    <% if (r.linkHopDong) { %><p><a href="<%= r.linkHopDong %>" target="_blank" rel="noopener">📄 Xem file hợp đồng gốc</a></p><% } %>
-                    <% if (r.ghiChu) { %><p class="muted"><%= r.ghiChu %></p><% } %>
-                    <% if (r.hoaDonDaThanhToan && r.hoaDonDaThanhToan.length) { %>
-                    <p style="margin-top:10px;"><strong>Hóa đơn đã thanh toán (đối chiếu từ trang Chi Phí):</strong></p>
+                <button type="button" class="link-btn" onclick="openNccDetail(<%= r.id %>)">▶ Chi tiết</button>
+                <div id="ncc-detail-<%= r.id %>" style="display:none;">
+                  <p><strong>Tên NCC:</strong> <%= r.tenNCC %></p>
+                  <p><strong>Tên đầy đủ NCC:</strong> <%= r.tenDayDuNCC || '—' %></p>
+                  <p><strong>MST:</strong> <%= r.mstNCC || '—' %> &nbsp; <strong>Địa chỉ:</strong> <%= r.diaChiNCC || '—' %></p>
+                  <p><strong>Số HĐ (gốc):</strong> <%= r.soHopDong || '—' %> &nbsp; <strong>Ngày ký:</strong> <%= r.ngayKy || '—' %> &nbsp; <strong>Bắt đầu:</strong> <%= r.ngayBatDauHD || '—' %></p>
+                  <% if (r.soTKNH) { %><p><strong>Số TK NH:</strong> <%= r.soTKNH %> — <%= r.khachMoTaiNH %></p><% } %>
+                  <% if (r.linkHopDong) { %><p><a href="<%= r.linkHopDong %>" target="_blank" rel="noopener">📄 Xem file hợp đồng gốc</a></p><% } %>
+                  <% if (r.ghiChu) { %><p class="muted"><%= r.ghiChu %></p><% } %>
+                  <% if (r.hoaDonDaThanhToan && r.hoaDonDaThanhToan.length) { %>
+                  <div style="margin-top:14px; padding:10px 12px; background:#f0f7ff; border-left:3px solid #1976d2; border-radius:6px;">
+                    <p style="margin:0 0 6px; font-weight:600; color:#1976d2;">💳 Chi phí đã thanh toán cho NCC này</p>
+                    <p style="margin:0 0 8px; font-size:12px; color:#555;">Tổng hợp từ trang Chi Phí — các hóa đơn đã được ghi nhận là đã chi cho NCC <strong><%= r.tenNCC %></strong>.</p>
                     <table class="table" style="margin-top:4px;">
                       <thead><tr><th>Ngày</th><th>Số hóa đơn</th><th>Số tiền</th><th></th></tr></thead>
                       <tbody>
@@ -123,9 +125,13 @@
                         <% }) %>
                       </tbody>
                     </table>
-                    <% } %>
-                    <% if (r.chiTiet && r.chiTiet.length) { %>
-                    <table class="table" style="margin-top:8px;">
+                  </div>
+                  <% } %>
+                  <% if (r.chiTiet && r.chiTiet.length) { %>
+                  <div style="margin-top:14px; padding:10px 12px; background:#f6fff0; border-left:3px solid #43a047; border-radius:6px;">
+                    <p style="margin:0 0 6px; font-weight:600; color:#2e7d32;">📋 Danh sách HĐ / Phụ lục</p>
+                    <p style="margin:0 0 8px; font-size:12px; color:#555;">Tất cả các hợp đồng gốc, phụ lục, BBNT, BBBG liên quan đến NCC này.</p>
+                    <table class="table" style="margin-top:4px;">
                       <thead>
                         <tr><th>Nội dung / Số phụ lục</th><th>Phân loại</th><th>Số HĐ</th><th>Ngày ký</th><th>Bắt đầu</th><th>Hết hạn</th><th>Số tiền</th><th>Link</th></tr>
                       </thead>
@@ -144,9 +150,9 @@
                         <% }) %>
                       </tbody>
                     </table>
-                    <% } %>
                   </div>
-                </details>
+                  <% } %>
+                </div>
               </td>
             </tr>
             <% }) %>
@@ -163,6 +169,43 @@
       </div>
     </section>
   </main>
+
+  <!-- Modal chi tiết NCC -->
+  <div id="nccDetailModal" style="display:none; position:fixed; inset:0; z-index:9999; background:rgba(0,0,0,0.45); display:none; align-items:center; justify-content:center; padding:16px;">
+    <div style="background:#fff; border-radius:12px; box-shadow:0 8px 40px rgba(0,0,0,0.22); max-width:760px; width:100%; max-height:88vh; overflow-y:auto; padding:0; position:relative;">
+      <div style="display:flex; align-items:center; justify-content:space-between; padding:16px 20px 12px; border-bottom:1px solid #eee; position:sticky; top:0; background:#fff; z-index:1;">
+        <h3 id="nccModalTitle" style="margin:0; font-size:16px; font-weight:700;"></h3>
+        <button type="button" onclick="closeNccModal()" style="background:none; border:none; font-size:22px; cursor:pointer; color:#888; line-height:1; padding:2px 6px;" title="Đóng">&times;</button>
+      </div>
+      <div id="nccModalBody" style="padding:18px 20px; font-size:13px; line-height:1.6;"></div>
+    </div>
+  </div>
+
+  <script>
+    function openNccDetail(id) {
+      var src = document.getElementById('ncc-detail-' + id);
+      if (!src) return;
+      var titleEl = document.getElementById('nccModalTitle');
+      // lấy tên NCC từ strong đầu tiên
+      var firstP = src.querySelector('p');
+      titleEl.textContent = firstP ? firstP.textContent.replace('Tên NCC:', '').trim() : 'Chi tiết NCC';
+      document.getElementById('nccModalBody').innerHTML = src.innerHTML;
+      var modal = document.getElementById('nccDetailModal');
+      modal.style.display = 'flex';
+      document.body.style.overflow = 'hidden';
+    }
+    function closeNccModal() {
+      document.getElementById('nccDetailModal').style.display = 'none';
+      document.body.style.overflow = '';
+    }
+    document.getElementById('nccDetailModal').addEventListener('click', function(e) {
+      if (e.target === this) closeNccModal();
+    });
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape') closeNccModal();
+    });
+  </script>
+
   <script>
     (function () {
       var PAGE_SIZE = 20;
@@ -198,15 +241,17 @@
       render();
 
       // Luyen, 2026-07-20: neu URL co #ncc-<id> (link tu trang Chi Phi qua),
-      // tu dong mo the "Chi tiet" cua dong do va cuon toi cho de xem ngay.
+      // tu dong mo modal chi tiet cua dong do.
       if (window.location.hash && window.location.hash.indexOf('#ncc-') === 0) {
-        var target = document.querySelector(window.location.hash);
+        var nccId = window.location.hash.replace('#ncc-', '');
+        var target = document.getElementById('ncc-' + nccId);
         if (target) {
           target.style.display = '';
-          var det = target.querySelector('details');
-          if (det) det.open = true;
-          setTimeout(function () { target.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, 50);
           target.style.background = '#fff6d8';
+          setTimeout(function () {
+            target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            openNccDetail(nccId);
+          }, 200);
         }
       }
     })();
