@@ -587,10 +587,12 @@ router.get("/chi-phi/:mien(mien-nam|mien-bac)/de-xuat-hoa-don", requireDataEntry
 
   const hdPool = (store.hoa_don_dau_vao || []).filter((h) => h.congTy === activeCompany && (h.soHoaDon || "").trim() && h.soTien);
 
+  const matchedIds = new Set();
   const results = [];
+
+  // Pass 1: khớp từng dòng 1-1 theo soTien + NCC
   chiPhiRows.forEach((r) => {
     if (!r.soTien || !r.ncc) return;
-    // Match by amount (±1000) then NCC score
     const byAmt = hdPool.filter((h) => Math.abs(h.soTien - r.soTien) <= 1000);
     if (byAmt.length === 0) return;
     const scored = byAmt
@@ -599,8 +601,9 @@ router.get("/chi-phi/:mien(mien-nam|mien-bac)/de-xuat-hoa-don", requireDataEntry
       .sort((a, b) => b.score - a.score);
     if (scored.length === 0) return;
     const best = scored[0];
+    matchedIds.add(r.id);
     results.push({
-      chiPhiId: r.id,
+      chiPhiIds: [r.id],
       ngay: r.ngay,
       gian: r.gian,
       ncc: r.ncc,
@@ -610,11 +613,75 @@ router.get("/chi-phi/:mien(mien-nam|mien-bac)/de-xuat-hoa-don", requireDataEntry
       tenNccHD: best.h.tenNCC,
       ngayHD: best.h.ngayHD,
       dienGiaiHD: best.h.dienGiai || "",
+      loaiMatch: "1:1",
       score: best.score,
-      hdId: best.h.id,
     });
   });
 
+  // Pass 2: sum matching – gom các dòng chưa khớp cùng NCC → tổng = 1 HĐ
+  const unmatched = chiPhiRows.filter((r) => !matchedIds.has(r.id) && r.soTien && r.ncc);
+  // Group by normalized NCC
+  const nccGroups = {};
+  unmatched.forEach((r) => {
+    const key = nccWords(r.ncc).sort().join("|");
+    if (!nccGroups[key]) nccGroups[key] = [];
+    nccGroups[key].push(r);
+  });
+  Object.values(nccGroups).forEach((group) => {
+    if (group.length < 2 || group.length > 8) return;
+    // Try pairs and triples
+    const maxCombo = Math.min(group.length, 5);
+    function combos(arr, k) {
+      if (k === 1) return arr.map((x) => [x]);
+      const res = [];
+      arr.forEach((el, i) => {
+        combos(arr.slice(i + 1), k - 1).forEach((rest) => res.push([el, ...rest]));
+      });
+      return res;
+    }
+    for (let k = 2; k <= maxCombo; k++) {
+      const found = [];
+      combos(group, k).forEach((combo) => {
+        const total = combo.reduce((s, r) => s + r.soTien, 0);
+        const byAmt = hdPool.filter((h) => Math.abs(h.soTien - total) <= 1000);
+        if (byAmt.length === 0) return;
+        const nccRef = combo[0].ncc;
+        const scored = byAmt
+          .map((h) => ({ h, score: matchNccScore(nccRef, h.tenNCC) }))
+          .filter((x) => x.score >= 2)
+          .sort((a, b) => b.score - a.score);
+        if (scored.length === 0) return;
+        const best = scored[0];
+        const ids = combo.map((r) => r.id);
+        if (ids.some((id) => matchedIds.has(id))) return;
+        found.push({ combo, best, total, ids, score: best.score });
+      });
+      // Chọn combo score cao nhất không trùng id
+      found.sort((a, b) => b.score - a.score);
+      found.forEach((f) => {
+        if (f.ids.some((id) => matchedIds.has(id))) return;
+        f.ids.forEach((id) => matchedIds.add(id));
+        const r0 = f.combo[0];
+        results.push({
+          chiPhiIds: f.ids,
+          ngay: r0.ngay,
+          gian: f.combo.map((r) => r.gian || '—').join(", "),
+          ncc: r0.ncc,
+          soTien: f.total,
+          chiPhiDetails: f.combo.map((r) => ({ id: r.id, gian: r.gian, soTien: r.soTien, dienGiai: r.dienGiai })),
+          soHoaDonGoiY: f.best.h.soHoaDon,
+          kyHieu: f.best.h.kyHieuHD || "",
+          tenNccHD: f.best.h.tenNCC,
+          ngayHD: f.best.h.ngayHD,
+          dienGiaiHD: f.best.h.dienGiai || "",
+          loaiMatch: k + ":1",
+          score: f.score,
+        });
+      });
+    }
+  });
+
+  results.sort((a, b) => (a.ngay < b.ngay ? 1 : -1));
   return res.json({ success: true, matches: results, total: chiPhiRows.length });
 });
 

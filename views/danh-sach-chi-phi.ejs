@@ -368,13 +368,19 @@
     html += '<div style="overflow-x:auto;"><table class="table" style="font-size:12px;min-width:800px;">'
       + '<thead><tr><th style="width:32px;"></th><th>Ngày</th><th>Gian</th><th>NCC (chi phí)</th><th style="text-align:right;">Số tiền</th>'
       + '<th>Số HĐ gợi ý</th><th>NCC trên HĐ</th><th>Ngày HĐ</th></tr></thead><tbody>';
-    matches.forEach(function(m) {
-      html += '<tr>'
-        + '<td><input type="checkbox" class="hd-check" data-id="'+m.chiPhiId+'" data-so="'+esc2(m.soHoaDonGoiY)+'" checked /></td>'
+    matches.forEach(function(m, idx) {
+      var ids = m.chiPhiIds || [m.chiPhiId];
+      var dataIds = JSON.stringify(ids).replace(/"/g,'&quot;');
+      var isSum = ids.length > 1;
+      var gianCell = isSum
+        ? '<div style="font-size:11px;color:#666;">'+(m.chiPhiDetails||[]).map(function(d){ return esc2(d.gian||'—')+' ('+Number(d.soTien).toLocaleString('vi-VN')+' đ)'; }).join('<br>')+'</div>'
+        : '<div style="max-width:100px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;" title="'+esc2(m.gian)+'">'+esc2(m.gian||'—')+'</div>';
+      html += '<tr'+(isSum?' style="background:rgba(255,243,224,0.6);"':'')+'>'
+        + '<td><input type="checkbox" class="hd-check" data-ids="'+dataIds+'" data-so="'+esc2(m.soHoaDonGoiY)+'" checked /></td>'
         + '<td style="white-space:nowrap;">'+fmtDate(m.ngay)+'</td>'
-        + '<td><div style="max-width:100px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;" title="'+esc2(m.gian)+'">'+esc2(m.gian||'—')+'</div></td>'
+        + '<td>'+gianCell+'</td>'
         + '<td><div style="max-width:140px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;" title="'+esc2(m.ncc)+'">'+esc2(m.ncc||'—')+'</div></td>'
-        + '<td style="text-align:right;white-space:nowrap;font-weight:600;">'+Number(m.soTien).toLocaleString('vi-VN')+' đ</td>'
+        + '<td style="text-align:right;white-space:nowrap;font-weight:600;">'+(isSum?'<span style="font-size:10px;color:#e65100;">∑</span> ':'')+Number(m.soTien).toLocaleString('vi-VN')+' đ</td>'
         + '<td style="font-weight:600;color:#1565c0;">'+esc2(m.soHoaDonGoiY)+(m.kyHieu?' ('+esc2(m.kyHieu)+')':'')+'</td>'
         + '<td><div style="max-width:160px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;" title="'+esc2(m.tenNccHD)+'">'+esc2(m.tenNccHD||'—')+'</div></td>'
         + '<td style="white-space:nowrap;color:#666;">'+fmtDate(m.ngayHD)+'</td>'
@@ -396,7 +402,10 @@
     btn.disabled = true;
     status.textContent = 'Đang lưu...';
     var items = [];
-    checks.forEach(function(c){ items.push({ chiPhiId: c.dataset.id, soHoaDon: c.dataset.so }); });
+    checks.forEach(function(c){
+      var ids = c.dataset.ids ? JSON.parse(c.dataset.ids) : [c.dataset.id];
+      ids.forEach(function(id){ items.push({ chiPhiId: id, soHoaDon: c.dataset.so }); });
+    });
     fetch('/chi-phi/cap-nhat-hoa-don-hang-loat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
@@ -408,7 +417,10 @@
       if (data.success) {
         status.textContent = '✓ Đã lưu ' + data.updated + ' dòng.';
         // Cập nhật lại _dschMap và bảng
+        var updated_set = {};
         items.forEach(function(it) {
+          if (updated_set[it.chiPhiId]) return;
+          updated_set[it.chiPhiId] = true;
           if (_dschMap[it.chiPhiId]) _dschMap[it.chiPhiId].soHoaDon = it.soHoaDon;
           var tr = document.getElementById('dsch-tr-' + it.chiPhiId);
           if (tr) { var cells = tr.querySelectorAll('td'); if (cells[4]) cells[4].textContent = it.soHoaDon; }
