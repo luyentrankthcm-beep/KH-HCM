@@ -295,11 +295,18 @@
         if (tr && data.record) {
           var r = data.record;
           var cells = tr.querySelectorAll('td');
-          // cells: 0=ngày,1=gian,2=tk,3=ncc,4=soHD,5=soUNC,6=CTLQ,7=dienGiai,8=soTien,9=chi
+          // cells: 0=ngày,1=gian,2=tk,3=ncc,4=soHD,5=Loại(phanLoai),6=soUNC,7=CTLQ,8=dienGiai,9=soTien,10=chi
           if (cells[3]) cells[3].querySelector('div').textContent = r.ncc || '—';
           if (cells[4]) cells[4].textContent = r.soHoaDon || '—';
-          if (cells[5]) cells[5].textContent = r.soUNC || '—';
-          if (cells[7]) cells[7].querySelector('div').textContent = r.dienGiai || '—';
+          if (cells[5]) {
+            var pl = r.phanLoai || r._phanLoaiAuto || 'DV';
+            var plColor = pl==='HH' ? '#2e7d32' : '#1565c0';
+            var plBg = pl==='HH' ? '#e8f5e9' : '#e3f2fd';
+            var plTitle = (pl==='HH' ? 'Hàng hóa' : 'Dịch vụ') + (r.phanLoai ? ' (đã sửa tay)' : ' (tự động)');
+            cells[5].innerHTML = '<span style="font-size:10px;font-weight:700;padding:2px 5px;border-radius:99px;background:'+plBg+';color:'+plColor+'" title="'+plTitle+'">'+pl+'</span>';
+          }
+          if (cells[6]) cells[6].textContent = r.soUNC || '—';
+          if (cells[8]) cells[8].querySelector('div').textContent = r.dienGiai || '—';
         }
         dschExitEdit();
         renderDschView(_dschMap[id]);

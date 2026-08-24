@@ -316,7 +316,15 @@ router.get("/chi-phi/:mien(mien-nam|mien-bac)/danh-sach", (req, res) => {
       _phanLoaiChanged = true;
     }
   });
-  if (_phanLoaiChanged) save(store);
+  // Dọn dẹp phanLoai bị lỗi (VD: "UNC 07/8" ghi nhầm vào phanLoai do bug cell index)
+  let _sanitizeChanged = false;
+  store.chi_phi.forEach((rec) => {
+    if (rec.phanLoai && !["HH","DV"].includes(rec.phanLoai)) {
+      rec.phanLoai = "";
+      _sanitizeChanged = true;
+    }
+  });
+  if (_sanitizeChanged || _phanLoaiChanged) save(store);
 
   // Tự trích số HĐ từ dienGiai nếu chưa có soHoaDon
   // VD: "theo hóa đơn 4594", "theo hd 106541", "hd so 4594", "HĐ 4594"
@@ -805,6 +813,8 @@ router.post("/chi-phi/:id/update", requireDataEntry, (req, res) => {
   editableFields.forEach((f) => {
     if (req.body[f] !== undefined) r[f] = (req.body[f] || "").trim();
   });
+  // Sanitize phanLoai: chỉ chấp nhận "", "HH", "DV"
+  if (!["", "HH", "DV"].includes(r.phanLoai || "")) r.phanLoai = "";
   save(store);
   return res.json({ success: true, record: r });
 });
