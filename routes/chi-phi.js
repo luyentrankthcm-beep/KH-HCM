@@ -316,6 +316,19 @@ router.get("/chi-phi/:mien(mien-nam|mien-bac)/danh-sach", (req, res) => {
       _phanLoaiChanged = true;
     }
   });
+  // Auto-apply gian_1388: gian nào đã từng tick 1388 → tự điền dtChiaSe=true cho record mới
+  const _gian1388Set = new Set((store.gian_1388 || []).map((g) => g.trim()));
+  if (_gian1388Set.size > 0) {
+    let _g1388Changed = false;
+    store.chi_phi.forEach((rec) => {
+      const g = (rec.gian || "").trim();
+      if (_gian1388Set.has(g) && !rec.dtChiaSe) { rec.dtChiaSe = true; _g1388Changed = true; }
+    });
+    if (_g1388Changed) save(store);
+    // Cập nhật rows hiển thị
+    rows.forEach((r) => { if (_gian1388Set.has((r.gian||"").trim())) r.dtChiaSe = true; });
+  }
+
   // Dọn dẹp phanLoai bị lỗi (VD: "UNC 07/8" ghi nhầm vào phanLoai do bug cell index)
   let _sanitizeChanged = false;
   store.chi_phi.forEach((rec) => {
@@ -825,8 +838,24 @@ router.post("/chi-phi/:id/toggle-dt-chia-se", requireDataEntry, (req, res) => {
   const r = store.chi_phi.find((x) => String(x.id) === req.params.id);
   if (!r) return res.status(404).json({ error: "Không tìm thấy khoản chi." });
   r.dtChiaSe = req.body.dtChiaSe === true || req.body.dtChiaSe === "true" || req.body.dtChiaSe === 1;
+  // Lưu/xóa gian khỏi danh sách gian_1388 để tự động áp dụng lần sau
+  if (!store.gian_1388) store.gian_1388 = [];
+  const gian = (r.gian || "").trim();
+  if (gian) {
+    if (r.dtChiaSe) {
+      if (!store.gian_1388.includes(gian)) store.gian_1388.push(gian);
+    } else {
+      store.gian_1388 = store.gian_1388.filter((g) => g !== gian);
+    }
+  }
+  // Áp dụng ngay cho toàn bộ record cùng gian
+  if (gian) {
+    store.chi_phi.forEach((rec) => {
+      if ((rec.gian || "").trim() === gian) rec.dtChiaSe = r.dtChiaSe;
+    });
+  }
   save(store);
-  return res.json({ success: true, dtChiaSe: r.dtChiaSe });
+  return res.json({ success: true, dtChiaSe: r.dtChiaSe, gian });
 });
 
 router.post("/chi-phi/:mien(mien-nam|mien-bac)", requireDataEntry, (req, res) => {
