@@ -283,17 +283,28 @@ router.get("/chi-phi/:mien(mien-nam|mien-bac)/danh-sach", (req, res) => {
   // 3) Con lai → DV
   const hdByHD = {};
   (store.hoa_don_dau_vao || []).forEach((h) => { if (h.soHoaDon) hdByHD[h.soHoaDon.trim()] = h; });
+  let _phanLoaiChanged = false;
   rows.forEach((r) => {
     if (r.phanLoai) return; // đã set tay → giữ nguyên
     const soHD = (r.soHoaDon || "").trim();
+    let autoVal;
     if (soHD && hdByHD[soHD] && hdByHD[soHD].phanLoai) {
-      r._phanLoaiAuto = hdByHD[soHD].phanLoai === "Hàng hóa" ? "HH" : "DV";
+      autoVal = hdByHD[soHD].phanLoai === "Hàng hóa" ? "HH" : "DV";
     } else if ((r.gian || "").includes("-")) {
-      r._phanLoaiAuto = "HH";
+      autoVal = "HH";
     } else {
-      r._phanLoaiAuto = "DV";
+      autoVal = "DV";
+    }
+    r._phanLoaiAuto = autoVal;
+    // Lưu vào store để lần sau import lại vẫn nhớ
+    const storeRec = store.chi_phi.find((x) => x.id === r.id);
+    if (storeRec && !storeRec.phanLoai) {
+      storeRec.phanLoai = autoVal;
+      r.phanLoai = autoVal;
+      _phanLoaiChanged = true;
     }
   });
+  if (_phanLoaiChanged) save(store);
 
   const tongTien = rows.reduce((s, r) => s + (r.soTien || 0), 0);
 
