@@ -248,6 +248,20 @@ router.get("/chi-phi/:mien(mien-nam|mien-bac)/danh-sach", (req, res) => {
   if (thangFilter) rows = rows.filter((r) => (r.ngay || "").slice(0, 7) === thangFilter);
   rows.sort((a, b) => (a.ngay < b.ngay ? 1 : -1));
 
+  // Dedup: bỏ qua các dòng trùng ngày + gian + soTien, giữ dòng có nhiều thông tin hơn
+  (function dedup() {
+    const seen = new Map();
+    const scoreRow = (r) =>
+      [(r.soHoaDon||"").trim(), (r.soUNC||"").trim(), (r.soChungTuLienQuan||"").trim(),
+       (r.ghiChu||"").trim(), (r.linkHoaDon||"").trim()].filter(Boolean).length;
+    rows.forEach((r) => {
+      const key = (r.ngay||"") + "|" + (r.gian||"") + "|" + (r.soTien||0);
+      if (!seen.has(key)) { seen.set(key, r); }
+      else if (scoreRow(r) > scoreRow(seen.get(key))) { seen.set(key, r); }
+    });
+    rows = [...seen.values()];
+  })();
+
   if (q) {
     rows = rows.filter((r) =>
       (r.dienGiai || "").toLowerCase().includes(q) ||
