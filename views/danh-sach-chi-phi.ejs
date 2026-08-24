@@ -75,7 +75,6 @@
           <colgroup>
             <col style="width:82px;">
             <col style="width:120px;">
-            <col style="width:46px;">
             <col style="width:44px;"><!-- TK KT 331/1388 -->
             <col style="width:160px;">
             <col style="width:68px;">
@@ -85,26 +84,28 @@
             <col><!-- dien giai -->
             <col style="width:110px;">
             <col style="width:38px;">
+            <col style="width:38px;"><!-- HT -->
           </colgroup>
           <thead>
             <tr>
-              <th>Ngày</th><th>Gian</th><th>TK</th><th title="TK kế toán: 331 = phải trả NCC, 1388 = doanh thu chia sẻ. Bấm để đổi.">TK KT</th><th>NCC</th>
+              <th>Ngày</th><th>Gian</th><th title="TK kế toán: 331 = phải trả NCC, 1388 = doanh thu chia sẻ. Bấm để đổi.">TK KT</th><th>NCC</th>
               <th>Số HĐ</th><th title="Hàng hóa / Dịch vụ">Loại</th><th>Số UNC</th><th>CT LQ</th>
               <th>Diễn giải</th>
               <th style="text-align:right;">Số tiền</th>
               <th style="text-align:center;" title="Đã chi">Chi</th>
+              <th style="text-align:center;" title="Đã hạch toán MISA">HT</th>
             </tr>
           </thead>
           <tbody>
             <% rows.forEach(function(r) { %>
             <tr class="dsch-row"
                 id="dsch-tr-<%= r.id %>"
+                style="<%= r.daHachToan ? 'background:rgba(56,142,60,0.07);' : '' %>"
                 onclick="openDschModal(<%= r.id %>)">
               <td style="white-space:nowrap;color:var(--muted);">
                 <%= r.ngay ? new Date(r.ngay).toLocaleDateString('vi-VN') : '—' %>
               </td>
               <td class="dsch-cell"><div class="dsch-cell-1" title="<%= r.gian || '' %>"><%= r.gian || '—' %></div></td>
-              <td style="color:var(--muted);white-space:nowrap;"><%= r.taiKhoan || '—' %></td>
               <td style="text-align:center;" onclick="event.stopPropagation(); toggleTkKT(<%= r.id %>, this)" title="Bấm để đổi 331 ↔ 1388">
                 <span id="tkkt-<%= r.id %>" style="font-size:10px;font-weight:700;padding:2px 5px;border-radius:99px;cursor:pointer;<%= r.dtChiaSe ? 'background:#fff3e0;color:#e65100;' : 'background:#f3f3f3;color:#555;' %>">
                   <%= r.dtChiaSe ? '1388' : '331' %>
@@ -131,13 +132,20 @@
               <td style="text-align:center;font-size:15px;">
                 <% if (r.daChi) { %><span style="color:#388e3c;">☑</span><% } else { %><span style="color:#ccc;">☐</span><% } %>
               </td>
+              <td style="text-align:center;" onclick="event.stopPropagation();">
+                <input type="checkbox" id="ht-<%= r.id %>" <%= r.daHachToan ? 'checked' : '' %>
+                  style="width:15px;height:15px;cursor:pointer;"
+                  title="Đã hạch toán MISA"
+                  onchange="toggleHtRow(<%= r.id %>, this)" />
+              </td>
             </tr>
             <% }) %>
           </tbody>
           <tfoot>
             <tr style="background:var(--bg-hover,#f5f5f5);font-weight:700;">
-              <td colspan="10" style="text-align:right;padding-right:10px;">Tổng cộng:</td>
+              <td colspan="9" style="text-align:right;padding-right:10px;">Tổng cộng:</td>
               <td style="text-align:right;white-space:nowrap;"><%= tongTien.toLocaleString('vi-VN') %> đ</td>
+              <td></td>
               <td></td>
             </tr>
           </tfoot>
@@ -203,7 +211,6 @@
     var fields = [
       ['Ngày', fmtDate(r.ngay)],
       ['Gian', fmt(r.gian)],
-      ['Tài khoản', fmt(r.taiKhoan)],
       ['NCC', fmt(r.ncc)],
       ['Số hóa đơn', fmt(r.soHoaDon)],
       ['Phân loại', (function(){
@@ -224,7 +231,11 @@
       ['Ghi chú', r.ghiChu || null],
       ['Trạng thái HĐ', r.trangThaiHoaDon || null],
       ['Link hóa đơn', r.linkHoaDon ? '<a href="'+r.linkHoaDon+'" target="_blank" rel="noopener">Xem hóa đơn</a>' : null],
-      ['Đã chi', r.daChi ? '✓ Đã chi' : 'Chưa chi'],
+      ['Đã chi', r.daChi
+        ? '<span style="color:#388e3c;font-weight:600;">✓ Đã chi</span>'
+          + (r.nguon ? ' — <span style="color:#555;">' + r.nguon + '</span>' : '')
+          + (r.ngay ? ' — <span style="color:#888;">' + fmtDate(r.ngay) + '</span>' : '')
+        : '<span style="color:#aaa;">Chưa chi</span>'],
     ];
     var html = '';
     fields.forEach(function(f) {
@@ -272,6 +283,32 @@
     document.getElementById('dschSaveStatus').textContent = '';
   }
 
+  function toggleHtRow(id, cb) {
+    var body = new URLSearchParams();
+    body.append('daHachToan', cb.checked ? '1' : '0');
+    fetch('/chi-phi/' + id + '/hach-toan', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-Requested-With': 'XMLHttpRequest' },
+      body: body.toString()
+    })
+    .then(function(r){ return r.json(); })
+    .then(function(data) {
+      if (data.success) {
+        if (_dschMap[id]) _dschMap[id].daHachToan = data.daHachToan;
+        var tr = document.getElementById('dsch-tr-' + id);
+        if (tr) tr.style.background = data.daHachToan ? 'rgba(56,142,60,0.07)' : '';
+        // sync modal checkbox nếu đang mở
+        if (_dschCurrentId == id) {
+          var mc = document.getElementById('dschHtCheck');
+          if (mc) mc.checked = data.daHachToan;
+          var ms = document.getElementById('dschHtStatus');
+          if (ms) ms.textContent = data.daHachToan ? '✓ Đã hạch toán' : '';
+        }
+      } else { cb.checked = !cb.checked; }
+    })
+    .catch(function() { cb.checked = !cb.checked; });
+  }
+
   function toggleTkKT(id, tdEl) {
     var span = document.getElementById('tkkt-' + id);
     if (!span) return;
@@ -317,18 +354,18 @@
         if (tr && data.record) {
           var r = data.record;
           var cells = tr.querySelectorAll('td');
-          // cells: 0=ngày,1=gian,2=tk,3=tkKT,4=ncc,5=soHD,6=Loại(phanLoai),7=soUNC,8=CTLQ,9=dienGiai,10=soTien,11=chi
-          if (cells[4]) cells[4].querySelector('div').textContent = r.ncc || '—';
-          if (cells[5]) cells[5].textContent = r.soHoaDon || '—';
-          if (cells[6]) {
+          // cells: 0=ngày,1=gian,2=tkKT,3=ncc,4=soHD,5=Loại(phanLoai),6=soUNC,7=CTLQ,8=dienGiai,9=soTien,10=chi,11=HT
+          if (cells[3]) cells[3].querySelector('div').textContent = r.ncc || '—';
+          if (cells[4]) cells[4].textContent = r.soHoaDon || '—';
+          if (cells[5]) {
             var pl = r.phanLoai || r._phanLoaiAuto || 'DV';
             var plColor = pl==='HH' ? '#2e7d32' : '#1565c0';
             var plBg = pl==='HH' ? '#e8f5e9' : '#e3f2fd';
             var plTitle = (pl==='HH' ? 'Hàng hóa' : 'Dịch vụ') + (r.phanLoai ? ' (đã sửa tay)' : ' (tự động)');
-            cells[6].innerHTML = '<span style="font-size:10px;font-weight:700;padding:2px 5px;border-radius:99px;background:'+plBg+';color:'+plColor+'" title="'+plTitle+'">'+pl+'</span>';
+            cells[5].innerHTML = '<span style="font-size:10px;font-weight:700;padding:2px 5px;border-radius:99px;background:'+plBg+';color:'+plColor+'" title="'+plTitle+'">'+pl+'</span>';
           }
-          if (cells[7]) cells[7].textContent = r.soUNC || '—';
-          if (cells[9]) cells[9].querySelector('div').textContent = r.dienGiai || '—';
+          if (cells[6]) cells[6].textContent = r.soUNC || '—';
+          if (cells[8]) cells[8].querySelector('div').textContent = r.dienGiai || '—';
         }
         dschExitEdit();
         renderDschView(_dschMap[id]);
