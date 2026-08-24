@@ -245,7 +245,14 @@ router.get("/phap-danh/hop-dong-thue-gian-hang", (req, res) => {
     .map(ensureThueDefaults)
     .filter((r) => (r.congTy || "kh_cu") === activeCompany && isMienNamRow(r));
   if (loaiFilter) rows = rows.filter((r) => r.loaiHinh === loaiFilter);
-  if (thangFilter) rows = rows.filter((r) => monthOverlaps(r, thangFilter));
+  if (thangFilter) {
+    rows = rows.filter((r) => monthOverlaps(r, thangFilter));
+    // Luyen, 2026-08-24: khi loc theo thang, bo cac HD da het han truoc dau thang
+    rows = rows.filter((r) => {
+      if (!r.ngayHetHanHD) return true;
+      return r.ngayHetHanHD >= thangFilter + "-01";
+    });
+  }
   rows.forEach((r) => {
     r.trangThaiHD = computeTrangThaiHD(r, todayStr);
   });
