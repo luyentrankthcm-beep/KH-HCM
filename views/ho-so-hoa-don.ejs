@@ -49,45 +49,55 @@
           <% }); %>
         </select>
       </form>
-      <span style="color:#666;font-size:.9em;"><strong><%= total %></strong> hóa đơn</span>
+      <span style="color:#666;font-size:.9em;"><strong><%= total %></strong> hóa đơn · <strong><%= groups.length %></strong> NCC</span>
     </div>
 
-    <% if (rows.length === 0) { %>
+    <% if (groups.length === 0) { %>
     <p style="color:#888;">Chưa có dữ liệu hóa đơn.</p>
     <% } else { %>
     <div style="overflow-x:auto;">
       <table class="hoso-table">
         <thead>
           <tr>
-            <th>#</th>
-            <th>NCC</th>
-            <th>Tên đầy đủ NCC</th>
+            <th style="width:36px;">#</th>
+            <th style="width:170px;">Số HĐ · Ngày</th>
             <th>Tổng tiền TT</th>
             <th>Nội dung tóm tắt</th>
             <th>Hồ sơ liên quan</th>
             <th>Link HĐ</th>
-            <th></th>
+            <th style="width:36px;"></th>
           </tr>
         </thead>
         <tbody>
-          <% rows.forEach(function(r, i) { %>
-          <tr>
-            <td style="color:#999;font-size:.8em;"><%= i+1 %></td>
-            <td>
-              <div class="ncc-short"><%= r.nccShort %></div>
-              <div style="color:#888;font-size:.8em;margin-top:.1rem;"><span class="tag-so"><%= r.soHoaDon %></span> · <%= r.ngay ? r.ngay.split('-').reverse().join('/') : '' %></div>
+          <% var _invNum = 0; groups.forEach(function(g) { %>
+          <tr style="background:#1e3a5f;color:#fff;">
+            <td colspan="2" style="padding:.5rem .75rem;">
+              <span style="font-weight:700;font-size:.9em;color:#fff;"><%= g.nccShort %></span>
+              <% if (g.tenDayDuNCC) { %>
+              <span style="font-weight:normal;font-size:.8em;margin-left:.5rem;opacity:.8;">— <%= g.tenDayDuNCC %></span>
+              <% } %>
             </td>
-            <td class="ncc-full" style="<%= r.autoFilled ? 'color:#555;font-style:italic;' : '' %>"><%= r.tenDayDuNCC || '—' %></td>
-            <td class="tien" style="<%= r.autoFilled ? 'color:#888;' : '' %>"><%= r.tongTien || '—' %></td>
+            <td style="padding:.5rem .75rem;font-size:.8em;opacity:.75;white-space:nowrap;"><%= g.invoices.length %> hóa đơn</td>
+            <td colspan="4"></td>
+          </tr>
+          <% g.invoices.forEach(function(r, ii) { _invNum++; %>
+          <tr style="background:<%= ii%2===0?'#f5f8ff':'#eef3ff' %>;">
+            <td style="color:#bbb;font-size:.78em;padding-left:1.2rem;"><%= _invNum %></td>
+            <td>
+              <span class="tag-so"><%= r.soHoaDon %></span>
+              <span style="color:#888;font-size:.8em;margin-left:.3rem;white-space:nowrap;"><%= r.ngay ? r.ngay.split('-').reverse().join('/') : '' %></span>
+            </td>
+            <td class="tien" style="<%= r.autoFilled && r.tongTien ? 'color:#888;' : '' %>"><%= r.tongTien || '—' %></td>
             <td style="max-width:220px;"><%= r.noiDung || '—' %></td>
-            <td style="max-width:180px;color:#bbb;font-style:italic;">—</td>
+            <td style="color:#bbb;font-style:italic;">—</td>
             <td>
               <% if (r.driveLink) { %>
-              <a href="<%= r.driveLink %>" target="_blank" rel="noopener" class="link-hd">📄 Mở HĐ</a>
-              <% } else { %><span class="empty-val">—</span><% } %>
+              <a href="<%= r.driveLink %>" target="_blank" rel="noopener" class="link-hd">📄 Mở</a>
+              <% } else { %><span style="color:#bbb;">—</span><% } %>
             </td>
             <td><button class="btn-edit" onclick="openEdit('<%= r.driveId %>','<%= encodeURIComponent(r.nccShort) %>','<%= encodeURIComponent(r.tenDayDuNCC||'') %>','<%= encodeURIComponent(r.tongTien||'') %>','<%= encodeURIComponent(r.noiDung||'') %>','<%= encodeURIComponent(r.hoSoLienQuan||'') %>')">✏️</button></td>
           </tr>
+          <% }); %>
           <% }); %>
         </tbody>
       </table>

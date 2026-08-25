@@ -28,15 +28,24 @@ function ensureHoSo(store) {
   if (!store.ho_so_hoa_don) store.ho_so_hoa_don = [];
 }
 
+// Bo so 0 dau de doi chieu so HD khong phu thuoc format (2072 = 00002072)
+function normSoHD(s) {
+  const str = String(s || "").trim();
+  return str.replace(/^0+/, "") || str;
+}
+
 // Luyen, 2026-08-25: tu dong dien Ten NCC va Tong tien tu bang hoa_don_dau_vao
-// (doi chieu theo so hoa don tu ten file). Neu da sua tay thi uu tien du lieu tay.
+// (doi chieu theo so hoa don tu ten file). Luu ca key goc lan key bo so 0 dau.
 function buildHddvLookup(store) {
-  const lookup = {}; // soHoaDon -> { tenNCC, tongTien }
+  const lookup = {}; // soHoaDon (raw + normalized) -> { tenNCC, tongTien }
   (store.hoa_don_dau_vao || []).forEach((r) => {
     const no = String(r.soHoaDon || "").trim();
     if (!no) return;
-    if (!lookup[no]) lookup[no] = { tenNCC: r.tenNCC || "", tongTien: 0 };
-    lookup[no].tongTien += r.soTien || 0;
+    const noNorm = normSoHD(no);
+    [no, noNorm].forEach((k) => {
+      if (!lookup[k]) lookup[k] = { tenNCC: r.tenNCC || "", tongTien: 0 };
+      lookup[k].tongTien += r.soTien || 0;
+    });
   });
   return lookup;
 }
@@ -68,7 +77,9 @@ function lookupNccNameFallback(nccShort, store) {
 
 function enrichRow(r, hddvLookup, store) {
   const parsed = parseInvoiceFileName(r.fileName || "");
-  const inv = hddvLookup && parsed.soHoaDon ? hddvLookup[parsed.soHoaDon] : null;
+  const inv = hddvLookup && parsed.soHoaDon
+    ? (hddvLookup[parsed.soHoaDon] || hddvLookup[normSoHD(parsed.soHoaDon)])
+    : null;
   const autoTenFromHD = inv ? inv.tenNCC : "";
   const autoTenFromNCC = !autoTenFromHD ? lookupNccNameFallback(parsed.ncc, store) : "";
   const autoTen = autoTenFromHD || autoTenFromNCC;
@@ -105,9 +116,26 @@ router.get("/ho-so/hoa-don-ncc", (req, res) => {
     return parseInvoiceFileName(r.fileName || "").thang;
   }).filter(Boolean))].sort().reverse();
 
+  // Nhom theo nccShort (ten ngan trong ten file) -- moi NCC 1 nhom du co
+  // chi nhanh hay ten khac nhau. Ten day du NCC lay tu hoa don dau vao / ncc list.
+  const groupMap = new Map();
+  rows.forEach((r) => {
+    const key = r.nccShort.toLowerCase();
+    if (!groupMap.has(key)) {
+      groupMap.set(key, { nccShort: r.nccShort, tenDayDuNCC: "", invoices: [] });
+    }
+    const g = groupMap.get(key);
+    if (!g.tenDayDuNCC && r.tenDayDuNCC) g.tenDayDuNCC = r.tenDayDuNCC;
+    g.invoices.push(r);
+  });
+  const groups = Array.from(groupMap.values()).sort((a, b) =>
+    a.nccShort.toLowerCase().localeCompare(b.nccShort.toLowerCase())
+  );
+
   res.render("ho-so-hoa-don", {
     userName: req.session.userName,
     rows,
+    groups,
     thangFilter,
     allThang,
     total: rows.length,
