@@ -87,7 +87,7 @@
               <span class="tag-so"><%= r.soHoaDon %></span>
               <span style="color:#888;font-size:.8em;margin-left:.3rem;white-space:nowrap;"><%= r.ngay ? r.ngay.split('-').reverse().join('/') : '' %></span>
             </td>
-            <td class="tien" style="<%= r.autoFilled && r.tongTien ? 'color:#888;' : '' %>"><%= r.tongTien || '—' %></td>
+            <td class="<%= r.tongTien ? 'tien' : '' %>" style="<%= (!r.tongTien) ? 'color:#bbb;' : (r.autoFilled ? 'color:#888;' : '') %>"><%= r.tongTien || '—' %></td>
             <td style="max-width:220px;"><%= r.noiDung || '—' %></td>
             <td style="color:#bbb;font-style:italic;">—</td>
             <td>
