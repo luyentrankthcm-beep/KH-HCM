@@ -43,8 +43,10 @@ function buildHddvLookup(store) {
     if (!no) return;
     const noNorm = normSoHD(no);
     [no, noNorm].forEach((k) => {
-      if (!lookup[k]) lookup[k] = { tenNCC: r.tenNCC || "", tongTien: 0 };
+      if (!lookup[k]) lookup[k] = { tenNCC: r.tenNCC || "", tongTien: 0, dienGiai: r.dienGiai || r.tenHangHoaMisa || "" };
       lookup[k].tongTien += r.soTien || 0;
+      if (!lookup[k].dienGiai && (r.dienGiai || r.tenHangHoaMisa))
+        lookup[k].dienGiai = r.dienGiai || r.tenHangHoaMisa || "";
     });
   });
   return lookup;
@@ -93,7 +95,7 @@ function enrichRow(r, hddvLookup, store) {
     driveLink: r.driveId ? `https://drive.google.com/file/d/${r.driveId}/view` : "",
     tenDayDuNCC: r.tenDayDuNCC || autoTen,
     tongTien: r.tongTien || autoTien,
-    noiDung: r.noiDung || "",
+    noiDung: r.noiDung || (inv ? inv.dienGiai : "") || "",
     hoSoLienQuan: r.hoSoLienQuan || "",
     autoFilled: !r.tenDayDuNCC && !!autoTen,
   };
