@@ -194,4 +194,91 @@ router.post("/ho-so/hoa-don-ncc/ncc/:nccKey/luu-chungtu", requireAdmin, (req, re
   res.json({ ok: true });
 });
 
+// ─── Phí Cảng Phú Quốc ────────────────────────────────────────────────────
+router.get("/ho-so/phi-cang-phu-quoc", (req, res) => {
+  const store = load();
+  const rows = (store.ho_so_phi_cang || []).slice().sort((a,b) => (b.ngay||'').localeCompare(a.ngay||''));
+  res.render("ho-so-phi-cang", {
+    userName: req.session.userName,
+    rows,
+    error: req.query.error || null,
+    success: req.query.success || null,
+  });
+});
+
+router.post("/ho-so/phi-cang-phu-quoc/them", requireAdmin, (req, res) => {
+  const store = load();
+  if (!store.ho_so_phi_cang) store.ho_so_phi_cang = [];
+  const { ngay, loaiPhi, soTien, linkFile, ghiChu } = req.body;
+  store.ho_so_phi_cang.push({
+    id: nextId(store),
+    ngay: (ngay||"").trim(),
+    loaiPhi: (loaiPhi||"").trim(),
+    soTien: (soTien||"").trim(),
+    linkFile: (linkFile||"").trim(),
+    ghiChu: (ghiChu||"").trim(),
+    createdAt: new Date().toISOString(),
+  });
+  save(store);
+  res.redirect("/ho-so/phi-cang-phu-quoc?success=Đã+thêm");
+});
+
+router.post("/ho-so/phi-cang-phu-quoc/:id/xoa", requireAdmin, (req, res) => {
+  const store = load();
+  store.ho_so_phi_cang = (store.ho_so_phi_cang||[]).filter(r=>String(r.id)!==req.params.id);
+  save(store);
+  res.redirect("/ho-so/phi-cang-phu-quoc?success=Đã+xóa");
+});
+
+router.post("/ho-so/phi-cang-phu-quoc/:id/sua", requireAdmin, (req, res) => {
+  const store = load();
+  const r = (store.ho_so_phi_cang||[]).find(x=>String(x.id)===req.params.id);
+  if (r) { r.ngay=(req.body.ngay||'').trim(); r.loaiPhi=(req.body.loaiPhi||'').trim(); r.soTien=(req.body.soTien||'').trim(); r.linkFile=(req.body.linkFile||'').trim(); r.ghiChu=(req.body.ghiChu||'').trim(); save(store); }
+  res.redirect("/ho-so/phi-cang-phu-quoc?success=Đã+lưu");
+});
+
+// ─── Doanh Thu Chia Sẻ ────────────────────────────────────────────────────
+router.get("/ho-so/doanh-thu-chia-se", (req, res) => {
+  const store = load();
+  const rows = (store.ho_so_doanhthu_chiase || []).slice().sort((a,b) => (b.ngay||'').localeCompare(a.ngay||''));
+  res.render("ho-so-doanhthu-chiase", {
+    userName: req.session.userName,
+    rows,
+    error: req.query.error || null,
+    success: req.query.success || null,
+  });
+});
+
+router.post("/ho-so/doanh-thu-chia-se/them", requireAdmin, (req, res) => {
+  const store = load();
+  if (!store.ho_so_doanhthu_chiase) store.ho_so_doanhthu_chiase = [];
+  const { ngay, gian, loai, soTien, linkFile, ghiChu } = req.body;
+  store.ho_so_doanhthu_chiase.push({
+    id: nextId(store),
+    ngay: (ngay||"").trim(),
+    gian: (gian||"").trim(),
+    loai: (loai||"").trim(),
+    soTien: (soTien||"").trim(),
+    linkFile: (linkFile||"").trim(),
+    ghiChu: (ghiChu||"").trim(),
+    createdAt: new Date().toISOString(),
+  });
+  save(store);
+  res.redirect("/ho-so/doanh-thu-chia-se?success=Đã+thêm");
+});
+
+router.post("/ho-so/doanh-thu-chia-se/:id/xoa", requireAdmin, (req, res) => {
+  const store = load();
+  store.ho_so_doanhthu_chiase = (store.ho_so_doanhthu_chiase||[]).filter(r=>String(r.id)!==req.params.id);
+  save(store);
+  res.redirect("/ho-so/doanh-thu-chia-se?success=Đã+xóa");
+});
+
+router.post("/ho-so/doanh-thu-chia-se/:id/sua", requireAdmin, (req, res) => {
+  const store = load();
+  const r = (store.ho_so_doanhthu_chiase||[]).find(x=>String(x.id)===req.params.id);
+  if (r) { r.ngay=(req.body.ngay||'').trim(); r.gian=(req.body.gian||'').trim(); r.loai=(req.body.loai||'').trim(); r.soTien=(req.body.soTien||'').trim(); r.linkFile=(req.body.linkFile||'').trim(); r.ghiChu=(req.body.ghiChu||'').trim(); save(store); }
+  res.redirect("/ho-so/doanh-thu-chia-se?success=Đã+lưu");
+});
+
 module.exports = router;
