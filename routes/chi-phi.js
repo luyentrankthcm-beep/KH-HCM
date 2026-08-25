@@ -899,9 +899,10 @@ router.get("/chi-phi/:mien(mien-nam|mien-bac)/de-xuat-hoa-don", requireDataEntry
 });
 
 // Luyen, 2026-08-25: "các gian trống bạn kiếm trong diễn giải đi rồi gợi ý cho
-// tôi nhá rồi tôi sẽ xem qua" -- tim dong gian trong / generic, khop dien giai
-// voi danh muc cong trinh, tra ve danh sach de nguoi dung review + chon truoc
-// khi ap dung (nguong 0.5 thay vi 0.8 auto-apply vi nguoi dung se xac nhan).
+// tôi nhá" -- trich xuat ten gian thang tu dien giai bang extractGianRentText
+// (mau "CTY K VA H TT tien thue [ghe] GIAN Thang X"), khong can khop cong trinh.
+// Nguoi dung xem qua roi bam "Ap dung" -> gian duoc dien, sau do Map Gian de
+// gan ma cong trinh neu can.
 router.get("/chi-phi/:mien(mien-nam|mien-bac)/goi-y-gian", requireDataEntry, (req, res) => {
   const store = load();
   ensureShape(store);
@@ -909,37 +910,48 @@ router.get("/chi-phi/:mien(mien-nam|mien-bac)/goi-y-gian", requireDataEntry, (re
   const mien = mienFromSeg(req.params.mien);
   const thangFilter = req.query.thang || "";
 
-  const GIAN_STOP_W2 = new Set(["phcm","phn","kvc","mtd","posh","jp","phm","mn","mb","moi","cu","kh"]);
-  function _normG(s) {
-    return String(s||"").toLowerCase()
-      .normalize("NFD").replace(/[̀-ͯ]/g,"")
-      .replace(/đ|Đ/g,"d")
-      .replace(/[^a-z0-9 ]/g," ").replace(/\s+/g," ").trim();
-  }
-  const _ctList2 = (activeCompany === "kh_moi"
-    ? (store.danh_muc_ma_cong_trinh_moi || [])
-    : (store.danh_muc_ma_cong_trinh_cu || []));
-  const _ctE2 = _ctList2.map((ct) => {
-    const nT = _normG(ct.ten);
-    const words = nT.split(" ").filter((w) => w.length >= 3 && !GIAN_STOP_W2.has(w));
-    return { ma: ct.ma, ten: ct.ten, normTen: nT, words };
-  }).filter((ct) => ct.words.length >= 1)
-    .sort((a, b) => b.words.length - a.words.length);
-
   let rows = (store.chi_phi || [])
     .map(ensureChiPhiDefaults)
     .filter((r) => r.congTy === activeCompany && r.mien === mien && (!r.gian || isUpgradableGian(r.gian)));
   if (thangFilter) rows = rows.filter((r) => (r.ngay || "").slice(0, 7) === thangFilter);
 
-  const THRESHOLD = 0.5; // thap hon 0.8 (auto-apply) vi nguoi dung se review
   const matches = [];
   rows.forEach((r) => {
+    // Thu 1: trich xuat tu dien giai bang extractGianRentText (mau K&H tien thue)
+    const extracted = extractGianRentText(r.dienGiai || "");
+    if (extracted) {
+      matches.push({
+        id: r.id,
+        ngay: r.ngay,
+        ncc: r.ncc,
+        dienGiai: r.dienGiai,
+        soTien: r.soTien,
+        currentGian: r.gian || "",
+        suggestedGian: extracted,
+        suggestedMa: "",
+        confidence: 90, // trich xuat truc tiep, do tin cao
+        source: "diengiai",
+      });
+      return;
+    }
+    // Thu 2: fallback khop token voi danh muc cong trinh (nguong 0.5)
+    const GIAN_STOP_W2 = new Set(["phcm","phn","kvc","mtd","posh","jp","phm","mn","mb","moi","cu","kh"]);
+    function _normG(s) {
+      return String(s||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"")
+        .replace(/đ|Đ/g,"d").replace(/[^a-z0-9 ]/g," ").replace(/\s+/g," ").trim();
+    }
+    const _ctList2 = (activeCompany === "kh_moi"
+      ? (store.danh_muc_ma_cong_trinh_moi || [])
+      : (store.danh_muc_ma_cong_trinh_cu || []));
     const dg = _normG(r.dienGiai || "") + " " + _normG(r.ncc || "");
     let bestCt = null, bestMatched = 0, bestRatio = 0;
-    for (const ct of _ctE2) {
-      const matched = ct.words.filter((w) => dg.includes(w)).length;
-      const ratio = matched / ct.words.length;
-      if (ratio >= THRESHOLD && matched > bestMatched) {
+    for (const ct of _ctList2) {
+      const nT = _normG(ct.ten);
+      const words = nT.split(" ").filter((w) => w.length >= 3 && !GIAN_STOP_W2.has(w));
+      if (!words.length) continue;
+      const matched = words.filter((w) => dg.includes(w)).length;
+      const ratio = matched / words.length;
+      if (ratio >= 0.5 && matched > bestMatched) {
         bestCt = ct; bestMatched = matched; bestRatio = ratio;
       }
     }
@@ -954,6 +966,7 @@ router.get("/chi-phi/:mien(mien-nam|mien-bac)/goi-y-gian", requireDataEntry, (re
         suggestedGian: bestCt.ten,
         suggestedMa: bestCt.ma,
         confidence: Math.round(bestRatio * 100),
+        source: "congtrinh",
       });
     }
   });
