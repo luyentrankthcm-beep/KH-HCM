@@ -13,7 +13,11 @@
 const CLIENT_ID = process.env.GOOGLE_CLIENT_ID || "";
 const CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || "";
 const REDIRECT_URI = process.env.GOOGLE_REDIRECT_URI || "";
-const SCOPE = "https://www.googleapis.com/auth/gmail.readonly";
+// Luyen, 2026-08-25: them drive.readonly de sync hoa don tu Google Drive
+const SCOPE = [
+  "https://www.googleapis.com/auth/gmail.readonly",
+  "https://www.googleapis.com/auth/drive.readonly",
+].join(" ");
 
 function isConfigured() {
   return !!(CLIENT_ID && CLIENT_SECRET && REDIRECT_URI);

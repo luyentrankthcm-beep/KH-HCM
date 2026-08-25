@@ -3,8 +3,9 @@
 // Google Drive. Mỗi hóa đơn có thêm: tên đầy đủ NCC, tổng tiền, nội dung
 // tóm tắt, hồ sơ liên quan.
 const express = require("express");
-const { load, save } = require("../store");
+const { load, save, nextId } = require("../store");
 const { requireLogin, requireAdmin } = require("../middleware/auth");
+const driveApi = require("../utils/driveApi");
 
 const router = express.Router();
 router.use(requireLogin);
@@ -279,6 +280,80 @@ router.post("/ho-so/doanh-thu-chia-se/:id/sua", requireAdmin, (req, res) => {
   const r = (store.ho_so_doanhthu_chiase||[]).find(x=>String(x.id)===req.params.id);
   if (r) { r.ngay=(req.body.ngay||'').trim(); r.gian=(req.body.gian||'').trim(); r.loai=(req.body.loai||'').trim(); r.soTien=(req.body.soTien||'').trim(); r.linkFile=(req.body.linkFile||'').trim(); r.ghiChu=(req.body.ghiChu||'').trim(); save(store); }
   res.redirect("/ho-so/doanh-thu-chia-se?success=Đã+lưu");
+});
+
+// ─── Sync Hóa Đơn NCC từ Google Drive ────────────────────────────────────────
+// Luyen, 2026-08-25: "cập nhật hóa đơn hàng ngày từ gg drive" -- list PDF
+// trong folder Drive, upsert vao store.ho_so_hoa_don (dedup theo driveId).
+// Scope drive.readonly da duoc them vao buildAuthUrl trong gmailApi.js -- neu
+// token cu chua co scope nay, Drive API tra 403, error message huong dan re-auth.
+router.post("/ho-so/sync-drive-hoa-don", requireAdmin, async (req, res) => {
+  const store = load();
+  ensureHoSo(store);
+  try {
+    const files = await driveApi.listFolderFiles(store, driveApi.DRIVE_HOADON_FOLDER_ID, "application/pdf");
+    const existingIds = new Set(store.ho_so_hoa_don.map((r) => r.driveId));
+    let added = 0;
+    files.forEach((f) => {
+      if (!existingIds.has(f.id)) {
+        store.ho_so_hoa_don.push({
+          driveId: f.id,
+          fileName: f.name,
+          addedAt: new Date().toISOString(),
+        });
+        added++;
+      }
+    });
+    save(store);
+    res.redirect(
+      "/ho-so/hoa-don-ncc?success=" +
+        encodeURIComponent(
+          "Đã sync Drive: thêm " + added + " file mới (tổng " + files.length + " file trong folder)."
+        )
+    );
+  } catch (e) {
+    res.redirect("/ho-so/hoa-don-ncc?error=" + encodeURIComponent(e.message));
+  }
+});
+
+// ─── Sync Phí Cảng từ Google Drive ───────────────────────────────────────────
+// Luyen, 2026-08-25: sync PDF tu folder "Phi Cang HK" Drive vao ho_so_phi_cang.
+// Moi file tao 1 dong moi voi linkFile = link Drive, ten file lam loaiPhi tam,
+// ngay/soTien de trong cho Luyen tu dien sau khi kiem tra.
+router.post("/ho-so/phi-cang-phu-quoc/sync-drive", requireAdmin, async (req, res) => {
+  const store = load();
+  if (!store.ho_so_phi_cang) store.ho_so_phi_cang = [];
+  try {
+    const files = await driveApi.listFolderFiles(store, driveApi.DRIVE_PHI_CANG_FOLDER_ID, "application/pdf");
+    const existingLinks = new Set(
+      store.ho_so_phi_cang.map((r) => r.linkFile).filter(Boolean)
+    );
+    let added = 0;
+    files.forEach((f) => {
+      const link = "https://drive.google.com/file/d/" + f.id + "/view";
+      if (!existingLinks.has(link)) {
+        store.ho_so_phi_cang.push({
+          id: nextId(store),
+          ngay: "",
+          loaiPhi: f.name.replace(/\.pdf$/i, ""),
+          soTien: "",
+          linkFile: link,
+          ghiChu: "Sync từ Drive tự động",
+          createdAt: new Date().toISOString(),
+        });
+        added++;
+      }
+    });
+    save(store);
+    res.redirect(
+      "/ho-so/phi-cang-phu-quoc?success=" +
+        encodeURIComponent(
+          "Đã sync Drive: thêm " + added + " file mới (tổng " + files.length + " file trong folder)."
+        )
+    );
+  } catch (e) {
+    res.redirect("/ho-so/phi-cang-phu-quoc?error=" + encodeURIComponent(e.message));
+  }
 });
 
 module.exports = router;

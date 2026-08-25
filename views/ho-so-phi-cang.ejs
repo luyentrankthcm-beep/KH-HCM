@@ -41,6 +41,12 @@
     <% if (typeof success !== 'undefined' && success) { %><div class="alert-success"><%= success %></div><% } %>
 
     <!-- Add form -->
+    <div style="display:flex;justify-content:flex-end;margin-bottom:.75rem;">
+      <form method="POST" action="/ho-so/phi-cang-phu-quoc/sync-drive">
+        <button type="submit" style="background:#0f766e;color:#fff;border:none;border-radius:5px;padding:.35rem .85rem;font-size:.85em;font-weight:600;cursor:pointer;white-space:nowrap;" title="Sync PDF từ folder Drive 'Phí Cảng HK'">🔄 Sync Drive</button>
+      </form>
+    </div>
+
     <div class="add-form">
       <h3>➕ Thêm chứng từ phí cảng</h3>
       <form method="POST" action="/ho-so/phi-cang-phu-quoc/them">
