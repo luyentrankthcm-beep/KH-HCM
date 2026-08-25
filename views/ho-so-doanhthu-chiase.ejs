@@ -40,10 +40,23 @@
     <% if (typeof error !== 'undefined' && error) { %><div class="alert-error"><%= error %></div><% } %>
     <% if (typeof success !== 'undefined' && success) { %><div class="alert-success"><%= success %></div><% } %>
 
+    <!-- Sub-tabs -->
+    <div style="display:flex;gap:4px;margin-bottom:1rem;border-bottom:2px solid #cbd5e1;padding-bottom:0;">
+      <% tabs.forEach(function(t) { %>
+      <a href="/ho-so/doanh-thu-chia-se?tab=<%= t.key %>"
+         style="padding:.45rem 1rem;font-size:.85em;font-weight:600;border-radius:6px 6px 0 0;text-decoration:none;
+                background:<%= activeTab===t.key ? '#1e3a5f' : '#e8f0fe' %>;
+                color:<%= activeTab===t.key ? '#fff' : '#1e3a5f' %>;">
+        <%= t.label %>
+      </a>
+      <% }); %>
+    </div>
+
     <!-- Add form -->
     <div class="add-form">
-      <h3>➕ Thêm chứng từ doanh thu chia sẻ</h3>
+      <h3>➕ Thêm chứng từ — <%= tabs.find(t=>t.key===activeTab).label %></h3>
       <form method="POST" action="/ho-so/doanh-thu-chia-se/them">
+        <input type="hidden" name="loaiTab" value="<%= activeTab %>" />
         <div class="form-row">
           <div>
             <label>Ngày</label>

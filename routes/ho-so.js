@@ -244,12 +244,21 @@ router.post("/ho-so/phi-cang-phu-quoc/:id/sua", requireAdmin, (req, res) => {
 });
 
 // ─── Doanh Thu Chia Sẻ ────────────────────────────────────────────────────
+const DTCS_TABS = [
+  { key: 'mall-giu-tien',      label: '🏦 Mall giữ tiền' },
+  { key: 'tien-thue-vuot',     label: '📈 Tiền thuê vượt' },
+  { key: 'tien-thue-co-dinh',  label: '📋 Tiền thuê chia cố định' },
+];
 router.get("/ho-so/doanh-thu-chia-se", (req, res) => {
   const store = load();
-  const rows = (store.ho_so_doanhthu_chiase || []).slice().sort((a,b) => (b.ngay||'').localeCompare(a.ngay||''));
+  const activeTab = DTCS_TABS.some(t => t.key === req.query.tab) ? req.query.tab : DTCS_TABS[0].key;
+  const allRows = (store.ho_so_doanhthu_chiase || []).slice().sort((a,b) => (b.ngay||'').localeCompare(a.ngay||''));
+  const rows = allRows.filter(r => (r.loaiTab || 'mall-giu-tien') === activeTab);
   res.render("ho-so-doanhthu-chiase", {
     userName: req.session.userName,
     rows,
+    tabs: DTCS_TABS,
+    activeTab,
     error: req.query.error || null,
     success: req.query.success || null,
   });
@@ -258,7 +267,8 @@ router.get("/ho-so/doanh-thu-chia-se", (req, res) => {
 router.post("/ho-so/doanh-thu-chia-se/them", requireAdmin, (req, res) => {
   const store = load();
   if (!store.ho_so_doanhthu_chiase) store.ho_so_doanhthu_chiase = [];
-  const { ngay, gian, loai, soTien, linkFile, ghiChu } = req.body;
+  const { ngay, gian, loai, soTien, linkFile, ghiChu, loaiTab } = req.body;
+  const tab = DTCS_TABS.some(t => t.key === loaiTab) ? loaiTab : DTCS_TABS[0].key;
   store.ho_so_doanhthu_chiase.push({
     id: nextId(store),
     ngay: (ngay||"").trim(),
@@ -267,24 +277,28 @@ router.post("/ho-so/doanh-thu-chia-se/them", requireAdmin, (req, res) => {
     soTien: (soTien||"").trim(),
     linkFile: (linkFile||"").trim(),
     ghiChu: (ghiChu||"").trim(),
+    loaiTab: tab,
     createdAt: new Date().toISOString(),
   });
   save(store);
-  res.redirect("/ho-so/doanh-thu-chia-se?success=Đã+thêm");
+  res.redirect("/ho-so/doanh-thu-chia-se?tab=" + tab + "&success=Đã+thêm");
 });
 
 router.post("/ho-so/doanh-thu-chia-se/:id/xoa", requireAdmin, (req, res) => {
   const store = load();
+  const r = (store.ho_so_doanhthu_chiase||[]).find(x=>String(x.id)===req.params.id);
+  const tab = r ? (r.loaiTab || DTCS_TABS[0].key) : DTCS_TABS[0].key;
   store.ho_so_doanhthu_chiase = (store.ho_so_doanhthu_chiase||[]).filter(r=>String(r.id)!==req.params.id);
   save(store);
-  res.redirect("/ho-so/doanh-thu-chia-se?success=Đã+xóa");
+  res.redirect("/ho-so/doanh-thu-chia-se?tab=" + tab + "&success=Đã+xóa");
 });
 
 router.post("/ho-so/doanh-thu-chia-se/:id/sua", requireAdmin, (req, res) => {
   const store = load();
   const r = (store.ho_so_doanhthu_chiase||[]).find(x=>String(x.id)===req.params.id);
   if (r) { r.ngay=(req.body.ngay||'').trim(); r.gian=(req.body.gian||'').trim(); r.loai=(req.body.loai||'').trim(); r.soTien=(req.body.soTien||'').trim(); r.linkFile=(req.body.linkFile||'').trim(); r.ghiChu=(req.body.ghiChu||'').trim(); save(store); }
-  res.redirect("/ho-so/doanh-thu-chia-se?success=Đã+lưu");
+  const tab = r ? (r.loaiTab || DTCS_TABS[0].key) : DTCS_TABS[0].key;
+  res.redirect("/ho-so/doanh-thu-chia-se?tab=" + tab + "&success=Đã+lưu");
 });
 
 // ─── Đọc PDF biên lai → trả về fields để auto-fill form ─────────────────────
