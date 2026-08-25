@@ -1684,6 +1684,68 @@ const SEED_CHT_NOP_TIEN_ROWS = [
   }
   if (removeWrongSeedVungTauZalo(store)) changed = true;
 
+  // Luyen, 2026-08-24: seed 50 hoa don T8 vao ho_so_hoa_don neu chua co
+  function seedHoSoHoaDonT8(store) {
+    if (!store.ho_so_hoa_don) store.ho_so_hoa_don = [];
+    if (store.ho_so_hoa_don.length > 0) return false;
+    const files = [
+      ["1aVIEdEOwLHCUqOzcxUMDyJTr4uYe3ArR","AEON_4601_15-08-2026.pdf"],
+      ["1oPzeUAvVrOaFZtZ9SWFWt0uSSoB7RSAt","AEON_4608_15-08-2026.pdf"],
+      ["1ZqenGuqNvgXlCcuHGFsCKsqeefTZ7TzK","Aeon_4873839_17-08-2026.pdf"],
+      ["1m2Y2HRg62geICfiR29P0cQGHYoyW0FDZ","AnLac_27349_10-08-2026.pdf"],
+      ["1n3ra8q-un2K8uItrVNhAR55iKmVErpO5","AnLac_27355_10-08-2026.pdf"],
+      ["19TC4t7EpMX0hOQGUz_asBVA7n7nDuz72","Bluecom_2072_07-08-2026.pdf"],
+      ["1ldoy_xn3Z2otq9hYdgZ8CmKByjzLTokp","Bluecom_2074_07-08-2026.pdf"],
+      ["1SrDOV4nCnGn9XW0T2vkaaaqnCyxys-Kf","CocaCola_101424_05-08-2026.pdf"],
+      ["1JUtLVGlx8Q4n5i566CesTtrkKYDKzq30","CocaCola_101553_05-08-2026.pdf"],
+      ["1S2qNQTkpzDFDZNO2W0pz0pRUrb1QAfQm","CocaCola_104973_13-08-2026.pdf"],
+      ["1jSjZcyI3k_T5ZhYIGsU8rJKSQbDlAC4d","CocaCola_106425_17-08-2026.pdf"],
+      ["1M5loUPZ3_i9BXpk9SGnLExQCIyNW0rEl","CocaCola_106541_17-08-2026.pdf"],
+      ["1L7je89wqYvmwN9daDQyybdalwQvtI8x0","CocaColaTayNinh_75339_05-08-2026.pdf"],
+      ["1_IgBEjIEm0Bz4Nq3fo6m5K011RyWQgyz","DongDuongTraVinh_793_07-08-2026.pdf"],
+      ["1iDhW1NiYTsUWLPjs15Mx3UUNsuWYvjLN","EBTanPhu_4050_07-08-2026.pdf"],
+      ["1g9yMJ4t8yAogAGMjjcheyK5pD2I49Kp1","EBTanPhu_4051_07-08-2026.pdf"],
+      ["1_-aD6kIMRm2p1T5AO_k0b87SHZ5ZWag1","Estella_4093_01-08-2026.pdf"],
+      ["1_4koNaedW6g0oIPGyXJl1-rO3bPAjRAp","Estella_4242_01-08-2026.pdf"],
+      ["1ZxPXs7B0yNUvSU3mxAgel_TGY9TXxTjR","Estella_4273_01-08-2026.pdf"],
+      ["1Dt2Pi1D6f_-hPHyTiY-ARZ-lietgg0hG","Estella_4418_14-08-2026.pdf"],
+      ["1JxLel857_pcOzsyhDmQFK416aQGHFaHX","GoBaRia_6_17-08-2026.pdf"],
+      ["1JEIq2hX6tLYEqYJIVU_VlUiW-lD_-tnf","GoBMT_4_17-08-2026.pdf"],
+      ["1CqLDR8hG9BAz72QFKgEZpGlt55yOgsev","HangGiaDungTongHop_206_17-08-2026.pdf"],
+      ["1YPXns1L9MLM8VfLOF_o3nlt3WxzhEm-K","HoangVinh_3553_16-08-2026.pdf"],
+      ["16_Q_Uw-cyqhYNvvBTuBDhp0r4XPC7pDt","KietAn_00000465_17-08-2026.pdf"],
+      ["1ILyqyiijDJ_i72GNMLUG_f_qJcQ2n1fE","MMMegaMarket_1243_03-08-2026.pdf"],
+      ["1eoCNUwUrhg8fDGY6IW7SERdkRx2KIs5V","MMMegaMarket_1258_03-08-2026.pdf"],
+      ["1UJ-QPGhvWQ8mHyoSmTbe_2usd-MsL4nr","MMMegaMarket_1312_03-08-2026.pdf"],
+      ["1WkYxW5iNHdXnZLSxO3BAZM0O_dtxemwW","MocFB_00028381_07-08-2026.pdf"],
+      ["1FKemqr7VxpLXtMG5nDi0znCUaLsntBtO","NangLuongAnBinh_20265_06-08-2026.pdf"],
+      ["1iFZjftvUUliT-Fijt52GUZs2MzGHzHID","NewPlan_614_14-08-2026.pdf"],
+      ["1sXSYkMMYhwEJjyxSLh8Y0PVoPdp-KDEd","NewPlan_615_14-08-2026.pdf"],
+      ["1__MbnU_GfsW35JSqeawXtWtxP250NMZT","NguyenKimTienGiang_1374_07-08-2026.pdf"],
+      ["1isNDN8-2awYW2UYOApkblhtlU2gvAR7f","NguyenKimTienGiang_1428_21-08-2026.pdf"],
+      ["1jKmRVfmBhSjPxxffbTqd1pLlEdTbL_Ae","SaiGonBenTre_3703_01-08-2026.pdf"],
+      ["1wNryQcBNLmePCbmuQOZXV4v_cxr37nqB","SaiGonCaMau_1512_01-08-2026.pdf"],
+      ["1JQb367_9sZuiione6OnniCkCCDF34NpB","SaiGonVanDong_1772_03-08-2026.pdf"],
+      ["1VxpsgUBvFPp6_BSPdP9EHD7WQddReGso","SenseCity_4857_11-08-2026.pdf"],
+      ["1lFONXBGKFHb5dmWh4sZtnzWTqWuowOwO","SieuThiAnLac_27759_24-08-2026.pdf"],
+      ["1b3ITZsoYyHYqlC8mfBqoRkgKYNq5wJUq","ToridollLotus_00060616_08-08-2026.pdf"],
+      ["1BjVEQQ6x9-l0qssxW9hrquu-9SCoPmK-","ToridollLotus_00060617_08-08-2026.pdf"],
+      ["1514QP5so0o60p3cfLcUQ72IFh_-6Rdc3","ToyotaLTK_15308_23-08-2026.pdf"],
+      ["1n0YRvG5rHHKTZw_sglywj2AdASySSFpl","TriTuePestControl_00000094_22-08-2026.pdf"],
+      ["1HqvleIsgfkpx-P96zMlX0h2KAsS5hzke","VietNhat_1210_07-08-2026.pdf"],
+      ["12VmurOiy3QBXMxuO0Jn1lKAwER7bcJes","VietNhatBaRia_1386_10-08-2026.pdf"],
+      ["15n-u92DkeaT7k2E-Q8Y2kcd1PybP2Vkl","VietNhatBaRia_1396_10-08-2026.pdf"],
+      ["1dhmJ8KrCyQLWXpEt0u7t9UaPphSKBOwI","VietNhatBaRia_1435_10-08-2026.pdf"],
+      ["1sJriAijx8-1m8kd819du9wuNnmhHAxuV","VietNhatBinhDuong_816_07-08-2026.pdf"],
+      ["1Vlz0Q0Wvgjf36k81XZ03HXKZlPt2Qxxp","VietNhatBinhDuong2_1072_07-08-2026.pdf"],
+      ["16nxCYFmPm3ft8Yyces3hpw7yrn6eEPTK","VietNhatBinhDuong2_1083_07-08-2026.pdf"],
+    ];
+    files.forEach(([driveId, fileName]) => store.ho_so_hoa_don.push({ driveId, fileName }));
+    console.log("[seed] Da seed " + files.length + " hoa don T8 vao ho_so_hoa_don.");
+    return true;
+  }
+  if (seedHoSoHoaDonT8(store)) changed = true;
+
   // Xoa file rac MOI LAN KHOI DONG de giai phong Volume:
   // 1. .bak files: moi lan restore tao 1 file .bak 138MB, giu toi da 2 ban moi nhat.
   // 2. .tmp-* files: cac lan restore/save bi crash (OOM/ENOSPC) de lai file
