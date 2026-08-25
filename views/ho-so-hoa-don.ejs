@@ -75,10 +75,10 @@
               <div class="ncc-short"><%= r.nccShort %></div>
               <div style="color:#888;font-size:.8em;margin-top:.1rem;"><span class="tag-so"><%= r.soHoaDon %></span> · <%= r.ngay ? r.ngay.split('-').reverse().join('/') : '' %></div>
             </td>
-            <td class="ncc-full"><%= r.tenDayDuNCC || '<span class="empty-val">—</span>' %></td>
-            <td class="tien"><%= r.tongTien || '<span class="empty-val">—</span>' %></td>
-            <td style="max-width:220px;"><%= r.noiDung || '<span class="empty-val">—</span>' %></td>
-            <td style="max-width:180px;"><%= r.hoSoLienQuan || '<span class="empty-val">—</span>' %></td>
+            <td class="ncc-full"><%= r.tenDayDuNCC || '—' %></td>
+            <td class="tien"><%= r.tongTien || '—' %></td>
+            <td style="max-width:220px;"><%= r.noiDung || '—' %></td>
+            <td style="max-width:180px;color:#bbb;font-style:italic;">—</td>
             <td>
               <% if (r.driveLink) { %>
               <a href="<%= r.driveLink %>" target="_blank" rel="noopener" class="link-hd">📄 Mở HĐ</a>
