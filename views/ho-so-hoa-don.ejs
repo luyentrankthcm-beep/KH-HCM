@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hồ Sơ Hóa Đơn NCC – K&H Bank Tracker</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+<%- include('partials/nav') %>
+<main>
+  <h1 class="page-title">Hồ Sơ Hóa Đơn NCC</h1>
+
+  <% if (typeof error !== 'undefined' && error) { %>
+  <div class="alert-error"><%= error %></div>
+  <% } %>
+  <% if (typeof success !== 'undefined' && success) { %>
+  <div class="alert-success"><%= success %></div>
+  <% } %>
+
+  <!-- Lọc tháng -->
+  <form method="GET" action="/ho-so/hoa-don-ncc" style="margin-bottom:1rem;display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;">
+    <label style="font-weight:600;">Tháng:</label>
+    <select name="thang" onchange="this.form.submit()" style="padding:.3rem .6rem;border-radius:4px;border:1px solid #ccc;">
+      <option value="">-- Tất cả --</option>
+      <% (allThang||[]).forEach(function(t){ %>
+      <option value="<%= t %>" <%= thangFilter===t?'selected':'' %>><%= t %></option>
+      <% }); %>
+    </select>
+    <span style="color:#666;font-size:.9em;"><%= total %> hóa đơn / <%= nccGroups.length %> NCC</span>
+  </form>
+
+  <% if (nccGroups.length === 0) { %>
+  <p style="color:#888;">Chưa có dữ liệu hóa đơn.</p>
+  <% } %>
+
+  <% nccGroups.forEach(function(g) { %>
+  <details style="margin-bottom:.6rem;border:1px solid #ddd;border-radius:6px;overflow:hidden;">
+    <summary style="background:#f5f7fa;padding:.6rem 1rem;cursor:pointer;font-weight:600;display:flex;align-items:center;gap:.6rem;">
+      <span style="flex:1;"><%= g.ncc %></span>
+      <span style="background:#2563eb;color:#fff;border-radius:99px;padding:.1rem .55rem;font-size:.82em;font-weight:700;"><%= g.items.length %></span>
+    </summary>
+    <table style="width:100%;border-collapse:collapse;font-size:.9em;">
+      <thead>
+        <tr style="background:#f0f4ff;">
+          <th style="padding:.4rem .75rem;text-align:left;border-bottom:1px solid #ddd;">Số HĐ</th>
+          <th style="padding:.4rem .75rem;text-align:left;border-bottom:1px solid #ddd;">Ngày</th>
+          <th style="padding:.4rem .75rem;text-align:left;border-bottom:1px solid #ddd;">File</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% g.items.forEach(function(inv) { %>
+        <tr style="border-bottom:1px solid #f0f0f0;">
+          <td style="padding:.4rem .75rem;"><%= inv.soHoaDon %></td>
+          <td style="padding:.4rem .75rem;white-space:nowrap;">
+            <% if (inv.ngay) { %>
+              <%= inv.ngay.split('-').reverse().join('/') %>
+            <% } %>
+          </td>
+          <td style="padding:.4rem .75rem;">
+            <% if (inv.driveLink) { %>
+            <a href="<%= inv.driveLink %>" target="_blank" rel="noopener" style="color:#2563eb;text-decoration:none;">
+              📄 <%= inv.fileName %>
+            </a>
+            <% } else { %>
+            <%= inv.fileName %>
+            <% } %>
+          </td>
+        </tr>
+        <% }); %>
+      </tbody>
+    </table>
+  </details>
+  <% }); %>
+</main>
+</body>
+</html>
