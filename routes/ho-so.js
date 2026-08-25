@@ -239,7 +239,7 @@ router.post("/ho-so/phi-cang-phu-quoc/:id/xoa", requireAdmin, (req, res) => {
 router.post("/ho-so/phi-cang-phu-quoc/:id/sua", requireAdmin, (req, res) => {
   const store = load();
   const r = (store.ho_so_phi_cang||[]).find(x=>String(x.id)===req.params.id);
-  if (r) { r.ngay=(req.body.ngay||'').trim(); r.loaiPhi=(req.body.loaiPhi||'').trim(); r.soTien=(req.body.soTien||'').trim(); r.linkFile=(req.body.linkFile||'').trim(); r.ghiChu=(req.body.ghiChu||'').trim(); save(store); }
+  if (r) { r.ngay=(req.body.ngay||'').trim(); r.soHoaDon=(req.body.soHoaDon||'').trim(); r.loaiPhi=(req.body.loaiPhi||'').trim(); r.soTien=(req.body.soTien||'').trim(); r.linkFile=(req.body.linkFile||'').trim(); r.ghiChu=(req.body.ghiChu||'').trim(); save(store); }
   res.redirect("/ho-so/phi-cang-phu-quoc?success=Đã+lưu");
 });
 
