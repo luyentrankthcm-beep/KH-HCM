@@ -47,13 +47,55 @@
       </form>
     </div>
 
+    <!-- Upload ảnh biên lai → PDF → Drive -->
+    <div class="add-form" style="border-color:#2563eb22;background:#eff6ff;">
+      <h3>📷 Tải ảnh biên lai → PDF → Drive</h3>
+      <form method="POST" action="/ho-so/phi-cang-phu-quoc/upload-anh" enctype="multipart/form-data">
+        <div class="form-row" style="margin-bottom:.55rem;">
+          <div>
+            <label>Ảnh biên lai <span style="color:#ef4444">*</span></label>
+            <input type="file" name="anh" accept=".jpg,.jpeg,.png" multiple required style="font-size:.83em;padding:.25rem;" />
+          </div>
+          <div>
+            <label>Ngày <span style="color:#ef4444">*</span></label>
+            <input type="date" name="ngay" required />
+          </div>
+          <div>
+            <label>Số hóa đơn</label>
+            <input type="text" name="soHoaDon" placeholder="VD: 0000192" style="min-width:110px;" />
+          </div>
+          <div style="min-width:200px;flex:1;">
+            <label>Loại phí</label>
+            <input type="text" name="loaiPhi" placeholder="VD: Phí kiểm tra an ninh hàng hóa..." style="width:100%;" />
+          </div>
+          <div>
+            <label>Số tiền (đ)</label>
+            <input type="text" name="soTien" placeholder="VD: 42.100" style="min-width:110px;" />
+          </div>
+          <div style="flex:1;min-width:150px;">
+            <label>Ghi chú</label>
+            <input type="text" name="ghiChu" placeholder="Ghi chú thêm..." style="width:100%;" />
+          </div>
+          <div>
+            <label>&nbsp;</label>
+            <button type="submit" class="btn-add" style="background:#2563eb;">⬆️ Upload</button>
+          </div>
+        </div>
+        <p style="margin:.2rem 0 0;font-size:.78em;color:#64748b;">Ảnh JPG/PNG sẽ tự chuyển sang PDF, đặt tên <em>PhiCang_SoHD_DD-MM-YYYY.pdf</em> và lưu vào Drive.</p>
+      </form>
+    </div>
+
     <div class="add-form">
-      <h3>➕ Thêm chứng từ phí cảng</h3>
+      <h3>➕ Thêm chứng từ phí cảng (nhập tay)</h3>
       <form method="POST" action="/ho-so/phi-cang-phu-quoc/them">
         <div class="form-row">
           <div>
             <label>Ngày</label>
             <input type="date" name="ngay" required />
+          </div>
+          <div>
+            <label>Số hóa đơn</label>
+            <input type="text" name="soHoaDon" placeholder="VD: 0000192" style="min-width:110px;" />
           </div>
           <div>
             <label>Loại phí</label>
@@ -87,10 +129,11 @@
         <thead>
           <tr>
             <th style="width:36px;">#</th>
-            <th style="width:110px;">Ngày</th>
+            <th style="width:100px;">Ngày</th>
+            <th style="width:110px;">Số HĐ</th>
             <th>Loại phí</th>
-            <th style="width:130px;">Số tiền</th>
-            <th>Link tài liệu</th>
+            <th style="width:120px;">Số tiền</th>
+            <th style="width:90px;">Tài liệu</th>
             <th>Ghi chú</th>
             <th style="width:36px;"></th>
           </tr>
@@ -100,6 +143,7 @@
           <tr>
             <td style="color:#bbb;font-size:.78em;"><%= i+1 %></td>
             <td><%= r.ngay ? r.ngay.split('-').reverse().join('/') : '—' %></td>
+            <td style="font-family:monospace;font-size:.85em;"><%= r.soHoaDon || '—' %></td>
             <td><%= r.loaiPhi || '—' %></td>
             <td class="<%= r.soTien ? 'tien' : '' %>"><%= r.soTien || '—' %></td>
             <td>

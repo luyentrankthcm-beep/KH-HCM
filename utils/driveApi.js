@@ -45,4 +45,63 @@ async function listFolderFiles(store, folderId, mimeFilter) {
   return data.files || [];
 }
 
-module.exports = { listFolderFiles, DRIVE_HOADON_FOLDER_ID, DRIVE_PHI_CANG_FOLDER_ID };
+// Chuyen anh (JPG/PNG buffer) thanh PDF 1 trang dung pdf-lib.
+// Tra ve Buffer chua PDF.
+async function imageToPdf(imageBuffer, mimeType) {
+  const { PDFDocument } = require("pdf-lib");
+  const pdfDoc = await PDFDocument.create();
+  const mt = (mimeType || "").toLowerCase();
+  let image;
+  if (mt === "image/jpeg" || mt === "image/jpg") {
+    image = await pdfDoc.embedJpg(imageBuffer);
+  } else if (mt === "image/png") {
+    image = await pdfDoc.embedPng(imageBuffer);
+  } else {
+    throw new Error("Chỉ hỗ trợ ảnh JPG hoặc PNG (mimeType: " + mimeType + ").");
+  }
+  const { width, height } = image.scale(1);
+  const page = pdfDoc.addPage([width, height]);
+  page.drawImage(image, { x: 0, y: 0, width, height });
+  return Buffer.from(await pdfDoc.save());
+}
+
+// Upload 1 file len Google Drive (multipart upload), tra ve {id, name}.
+// `fileBuffer` la Buffer, `mimeType` la MIME cua file can upload (vd "application/pdf").
+// Can scope drive.file trong OAuth -- neu token cu chua co scope nay, bao loi 403 huong
+// dan bam "Ket noi Gmail" lai.
+async function uploadFileToDrive(store, folderId, fileName, fileBuffer, mimeType) {
+  const accessToken = await gmailApi.getValidAccessToken(store);
+  const boundary = "kh_bnd_" + Date.now();
+  const metadata = JSON.stringify({ name: fileName, parents: [folderId] });
+  const body = Buffer.concat([
+    Buffer.from(`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${metadata}\r\n`),
+    Buffer.from(`--${boundary}\r\nContent-Type: ${mimeType}\r\n\r\n`),
+    fileBuffer,
+    Buffer.from(`\r\n--${boundary}--`),
+  ]);
+  const resp = await fetch(
+    "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name",
+    {
+      method: "POST",
+      headers: {
+        Authorization: "Bearer " + accessToken,
+        "Content-Type": `multipart/related; boundary=${boundary}`,
+      },
+      body,
+    }
+  );
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({}));
+    const msg = (err.error && err.error.message) ? err.error.message : resp.statusText;
+    if (resp.status === 403 || resp.status === 401) {
+      throw new Error(
+        "Google Drive upload lỗi " + resp.status + ": " + msg +
+        " — Cần bấm 'Kết nối Gmail' lại để cấp quyền upload Drive."
+      );
+    }
+    throw new Error("Google Drive upload lỗi " + resp.status + ": " + msg);
+  }
+  return await resp.json(); // { id, name }
+}
+
+module.exports = { listFolderFiles, imageToPdf, uploadFileToDrive, DRIVE_HOADON_FOLDER_ID, DRIVE_PHI_CANG_FOLDER_ID };

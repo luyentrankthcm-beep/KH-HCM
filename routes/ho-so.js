@@ -3,9 +3,12 @@
 // Google Drive. Mỗi hóa đơn có thêm: tên đầy đủ NCC, tổng tiền, nội dung
 // tóm tắt, hồ sơ liên quan.
 const express = require("express");
+const multer = require("multer");
 const { load, save, nextId } = require("../store");
 const { requireLogin, requireAdmin } = require("../middleware/auth");
 const driveApi = require("../utils/driveApi");
+
+const uploadMem = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
 
 const router = express.Router();
 router.use(requireLogin);
@@ -210,10 +213,11 @@ router.get("/ho-so/phi-cang-phu-quoc", (req, res) => {
 router.post("/ho-so/phi-cang-phu-quoc/them", requireAdmin, (req, res) => {
   const store = load();
   if (!store.ho_so_phi_cang) store.ho_so_phi_cang = [];
-  const { ngay, loaiPhi, soTien, linkFile, ghiChu } = req.body;
+  const { ngay, soHoaDon, loaiPhi, soTien, linkFile, ghiChu } = req.body;
   store.ho_so_phi_cang.push({
     id: nextId(store),
     ngay: (ngay||"").trim(),
+    soHoaDon: (soHoaDon||"").trim(),
     loaiPhi: (loaiPhi||"").trim(),
     soTien: (soTien||"").trim(),
     linkFile: (linkFile||"").trim(),
@@ -280,6 +284,63 @@ router.post("/ho-so/doanh-thu-chia-se/:id/sua", requireAdmin, (req, res) => {
   const r = (store.ho_so_doanhthu_chiase||[]).find(x=>String(x.id)===req.params.id);
   if (r) { r.ngay=(req.body.ngay||'').trim(); r.gian=(req.body.gian||'').trim(); r.loai=(req.body.loai||'').trim(); r.soTien=(req.body.soTien||'').trim(); r.linkFile=(req.body.linkFile||'').trim(); r.ghiChu=(req.body.ghiChu||'').trim(); save(store); }
   res.redirect("/ho-so/doanh-thu-chia-se?success=Đã+lưu");
+});
+
+// ─── Upload ảnh Phí Cảng → PDF → Google Drive ────────────────────────────────
+// Luyen, 2026-08-25: "tải lên ảnh, lưu ảnh qua PDF đặt tên số HĐ + ngày, lưu
+// vào Drive, điền thông tin cơ bản hiển thị trên web" -- nhan anh tu form,
+// chuyen sang PDF bang pdf-lib, upload len folder "Phi Cang HK" tren Drive,
+// luu record vao store.ho_so_phi_cang voi link Drive.
+router.post("/ho-so/phi-cang-phu-quoc/upload-anh", requireAdmin, uploadMem.array("anh", 10), async (req, res) => {
+  const store = load();
+  if (!store.ho_so_phi_cang) store.ho_so_phi_cang = [];
+  if (!req.files || req.files.length === 0) {
+    return res.redirect("/ho-so/phi-cang-phu-quoc?error=" + encodeURIComponent("Vui lòng chọn ít nhất 1 ảnh."));
+  }
+  const { ngay, soHoaDon, loaiPhi, soTien, ghiChu } = req.body;
+  const soHD = (soHoaDon || "").trim();
+  // Dinh dang ten file: PhiCang_SoHD_DD-MM-YYYY.pdf
+  const dateStr = ngay
+    ? ngay.split("-").reverse().join("-") // YYYY-MM-DD → DD-MM-YYYY
+    : new Date().toLocaleDateString("vi-VN").replace(/\//g, "-");
+
+  const errors = [];
+  let added = 0;
+
+  for (let i = 0; i < req.files.length; i++) {
+    const f = req.files[i];
+    try {
+      const suffix = req.files.length > 1 ? `_${i + 1}` : "";
+      const fileName = `PhiCang_${soHD || "HoaDon"}${suffix}_${dateStr}.pdf`;
+      const pdfBuffer = await driveApi.imageToPdf(f.buffer, f.mimetype);
+      const driveFile = await driveApi.uploadFileToDrive(
+        store, driveApi.DRIVE_PHI_CANG_FOLDER_ID, fileName, pdfBuffer, "application/pdf"
+      );
+      const linkFile = "https://drive.google.com/file/d/" + driveFile.id + "/view";
+      store.ho_so_phi_cang.push({
+        id: nextId(store),
+        ngay: ngay || "",
+        soHoaDon: soHD,
+        loaiPhi: (loaiPhi || "").trim(),
+        soTien: (soTien || "").trim(),
+        linkFile,
+        driveId: driveFile.id,
+        ghiChu: (ghiChu || "").trim(),
+        createdAt: new Date().toISOString(),
+      });
+      added++;
+    } catch (e) {
+      errors.push(f.originalname + ": " + e.message);
+    }
+  }
+
+  save(store);
+  if (errors.length > 0 && added === 0) {
+    return res.redirect("/ho-so/phi-cang-phu-quoc?error=" + encodeURIComponent(errors.join(" | ")));
+  }
+  let msg = "Đã upload " + added + " ảnh thành PDF lên Drive và lưu hồ sơ.";
+  if (errors.length > 0) msg += " Lỗi: " + errors.join(" | ");
+  res.redirect("/ho-so/phi-cang-phu-quoc?success=" + encodeURIComponent(msg));
 });
 
 // ─── Sync Hóa Đơn NCC từ Google Drive ────────────────────────────────────────

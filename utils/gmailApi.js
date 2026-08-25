@@ -13,10 +13,11 @@
 const CLIENT_ID = process.env.GOOGLE_CLIENT_ID || "";
 const CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || "";
 const REDIRECT_URI = process.env.GOOGLE_REDIRECT_URI || "";
-// Luyen, 2026-08-25: them drive.readonly de sync hoa don tu Google Drive
+// Luyen, 2026-08-25: them Drive scopes -- readonly de list folder, file de upload
 const SCOPE = [
   "https://www.googleapis.com/auth/gmail.readonly",
   "https://www.googleapis.com/auth/drive.readonly",
+  "https://www.googleapis.com/auth/drive.file",
 ].join(" ");
 
 function isConfigured() {
