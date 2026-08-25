@@ -86,11 +86,9 @@
       </form>
     </div>
     <script>
-    function pcEditLink(id, current) {
+    function pcEditLink(id) {
       const box = document.getElementById('pclink-' + id);
-      const inp = document.getElementById('pclink-input-' + id);
       box.style.display = box.style.display === 'none' ? 'block' : 'none';
-      if (inp) inp.value = current;
     }
     async function docPhiCangFile(input) {
       const files = input.files;
@@ -187,9 +185,9 @@
             <td>
               <% if (r.linkFile) { %>
               <a href="<%= r.linkFile %>" target="_blank" class="link-doc">📄 Xem</a>
-              <button onclick="pcEditLink('<%= r.id %>','<%= (r.linkFile||'').replace(/'/g,\"\\\\'\\\"') %>')" style="background:none;border:none;color:#94a3b8;cursor:pointer;font-size:.75em;padding:0 2px;" title="Sửa link">✏️</button>
+              <button onclick="pcEditLink('<%= r.id %>')" style="background:none;border:none;color:#94a3b8;cursor:pointer;font-size:.75em;padding:0 2px;" title="Sửa link">✏️</button>
               <% } else { %>
-              <button onclick="pcEditLink('<%= r.id %>','')" style="background:none;border:none;color:#2563eb;cursor:pointer;font-size:.78em;padding:0;" title="Dán link Drive">🔗 Dán link</button>
+              <button onclick="pcEditLink('<%= r.id %>')" style="background:none;border:none;color:#2563eb;cursor:pointer;font-size:.78em;padding:0;" title="Dán link Drive">🔗 Dán link</button>
               <% } %>
               <div id="pclink-<%= r.id %>" style="display:none;margin-top:3px;">
                 <form method="POST" action="/ho-so/phi-cang-phu-quoc/<%= r.id %>/sua" style="display:flex;gap:4px;">
