@@ -69,17 +69,21 @@
     <% if (typeof error !== 'undefined' && error) { %><div class="alert-error"><%= error %></div><% } %>
     <% if (typeof success !== 'undefined' && success) { %><div class="alert-success"><%= success %></div><% } %>
 
-    <div style="display:flex;gap:.75rem;align-items:center;margin-bottom:1rem;flex-wrap:wrap;">
+    <div style="display:flex;gap:.6rem;align-items:center;margin-bottom:1rem;flex-wrap:wrap;">
       <form method="GET" action="/ho-so/hoa-don-ncc" style="display:flex;gap:.5rem;align-items:center;">
         <label style="font-weight:600;white-space:nowrap;">Tháng:</label>
-        <select name="thang" onchange="this.form.submit()" style="padding:.3rem .6rem;border-radius:4px;border:1px solid #ccc;min-width:120px;">
+        <select name="thang" onchange="this.form.submit()" style="padding:.3rem .6rem;border-radius:4px;border:1px solid #ccc;min-width:110px;">
           <option value="">-- Tất cả --</option>
           <% (allThang||[]).forEach(function(t){ %>
           <option value="<%= t %>" <%= thangFilter===t?'selected':'' %>><%= t %></option>
           <% }); %>
         </select>
       </form>
-      <span style="color:#666;font-size:.9em;"><strong><%= total %></strong> hóa đơn · <strong><%= groups.length %></strong> NCC</span>
+      <input id="srchNcc" type="text" placeholder="🔍 Tìm NCC…" oninput="filterTable()"
+        style="padding:.3rem .6rem;border-radius:4px;border:1px solid #ccc;min-width:160px;font-size:.88em;" />
+      <input id="srchSoHD" type="text" placeholder="🔍 Số hóa đơn…" oninput="filterTable()"
+        style="padding:.3rem .6rem;border-radius:4px;border:1px solid #ccc;min-width:140px;font-size:.88em;" />
+      <span id="countBadge" style="color:#666;font-size:.9em;"><strong><%= total %></strong> hóa đơn · <strong><%= groups.length %></strong> NCC</span>
     </div>
 
     <% if (groups.length === 0) { %>
@@ -91,13 +95,19 @@
           <tr>
             <th style="width:36px;">#</th>
             <th>NCC</th>
-            <th style="width:100px;text-align:center;">Hóa đơn</th>
-            <th style="width:120px;text-align:center;">Hợp đồng</th>
+            <th style="width:90px;text-align:center;">Hóa đơn</th>
+            <th style="width:100px;text-align:center;">Hợp đồng</th>
+            <th style="width:110px;text-align:center;">Chứng từ LQ</th>
           </tr>
         </thead>
-        <tbody>
-          <% groups.forEach(function(g, gi) { %>
-          <tr onclick="openDetail(<%= gi %>)">
+        <tbody id="nccTbody">
+          <% groups.forEach(function(g, gi) {
+            var ctCount = g.chungTu ? g.chungTu.split('\n').filter(function(l){return l.trim();}).length : 0;
+            var soHdList = g.invoices.map(function(r){return r.soHoaDon;}).join(' ');
+          %>
+          <tr onclick="openDetail(<%= gi %>)"
+              data-ncc="<%= (g.nccShort + ' ' + (g.tenDayDuNCC||'')).toLowerCase() %>"
+              data-sohd="<%= soHdList.toLowerCase() %>">
             <td style="color:#94a3b8;font-size:.8em;"><%= gi+1 %></td>
             <td>
               <span class="ncc-name"><%= g.nccShort %></span>
@@ -107,6 +117,11 @@
             <td style="text-align:center;">
               <% if (g.hopDong && g.hopDong.length > 0) { %>
               <span class="badge badge-green"><%= g.hopDong.length %> HĐ</span>
+              <% } else { %><span style="color:#cbd5e1;font-size:.8em;">—</span><% } %>
+            </td>
+            <td style="text-align:center;">
+              <% if (ctCount > 0) { %>
+              <span class="badge" style="background:#fef9c3;color:#854d0e;"><%= ctCount %> CT</span>
               <% } else { %><span style="color:#cbd5e1;font-size:.8em;">—</span><% } %>
             </td>
           </tr>
@@ -300,6 +315,21 @@
 
     function escHtml(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
     function escAttr(s) { return String(s||'').replace(/"/g,'&quot;'); }
+
+    function filterTable() {
+      var nccQ = (document.getElementById('srchNcc').value || '').toLowerCase().trim();
+      var hdQ  = (document.getElementById('srchSoHD').value || '').toLowerCase().trim();
+      var rows = document.querySelectorAll('#nccTbody tr');
+      var shown = 0;
+      rows.forEach(function(tr) {
+        var nccVal = tr.dataset.ncc || '';
+        var hdVal  = tr.dataset.sohd || '';
+        var ok = (!nccQ || nccVal.includes(nccQ)) && (!hdQ || hdVal.includes(hdQ));
+        tr.style.display = ok ? '' : 'none';
+        if (ok) shown++;
+      });
+      document.getElementById('countBadge').innerHTML = '<strong>' + shown + '</strong> NCC hiển thị';
+    }
   </script>
 </body>
 </html>
