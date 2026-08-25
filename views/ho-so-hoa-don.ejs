@@ -9,20 +9,21 @@
     .hoso-table th {
       background:#1e3a5f; color:#fff; padding:.5rem .75rem;
       text-align:left; white-space:nowrap;
-      position:sticky; top:56px; z-index:10;
+      position:sticky; top:0; z-index:10;
     }
     .hoso-table td { padding:.45rem .75rem; border-bottom:1px solid #eee; vertical-align:top; }
     /* NCC group header row */
     .ncc-group-row td {
-      background:#1d4ed8 !important;
-      color:#fff;
+      background:#fff !important;
+      color:#1d4ed8;
       font-weight:700;
       cursor:pointer;
       user-select:none;
-      border-top:3px solid #1e3a5f;
+      border-top:3px solid #bfdbfe;
+      border-bottom:1px solid #bfdbfe;
     }
-    .ncc-group-row:hover td { background:#1e40af !important; }
-    .ncc-full { font-weight:normal; font-size:.82em; opacity:.85; margin-left:.5rem; }
+    .ncc-group-row:hover td { background:#eff6ff !important; }
+    .ncc-full { font-weight:normal; font-size:.82em; color:#3b82f6; margin-left:.5rem; }
     .ncc-count { font-size:.8em; font-weight:600; opacity:.75; white-space:nowrap; }
     .ncc-arrow { font-size:.8em; margin-right:.4rem; transition:transform .2s; display:inline-block; }
     .ncc-group-row.open .ncc-arrow { transform:rotate(90deg); }
