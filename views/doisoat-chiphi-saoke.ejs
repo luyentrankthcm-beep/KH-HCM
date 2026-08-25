@@ -414,12 +414,15 @@
             </tr>
           </thead>
           <tbody>
-            <% rows.forEach(function(r) { %>
+            <% rows.forEach(function(r, _ri) { %>
             <%
               var txKey = r.id != null ? String(r.id) : null;
               var rowBal = txKey && balanceByTxId[txKey] !== undefined ? balanceByTxId[txKey] : null;
             %>
-            <tr class="<%= r.txType === 'thu' ? 'row-thu' : r.matchType === 'exact' ? 'row-matched-exact' : r.matchType === 'fuzzy' ? 'row-matched-fuzzy' : 'row-unmatched' %>">
+            <tr style="background:#fffde7;cursor:pointer;"
+                onmouseover="this.style.background='#fff9c4'"
+                onmouseout="this.style.background='#fffde7'"
+                onclick="openRowModal(<%= _ri %>)">
               <td style="white-space:nowrap;">
                 <span class="date-cell"><%= r.date %></span>
               </td>
@@ -570,6 +573,100 @@
     <% } %>
 
   </main>
+
+  <!-- Dữ liệu dòng cho modal -->
+  <script>
+  var _saokeRows = <%- JSON.stringify(rows.map(function(r){return{
+    id: r.id != null ? String(r.id) : '',
+    date: r.date || '',
+    bank: r.bankLabel || r.bankName || '',
+    tenDoiUng: r.tenDoiUng || '',
+    description: r.description || '',
+    amount: r.amount || 0,
+    txType: r.txType || '',
+    soHoaDon: r.soHoaDon || '',
+    gian: r.gian || r.suggestedGian || '',
+    ncc: r.ncc || '',
+    tk: r.tk || '',
+    matchType: r.matchType || '',
+    chiPhiId: r.chiPhiId ? String(r.chiPhiId) : ''
+  };})) %>;
+  </script>
+
+  <!-- Modal chi tiết giao dịch -->
+  <div id="rowModalBd" style="display:none;position:fixed;inset:0;z-index:8000;background:rgba(0,0,0,.45);" onclick="closeRowModal()"></div>
+  <div id="rowModal" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);width:min(540px,96vw);z-index:8001;background:#fff;border-radius:12px;box-shadow:0 8px 40px rgba(0,0,0,.25);overflow:hidden;">
+    <div style="background:#1e3a5f;color:#fff;padding:12px 18px;display:flex;align-items:center;justify-content:space-between;">
+      <span id="rmTitle" style="font-weight:700;font-size:.95rem;">Chi tiết giao dịch</span>
+      <button onclick="closeRowModal()" style="background:rgba(255,255,255,.15);border:none;color:#fff;border-radius:6px;padding:3px 10px;cursor:pointer;font-size:1rem;">✕</button>
+    </div>
+    <div style="padding:16px 20px;font-size:.88rem;line-height:1.6;">
+      <table style="width:100%;border-collapse:collapse;">
+        <tr><td style="width:130px;color:#666;padding:3px 0;">Ngày</td><td id="rmDate" style="font-weight:600;"></td></tr>
+        <tr><td style="color:#666;padding:3px 0;">Ngân hàng</td><td id="rmBank"></td></tr>
+        <tr><td style="color:#666;padding:3px 0;">Đối tác</td><td id="rmTenDoiUng" style="word-break:break-word;"></td></tr>
+        <tr><td style="color:#666;padding:3px 0;">Diễn giải</td><td id="rmDescription" style="word-break:break-word;"></td></tr>
+        <tr><td style="color:#666;padding:3px 0;">Số tiền</td><td id="rmAmount" style="font-weight:700;"></td></tr>
+        <tr><td style="color:#666;padding:3px 0;">Số HĐ</td><td id="rmSoHD"></td></tr>
+        <tr><td style="color:#666;padding:3px 0;">NCC</td><td id="rmNcc"></td></tr>
+        <tr><td style="color:#666;padding:3px 0;">Khớp</td><td id="rmMatch"></td></tr>
+      </table>
+      <hr style="margin:12px 0;border:none;border-top:1px solid #eee;">
+      <form id="rmForm" method="POST" action="/doi-soat/chi-phi-saoke/set-gian-banktx">
+        <input type="hidden" name="bankTxId" id="rmBankTxId">
+        <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;">
+          <label style="flex:1;min-width:160px;display:flex;flex-direction:column;gap:4px;">
+            <span style="font-weight:600;color:#333;">Gian / Mã công trình</span>
+            <input type="text" name="gian" id="rmGianInput" placeholder="VD: AEON BD" style="padding:6px 10px;border:1px solid #ccc;border-radius:6px;font-size:.88rem;">
+          </label>
+          <label style="min-width:120px;display:flex;flex-direction:column;gap:4px;">
+            <span style="font-weight:600;color:#333;">TK Nợ</span>
+            <select name="tk" id="rmTkSelect" style="padding:6px 10px;border:1px solid #ccc;border-radius:6px;font-size:.88rem;">
+              <option value="331">331</option>
+              <option value="1388">1388</option>
+              <option value="">— (tự tính)</option>
+            </select>
+          </label>
+        </div>
+        <div style="margin-top:14px;display:flex;gap:8px;justify-content:flex-end;">
+          <button type="button" onclick="closeRowModal()" style="background:#f1f5f9;border:1px solid #cbd5e1;border-radius:6px;padding:6px 16px;cursor:pointer;font-size:.88rem;">Hủy</button>
+          <button type="submit" style="background:#1e3a5f;color:#fff;border:none;border-radius:6px;padding:6px 18px;cursor:pointer;font-weight:700;font-size:.88rem;">💾 Lưu</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+  function openRowModal(idx) {
+    var r = _saokeRows[idx];
+    if (!r) return;
+    document.getElementById('rmTitle').textContent = (r.txType === 'thu' ? '📥 Thu' : '📤 Chi') + ' — ' + r.date;
+    document.getElementById('rmDate').textContent = r.date;
+    document.getElementById('rmBank').textContent = r.bank;
+    document.getElementById('rmTenDoiUng').textContent = r.tenDoiUng || '—';
+    document.getElementById('rmDescription').textContent = r.description || '—';
+    var amtFmt = (r.amount || 0).toLocaleString('vi-VN') + 'đ';
+    var amtEl = document.getElementById('rmAmount');
+    amtEl.textContent = (r.txType === 'thu' ? '+' : '−') + amtFmt;
+    amtEl.style.color = r.txType === 'thu' ? '#15803d' : '#c0392b';
+    document.getElementById('rmSoHD').textContent = r.soHoaDon || '—';
+    document.getElementById('rmNcc').textContent = r.ncc || '—';
+    var matchLabels = {exact:'✅ Chính xác', fuzzy:'🟡 Tương đối', '':'❌ Chưa khớp'};
+    document.getElementById('rmMatch').textContent = matchLabels[r.matchType] || r.matchType || '—';
+    document.getElementById('rmBankTxId').value = r.id;
+    document.getElementById('rmGianInput').value = r.gian;
+    document.getElementById('rmTkSelect').value = r.tk || '';
+    document.getElementById('rowModalBd').style.display = 'block';
+    document.getElementById('rowModal').style.display = 'block';
+    document.body.style.overflow = 'hidden';
+  }
+  function closeRowModal() {
+    document.getElementById('rowModalBd').style.display = 'none';
+    document.getElementById('rowModal').style.display = 'none';
+    document.body.style.overflow = '';
+  }
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape') closeRowModal(); });
+  </script>
 
   <style>
     .row-matched-exact { background: rgba(45,158,95,0.05); }
