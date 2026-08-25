@@ -1,0 +1,2580 @@
+{
+  "ma_cong_trinh_moi": [
+    {
+      "ma": "AE BD PHCM",
+      "ten": "AEON MALL BINH DUONG POSH"
+    },
+    {
+      "ma": "AE BINH TAN PHN",
+      "ten": "AE BINH TAN POSH PHN"
+    },
+    {
+      "ma": "AE BT JP",
+      "ten": "AEON BINH TAN JP GASHAPON"
+    },
+    {
+      "ma": "AE HP KVC",
+      "ten": "AE HAI PHONG KVC"
+    },
+    {
+      "ma": "AE HP PHN",
+      "ten": "AEON MALL HAI PHONG POSH"
+    },
+    {
+      "ma": "AE LBIEN KVC",
+      "ten": "AEON LONG BIEN KVC(Tasco MAll)"
+    },
+    {
+      "ma": "AE LBIEN PHN",
+      "ten": "AEON LONG BIEN POSH"
+    },
+    {
+      "ma": "AE TAN AN KVC",
+      "ten": "AE TAN AN (LONG AN) KVC"
+    },
+    {
+      "ma": "AM TP KVCM",
+      "ten": "AM Tân Phú kvc"
+    },
+    {
+      "ma": "AM TP PHCM",
+      "ten": "AEON MALL TAN PHU POSH"
+    },
+    {
+      "ma": "BA NA HILL PHN",
+      "ten": "BA NA HILL POSH HN"
+    },
+    {
+      "ma": "BIG C LTT PHN",
+      "ten": "BIG C LE TRONG TAN PHN"
+    },
+    {
+      "ma": "BIG C TL PHN",
+      "ten": "BIG C THANG LONG PHN"
+    },
+    {
+      "ma": "BIGC HO GUOM PHN",
+      "ten": "BIGC HO GUOM PHN"
+    },
+    {
+      "ma": "BV 175 PHCM",
+      "ten": "BV 175 PHCM (QC SAN BAY)"
+    },
+    {
+      "ma": "BV BAI CHAY PHN",
+      "ten": "BENH VIEN BAI CHAY PHN"
+    },
+    {
+      "ma": "BV QT VINH PHN",
+      "ten": "BV QUOC TE VINH"
+    },
+    {
+      "ma": "BV TMH PHCM",
+      "ten": "BV TMH (tai mũi họng)"
+    },
+    {
+      "ma": "BV UNG BUOU PHCM",
+      "ten": "BV UNG BUOU PHCM (QC SAN BAY)"
+    },
+    {
+      "ma": "Bzone Thảo Điền",
+      "ten": "Bzone Thảo Điền"
+    },
+    {
+      "ma": "CITY HUB VINH PHN",
+      "ten": "CITY HUB VINH PHN"
+    },
+    {
+      "ma": "CON DAO AIRPORT PHCM",
+      "ten": "SAN BAY CON DAO"
+    },
+    {
+      "ma": "COOP DNANG PHN",
+      "ten": "COOPMART DA NANG"
+    },
+    {
+      "ma": "COOPMART VINH PHUC PHN",
+      "ten": "COOPMART VINH PHUC"
+    },
+    {
+      "ma": "DA NANG KVC",
+      "ten": "DA NANG KVC"
+    },
+    {
+      "ma": "DIY VC LVV",
+      "ten": "DIY VC LE VAN VIET"
+    },
+    {
+      "ma": "DIY VC SMART",
+      "ten": "DIY VC SMART"
+    },
+    {
+      "ma": "DIY VC TDH",
+      "ten": "DIY VC TRAN DUY HUNG"
+    },
+    {
+      "ma": "ESTELLA PHN",
+      "ten": "ESTELLA PHN"
+    },
+    {
+      "ma": "FARM BIGC DONG NAI",
+      "ten": "FARM BIGC DONG NAI"
+    },
+    {
+      "ma": "FARM GO NT",
+      "ten": "FARM GO NHA TRANG KVC"
+    },
+    {
+      "ma": "FARM LOTTE BAC GIANG",
+      "ten": "FARM LOTTE BAC GIANG"
+    },
+    {
+      "ma": "FARM LOTTE NHA TRANG",
+      "ten": "FARM LOTTE NHA TRANG"
+    },
+    {
+      "ma": "FARM LOTTE PHAN THIET",
+      "ten": "FARM LOTTE PHAN THIET (BINH THUAN) KVC"
+    },
+    {
+      "ma": "FARM SAVICO KVC",
+      "ten": "FARM SAVICO KVC"
+    },
+    {
+      "ma": "FZ-DIY GRAND PARK",
+      "ten": "FZ-DIY GRAND PARK"
+    },
+    {
+      "ma": "GALAXY KINH DUONG VUONG PHCM",
+      "ten": "GALAXY KINH DUONG VUONG"
+    },
+    {
+      "ma": "GALAXY QUANG TRUNG PHCM",
+      "ten": "GALAXY QUANG TRUNG"
+    },
+    {
+      "ma": "Gigamall PVD PHCM",
+      "ten": "Gigamall PVD PHCM"
+    },
+    {
+      "ma": "GO AN LAC PHN",
+      "ten": "GO AN LAC PHN"
+    },
+    {
+      "ma": "GO AU CO PHCM",
+      "ten": "GO AU CO PHCM"
+    },
+    {
+      "ma": "GO BA RIA PHCM",
+      "ten": "GO BA RIA POSH"
+    },
+    {
+      "ma": "GO BAC GIANG PHN",
+      "ten": "GO BAC GIANG PHN"
+    },
+    {
+      "ma": "GO BAC LIEU PHCM",
+      "ten": "GO BAC LIEU PHCM"
+    },
+    {
+      "ma": "GO BEN TRE PHN",
+      "ten": "GO BEN TRE PHN"
+    },
+    {
+      "ma": "GO BMT PHCM",
+      "ten": "GO BUON ME THUOT"
+    },
+    {
+      "ma": "GO CAN THO PHCM",
+      "ten": "GO CAN THO"
+    },
+    {
+      "ma": "GO DA NANG PHN",
+      "ten": "GO DA NANG PHN"
+    },
+    {
+      "ma": "GO DI AN PHCM",
+      "ten": "GO DI AN PHCM"
+    },
+    {
+      "ma": "GO HA LONG PHN",
+      "ten": "GO HA LONG"
+    },
+    {
+      "ma": "GO HA NAM PHN",
+      "ten": "GO HA NAM PHN"
+    },
+    {
+      "ma": "GO HAI DUONG PHN",
+      "ten": "GO HAI DUONG PHN"
+    },
+    {
+      "ma": "GO HP PHN",
+      "ten": "GO HAI PHONG PHN"
+    },
+    {
+      "ma": "Go Hue PHN",
+      "ten": "Go Hue PHN"
+    },
+    {
+      "ma": "GO HUNG YEN PHN",
+      "ten": "GO HUNG YEN PHN"
+    },
+    {
+      "ma": "GO LB PHN",
+      "ten": "GO LONG BIEN PHN"
+    },
+    {
+      "ma": "GO MY THO PHCM",
+      "ten": "GO MY THO PHCM"
+    },
+    {
+      "ma": "GO NAM DINH PHN",
+      "ten": "GO NAM DINH"
+    },
+    {
+      "ma": "GO NINH BINH PHN",
+      "ten": "GO NINH BINH PHN"
+    },
+    {
+      "ma": "GO NTRANG PHN",
+      "ten": "GO NHA TRANG"
+    },
+    {
+      "ma": "GO NTT PHCM",
+      "ten": "GO NGUYEN THI THAP PHCM"
+    },
+    {
+      "ma": "GO TDM",
+      "ten": "GO THU DAU MOT PHM"
+    },
+    {
+      "ma": "GO THAI BINH PHN",
+      "ten": "GO THAI BINH PHN"
+    },
+    {
+      "ma": "GO THAI NGUYEN PHN",
+      "ten": "GO THAI NGUYEN PHN"
+    },
+    {
+      "ma": "GO THANH HOA PHN",
+      "ten": "GO THANH HOA PHN"
+    },
+    {
+      "ma": "GO TRA VINH",
+      "ten": "GO TRA VINH PHCM"
+    },
+    {
+      "ma": "GO TRUONG CHINH PHCM",
+      "ten": "GO TRUONG CHINH PHCM"
+    },
+    {
+      "ma": "GO VIET TRI PHN",
+      "ten": "GO VIET TRI PHN"
+    },
+    {
+      "ma": "GO VINH PHN",
+      "ten": "GO VINH PHN"
+    },
+    {
+      "ma": "GO VINH PHUC PHN",
+      "ten": "GO VINH PHUC"
+    },
+    {
+      "ma": "GOLDEN PALACE PHN",
+      "ten": "GOLDEN PALACE PHN"
+    },
+    {
+      "ma": "IN OP BA NA HILL",
+      "ten": "IN OP BA NA HILL"
+    },
+    {
+      "ma": "IN OP VHANH MALL",
+      "ten": "IN OP VHANH MALL"
+    },
+    {
+      "ma": "IN OP VW NHA TRANG",
+      "ten": "IN OP VW NHA TRANG"
+    },
+    {
+      "ma": "IPH PHN",
+      "ten": "IPH POSH HN"
+    },
+    {
+      "ma": "JP AE DN",
+      "ten": "JP AEON Đà Nẵng"
+    },
+    {
+      "ma": "JP AE HP",
+      "ten": "JP AE HAI PHONG"
+    },
+    {
+      "ma": "JP AE HUE",
+      "ten": "JP AE HUE"
+    },
+    {
+      "ma": "JP AE LONG BIEN",
+      "ten": "JP AE LONG BIEN"
+    },
+    {
+      "ma": "JP AE TAN PHU",
+      "ten": "JP AE TAN PHU"
+    },
+    {
+      "ma": "JP BA NA HILL",
+      "ten": "JP BA NA HILL HN"
+    },
+    {
+      "ma": "JP CTQT HLONG",
+      "ten": "JP CANG TAU QT HA LONG"
+    },
+    {
+      "ma": "JP ESTELLA",
+      "ten": "JP ESTELLA"
+    },
+    {
+      "ma": "JP GO DA LAT",
+      "ten": "JP GO DA LAT"
+    },
+    {
+      "ma": "JP GO ĐA NANG",
+      "ten": "JP GO ĐA NANG (EB HAI PHONG)"
+    },
+    {
+      "ma": "JP GO ĐA NANG AN LAC",
+      "ten": "JP GO ĐA NANG (SIEU THI AN LAC)"
+    },
+    {
+      "ma": "JP GO ĐA NANG BIC AN LAC",
+      "ten": "JP GO ĐA NANG (BIG C AN LAC)"
+    },
+    {
+      "ma": "JP GOLD COAST NHA TRANG (RSM)",
+      "ten": "JP GOLD COAST NHA TRANG (RSM)"
+    },
+    {
+      "ma": "JP IPH",
+      "ten": "JP IPH"
+    },
+    {
+      "ma": "JP KIWOOZA",
+      "ten": "JP KIWOOZA"
+    },
+    {
+      "ma": "JP NT CENTER",
+      "ten": "JP NHA TRANG CENTER"
+    },
+    {
+      "ma": "JP NUI THAN TAI (SUOI DOI)",
+      "ten": "JP NUI THAN TAI (SUOI DOI)"
+    },
+    {
+      "ma": "JP POSH LOTTE NHA TRANG",
+      "ten": "JP POSH LOTTE NHA TRANG"
+    },
+    {
+      "ma": "JP POSH VW VU YEN",
+      "ten": "JP POSH VW VU YEN"
+    },
+    {
+      "ma": "JP SENSE CT PVĐ",
+      "ten": "SENSE CITY PHAM VAN DONG JP"
+    },
+    {
+      "ma": "JP VC BA TRIEU",
+      "ten": "JP VC BA TRIEU"
+    },
+    {
+      "ma": "JP VC PNT",
+      "ten": "JP VC PNT (PHAM NGOC THACH)"
+    },
+    {
+      "ma": "JP VC ROY",
+      "ten": "JP VINCOM ROYAL"
+    },
+    {
+      "ma": "JP VINPEARL HOI AN",
+      "ten": "JP VINPEARL HOI AN"
+    },
+    {
+      "ma": "JP VINPEARL NT",
+      "ten": "VINWONDERS  NHA TRANG JP"
+    },
+    {
+      "ma": "JP-KVC- P SUN HL",
+      "ten": "JP-KVC- P SUN HA LONG"
+    },
+    {
+      "ma": "JP-KVC-POSH SUN FANSIPAN",
+      "ten": "JP-KVC-POSH SUN FANSIPAN"
+    },
+    {
+      "ma": "JP-POSH GRAND PARK",
+      "ten": "JP POSH GRAND PARK"
+    },
+    {
+      "ma": "JP-POSH VW CUA HOI",
+      "ten": "JP-POSH VW CUA HOI"
+    },
+    {
+      "ma": "JP-POSH VW NHA TRANG",
+      "ten": "JP POSH VW NHA TRANG"
+    },
+    {
+      "ma": "KIDS DONG ANH",
+      "ten": "Kids Đông Anh( Kids City)"
+    },
+    {
+      "ma": "KNG BA RIA PHCM",
+      "ten": "KNG BA RIA POSH"
+    },
+    {
+      "ma": "KUBO BAC GIANG PHN",
+      "ten": "KUBO BAC GIANG PHN"
+    },
+    {
+      "ma": "KUBO DONG NAI PHCM",
+      "ten": "KUBO DONG NAI PHCM"
+    },
+    {
+      "ma": "KUBO GO BA RIA PHCM",
+      "ten": "KUBO GO BA RIA"
+    },
+    {
+      "ma": "KUBO GO BUON ME THUOT PHCM",
+      "ten": "KUBO GO BUON ME THUOT"
+    },
+    {
+      "ma": "KUBO GO CAN THO PHCM",
+      "ten": "KUBO GO CAN THO"
+    },
+    {
+      "ma": "KUBO GO DA NANG PHN",
+      "ten": "KUBO GO DA NANG"
+    },
+    {
+      "ma": "KUBO GO HAI DUONG PHN",
+      "ten": "KUBO GO HAI DUONG"
+    },
+    {
+      "ma": "KUBO GO LONG BIEN PHN",
+      "ten": "KUBO GO LONG BIEN"
+    },
+    {
+      "ma": "KUBO GO NAM DINH PHN",
+      "ten": "KUBO GO NAM DINH"
+    },
+    {
+      "ma": "KUBO GO NHA TRANG",
+      "ten": "KUBO GO NHA TRANG"
+    },
+    {
+      "ma": "KUBO GO NINH BINH PHN",
+      "ten": "KUBO GO NINH BINH"
+    },
+    {
+      "ma": "KUBO GO PHU THO",
+      "ten": "KUBO GO PHU THO"
+    },
+    {
+      "ma": "KUBO GO THANG LONG PHN",
+      "ten": "KUBO GO THANG LONG"
+    },
+    {
+      "ma": "KUBO HUE PHN",
+      "ten": "KUBO HUE PHN"
+    },
+    {
+      "ma": "KUBO HUNG YEN PHN",
+      "ten": "KUBO HUNG YEN"
+    },
+    {
+      "ma": "KUBO SMART CITY PHN",
+      "ten": "KUBO SMART CITY"
+    },
+    {
+      "ma": "KUBO THAI NGUYEN PHN",
+      "ten": "KUBO THAI NGUYEN PHN"
+    },
+    {
+      "ma": "KUBO VIET TRI PHN",
+      "ten": "KUBO VIET TRI PHN"
+    },
+    {
+      "ma": "KUBO VINH PHN",
+      "ten": "KUBO VINH PHN"
+    },
+    {
+      "ma": "KUBO VINH PHUC PHN",
+      "ten": "KUBO VINH PHUC"
+    },
+    {
+      "ma": "KVC AE HUE",
+      "ten": "KVC AE HUE"
+    },
+    {
+      "ma": "KVC ESTELLA",
+      "ten": "FZ-TUTU TRAIN ESTELLA KVC"
+    },
+    {
+      "ma": "KVC OCP",
+      "ten": "KVC OCP"
+    },
+    {
+      "ma": "KVC ROYAL",
+      "ten": "KVC ROYAL"
+    },
+    {
+      "ma": "KVC ROYAL SNOWFUN",
+      "ten": "KVC ROYAL SNOWFUN"
+    },
+    {
+      "ma": "KVC TIMES",
+      "ten": "KVC TIMES"
+    },
+    {
+      "ma": "LOTTE ĐN PHN",
+      "ten": "LOTTE MART DA NANG"
+    },
+    {
+      "ma": "LOTTE GO VAP VR-PHN",
+      "ten": "LOTTE GO VAP VR-POSH"
+    },
+    {
+      "ma": "LOTTE PHAN THIET",
+      "ten": "LOTTE PHAN THIET (BINH THUAN) PHN"
+    },
+    {
+      "ma": "LOTTE PHU THO PHCM",
+      "ten": "LOTTE PHU THO"
+    },
+    {
+      "ma": "LOTTE Q7 (NSG) PHM",
+      "ten": "LOTTE Q7 (NAM SAI GON) POSH"
+    },
+    {
+      "ma": "LOTTE VINH KVC",
+      "ten": "LOTTE VINH KVC"
+    },
+    {
+      "ma": "LOTTE VINH PHN",
+      "ten": "LOTTE VINH PHN"
+    },
+    {
+      "ma": "LOTTY FRIENDS PHN",
+      "ten": "LOTTY FRIENDS PHN"
+    },
+    {
+      "ma": "MGG BA NA HILL",
+      "ten": "MGG BA NA HILL HN"
+    },
+    {
+      "ma": "MGG CV CHAU A",
+      "ten": "MGG CV CHAU A HN"
+    },
+    {
+      "ma": "MGG IPH (PICK FUN)",
+      "ten": "MAY GAP GAU IPH (PICK FUN)"
+    },
+    {
+      "ma": "MIKAZUKI ĐÀ NẴNG",
+      "ten": "MIKAZUKI ĐÀ NẴNG"
+    },
+    {
+      "ma": "MIKAZUKI DN PHN",
+      "ten": "MIKAZUKI DN"
+    },
+    {
+      "ma": "MIPEC LB PHN",
+      "ten": "MIPEC LB PHN"
+    },
+    {
+      "ma": "MLINH PLAZA PHN",
+      "ten": "ME LINH PLAZA"
+    },
+    {
+      "ma": "MM MARKET DA NANG MTD",
+      "ten": "MM MARKET DA NANG MTD"
+    },
+    {
+      "ma": "MOC CHAU PHN",
+      "ten": "CAU KINH MOC CHAU"
+    },
+    {
+      "ma": "NHA TRANG CENTER PHN",
+      "ten": "NHA TRANG CENTER POSH HN"
+    },
+    {
+      "ma": "Nowzone PHCM",
+      "ten": "Nowzone (FEI-YUEH) PHCM"
+    },
+    {
+      "ma": "NSTV BTL PHN",
+      "ten": "NSTV BAC TU LIEM"
+    },
+    {
+      "ma": "NSTV GO TN PHN",
+      "ten": "NSTV GO THAI NGUYEN PHN"
+    },
+    {
+      "ma": "NSTV HL PHN",
+      "ten": "NSTV HA LONG"
+    },
+    {
+      "ma": "NSTV NAM DINH PHN",
+      "ten": "NSTV NAM DINH PHN"
+    },
+    {
+      "ma": "NSTV OCP PHN",
+      "ten": "NSTV OCEAN PARK"
+    },
+    {
+      "ma": "NSTV PHU LY PHN",
+      "ten": "NSTV PHU LY"
+    },
+    {
+      "ma": "NSTV ROY PHN",
+      "ten": "NSTV ROYAL"
+    },
+    {
+      "ma": "NSTV SAVICO PHN",
+      "ten": "NSTV SAVICO"
+    },
+    {
+      "ma": "NSTV THAI BINH PHN",
+      "ten": "NSTV THAI BINH"
+    },
+    {
+      "ma": "NSTV TRUNH HOA PHN",
+      "ten": "NSTV TRUNH HOA PHN"
+    },
+    {
+      "ma": "NSTV TUYEN QUANG PHN",
+      "ten": "NSTV TUYEN QUANG"
+    },
+    {
+      "ma": "NSTV VC TN PHN",
+      "ten": "NSTV VC THAI NGUYEN PHN"
+    },
+    {
+      "ma": "OCP PHN",
+      "ten": "VINCOM OCEAN PARK"
+    },
+    {
+      "ma": "P GOLD COAST NHA TRANG (RSM)",
+      "ten": "POSH GOLD COAST NHA TRANG (RSM)"
+    },
+    {
+      "ma": "P-JP-PF SUN CAT BA",
+      "ten": "P-JP-PF SUN CAT BA"
+    },
+    {
+      "ma": "PF DIAMOND PLACE",
+      "ten": "PF DIAMOND PLACE THANH XUAN"
+    },
+    {
+      "ma": "PF SC VIVO",
+      "ten": "PF SC VIVO"
+    },
+    {
+      "ma": "PF TAM CHUC",
+      "ten": "PF TAM CHUC (CHAN TAM)"
+    },
+    {
+      "ma": "PF TIME CITY",
+      "ten": "PF TIME CITY (VINKE THUY CUNG)"
+    },
+    {
+      "ma": "PINBALL DA NANG",
+      "ten": "PINBALL ĐÀ NẴNG"
+    },
+    {
+      "ma": "Pinball và ghế LOTTE BAC GIANG",
+      "ten": "Pinball và ghế LOTTE BAC GIANG"
+    },
+    {
+      "ma": "POSH AE HUE",
+      "ten": "POSH AE HUE"
+    },
+    {
+      "ma": "POSH KIWOOZA",
+      "ten": "POSH KIWOOZA"
+    },
+    {
+      "ma": "POSH MB ECOPARK VINH",
+      "ten": "POSH MB ECOPARK VINH"
+    },
+    {
+      "ma": "POSH MN CGV BÌNH DƯƠNG SQUARE",
+      "ten": "POSH MN CGV BÌNH DƯƠNG SQUARE"
+    },
+    {
+      "ma": "POSH MN CGV LÝ CHÍNH THẮNG",
+      "ten": "POSH MN CGV LÝ CHÍNH THẮNG"
+    },
+    {
+      "ma": "POSH MN CGV PEARL PLAZA",
+      "ten": "POSH MN CGV PEARL PLAZA"
+    },
+    {
+      "ma": "POSH MN CGV Vincom Landmark",
+      "ten": "POSH MN CGV Vincom Landmark"
+    },
+    {
+      "ma": "POSH MN CGV Vincom Phan Văn Trị",
+      "ten": "POSH MN CGV Vincom Phan Văn Trị"
+    },
+    {
+      "ma": "POSH MN CGV Vincom Xuân Khánh",
+      "ten": "POSH MN CGV Vincom Xuân Khánh"
+    },
+    {
+      "ma": "PQ SUN HTHOM JPHCM",
+      "ten": "JP SUN HON THOM"
+    },
+    {
+      "ma": "PQ SUN HTHOM PHCM",
+      "ten": "SUN HON THOM"
+    },
+    {
+      "ma": "PREMIUM PHCM",
+      "ten": "PREMIUM PHCM"
+    },
+    {
+      "ma": "RABBIT DA NANG",
+      "ten": "RABBIT DA NANG"
+    },
+    {
+      "ma": "RABBIT GAME VINH",
+      "ten": "RABBIT GAME VINH"
+    },
+    {
+      "ma": "RAP CPQG",
+      "ten": "RAP CHIEU PHIM QG PHN"
+    },
+    {
+      "ma": "SAVICO PHN",
+      "ten": "SAVICO PHN"
+    },
+    {
+      "ma": "SB CAN THO PHCM",
+      "ten": "SAN BAY CAN THO"
+    },
+    {
+      "ma": "SB PHU QUOC PHN",
+      "ten": "SAN BAY PHU QUOC PHN"
+    },
+    {
+      "ma": "SB PHU QUOC VTP PHN",
+      "ten": "SB PHU QUOC VAN THINH PHAT PHN"
+    },
+    {
+      "ma": "SC VIVO PHCM",
+      "ten": "SC VIVO POSH-JP HCM"
+    },
+    {
+      "ma": "SENSE BTRE PHCM",
+      "ten": "SENSE  BEN TRE PHCM"
+    },
+    {
+      "ma": "SENSE CA MAU PHCM",
+      "ten": "SENSE CA MAU PHCM"
+    },
+    {
+      "ma": "SENSE CAI BE PHN",
+      "ten": "SENSE MARKET CAI BE PHN"
+    },
+    {
+      "ma": "SENSE CT CTHO PHCM",
+      "ten": "SENSE CITY CAN THO"
+    },
+    {
+      "ma": "SENSE PVD PHCM",
+      "ten": "SENSE PHAM VAN DONG PHCM"
+    },
+    {
+      "ma": "SUN FANSIPAN PHN",
+      "ten": "POSH SUN FANSIPAN"
+    },
+    {
+      "ma": "SUN TNINH PHCM",
+      "ten": "SUN TAY NINH -NUI BA DEN"
+    },
+    {
+      "ma": "TAM CHUC PHN",
+      "ten": "POSH TAM CHUC (CHAN TAM)"
+    },
+    {
+      "ma": "TĐBS PF",
+      "ten": "THIEN DUONG BAO SON PF"
+    },
+    {
+      "ma": "TĐBS PHN",
+      "ten": "THIEN DUONG BAO SON PHN"
+    },
+    {
+      "ma": "THE GARDEN PHN",
+      "ten": "THE GARDEN"
+    },
+    {
+      "ma": "TP XANH(VW GRANDPARK)",
+      "ten": "TP XANH(VW GRANDPARK)JP-POSH"
+    },
+    {
+      "ma": "TTC TAY NINH PHN",
+      "ten": "TTC TAY NINH PHN"
+    },
+    {
+      "ma": "VC 3/2 JP-Posh",
+      "ten": "VC 3/2 JP-Posh"
+    },
+    {
+      "ma": "VC BA TRIEU PHN",
+      "ten": "VC BA TRIEU PHN"
+    },
+    {
+      "ma": "VC BAC GIANG PHN",
+      "ten": "VC BAC GIANG PHN"
+    },
+    {
+      "ma": "VC BIEN HOA PHN",
+      "ten": "VC BIEN HOA PHN"
+    },
+    {
+      "ma": "VC BTL PHN",
+      "ten": "VC BAC TU LIEM POSH"
+    },
+    {
+      "ma": "VC DN PHN",
+      "ten": "VC DA NANG POSH"
+    },
+    {
+      "ma": "VC DONG KHOI PHCM",
+      "ten": "VC DONG KHOI PHCM"
+    },
+    {
+      "ma": "VC GV PHCM",
+      "ten": "VC GO VAP (PHAN VAN TRI) POSH"
+    },
+    {
+      "ma": "VC HA LONG PHN",
+      "ten": "VINCOM HA LONG (QUANG NINH) PHN"
+    },
+    {
+      "ma": "VC HUE PHN",
+      "ten": "VC HUE PHN"
+    },
+    {
+      "ma": "VC LVV PHCM",
+      "ten": "VC LE VAN VIET POSH"
+    },
+    {
+      "ma": "VC MAXI TN NT PHN",
+      "ten": "VINCOM MAXI THAI NGUYEN NHA TRANG"
+    },
+    {
+      "ma": "VC METROPOLIS (LIEU GIAI) PHN",
+      "ten": "VC METROPOLIS (LIEU GIAI) PHN"
+    },
+    {
+      "ma": "VC NCT PHN",
+      "ten": "VC NCT PHN (NGUYEN CHI THANH)"
+    },
+    {
+      "ma": "VC OCP KVCN",
+      "ten": "Vincom Ocean Park kvc"
+    },
+    {
+      "ma": "VC PHAM HUNG (SKYLAKE)",
+      "ten": "VC PHAM HUNG (SKYLAKE)"
+    },
+    {
+      "ma": "VC PHU LY PHN",
+      "ten": "VC PHU LY PHN"
+    },
+    {
+      "ma": "VC PNT PHN",
+      "ten": "VC PHAM NGOC THACH PHN"
+    },
+    {
+      "ma": "VC QT PHCM",
+      "ten": "VC QUANG TRUNG POSH"
+    },
+    {
+      "ma": "VC ROY PHN",
+      "ten": "VC ROY PHN"
+    },
+    {
+      "ma": "VC SMART PHN",
+      "ten": "VC SMART PHN"
+    },
+    {
+      "ma": "VC T.PHU N.TRANG PHN",
+      "ten": "VC TRAN PHU NHA TRANG PHN"
+    },
+    {
+      "ma": "VC TD PHCM",
+      "ten": "VC THAO DIEN POSH"
+    },
+    {
+      "ma": "VC TDH PHN",
+      "ten": "VC TRAN DUY HUNG PHN-JP"
+    },
+    {
+      "ma": "VC THAI BINH PHN",
+      "ten": "VC THAI BINH PHN"
+    },
+    {
+      "ma": "VC THAI NGUYEN PHN",
+      "ten": "VC THAI NGUYEN PHN"
+    },
+    {
+      "ma": "VC THANH HOA PHN",
+      "ten": "VC THANH HOA PHN"
+    },
+    {
+      "ma": "VC THU DUC PHCM",
+      "ten": "VC THU DUC PHCM"
+    },
+    {
+      "ma": "VC TIMES PHN",
+      "ten": "VC TIMES PHN"
+    },
+    {
+      "ma": "VC TRAN PHU NHA TRANG PHN",
+      "ten": "VC TRAN PHU NHA TRANG PHN"
+    },
+    {
+      "ma": "VC TUYEN QUANG PNH",
+      "ten": "VC TUYEN QUANG PNH"
+    },
+    {
+      "ma": "VC VIET TRI PHN",
+      "ten": "VINCOM VIET TRI PHN"
+    },
+    {
+      "ma": "VC VU YEN PHN",
+      "ten": "VC VU YEN PHN"
+    },
+    {
+      "ma": "VHANH MALL PHCM",
+      "ten": "VAN HANH MALL"
+    },
+    {
+      "ma": "VINH CENTER PHN",
+      "ten": "VINH CENTER PHN"
+    },
+    {
+      "ma": "VINKE-TCUNG",
+      "ten": "VINKE THUY CUNG"
+    },
+    {
+      "ma": "VINPEARL HOI AN PHN",
+      "ten": "VINPEARL HOI AN"
+    },
+    {
+      "ma": "VPNT PHN",
+      "ten": "VINPEARL NHA TRANG PHN( KHU MUA SAM)"
+    },
+    {
+      "ma": "VUNG TAU PHCM",
+      "ten": "POSH LOTTE MART VUNG TAU"
+    },
+    {
+      "ma": "YOKIDS PHCM",
+      "ten": "YOKIDS PHCM"
+    },
+    {
+      "ma": "ZONE C KIEN GIANG PHCM",
+      "ten": "ZONE C KIEN GIANG PHCM"
+    }
+  ],
+  "ma_nha_cung_cap_moi": [
+    {
+      "ma": "0100105486",
+      "ten": "CÔNG TY TNHH MỘT THÀNH VIÊN KHAI THÁC ĐIỂM ĐỖ XE HÀ NỘI"
+    },
+    {
+      "ma": "1986 VIỆT NAM0108316915",
+      "ten": "CÔNG TY TNHH 1986 VIỆT NAM"
+    },
+    {
+      "ma": "4PS TRÀNG TIỀN0313168515-006",
+      "ten": "CHI NHÁNH CÔNG TY CỔ PHẦN PIZZA 4PS - NHÀ HÀNG PIZZA 4PS TRÀNG TIỀN"
+    },
+    {
+      "ma": "AE BD0106099581-002",
+      "ten": "CHI NHÁNH CÔNG TY TNHH AEONMALL VIỆT NAM TẠI BÌNH DƯƠNG"
+    },
+    {
+      "ma": "AE BÌNH TÂN0106099581-001",
+      "ten": "CHI NHÁNH CÔNG TY TNHH AEONMALL VIỆT NAM TẠI THÀNH PHỐ HỒ CHÍ MINH"
+    },
+    {
+      "ma": "AEDN0106099581-007",
+      "ten": "CHI NHÁNH CÔNG TY TNHH AEONMALL VIỆT NAM TẠI ĐÀ NẴNG"
+    },
+    {
+      "ma": "AE HẢI PHÒNG0106099581-003",
+      "ten": "CHI NHÁNH CÔNG TY TNHH AEONMALL VIỆT NAM TẠI HẢI PHÒNG"
+    },
+    {
+      "ma": "AE HUẾ0106099581-004",
+      "ten": "CHI NHÁNH CÔNG TY TNHH AEONMALL VIỆT NAM TẠI THỪA THIÊN HUẾ"
+    },
+    {
+      "ma": "AE LONGBIEN0106048322",
+      "ten": "CÔNG TY TNHH AEONMALL LONG BIÊN"
+    },
+    {
+      "ma": "AEON VN CN LONG BIEN0311241512-004",
+      "ten": "CÔNG TY TNHH AEON VIỆT NAM- CHI NHÁNH LONG BIÊN"
+    },
+    {
+      "ma": "AEQN0106099581-006",
+      "ten": "CHI NHÁNH CÔNG TY TNHH AEONMALL VIỆT NAM TẠI QUẢNG NINH"
+    },
+    {
+      "ma": "AE TÂN AN0311241512 – 010",
+      "ten": "CÔNG TY TNHH AEON VIỆT NAM – CHI NHÁNH LONG AN"
+    },
+    {
+      "ma": "AE TÂN PHÚ0311241512",
+      "ten": "CÔNG TY TNHH AEON VIỆT NAM"
+    },
+    {
+      "ma": "AIKIA VIỆT NAM0317426132",
+      "ten": "CÔNG TY TNHH THƯƠNG MẠI DỊCH VỤ AIKIA VIỆT NAM"
+    },
+    {
+      "ma": "ALADDIN0107742477",
+      "ten": "CÔNG TY CP TẦM NHÌN QUỐC TẾ ALADDIN"
+    },
+    {
+      "ma": "ẨM THỰC VIỆT NHẬT0107893162",
+      "ten": "CÔNG TY CỔ PHẦN ẨM THỰC VIỆT NHẬT"
+    },
+    {
+      "ma": "ANCUA SAIGON0319376423",
+      "ten": "CÔNG TY TNHH ANCUA SAIGON"
+    },
+    {
+      "ma": "ANH HÀO3400977564",
+      "ten": "CÔNG TY TNHH ANH HÀO PHAN THIẾT"
+    },
+    {
+      "ma": "ÁNH NGUYÊN0313931670",
+      "ten": "CÔNG TY TNHH ĐẦU TƯ THƯƠNG MẠI DỊCH VỤ ÁNH NGUYÊN"
+    },
+    {
+      "ma": "ANH TÚ0105201507",
+      "ten": "CÔNG TY CỔ PHẦN THƯƠNG MẠI DỊCH VỤ Ô TÔ ANH TÚ"
+    },
+    {
+      "ma": "AN LẠC0301472278",
+      "ten": "CÔNG TY TRÁCH NHIỆM HỮU HẠN THƯƠNG MẠI VÀ DỊCH VỤ SIÊU THỊ BIG C AN LẠC"
+    },
+    {
+      "ma": "ANLIS0109212531",
+      "ten": "CÔNG TY TNHH SỞ HỮU TRÍ TUỆ ANLIS VIỆT NAM"
+    },
+    {
+      "ma": "ANNA3401288398",
+      "ten": "CÔNG TY TNHH TUYỀN ANNA"
+    },
+    {
+      "ma": "AN NHẬT PHÁT4500642940",
+      "ten": "CÔNG TY TNHH THƯƠNG MẠI VÀ DỊCH VỤ AN NHẬT PHÁT"
+    },
+    {
+      "ma": "AN THỊNH PHÁT0108551789",
+      "ten": "CÔNG TY TNHH THIẾT BỊ VÀ NỘI THẤT AN THỊNH PHÁT"
+    },
+    {
+      "ma": "AN VIỆT SÔNG HỒNG0105787680",
+      "ten": "CÔNG TY CỔ PHẦN AN VIỆT SÔNG HỒNG"
+    },
+    {
+      "ma": "AT0109776390",
+      "ten": "CÔNG TY TNHH THƯƠNG MẠI TỔNG HỢP VÀ DỊCH VỤ AT VIỆT NAM"
+    },
+    {
+      "ma": "BẠCH ĐẰNG0200607994-002",
+      "ten": "CHI NHÁNH SỐ 2 CÔNG TY CỔ PHẦN XĂNG DẦU BẠCH ĐẰNG"
+    },
+    {
+      "ma": "BÀ NÀ0400585547",
+      "ten": "CÔNG TY CỔ PHẦN DỊCH VỤ CÁP TREO BÀ NÀ"
+    },
+    {
+      "ma": "BAO BÌ PHÚ THÀNH0313289573",
+      "ten": "CÔNG TY TNHH SẢN XUẤT IN ẤN BAO BÌ PHÚ THÀNH"
+    },
+    {
+      "ma": "BẢO HIỂM DBV0102737963-079",
+      "ten": "Công ty Cổ Phần Tập Đoàn Bảo Hiểm DBV - Chi Nhánh Phú Mỹ"
+    },
+    {
+      "ma": "BẢO HIỂM PVI0105402531-019",
+      "ten": "Công Ty Bảo Hiểm PVI TP.Hồ Chí Minh"
+    },
+    {
+      "ma": "BẢO HIỂM PVI0105402531-045",
+      "ten": "Tổng Công ty Bảo Hiểm PVI-Chi Nhánh Bảo Hiểm PVI Đồng Khởi"
+    },
+    {
+      "ma": "BẢO HIỂM TASCO0302391670",
+      "ten": "CÔNG TY TRÁCH NHIỆM HỮU HẠN BẢO HIỂM TASCO"
+    },
+    {
+      "ma": "BẢO SƠN0500579561",
+      "ten": "CÔNG TY TNHH MỘT THÀNH VIÊN DU LỊCH GIẢI TRÍ THIÊN ĐƯỜNG BẢO SƠN"
+    },
+    {
+      "ma": "Bảo Việt Sài Gòn0101527385-047",
+      "ten": "Công Ty Bảo Việt Sài Gòn"
+    },
+    {
+      "ma": "BĐS VINCOM NCT0110721491",
+      "ten": "CÔNG TY TNHH BẤT ĐỘNG SẢN VINCOM NCT"
+    },
+    {
+      "ma": "Bệnh viện Bãi Cháy5700391615",
+      "ten": "Bệnh viện Bãi Cháy"
+    },
+    {
+      "ma": "BEWELL SÀI GÒN0317877738",
+      "ten": "CÔNG TY TNHH PHÒNG KHÁM SỨC KHỎE BEWELL SÀI GÒN"
+    },
+    {
+      "ma": "BH LPBANK0104345961-035",
+      "ten": "Tổng Công ty Cổ phần Bảo Hiểm LPBank - Chi nhánh Âu Lạc"
+    },
+    {
+      "ma": "BHXH Q HÀ ĐÔNG0500609819",
+      "ten": "BẢO HIỂM XÃ HỘI QUẬN HÀ ĐÔNG"
+    },
+    {
+      "ma": "BHXH TỪ LIÊM",
+      "ten": "BẢO HIỂM XÃ HỘI CƠ SỞ TỪ LIÊM"
+    },
+    {
+      "ma": "BIDV0100150619",
+      "ten": "Ngân hàng Thương mại Cổ phần Đầu tư và Phát triển Việt Nam"
+    },
+    {
+      "ma": "BIDV CN SGD0100150619-067",
+      "ten": "Ngân hàng Thương mại Cổ phần Đầu tư và Phát triển Việt Nam - Chi nhánh Sở Giao dịch 1"
+    },
+    {
+      "ma": "BIDV VẠN PHÚC0100150619-186",
+      "ten": "NGÂN HÀNG THƯƠNG MẠI CỔ PHẦN ĐẦU TƯ VÀ PHÁT TRIỂN VIỆT NAM - CHI NHÁNH VẠN PHÚC HÀ NỘI"
+    },
+    {
+      "ma": "BIG C ĐỒNG NAI3600258976",
+      "ten": "CÔNG TY TNHH THƯƠNG MẠI DỊCH VỤ QUỐC TẾ BIG C ĐỒNG NAI"
+    },
+    {
+      "ma": "BIG C THĂNG LONG0100956381",
+      "ten": "CÔNG TY TNHH THƯƠNG MẠI QUỐC TẾ VÀ DỊCH VỤ SIÊU THỊ BIG C THĂNG LONG"
+    },
+    {
+      "ma": "BIGSTAR0106852727",
+      "ten": "CÔNG TY CỔ PHẦN BIGSTAR VIỆT NAM"
+    },
+    {
+      "ma": "BIN BƠ0310880724",
+      "ten": "CÔNG TY TNHH MỘT THÀNH VIÊN BIN BƠ"
+    },
+    {
+      "ma": "BINGO0314709887",
+      "ten": "CÔNG TY TNHH SẢN XUẤT THƯƠNG MẠI BINGO"
+    },
+    {
+      "ma": "BÌNH ĐẠT 0111082537",
+      "ten": "CÔNG TY TNHH KINH DOANH THƯƠNG MẠI BÌNH ĐẠT"
+    },
+    {
+      "ma": "BLUCOM0105022466",
+      "ten": "CÔNG TY CỔ PHẦN BLUECOM VIỆT NAM"
+    },
+    {
+      "ma": "BLUE OCEAN4201772123",
+      "ten": "CÔNG TY TNHH BLUE OCEAN RESORT NT"
+    },
+    {
+      "ma": "BMT0102853832-016",
+      "ten": "CHI NHÁNH CÔNG TY CỔ PHẦN BẤT ĐỘNG SẢN VIỆT - NHẬT TẠI BUÔN MA THUỘT"
+    },
+    {
+      "ma": "BUSINESS HUẾ3300854978",
+      "ten": "CÔNG TY CỔ PHẦN ESPACE BUSINESS HUẾ"
+    },
+    {
+      "ma": "Bưu chính Viettel0104093672",
+      "ten": "TỔNG CÔNG TY CỔ PHẦN BƯU CHÍNH VIETTEL"
+    },
+    {
+      "ma": "CẢNG NAM ĐÌNH VŨ0201741248",
+      "ten": "CÔNG TY CỔ PHẦN CẢNG NAM ĐÌNH VŨ"
+    },
+    {
+      "ma": "CẢNG TÀU QT HẠ LONG 5701723020-002",
+      "ten": "CÔNG TY TNHH MẶT TRỜI HẠ LONG - CHI NHÁNH CẢNG TÀU KHÁCH QUỐC TẾ HẠ LONG"
+    },
+    {
+      "ma": "CAO PHONG0302309845",
+      "ten": "CÔNG TY TNHH CAO PHONG"
+    },
+    {
+      "ma": "CÁT BÀ0201755057-002",
+      "ten": "CÔNG TY TNHH MẶT TRỜI CÁT BÀ - CHI NHÁNH SUN WORLD CÁT BÀ"
+    },
+    {
+      "ma": "CCT KV LÊ CHÂN-DƯƠNG KINH0200351213-003",
+      "ten": "CHI CỤC THUẾ KHU VỰC LÊ CHÂN - DƯƠNG KINH"
+    },
+    {
+      "ma": "CCT KV VĂN GIANG-KHOÁI CHÂU0901074511",
+      "ten": "CHI CỤC THUẾ KHU VỰC VĂN GIANG - KHOÁI CHÂU"
+    },
+    {
+      "ma": "CCT Q TÂN PHÚ0301519977-026",
+      "ten": "CHI CỤC THUẾ QUẬN TÂN PHÚ"
+    },
+    {
+      "ma": "CCT TP THỦ ĐỨC0301519977-030",
+      "ten": "CHI CỤC THUẾ THÀNH PHỐ THỦ ĐỨC"
+    },
+    {
+      "ma": "CESCO VIỆT NAM0313073253",
+      "ten": "CÔNG TY TNHH CESCO VIỆT NAM"
+    },
+    {
+      "ma": "CHÂN TÂM0700823217",
+      "ten": "CÔNG TY TNHH DỊCH VỤ DU LỊCH CHÂN TÂM"
+    },
+    {
+      "ma": "CHK QUỐC TẾ CAM RANH0311638525-013",
+      "ten": "CẢNG HÀNG KHÔNG QUỐC TẾ CAM RANH - CHI NHÁNH TỔNG CÔNG TY CẢNG HÀNG KHÔNG VIỆT NAM - CTCP"
+    },
+    {
+      "ma": "CHOLIMEX0304475742",
+      "ten": "CÔNG TY CỔ PHẦN THỰC PHẨM CHOLIMEX"
+    },
+    {
+      "ma": "CN IPOS.VN0104789847-002",
+      "ten": "CHI NHÁNH CÔNG TY CỔ PHẦN IPOS.VN TẠI THÀNH PHỐ HỒ CHÍ MINH"
+    },
+    {
+      "ma": "CƠ ĐIỆN BMV0315998222",
+      "ten": "CÔNG TY TNHH SẢN XUẤT CƠ ĐIỆN BMV"
+    },
+    {
+      "ma": "CÔNG NGHỆ APOLLO0104950415",
+      "ten": "CÔNG TY CỔ PHẦN PHÁT TRIỂN CÔNG NGHỆ APOLLO VIỆT NAM"
+    },
+    {
+      "ma": "CÔNG TY CỔ PHẦN ĐẦU TƯ XUẤT NHẬP KHẨU XĂNG DẦU VIỆT NAM0105216422",
+      "ten": "CÔNG TY CỔ PHẦN ĐẦU TƯ XUẤT NHẬP KHẨU XĂNG DẦU VIỆT NAM"
+    },
+    {
+      "ma": "CÔNG TY TNHH TƯỢNG THẠCH CAO THÀNH ĐẠT0315619548",
+      "ten": "CÔNG TY TNHH TƯỢNG THẠCH CAO THÀNH ĐẠT"
+    },
+    {
+      "ma": "CO.OP ĐÀ NẴNG0401281414",
+      "ten": "CÔNG TY TNHH MỘT THÀNH VIÊN TMDV SIÊU THỊ CO.OPMART ĐÀ NẴNG"
+    },
+    {
+      "ma": "CO.OP MART VĨNH PHÚC2500454301",
+      "ten": "CÔNG TY TNHH MỘT THÀNH VIÊN CO.OP MART VĨNH PHÚC"
+    },
+    {
+      "ma": "CTT0402149578",
+      "ten": "CÔNG TY CỔ PHẦN CÔNG NGHỆ SỐ CTT VIỆT NAM"
+    },
+    {
+      "ma": "CTT Q HÀ ĐÔNG0100786940-042",
+      "ten": "CHI CỤC THUẾ QUẬN HÀ ĐÔNG"
+    },
+    {
+      "ma": "CTTTHUẬN AN3700144203-004",
+      "ten": "CHI CỤC THUẾ THUẬN AN"
+    },
+    {
+      "ma": "Cửa Hội2902171014",
+      "ten": "Công ty Cổ phần Vinpearl Cửa Hội"
+    },
+    {
+      "ma": "CV CHÂU Á0401524378",
+      "ten": "CÔNG TY TNHH CÔNG VIÊN CHÂU Á"
+    },
+    {
+      "ma": "ĐẠI NGUYỄN0303114398",
+      "ten": "CÔNG TY TRÁCH NHIỆM HỮU HẠN ĐẠI NGUYỄN"
+    },
+    {
+      "ma": "ĐĂNG KIỂM0100106024-003",
+      "ten": "TRUNG TÂM ĐĂNG KIỂM XE CƠ GIỚI 2901S - CHI NHÁNH CÔNG TY TNHH MỘT THÀNH VIÊN CHIẾU SÁNG VÀ THIẾT BỊ ĐÔ THỊ"
+    },
+    {
+      "ma": "ĐĂNG KIỂM0500238177",
+      "ten": "TRUNG TÂM ĐĂNG KIỂM XE CƠ GIỚI HÀ NỘI"
+    },
+    {
+      "ma": "ĐẠT VIỆT0110879489",
+      "ten": "CÔNG TY CỔ PHẦN THƯƠNG MẠI DỊCH VỤ ĐẦU TƯ ĐẠI VIỆT"
+    },
+    {
+      "ma": "DBV AN BÌNH0102737963-103",
+      "ten": "CÔNG TY CỔ PHẦN TẬP ĐOÀN BẢO HIỂM DBV - CHI NHÁNH AN BÌNH"
+    },
+    {
+      "ma": "DECATHLON0305728805-002",
+      "ten": "CHI NHÁNH CÔNG TY TNHH DECATHLON VIỆT NAM TẠI HÀ NỘI"
+    },
+    {
+      "ma": "DELIGHT0312115214",
+      "ten": "CÔNG TY TNHH AEON DELIGHT (VIỆT NAM)"
+    },
+    {
+      "ma": "DHC SUỐI ĐÔI0401585934",
+      "ten": "CÔNG TY CỔ PHẦN DHC SUỐI ĐÔI"
+    },
+    {
+      "ma": "Diệu Phúc0316172372",
+      "ten": "CÔNG TY TNHH THƯƠNG MẠI VÀ DỊCH VỤ KỸ THUẬT DIỆU PHÚC"
+    },
+    {
+      "ma": "ĐÔNG HƯNG1700543892",
+      "ten": "CÔNG TY CỔ PHẦN ĐÔNG HƯNG"
+    },
+    {
+      "ma": "ĐỒNG NAI0102853832-017",
+      "ten": "CHI NHÁNH CÔNG TY CỔ PHẦN BẤT ĐỘNG SẢN VIỆT-NHẬT TẠI ĐỒNG NAI"
+    },
+    {
+      "ma": "DTF0105169412",
+      "ten": "CÔNG TY CỔ PHẦN THƯƠNG MẠI DỊCH VỤ DTF VIỆT NAM"
+    },
+    {
+      "ma": "ĐỨC NAM0313550026",
+      "ten": "CÔNG TY TNHH SẢN XUẤT THƯƠNG MẠI XUẤT NHẬP KHẨU ĐỨC NAM"
+    },
+    {
+      "ma": "EB HẢI PHÒNG0200662314-001",
+      "ten": "CHI NHÁNH CÔNG TY CỔ PHẦN EB HẢI PHÒNG TẠI THÀNH PHỐ ĐÀ NẴNG"
+    },
+    {
+      "ma": "EB TÂN PHÚ0312120895",
+      "ten": "CÔNG TY TNHH EB TÂN PHÚ"
+    },
+    {
+      "ma": "EMALL0312487886",
+      "ten": "CÔNG TY CỔ PHẦN THƯƠNG MẠI VÀ DỊCH VỤ EMALL"
+    },
+    {
+      "ma": "ESTELLA0305141968",
+      "ten": "CÔNG TY TNHH LIÊN DOANH ESTELLA"
+    },
+    {
+      "ma": "FANSIPAN5300634655-003",
+      "ten": "CÔNG TY TNHH DỊCH VỤ DU LỊCH CÁP TREO FANSIPAN SA PA - CHI NHÁNH SUN WORLD FANSIPAN SA PA"
+    },
+    {
+      "ma": "FEI-YUEH0302102135",
+      "ten": "CÔNG TY CỔ PHẦN FEI-YUEH VIỆT NAM"
+    },
+    {
+      "ma": "GEN GROUP0109515504",
+      "ten": "CÔNG TY CỔ PHẦN THỜI TRANG GEN GROUP"
+    },
+    {
+      "ma": "GIA AN0111262628",
+      "ten": "CÔNG TY TNHH DỊCH VỤ ẨM THỰC GIA AN"
+    },
+    {
+      "ma": "GIA DỤNG TỔNG HỢP(KUBO)0314578955",
+      "ten": "CÔNG TY TNHH  MỘT THÀNH VIÊN THƯƠNG MẠI HÀNG GIA DỤNG TỔNG HỢP"
+    },
+    {
+      "ma": "GIA PHẠM2901790815",
+      "ten": "CÔNG TY TNHH ĐẦU TƯ VÀ THƯƠNG MẠI GIA PHẠM"
+    },
+    {
+      "ma": "GIGA GIFT0110887352",
+      "ten": "CÔNG TY CỔ PHẦN GIGA GIFT"
+    },
+    {
+      "ma": "GIGAMALL0313114291",
+      "ten": "CÔNG TY CỔ PHẦN ĐẦU TƯ THƯƠNG MẠI DỊCH VỤ GIGAMALL VIỆT NAM"
+    },
+    {
+      "ma": "GO BẮC GIANG0102853832-012",
+      "ten": "CHI NHÁNH CÔNG TY CỔ PHẦN BẤT ĐỘNG SẢN VIỆT-NHẬT TẠI BẮC GIANG"
+    },
+    {
+      "ma": "GO BẠC LIÊU0102853832-023",
+      "ten": "CHI NHÁNH CÔNG TY CỔ PHẦN BẤT ĐỘNG SẢN VIỆT-NHẬT TẠI BẠC LIÊU"
+    },
+    {
+      "ma": "GO BÀ RỊA0102853832-018",
+      "ten": "CHI NHÁNH CÔNG TY CỔ PHẦN BẤT ĐỘNG SẢN VIỆT-NHẬT TẠI BÀ RỊA"
+    },
+    {
+      "ma": "GO BẾN TRE0102853832-020",
+      "ten": "CHI NHÁNH CÔNG TY CỔ PHẦN BẤT ĐỘNG SẢN VIỆT-NHẬT TẠI BẾN TRE"
+    },
+    {
+      "ma": "GO C THƠ0102853832-004",
+      "ten": "CHI NHÁNH CÔNG TY CỔ PHẦN BẤT ĐỘNG SẢN VIỆT - NHẬT TẠI CẦN THƠ"
+    },
+    {
+      "ma": "GO DI AN0102853832-007",
+      "ten": "CHI NHÁNH SỐ 2 CÔNG TY CỔ PHẦN BẤT ĐỘNG SẢN VIỆT - NHẬT TẠI BÌNH DƯƠNG"
+    },
+    {
+      "ma": "GO HẢI DƯƠNG0102853832-005",
+      "ten": "CHI NHÁNH CÔNG TY CỔ PHẦN BẤT ĐỘNG SẢN VIỆT - NHẬT TẠI HẢI DƯƠNG"
+    },
+    {
+      "ma": "GO HA LONG0102853832-011",
+      "ten": "CHI NHÁNH CÔNG TY CỔ PHẦN BẤT ĐỘNG SẢN VIỆT - NHẬT TẠI THÀNH PHỐ HẠ LONG"
+    },
+    {
+      "ma": "GO HÀ NAM0102853832-022",
+      "ten": "CHI NHÁNH CÔNG TY CỔ PHẦN BẤT ĐỘNG SẢN VIỆT-NHẬT TẠI HÀ NAM"
+    },
+    {
+      "ma": "GO Hưng Yên0102853832-027",
+      "ten": "Chi nhánh Công ty Cổ phần Bất Động Sản Việt - Nhật tại Hưng Yên"
+    },
+    {
+      "ma": "GOLDEN GATE0102721191-068",
+      "ten": "CÔNG TY CỔ PHẦN TẬP ĐOÀN GOLDEN GATE – CHI NHÁNH MIỀN BẮC"
+    },
+    {
+      "ma": "GOLDEN LAKE0110316020",
+      "ten": "CÔNG TY TNHH DU LỊCH VÀ THƯƠNG MẠI GOLDEN LAKE HÀ NỘI"
+    },
+    {
+      "ma": "GOLDEN PALACE0105528622",
+      "ten": "CÔNG TY TNHH DỊCH VỤ CAO CẤP CUỘC SỐNG VÀNG"
+    },
+    {
+      "ma": "GO LONG BIEN0102853832-003",
+      "ten": "CHI NHÁNH CÔNG TY CỔ PHẦN BẤT ĐỘNG SẢN VIỆT - NHẬT TẠI LONG BIÊN"
+    },
+    {
+      "ma": "GO NAM DINH0102853832-001",
+      "ten": "CHI NHÁNH CÔNG TY CỔ PHẦN BẤT ĐỘNG SẢN VIỆT – NHẬT TẠI NAM ĐỊNH"
+    },
+    {
+      "ma": "GO NINH BÌNH0102853832-009",
+      "ten": "CHI NHÁNH CÔNG TY CỔ PHẦN BẤT ĐỘNG SẢN VIỆT - NHẬT TẠI NINH BÌNH"
+    },
+    {
+      "ma": "GO N TRANG0102853832-014",
+      "ten": "CHI NHÁNH CÔNG TY CỔ PHẦN BẤT ĐỘNG SẢN VIỆT - NHẬT TẠI NHA TRANG"
+    },
+    {
+      "ma": "GO TDM0102853832-006",
+      "ten": "CHI NHÁNH CÔNG TY CỔ PHẦN BẤT ĐỘNG SẢN VIỆT - NHẬT TẠI BÌNH DƯƠNG"
+    },
+    {
+      "ma": "GO THAI BINH0102853832-019",
+      "ten": "CHI NHÁNH CÔNG TY CỔ PHẦN BẤT ĐỘNG SẢN VIỆT-NHẬT TẠI THÁI BÌNH"
+    },
+    {
+      "ma": "GO THAI NGUYEN4601543738",
+      "ten": "CÔNG TY CỔ PHẦN BẤT ĐỘNG SẢN VIỆT - NHẬT THÁI NGUYÊN"
+    },
+    {
+      "ma": "GO THANH HÓA0102853832-002",
+      "ten": "CHI NHÁNH CÔNG TY CỔ PHẦN BẤT ĐỘNG SẢN VIỆT - NHẬT TẠI THANH HÓA"
+    },
+    {
+      "ma": "GO TRÀ VINH2100636184",
+      "ten": "CÔNG TY CỔ PHẦN BẤT ĐỘNG SẢN VÀ SIÊU THỊ BÁN LẺ ĐÔNG DƯƠNG TRÀ VINH"
+    },
+    {
+      "ma": "GO VIỆT TRÌ0102853832-008",
+      "ten": "CHI NHÁNH CÔNG TY CỔ PHẦN BẤT ĐỘNG SẢN VIỆT - NHẬT TẠI PHÚ THỌ"
+    },
+    {
+      "ma": "HẢI ĐĂNG4600388423",
+      "ten": "CÔNG TY CỔ PHẦN HẢI ĐĂNG"
+    },
+    {
+      "ma": "HANOI CARPET0110941810",
+      "ten": "CÔNG TY CỔ PHẦN HANOI CARPET"
+    },
+    {
+      "ma": "HAPPY CHOICE0202177190",
+      "ten": "CÔNG TY TNHH XUẤT NHẬP KHẨU HAPPY CHOICE"
+    },
+    {
+      "ma": "HH VIỆT NAM0108566760",
+      "ten": "CÔNG TY TNHH THƯƠNG MẠI VÀ SẢN XUẤT HH VIỆT NAM"
+    },
+    {
+      "ma": "HOÀNG ANH0314413872",
+      "ten": "CÔNG TY TNHH SẢN XUẤT NỘI THẤT HOÀNG ANH"
+    },
+    {
+      "ma": "HOÀNG ĐĂNG0101933972",
+      "ten": "CÔNG TY CỔ PHẦN HOÀNG ĐĂNG"
+    },
+    {
+      "ma": "HOÀNG DŨNG0110383757",
+      "ten": "CÔNG TY TNHH THƯƠNG MẠI VÀ DỊCH VỤ KỸ THUẬT HOÀNG DŨNG"
+    },
+    {
+      "ma": "HOATEM4201465997",
+      "ten": "CÔNG TY TNHH MỘT THÀNH VIÊN HỮU HOẠT EM"
+    },
+    {
+      "ma": "HỒNG LAM2500258674",
+      "ten": "CÔNG TY CỔ PHẦN HỒNG LAM"
+    },
+    {
+      "ma": "HỢP TÁC XÃ0301449952",
+      "ten": "HỢP TÁC XÃ THƯƠNG MẠI PHƯỜNG 14 QUẬN 3"
+    },
+    {
+      "ma": "HOSPITALITY0315132225",
+      "ten": "CÔNG TY CỔ PHẦN ĐẦU TƯ VÀ PHÁT TRIỂN DỊCH VỤ CITI COMPLEX HOSPITALITY"
+    },
+    {
+      "ma": "HQ CK ĐÌNH VŨ (HẢI PHÒNG)",
+      "ten": "HẢI QUAN CỬA KHẨU CẢNG ĐÌNH VŨ (HẢI PHÒNG)"
+    },
+    {
+      "ma": "HQ CK TAN THANH (LANG SON)",
+      "ten": "HẢI QUAN CỬA KHẨU TÂN THANH-LẠNG SƠN"
+    },
+    {
+      "ma": "HS VIỆT NAM0109804908",
+      "ten": "CÔNG TY TNHH ĐẦU TƯ VÀ THƯƠNG MẠI HS VIỆT NAM"
+    },
+    {
+      "ma": "HTV0108075931",
+      "ten": "Công ty TNHH Thương Mại Tổng hợp HTV"
+    },
+    {
+      "ma": "JD&M0109839273",
+      "ten": "CÔNG TY TNHH JD&M VIỆT NAM"
+    },
+    {
+      "ma": "KENGROUP0315382419",
+      "ten": "CÔNG TY TNHH THƯƠNG MẠI KENGROUP"
+    },
+    {
+      "ma": "K&H0106924989",
+      "ten": "CÔNG TY TNHH DỊCH VỤ VÀ GIẢI TRÍ K&H"
+    },
+    {
+      "ma": "KIMPHATFOOD3401280952",
+      "ten": "CÔNG TY TNHH KIM PHÁT FOOD"
+    },
+    {
+      "ma": "KINH DOANH BẤT ĐỘNG SẢN HÀ NỘI0101437004",
+      "ten": "CÔNG TY CỔ PHẦN DỊCH VỤ VÀ KINH DOANH BẤT ĐỘNG SẢN HÀ NỘI"
+    },
+    {
+      "ma": "KIWOOZA0315850120",
+      "ten": "CÔNG TY CỔ PHẦN KIWOOZA EDUTAINMENT VIETNAM"
+    },
+    {
+      "ma": "KTBOOKS 0109107505",
+      "ten": "CÔNG TY TNHH GIÁO DỤC VÀ ĐÀO TẠO KTBOOKS"
+    },
+    {
+      "ma": "KuboBacGiang0314578955-043",
+      "ten": "CHI NHÁNH TẠI BẮC GIANG - CÔNG TY TNHH MỘT THÀNH VIÊN THƯƠNG MẠI HÀNG GIA DỤNG TỔNG HỢP"
+    },
+    {
+      "ma": "KUBO BÀ RỊA0314578955-061",
+      "ten": "CHI NHÁNH BÀ RỊA - CÔNG TY TNHH MỘT THÀNH VIÊN THƯƠNG MẠI HÀNG GIA DỤNG TỔNG HỢP"
+    },
+    {
+      "ma": "KUBO BMT0314578955-025",
+      "ten": "CHI NHÁNH CÔNG TY TNHH MỘT THÀNH VIÊN THƯƠNG MẠI HÀNG GIA DỤNG TỔNG HỢP TẠI BUÔN MA THUỘT"
+    },
+    {
+      "ma": "KUBO CẦN THƠ0314578955-041",
+      "ten": "CHI NHÁNH TẠI CẦN THƠ - CÔNG TY TNHH MỘT THÀNH VIÊN THƯƠNG MẠI HÀNG GIA DỤNG TỔNG HỢP"
+    },
+    {
+      "ma": "KUBO ĐÀ NẴNG0314578955-050",
+      "ten": "CHI NHÁNH TẠI ĐÀ NẴNG - CÔNG TY TNHH MỘT THÀNH VIÊN THƯƠNG MẠI HÀNG GIA DỤNG TỔNG HỢP"
+    },
+    {
+      "ma": "KUBO HẢI DƯƠNG0314578955-068",
+      "ten": "CHI NHÁNH HẢI DƯƠNG - CÔNG TY TNHH MỘT THÀNH VIÊN THƯƠNG MẠI HÀNG GIA DỤNG TỔNG HỢP"
+    },
+    {
+      "ma": "KUBO HÀ NỘI0314578955-056",
+      "ten": "CHI NHÁNH TẠI TP HÀ NỘI - CÔNG TY TNHH MỘT THÀNH VIÊN THƯƠNG MẠI HÀNG GIA DỤNG TỔNG HỢP"
+    },
+    {
+      "ma": "KuboHue0314578955-049",
+      "ten": "CHI NHÁNH TẠI HUẾ - CÔNG TY TNHH MỘT THÀNH VIÊN THƯƠNG MẠI HÀNG GIA DỤNG TỔNG HỢP"
+    },
+    {
+      "ma": "KUBO KHÁNH HÒA0314578955-034",
+      "ten": "CHI NHÁNH TẠI KHÁNH HÒA- CÔNG TY TNHH MỘT THÀNH VIÊN THƯƠNG MẠI HÀNG GIA DỤNG TỔNG HỢP"
+    },
+    {
+      "ma": "KUBO NAM ĐỊNH0314578955-044",
+      "ten": "CHI NHÁNH TẠI NAM ĐỊNH - CÔNG TY TNHH MỘT THÀNH VIÊN THƯƠNG MẠI HÀNG GIA DỤNG TỔNG HỢP"
+    },
+    {
+      "ma": "KUBO NINH BÌNH0314578955-065",
+      "ten": "CHI NHÁNH NINH BÌNH- CÔNG TY TNHH MỘT THÀNH VIÊN THƯƠNG MẠI HÀNG GIA DỤNG TỔNG HỢP"
+    },
+    {
+      "ma": "KuboPhúThọ0314578955-066",
+      "ten": "CHI NHÁNH PHÚ THỌ- CÔNG TY TNHH MỘT THÀNH VIÊN THƯƠNG MẠI HÀNG GIA DỤNG TỔNG HỢP"
+    },
+    {
+      "ma": "KuboThaiNguyen0314578955-059",
+      "ten": "CHI NHÁNH TẠI THÁI NGUYÊN - CÔNG TY TNHH MỘT THÀNH VIÊN THƯƠNG MẠI HÀNG GIA DỤNG TỔNG HỢP"
+    },
+    {
+      "ma": "KuboVinh0314578955-045",
+      "ten": "CHI NHÁNH TẠI THÀNH PHỐ VINH - CÔNG TY TNHH MỘT THÀNH VIÊN THƯƠNG MẠI HÀNG GIA DỤNG TỔNG HỢP"
+    },
+    {
+      "ma": "KuboVĩnhPhúc0314578955-042",
+      "ten": "CHI NHÁNH TẠI VĨNH PHÚC - CÔNG TY TNHH MỘT THÀNH VIÊN THƯƠNG MẠI HÀNG GIA DỤNG TỔNG HỢP"
+    },
+    {
+      "ma": "KWAY0107608538",
+      "ten": "CÔNG TY TNHH KWAY"
+    },
+    {
+      "ma": "LÂM SANG0314674433",
+      "ten": "CÔNG TY TNHH THƯƠNG MẠI DỊCH VỤ VẬN TẢI LÂM SANG"
+    },
+    {
+      "ma": "LELA0111376833",
+      "ten": "CÔNG TY CỔ PHẦN THƯƠNG MẠI LELA"
+    },
+    {
+      "ma": "LIME VIỆT NAM0109853743",
+      "ten": "CÔNG TY CỔ PHẦN TRUYỀN THÔNG VÀ GIẢI TRÍ LIME VIỆT NAM"
+    },
+    {
+      "ma": "LINKI VIỆT NAM0315508566",
+      "ten": "CÔNG TY TNHH LINKI VIỆT NAM"
+    },
+    {
+      "ma": "LOTTE BÌNH THUẬN0304741634-002",
+      "ten": "CÔNG TY CỔ PHẦN TRUNG TÂM THƯƠNG MẠI LOTTE VIỆT NAM - CHI NHÁNH BÌNH THUẬN"
+    },
+    {
+      "ma": "LOTTE ĐN0304741634-009",
+      "ten": "CÔNG TY CỔ PHẦN TRUNG TÂM THƯƠNG MẠI LOTTE VIỆT NAM - CHI NHÁNH ĐÀ NẴNG"
+    },
+    {
+      "ma": "LOTTE GÒ VẤP0304741634-010",
+      "ten": "CÔNG TY CỔ PHẦN TRUNG TÂM THƯƠNG MẠI LOTTE VIỆT NAM - CHI NHÁNH GÒ VẤP"
+    },
+    {
+      "ma": "Lotte Nha Trang0304741634-011",
+      "ten": "Công ty cổ phần trung tâm thương mại Lotte Việt Nam-Chi nhánh Nha Trang"
+    },
+    {
+      "ma": "LOTTE VIỆT NAM0304741634",
+      "ten": "CÔNG TY CỔ PHẦN TRUNG TÂM THƯƠNG MẠI LOTTE VIỆT NAM"
+    },
+    {
+      "ma": "LOTTE VINH0304741634-013",
+      "ten": "CÔNG TY CỔ PHẦN TRUNG TÂM THƯƠNG MẠI LOTTE VIỆT NAM - CHI NHÁNH VINH"
+    },
+    {
+      "ma": "LOTTY FRIENDS0109149008-001",
+      "ten": "CÔNG TY TNHH LOTTE WORLD VIỆT NAM - CHI NHÁNH LOTTY FRIENDS"
+    },
+    {
+      "ma": "LOVE PURPLE0202206719",
+      "ten": "CÔNG TY TNHH LOVE PURPLE"
+    },
+    {
+      "ma": "LPMB địa điểm kinh doanh",
+      "ten": "LPMB địa điểm kinh doanh"
+    },
+    {
+      "ma": "LUẬT VŨ & ĐỒNG NGHIỆP4201432504",
+      "ten": "CÔNG TY LUẬT TNHH MTV VŨ & ĐỒNG NGHIỆP"
+    },
+    {
+      "ma": "Luong CBCNV - 705",
+      "ten": "CP lương,Thưởng CBCNV 705"
+    },
+    {
+      "ma": "MANGETSU0317070895",
+      "ten": "CÔNG TY TNHH MANGETSU"
+    },
+    {
+      "ma": "MARKET 0302249586",
+      "ten": "CÔNG TY TNHH MM MEGA MARKET (VIỆT NAM)"
+    },
+    {
+      "ma": "MATHOME VIỆT NAM0109006793",
+      "ten": "CÔNG TY CỔ PHẦN CÁCH NHIỆT MATHOME VIỆT NAM"
+    },
+    {
+      "ma": "MEDIAMART0102516308",
+      "ten": "CÔNG TY CỔ PHẦN MEDIAMART VIỆT NAM"
+    },
+    {
+      "ma": "MEDLATEC0101234974",
+      "ten": "CÔNG TY TNHH MEDLATEC VIỆT NAM"
+    },
+    {
+      "ma": "ME LINH PLAZA2500220310",
+      "ten": "CÔNG TY CỔ PHẦN ĐẦU TƯ T&M VIỆT NAM"
+    },
+    {
+      "ma": "MIC THỐNG NHẤT0102385623-052",
+      "ten": "Công ty bảo hiểm MIC Thống nhất"
+    },
+    {
+      "ma": "MIKAZUKI0400510460",
+      "ten": "CÔNG TY TNHH ODK MIKAZUKI VIỆT NAM"
+    },
+    {
+      "ma": "MINH ĐỨC HUY0105831629",
+      "ten": "CÔNG TY TNHH THỜI TRANG MINH ĐỨC HUY"
+    },
+    {
+      "ma": "MINH KHUYẾN 109569330",
+      "ten": "CÔNG TY TNHH THƯƠNG MẠI ĐẦU TƯ MINH KHUYẾN AUDIO"
+    },
+    {
+      "ma": "MINH THƯ0106145340",
+      "ten": "CÔNG TY TNHH VẬN TẢI VÀ DỊCH VỤ MINH THƯ"
+    },
+    {
+      "ma": "MINH TUYẾT NHA TRANG4200497442",
+      "ten": "CÔNG TY TNHH MINH TUYẾT NHA TRANG"
+    },
+    {
+      "ma": "MIPEC0105022515",
+      "ten": "CÔNG TY TNHH DỊCH VỤ VÀ QUẢN LÝ MIPEC"
+    },
+    {
+      "ma": "MISA0101243150",
+      "ten": "CÔNG TY CỔ PHẦN MISA"
+    },
+    {
+      "ma": "MM MEGA MARKET0302249586-004",
+      "ten": "CHI NHÁNH CÔNG TY TNHH MM MEGA MARKET (VIỆT NAM) TẠI TP.ĐÀ NẴNG"
+    },
+    {
+      "ma": "Mộc Châu0109202879-001",
+      "ten": "CÔNG TY CỔ PHẦN DU LỊCH VÀ TRUYỀN THÔNG MỘC CHÂU GO - CHI NHÁNH MỘC CHÂU"
+    },
+    {
+      "ma": "MTTQ VIỆT NAM",
+      "ten": "MẶT TRẬN TỔ QUỐC VIỆT NAM - BAN CỨU TRỢ TW"
+    },
+    {
+      "ma": "MURA VIỆT NAM0319206728",
+      "ten": "CÔNG TY TNHH THƯƠNG MẠI DỊCH VỤ MURA VIỆT NAM"
+    },
+    {
+      "ma": "NAM PHƯƠNG CENTURY0313244276",
+      "ten": "CÔNG TY TNHH NAM PHƯƠNG CENTURY"
+    },
+    {
+      "ma": "NAM TRIỆU0200396207",
+      "ten": "CÔNG TY TNHH MỘT THÀNH VIÊN NAM TRIỆU"
+    },
+    {
+      "ma": "NĂNG LƯỢNG0106653062",
+      "ten": "CÔNG TY CỔ PHẦN QUẢN LÝ NĂNG LƯỢNG THÔNG MINH"
+    },
+    {
+      "ma": "NGỌC AN NHIÊN0111430953",
+      "ten": "CÔNG TY TNHH ĐẦU TƯ VÀ THƯƠNG MẠI NGỌC AN NHIÊN"
+    },
+    {
+      "ma": "NGỌC BÌNH0106773401",
+      "ten": "CÔNG TY TNHH SẢN XUẤT THƯƠNG MẠI VÀ DỊCH VỤ NGỌC BÌNH"
+    },
+    {
+      "ma": "NGÔI SAO LỚN0312152569",
+      "ten": "CÔNG TY TRÁCH NHIỆM HỮU HẠN TIN HỌC NGÔI SAO LỚN"
+    },
+    {
+      "ma": "NGUYỄN KIM NHA TRANG0302286281-061",
+      "ten": "CHI NHÁNH CÔNG TY CỔ PHẦN THƯƠNG MẠI NGUYỄN KIM - TRUNG TÂM MUA SẮM NGUYỄN KIM NHA TRANG"
+    },
+    {
+      "ma": "NGUYỄN KIM TIỀN GIANG1201476471",
+      "ten": "CÔNG TY TRÁCH NHIỆM HỮU HẠN MỘT THÀNH VIÊN ĐẦU TƯ PHÁT TRIỂN NGUYỄN KIM TIỀN GIANG"
+    },
+    {
+      "ma": "Nguyễn Kim Trường Chinh0302286281-023",
+      "ten": "Chi nhánh Công ty Cổ Phần Thương Mại Nguyễn Kim - Trung tâm Mua Sắm Nguyễn Kim Trường Chinh"
+    },
+    {
+      "ma": "NGUYỄN PHƯỚC0313884646",
+      "ten": "CÔNG TY TNHH THƯƠNG MẠI VẬN TẢI NGUYỄN PHƯỚC"
+    },
+    {
+      "ma": "NHÀ HÀNG CHÂU Á0107349499",
+      "ten": "CÔNG TY TNHH PHÁT TRIỂN NHÀ HÀNG CHÂU Á"
+    },
+    {
+      "ma": "NHÂM HẰNG0107758621",
+      "ten": "CÔNG TY TNHH THƯƠNG MẠI NHÂM HẰNG"
+    },
+    {
+      "ma": "NHÂN ĐỨC0108196326",
+      "ten": "CÔNG TY TNHH PHÁT TRIỂN THƯƠNG MẠI NHÂN ĐỨC"
+    },
+    {
+      "ma": "NHÀ Ở HÀ NỘI0101542792",
+      "ten": "CÔNG TY TNHH TRUNG TÂM THƯƠNG MẠI VÀ NHÀ Ở HÀ NỘI"
+    },
+    {
+      "ma": "NHÀ SÀNH0315195698",
+      "ten": "CÔNG TY TNHH NỘI THẤT NHÀ SÀNH"
+    },
+    {
+      "ma": "NHẤT VIỆT0318801611",
+      "ten": "CÔNG TY TNHH ĐẦU TƯ TỔNG HỢP NHẤT VIỆT"
+    },
+    {
+      "ma": "NHC0402243203",
+      "ten": "CÔNG TY TNHH MTV XÂY DỰNG VÀ DỊCH VỤ NHC"
+    },
+    {
+      "ma": "NNB0315793602",
+      "ten": "CÔNG TY CỔ PHẦN KỸ THUẬT & XÂY DỰNG NNB"
+    },
+    {
+      "ma": "NNB - CHI NHÁNH PHÍA BẮC0315793602-001",
+      "ten": "CÔNG TY CỔ PHẦN KỸ THUẬT & XÂY DỰNG NNB - CHI NHÁNH PHÍA BẮC"
+    },
+    {
+      "ma": "NPOS0319075391",
+      "ten": "CÔNG TY TNHH THƯƠNG MẠI KỸ THUẬT NPOS"
+    },
+    {
+      "ma": "NƯỚC ĐÁ HIỆP LỰC3400165650",
+      "ten": "DOANH NGHIỆP TƯ NHÂN SẢN XUẤT NƯỚC ĐÁ HIỆP LỰC"
+    },
+    {
+      "ma": "PCCC TRẦN SANG0313095352",
+      "ten": "CÔNG TY TNHH THIẾT BỊ PCCC TRẦN SANG"
+    },
+    {
+      "ma": "PETROLIMEX2600108866",
+      "ten": "CÔNG TY TNHH MTV PETROLIMEX PHÚ THỌ"
+    },
+    {
+      "ma": "PETROLIMEX5700101690",
+      "ten": "CÔNG TY TNHH MTV PETROLIMEX QUẢNG NINH"
+    },
+    {
+      "ma": "PETROLIMEX THÁI BÌNH0901146759-001",
+      "ten": "CHI NHÁNH PETROLIMEX THÁI BÌNH - CÔNG TY TNHH MTV PETROLIMEX HƯNG YÊN"
+    },
+    {
+      "ma": "PHẠM CÔNG NHẬT MINH0108587513",
+      "ten": "CÔNG TY TNHH SẢN XUẤT VÀ THƯƠNG MẠI PHẠM CÔNG NHẬT MINH"
+    },
+    {
+      "ma": "PHONG MÃ0312860515",
+      "ten": "CÔNG TY CỔ PHẦN VẬN TẢI CHUYỂN PHÁT NHANH PHONG MÃ"
+    },
+    {
+      "ma": "PHONG VÂN0500507567",
+      "ten": "DOANH NGHIỆP TƯ NHÂN PHONG VÂN"
+    },
+    {
+      "ma": "PHƯƠNG HIỀN0101909867",
+      "ten": "CÔNG TY TNHH THƯƠNG MẠI - DỊCH VỤ VÀ XUẤT NHẬP KHẨU PHƯƠNG HIỀN"
+    },
+    {
+      "ma": "PHƯƠNG HIỀN0101909867-001",
+      "ten": "CHI NHÁNH CÔNG TY TNHH THƯƠNG MẠI - DỊCH VỤ VÀ XUẤT NHẬP KHẨU PHƯƠNG HIỀN"
+    },
+    {
+      "ma": "PHƯƠNG LAI0303750548",
+      "ten": "CÔNG TY TNHH PHƯƠNG LAI"
+    },
+    {
+      "ma": "QUANG HÀ0106632792",
+      "ten": "CÔNG TY TNHH VIỄN THÔNG QUANG HÀ"
+    },
+    {
+      "ma": "QUEENPACK108316471",
+      "ten": "CÔNG TY TNHH QUEEN PACK"
+    },
+    {
+      "ma": "RẠP PHIM QG0100777978",
+      "ten": "TRUNG TÂM CHIẾU PHIM QUỐC GIA"
+    },
+    {
+      "ma": "RIOTECH0313823139",
+      "ten": "CÔNG TY CỔ PHẦN RIOTECH"
+    },
+    {
+      "ma": "RSM4201829147",
+      "ten": "CÔNG TY CỔ PHẦN RSM"
+    },
+    {
+      "ma": "SÀI GÒN – CÀ MAU2000969020",
+      "ten": "CÔNG TY TNHH THƯƠNG MẠI DỊCH VỤ SÀI GÒN - CÀ MAU"
+    },
+    {
+      "ma": "SÂN BAY0317631981",
+      "ten": "CÔNG TY TNHH QUẢNG CÁO SÂN BAY"
+    },
+    {
+      "ma": "SAVICO0102305191",
+      "ten": "CÔNG TY CỔ PHẦN SAVICO HÀ NỘI"
+    },
+    {
+      "ma": "SD SOLUTIONS0317388705",
+      "ten": "CÔNG TY TNHH TMDV SD SOLUTIONS"
+    },
+    {
+      "ma": "SENSE BẾN TRE1300419650",
+      "ten": "CÔNG TY TNHH MỘT THÀNH VIÊN THƯƠNG MẠI SÀI GÒN - BẾN TRE"
+    },
+    {
+      "ma": "SENSE CÁI BÈ1201677996",
+      "ten": "CÔNG TY TNHH MỘT THÀNH VIÊN THƯƠNG MẠI DỊCH VỤ SENSE CÁI BÈ"
+    },
+    {
+      "ma": "SENSE CITY CT1800502219",
+      "ten": "CÔNG TY TNHH THƯƠNG MẠI SÀI GÒN CẦN THƠ"
+    },
+    {
+      "ma": "SENSE CITY PVĐ0315087357",
+      "ten": "CÔNG TY TNHH MTV SÀI GÒN - VĂN ĐỒNG"
+    },
+    {
+      "ma": "SHANGHAI RONGTAI",
+      "ten": "SHANGHAI RONGTAI"
+    },
+    {
+      "ma": "SIÊU THỊ AN LẠC0301472278",
+      "ten": "CÔNG TY TRÁCH NHIỆM HỮU HẠN THƯƠNG MẠI VÀ DỊCH VỤ SIÊU THỊ AN LẠC"
+    },
+    {
+      "ma": "SKY LIGHT VIỆT NAM0109475442",
+      "ten": "CÔNG TY TNHH SẢN XUẤT THƯƠNG MẠI SKY LIGHT VIỆT NAM"
+    },
+    {
+      "ma": "SÔNG LAM0901210669",
+      "ten": "CÔNG TY TNHH DỊCH VỤ ẨM THỰC SÔNG LAM"
+    },
+    {
+      "ma": "SỮA VIỆT BẢO ANH4202002913",
+      "ten": "CÔNG TY TNHH SỮA VIỆT BẢO ANH"
+    },
+    {
+      "ma": "SUN H THƠM1701900730-004",
+      "ten": "CHI NHÁNH CÔNG TY TNHH MẶT TRỜI PHÚ QUỐC TẠI HÒN THƠM"
+    },
+    {
+      "ma": "SUN TÂY NINH3901248989",
+      "ten": "CÔNG TY CỔ PHẦN MẶT TRỜI TÂY NINH"
+    },
+    {
+      "ma": "SUN WORLD HẠ LONG5701723020-001",
+      "ten": "CÔNG TY TNHH MẶT TRỜI HẠ LONG - CHI NHÁNH CÔNG VIÊN SUN WORLD HẠ LONG"
+    },
+    {
+      "ma": "SVN0110271789",
+      "ten": "CÔNG TY CỔ PHẦN CHUỖI NHÀ HÀNG SVN"
+    },
+    {
+      "ma": "TADACA0110256276",
+      "ten": "CÔNG TY TNHH THƯƠNG MẠI VÀ DỊCH VỤ TADACA"
+    },
+    {
+      "ma": "TAM ANH0108073726",
+      "ten": "CÔNG TY TNHH QUẢNG CÁO VÀ CƠ KHÍ CÔNG NGHIỆP TAM ANH"
+    },
+    {
+      "ma": "TÂN THỊNH0700672053",
+      "ten": "CÔNG TY CP ĐẦU TƯ DỊCH VỤ THƯƠNG MẠI TÂN THỊNH"
+    },
+    {
+      "ma": "TÂN TIẾN VIỆT VENDING0111194583",
+      "ten": "CÔNG TY TNHH TÂN TIẾN VIỆT VENDING"
+    },
+    {
+      "ma": "TÂN VIỆT0101955609",
+      "ten": "CÔNG TY CỔ PHẦN VĂN HÓA VÀ GIÁO DỤC TÂN VIỆT"
+    },
+    {
+      "ma": "TÂN VIỆT HẠ LONG0101955609-003",
+      "ten": "CÔNG TY CỔ PHẦN VĂN HÓA VÀ GIÁO DỤC TÂN VIỆT - CHI NHÁNH HẠ LONG"
+    },
+    {
+      "ma": "TÂN VIỆT HÀ NAM0101955609-013",
+      "ten": "CÔNG TY CỔ PHẦN VĂN HÓA VÀ GIÁO DỤC TÂN VIỆT - CHI NHÁNH HÀ NAM"
+    },
+    {
+      "ma": "TÂN VIỆT THÁI BÌNH0101955609-015",
+      "ten": "CÔNG TY CỔ PHẦN VĂN HÓA VÀ GIÁO DỤC TÂN VIỆT-CHI NHÁNH THÁI BÌNH"
+    },
+    {
+      "ma": "TÂN VIỆT THÁI NGUYÊN0101955609-004",
+      "ten": "CHI NHÁNH THÁI NGUYÊN - CÔNG TY CỔ PHẦN VĂN HÓA VÀ GIÁO DỤC TÂN VIỆT"
+    },
+    {
+      "ma": "TÂN VIỆT TUYÊN QUANG0101955609-014",
+      "ten": "CÔNG TY CỔ PHẦN VĂN HÓA VÀ GIÁO DỤC TÂN VIỆT - CHI NHÁNH TUYÊN QUANG"
+    },
+    {
+      "ma": "TBG0110792037",
+      "ten": "CÔNG TY TNHH THƯƠNG MẠI TBG"
+    },
+    {
+      "ma": "TEFICO2301364212",
+      "ten": "CÔNG TY CỔ PHẦN TEFICO VIỆT NAM"
+    },
+    {
+      "ma": "THÁI MINH GROUP0106536425-002",
+      "ten": "CHI NHÁNH HƯNG YÊN - CÔNG TY CỔ PHẦN THÁI MINH GROUP"
+    },
+    {
+      "ma": "THÁI MINH GROUP0106536425-003",
+      "ten": "CHI NHÁNH HẢI PHÒNG - CÔNG TY CỔ PHẦN THÁI MINH GROUP"
+    },
+    {
+      "ma": "THÀNH CÔNG3900244389",
+      "ten": "CÔNG TY CỔ PHẦN THÀNH THÀNH CÔNG - BIÊN HÒA"
+    },
+    {
+      "ma": "Thành Công Đông Đô0107604212",
+      "ten": "CÔNG TY TNHH Ô TÔ THÀNH CÔNG ĐÔNG ĐÔ"
+    },
+    {
+      "ma": "THÀNH ĐẠT3703401378",
+      "ten": "CÔNG TY TNHH THƯƠNG MẠI SỬA CHỮA Ô TÔ THÀNH ĐẠT"
+    },
+    {
+      "ma": "THANH HUYỀN0110259936",
+      "ten": "CÔNG TY TNHH VẬN TẢI DẦU KHÍ THANH HUYỀN"
+    },
+    {
+      "ma": "THANH TUYỀN060190001495",
+      "ten": "HỘ KINH DOANH THANH TUYỀN"
+    },
+    {
+      "ma": "THE GARDEN0103879784",
+      "ten": "CÔNG TY TNHH MỘT THÀNH VIÊN ĐẦU TƯ VÀ THƯƠNG MẠI THE GARDEN"
+    },
+    {
+      "ma": "THẾ GIỚI DI ĐỘNG0303217354-001",
+      "ten": "CHI NHÁNH CÔNG TY CỔ PHẦN ĐẦU TƯ ĐIỆN MÁY XANH"
+    },
+    {
+      "ma": "THIÊN BÌNH0317366620",
+      "ten": "CÔNG TY TNHH ĐẦU TƯ THƯƠNG MẠI DỊCH VỤ THIÊN BÌNH"
+    },
+    {
+      "ma": "THIÊN NGÂN0101595681",
+      "ten": "CÔNG TY CỔ PHẦN  PHIM THIÊN NGÂN"
+    },
+    {
+      "ma": "THỜI TRANG TỔNG HỢP TẠI HÀ NỘI0314635071-001",
+      "ten": "CHI NHÁNH CÔNG TY TNHH MỘT THÀNH VIÊN THƯƠNG MẠI THỜI TRANG TỔNG HỢP TẠI HÀ NỘI"
+    },
+    {
+      "ma": "THUẬN CHINH2500740126",
+      "ten": "CÔNG TY TNHH THUẬN CHINH ĐẠI LẢI"
+    },
+    {
+      "ma": "THỰC PHẨM TIẾN PHÁT0318914319",
+      "ten": "CÔNG TY TNHH SẢN XUẤT THƯƠNG MẠI THỰC PHẨM TIẾN PHÁT"
+    },
+    {
+      "ma": "THU PHÍ TỰ ĐỘNG VETC0107500414",
+      "ten": "CÔNG TY TNHH THU PHÍ TỰ ĐỘNG VETC"
+    },
+    {
+      "ma": "TL - CHI NHÁNH NUMBER 1 0314949279-004",
+      "ten": "CÔNG TY TNHH DỊCH VỤ TL - CHI NHÁNH NUMBER 1"
+    },
+    {
+      "ma": "TOÀN PHÁT0105207604",
+      "ten": "CÔNG TY CỔ PHẦN THƯƠNG MẠI VĂN PHÒNG PHẨM TOÀN PHÁT"
+    },
+    {
+      "ma": "TOÀN PHÁT0313512581",
+      "ten": "CÔNG TY TNHH SẢN XUẤT THƯƠNG MẠI XUẤT NHẬP KHẨU TOÀN PHÁT"
+    },
+    {
+      "ma": "TOÀN THỊNH0108013734",
+      "ten": "CÔNG TY TNHH DỊCH VỤ VÀ THƯƠNG MẠI TOÀN THỊNH"
+    },
+    {
+      "ma": "TOKIO MARINE0300584356",
+      "ten": "CÔNG TY TNHH BẢO HIỂM TOKIO MARINE VIỆT NAM"
+    },
+    {
+      "ma": "TOKIO MARINE0300584356-001",
+      "ten": "Công Ty TNHH Bảo Hiểm Tokio Marine Việt Nam - Chi Nhánh Thành Phố Hồ Chí Minh"
+    },
+    {
+      "ma": "TONGHOP0314578955-060",
+      "ten": "CHI NHÁNH TẠI ĐỒNG NAI - CÔNG TY TNHH MỘT THÀNH VIÊN THƯƠNG MẠI HÀNG GIA DỤNG TỔNG HỢP"
+    },
+    {
+      "ma": "TOP ONE0110410256",
+      "ten": "CÔNG TY TNHH TOP ONE VIỆT NAM"
+    },
+    {
+      "ma": "TOZ107762547",
+      "ten": "CÔNG TY TNHH SẢN XUẤT VÀ THƯƠNG MẠI TOZ VIỆT NAM"
+    },
+    {
+      "ma": "T&P GROUP3301675435",
+      "ten": "CÔNG TY TRÁCH NHIỆM HỮU HẠN MỘT THÀNH VIÊN THƯƠNG MẠI DỊCH VỤ VÀ DU LỊCH T&P GROUP"
+    },
+    {
+      "ma": "TP XANH(VW GRANDPARK)0305320043",
+      "ten": "CÔNG TY CỔ PHẦN PHÁT TRIỂN THÀNH PHỐ XANH"
+    },
+    {
+      "ma": "TRỰC TUYẾN0305289153",
+      "ten": "CÔNG TY CỔ PHẦN DỊCH VỤ DI ĐỘNG TRỰC TUYẾN"
+    },
+    {
+      "ma": "TRƯỜNG CHINH 0311969319",
+      "ten": "CÔNG TY TNHH ĐẦU TƯ BẤT ĐỘNG SẢN NEW PLAN"
+    },
+    {
+      "ma": "TRƯỜNG SƠN0500402500",
+      "ten": "CÔNG TY CỔ PHẦN CÔNG NGHỆ CAO TRƯỜNG SƠN"
+    },
+    {
+      "ma": "TUẤN TÚ PHÚ THỌ2600347487",
+      "ten": "CÔNG TY TNHH TUẤN TÚ PHÚ THỌ"
+    },
+    {
+      "ma": "Tường Nghi4200457471",
+      "ten": "Công Ty TNHH Tường Nghi"
+    },
+    {
+      "ma": "T&Y GROUP5702132630",
+      "ten": "CÔNG TY TNHH THƯƠNG MẠI VÀ DỊCH VỤ DU LỊCH T&Y GROUP"
+    },
+    {
+      "ma": "VẠN HẠNH MALL0305456774",
+      "ten": "CÔNG TY CỔ PHẦN ĐẦU TƯ XÂY DỰNG BẮC BÌNH"
+    },
+    {
+      "ma": "VậnhànhVincomRetail0106250673-001",
+      "ten": "Chi nhánh tại tỉnh Phú Thọ - Công ty TNHH Vận hành Vincom Retail"
+    },
+    {
+      "ma": "VẬN TẢI VÀNG0106720456",
+      "ten": "CÔNG TY CỔ PHẦN GIAO NHẬN VẬN TẢI VÀNG"
+    },
+    {
+      "ma": "VẠN THỊNH PHÁT0314899162",
+      "ten": "CÔNG TY TNHH QUẢNG CÁO VẠN THỊNH PHÁT"
+    },
+    {
+      "ma": "VC BẮC GIANG0106250673-031",
+      "ten": "CHI NHÁNH TẠI TỈNH BẮC GIANG - CÔNG TY TNHH VẬN HÀNH VINCOM RETAIL"
+    },
+    {
+      "ma": "VC CN ĐỒNG NAI0106250673-026",
+      "ten": "CHI NHÁNH TẠI TỈNH ĐỒNG NAI - CÔNG TY TNHH VẬN HÀNH VINCOM RETAIL"
+    },
+    {
+      "ma": "VC CN HCM0106250673-021",
+      "ten": "CHI NHÁNH TẠI THÀNH PHỐ HỒ CHÍ MINH - CÔNG TY TNHH VẬN HÀNH VINCOM RETAIL"
+    },
+    {
+      "ma": "VC CN QUẢNG NINH0106250673-003",
+      "ten": "CHI NHÁNH TẠI TỈNH QUẢNG NINH - CÔNG TY TNHH VẬN HÀNH VINCOM RETAIL"
+    },
+    {
+      "ma": "VC CP HUẾ0105850244-002",
+      "ten": "CHI NHÁNH TẠI THÀNH PHỐ HUẾ - CÔNG TY CỔ PHẦN VINCOM RETAIL"
+    },
+    {
+      "ma": "VC CP PHỦ Lý0105850244-011",
+      "ten": "CHI NHÁNH TẠI TỈNH HÀ NAM - CÔNG TY CỔ PHẦN VINCOM RETAIL"
+    },
+    {
+      "ma": "VC CP THÁI NGUYÊN0105850244-010",
+      "ten": "CHI NHÁNH TẠI TỈNH THÁI NGUYÊN - CÔNG TY CỔ PHẦN VINCOM RETAIL"
+    },
+    {
+      "ma": "VC CP THANH HÓA0105850244-001",
+      "ten": "CHI NHÁNH TẠI TỈNH THANH HÓA - CÔNG TY CỔ PHẦN VINCOM RETAIL"
+    },
+    {
+      "ma": "VC ĐN0106250673-024",
+      "ten": "CHI NHÁNH TẠI THÀNH PHỐ ĐÀ NẴNG - CÔNG TY TNHH VẬN HÀNH VINCOM RETAIL"
+    },
+    {
+      "ma": "VC THÁI BÌNH0106250673-004",
+      "ten": "CHI NHÁNH TẠI TỈNH THÁI BÌNH - CÔNG TY TNHH VẬN HÀNH VINCOM RETAIL"
+    },
+    {
+      "ma": "VC TN NT0106250673-013",
+      "ten": "CHI NHÁNH TẠI TỈNH KHÁNH HÒA - CÔNG TY TNHH VẬN HÀNH VINCOM RETAIL"
+    },
+    {
+      "ma": "VC TP N.TRANG0105850244-009",
+      "ten": "CHI NHÁNH TẠI TỈNH KHÁNH HÒA - CÔNG TY CỔ PHẦN VINCOM RETAIL"
+    },
+    {
+      "ma": "VC TUYÊN QUANG0106250673-010",
+      "ten": "CHI NHÁNH TẠI TỈNH TUYÊN QUANG - CÔNG TY TNHH VẬN HÀNH VINCOM RETAIL"
+    },
+    {
+      "ma": "VC VẬN HÀNH0106250673",
+      "ten": "Công ty TNHH Vận Hành VINCOM RETAIL"
+    },
+    {
+      "ma": "VIỆC LÀM 24H0314071202",
+      "ten": "CÔNG TY CỔ PHẦN VIỆC LÀM 24H"
+    },
+    {
+      "ma": "Viễn thông Quân đội0100109106",
+      "ten": "Tập đoàn Công nghiệp - Viễn thông Quân đội"
+    },
+    {
+      "ma": "vietinbank0100111948-230",
+      "ten": "NGÂN HÀNG THƯƠNG MẠI CỔ PHẦN CÔNG THƯƠNG VIỆT NAM - CHI NHÁNH BẮC THĂNG LONG"
+    },
+    {
+      "ma": "VIETINBANK0101335193",
+      "ten": "TỔNG CÔNG TY CỔ PHẦN BẢO HIỂM NGÂN HÀNG TMCP CÔNG THƯƠNG VIỆT NAM"
+    },
+    {
+      "ma": "VIETINBANK4444",
+      "ten": "NGÂN HÀNG TMCP CÔNG THƯƠNG VIỆT NAM (TK vay tín dụng)"
+    },
+    {
+      "ma": "VIỆT LONG PHÁT NT4202014309",
+      "ten": "CÔNG TY TNHH VIỆT LONG PHÁT NT"
+    },
+    {
+      "ma": "VIỆT NGUYÊN4201562630",
+      "ten": "CÔNG TY TNHH PHÂN PHỐI VIỆT NGUYÊN"
+    },
+    {
+      "ma": "VIỆT - NHẬT0102853832-010",
+      "ten": "CHI NHÁNH CÔNG TY CỔ PHẦN BẤT ĐỘNG SẢN VIỆT - NHẬT TẠI THÀNH PHỐ ĐÀ LẠT"
+    },
+    {
+      "ma": "VIETSIN VIVO0310055721",
+      "ten": "CÔNG TY CỔ PHẦN PHÁT TRIỂN KHU PHỨC HỢP THƯƠNG MẠI VIETSIN"
+    },
+    {
+      "ma": "Viettel0100109106-122",
+      "ten": "Viettel Hồ Chí Minh- Chi nhánh Tập đoàn Công nghiệp - Viễn thông Quân đội"
+    },
+    {
+      "ma": "VIHEM0110869346",
+      "ten": "CÔNG TY CỔ PHẦN MÁY ĐIỆN VIHEM"
+    },
+    {
+      "ma": "Vincom CN Hải Phòng0106250673-002",
+      "ten": "CHI NHÁNH TẠI THÀNH PHỐ HẢI PHÒNG - CÔNG TY TNHH VẬN HÀNH VINCOM RETAIL"
+    },
+    {
+      "ma": "VINCOM RETAIL0105850244",
+      "ten": "CÔNG TY CỔ PHẦN VINCOM RETAIL"
+    },
+    {
+      "ma": "VINCOM VẬN HÀNH0106250673-032",
+      "ten": "CHI NHÁNH TẠI TỈNH HƯNG YÊN - CÔNG TY TNHH VẬN HÀNH VINCOM RETAIL"
+    },
+    {
+      "ma": "VINH CENTRE2902137398",
+      "ten": "CÔNG TY CỔ PHẦN THƯƠNG MẠI VINH CENTRE"
+    },
+    {
+      "ma": "Vinhomes(VW Vũ Yên)0102671977",
+      "ten": "Công ty cổ phần Vinhomes"
+    },
+    {
+      "ma": "VINKE-TCUNG4200456848-013",
+      "ten": "CHI NHÁNH HÀ NỘI - CÔNG TY CỔ PHẦN VINPEARL"
+    },
+    {
+      "ma": "VINPEARL HA4200456848-009",
+      "ten": "Chi nhánh Quảng Nam - Công ty cổ phần Vinpearl"
+    },
+    {
+      "ma": "Vinwonders Nha Trang4201954042",
+      "ten": "Công ty cổ phần Vinwonders Nha Trang"
+    },
+    {
+      "ma": "VN PAY0102182292",
+      "ten": "CÔNG TY CỔ PHẦN  GIẢI PHÁP THANH TOÁN VIỆT NAM"
+    },
+    {
+      "ma": "VPBANK0100233583",
+      "ten": "Ngân hàng TMCP Việt Nam Thịnh Vượng"
+    },
+    {
+      "ma": "Wincommerce0104918404-002",
+      "ten": "Chi nhánh Hà Nội - Công ty Cổ phần Dịch vụ Thương mại Tổng hợp Wincommerce"
+    },
+    {
+      "ma": "WINTIME ZHONGSHAN",
+      "ten": "WINTIME ZHONGSHAN"
+    },
+    {
+      "ma": "XĂNG DẦU0100107564",
+      "ten": "CÔNG TY TNHH MTV PETROLIMEX HÀ NỘI"
+    },
+    {
+      "ma": "XĂNG DẦU0100107564-001",
+      "ten": "CHI NHÁNH XĂNG DẦU HÀ NỘI - CÔNG TY XĂNG DẦU KHU VỰC I - CÔNG TY TRÁCH NHIỆM HỮU HẠN MỘT THÀNH VIÊN"
+    },
+    {
+      "ma": "XĂNG DẦU0100108688",
+      "ten": "CÔNG TY TNHH MỘT THÀNH VIÊN TỔNG CÔNG TY XĂNG DẦU QUÂN ĐỘI"
+    },
+    {
+      "ma": "Xăng dầu0100108688-027",
+      "ten": "CHI NHÁNH XĂNG DẦU QUÂN ĐỘI KV TÂY BẮC - CÔNG TY TNHH MỘT THÀNH VIÊN TỔNG CÔNG TY XĂNG DẦU QUÂN ĐỘI"
+    },
+    {
+      "ma": "Xăng dầu0100919284-002",
+      "ten": "CHI NHÁNH CÔNG TY CỔ PHẦN THƯƠNG MẠI VÀ VẬN TẢI PETROLIMEX HÀ NỘI TẠI BẮC NINH"
+    },
+    {
+      "ma": "XĂNG DẦU0102421913-008",
+      "ten": "CHI NHÁNH TUYÊN QUANG - CÔNG TY CỔ PHẦN XĂNG DẦU DẦU KHÍ PHÚ THỌ"
+    },
+    {
+      "ma": "XĂNG DẦU0106926908",
+      "ten": "CÔNG TY CỔ PHẦN VẬT TƯ XĂNG DẦU MIỀN BẮC"
+    },
+    {
+      "ma": "XĂNG DẦU0107779847",
+      "ten": "CÔNG TY CỔ PHẦN ĐẦU TƯ PHÁT TRIỂN XĂNG DẦU HÀ NỘI"
+    },
+    {
+      "ma": "XĂNG DẦU0200120833",
+      "ten": "CÔNG TY TNHH MTV PETROLIMEX HẢI PHÒNG"
+    },
+    {
+      "ma": "XĂNG DẦU0500232954",
+      "ten": "CÔNG TY XĂNG DẦU HÀ SƠN BÌNH - CÔNG TY TNHH MỘT THÀNH VIÊN"
+    },
+    {
+      "ma": "Xăng dầu0600759399",
+      "ten": "CÔNG TY CP XĂNG DẦU DẦU KHÍ NAM ĐỊNH"
+    },
+    {
+      "ma": "XANG DAU0900619716-025",
+      "ten": "CHI NHÁNH PHÚ LÃM - CÔNG TY CỔ PHẦN XĂNG DẦU HƯNG YÊN"
+    },
+    {
+      "ma": "XĂNG DẦU3300100988",
+      "ten": "CÔNG TY TNHH MTV PETROLIMEX HUẾ"
+    },
+    {
+      "ma": "XĂNG DẦU DTH0109902359",
+      "ten": "CÔNG TY TNHH XĂNG DẦU DTH"
+    },
+    {
+      "ma": "XĂNG DẦU HỒNG PHONG0103054649",
+      "ten": "DOANH NGHIỆP TƯ NHÂN THƯƠNG MẠI XĂNG DẦU HỒNG PHONG"
+    },
+    {
+      "ma": "XUÂN HƯNG PHÁT1000458440",
+      "ten": "CÔNG TY TNHH XUÂN HƯNG PHÁT"
+    },
+    {
+      "ma": "XUÂN THÀNH0201742876",
+      "ten": "CÔNG TY TNHH PHÁT TRIỂN XUÂN THÀNH"
+    },
+    {
+      "ma": "YAKI VIỆT NAM0110223464",
+      "ten": "CÔNG TY TNHH TEPPAN YAKI VIỆT NAM"
+    },
+    {
+      "ma": "YODY0801206940",
+      "ten": "CÔNG TY CỔ PHẦN THỜI TRANG YODY"
+    },
+    {
+      "ma": "YOKIDS0801365316",
+      "ten": "CÔNG TY CỔ PHẦN THƯƠNG MẠI VÀ DỊCH VỤ YOKIDS"
+    },
+    {
+      "ma": "Ý TƯỞNG VIỆT2700834861",
+      "ten": "CÔNG TY TNHH GIẢI PHÁP CÔNG NGHỆ Ý TƯỞNG VIỆT"
+    }
+  ],
+  "ma_khach_hang_moi": [
+    {
+      "ma": "AE HẢI PHÒNG0106099581-003",
+      "ten": "CHI NHÁNH CÔNG TY TNHH AEONMALL VIỆT NAM TẠI HẢI PHÒNG"
+    },
+    {
+      "ma": "BABY VINA3401234473",
+      "ten": "CÔNG TY CỔ PHẦN BABY VINA"
+    },
+    {
+      "ma": "BÀ NÀ0400585547",
+      "ten": "CÔNG TY CỔ PHẦN DỊCH VỤ CÁP TREO BÀ NÀ"
+    },
+    {
+      "ma": "BLUE OCEAN4201772123",
+      "ten": "CÔNG TY TNHH BLUE OCEAN RESORT NT"
+    },
+    {
+      "ma": "CẢNG TÀU QT HẠ LONG 5701723020-002",
+      "ten": "CÔNG TY TNHH MẶT TRỜI HẠ LONG - CHI NHÁNH CẢNG TÀU KHÁCH QUỐC TẾ HẠ LONG"
+    },
+    {
+      "ma": "CÁT BÀ0201755057-002",
+      "ten": "CÔNG TY TNHH MẶT TRỜI CÁT BÀ - CHI NHÁNH SUN WORLD CÁT BÀ"
+    },
+    {
+      "ma": "CHÂN TÂM0700823217",
+      "ten": "CÔNG TY TNHH DỊCH VỤ DU LỊCH CHÂN TÂM"
+    },
+    {
+      "ma": "CO.OP MART VĨNH PHÚC2500454301",
+      "ten": "CÔNG TY TNHH MỘT THÀNH VIÊN CO.OP MART VĨNH PHÚC"
+    },
+    {
+      "ma": "CV CHÂU Á0401524378",
+      "ten": "CÔNG TY TNHH CÔNG VIÊN CHÂU Á"
+    },
+    {
+      "ma": "DHC SUỐI ĐÔI0401585934",
+      "ten": "CÔNG TY CỔ PHẦN DHC SUỐI ĐÔI"
+    },
+    {
+      "ma": "ĐỊNH GIÁ QUỐC TẾ0106299213",
+      "ten": "CÔNG TY TNHH KIỂM TOÁN VÀ ĐỊNH GIÁ QUỐC TẾ"
+    },
+    {
+      "ma": "FANSIPAN5300634655-003",
+      "ten": "CÔNG TY TNHH DỊCH VỤ DU LỊCH CÁP TREO FANSIPAN SA PA - CHI NHÁNH SUN WORLD FANSIPAN SA PA"
+    },
+    {
+      "ma": "GO BÀ RỊA0102853832-018",
+      "ten": "CHI NHÁNH CÔNG TY CỔ PHẦN BẤT ĐỘNG SẢN VIỆT-NHẬT TẠI BÀ RỊA"
+    },
+    {
+      "ma": "GO LONG BIEN0102853832-003",
+      "ten": "CHI NHÁNH CÔNG TY CỔ PHẦN BẤT ĐỘNG SẢN VIỆT - NHẬT TẠI LONG BIÊN"
+    },
+    {
+      "ma": "GO TRÀ VINH2100636184",
+      "ten": "CÔNG TY CỔ PHẦN BẤT ĐỘNG SẢN VÀ SIÊU THỊ BÁN LẺ ĐÔNG DƯƠNG TRÀ VINH"
+    },
+    {
+      "ma": "KINH DOANH BẤT ĐỘNG SẢN HÀ NỘI0101437004",
+      "ten": "CÔNG TY CỔ PHẦN DỊCH VỤ VÀ KINH DOANH BẤT ĐỘNG SẢN HÀ NỘI"
+    },
+    {
+      "ma": "KIWOOZA0315850120",
+      "ten": "CÔNG TY CỔ PHẦN KIWOOZA EDUTAINMENT VIETNAM"
+    },
+    {
+      "ma": "KL",
+      "ten": "Khách hàng lẻ"
+    },
+    {
+      "ma": "LOTTE ĐN0304741634-009",
+      "ten": "CÔNG TY CỔ PHẦN TRUNG TÂM THƯƠNG MẠI LOTTE VIỆT NAM - CHI NHÁNH ĐÀ NẴNG"
+    },
+    {
+      "ma": "MBBANKVN0010920 - CN Hoài Đức",
+      "ten": "NGÂN HÀNG TMCP QUÂN ĐỘI - CN HOÀI ĐỨC"
+    },
+    {
+      "ma": "Mộc Châu0109202879-001",
+      "ten": "CÔNG TY CỔ PHẦN DU LỊCH VÀ TRUYỀN THÔNG MỘC CHÂU GO - CHI NHÁNH MỘC CHÂU"
+    },
+    {
+      "ma": "NEW LAND3401257600",
+      "ten": "CÔNG TY TNHH GIÁO DỤC NEW LAND"
+    },
+    {
+      "ma": "PHAN THỊ QUỲNH NHI",
+      "ten": "PHAN THỊ QUỲNH NHI"
+    },
+    {
+      "ma": "RSM4201829147",
+      "ten": "CÔNG TY CỔ PHẦN RSM"
+    },
+    {
+      "ma": "SENSE BẾN TRE1300419650",
+      "ten": "CÔNG TY TNHH MỘT THÀNH VIÊN THƯƠNG MẠI SÀI GÒN - BẾN TRE"
+    },
+    {
+      "ma": "SUN H THƠM1701900730-004",
+      "ten": "CHI NHÁNH CÔNG TY TNHH MẶT TRỜI PHÚ QUỐC TẠI HÒN THƠM"
+    },
+    {
+      "ma": "SUN TÂY NINH3901248989",
+      "ten": "CÔNG TY CỔ PHẦN MẶT TRỜI TÂY NINH"
+    },
+    {
+      "ma": "SUN WORLD HẠ LONG5701723020-001",
+      "ten": "CÔNG TY TNHH MẶT TRỜI HẠ LONG - CHI NHÁNH CÔNG VIÊN SUN WORLD HẠ LONG"
+    },
+    {
+      "ma": "TÂN TIẾN VIỆT VENDING0111194583",
+      "ten": "CÔNG TY TNHH TÂN TIẾN VIỆT VENDING"
+    },
+    {
+      "ma": "THÀNH CÔNG3900244389",
+      "ten": "CÔNG TY CỔ PHẦN THÀNH THÀNH CÔNG - BIÊN HÒA"
+    },
+    {
+      "ma": "TRẦN ĐÌNH VŨ",
+      "ten": "TRẦN ĐÌNH VŨ"
+    },
+    {
+      "ma": "TRỰC TUYẾN0305289153",
+      "ten": "CÔNG TY CỔ PHẦN DỊCH VỤ DI ĐỘNG TRỰC TUYẾN"
+    },
+    {
+      "ma": "VẠN THỊNH PHÁT0314899162",
+      "ten": "CÔNG TY TNHH QUẢNG CÁO VẠN THỊNH PHÁT"
+    },
+    {
+      "ma": "VICTORIA - AUSTRALIA0402055383-002",
+      "ten": "CHI NHÁNH CÔNG TY CỔ PHẦN GIÁO DỤC QUỐC TẾ VICTORIA - AUSTRALIA TẠI NHA TRANG"
+    },
+    {
+      "ma": "VINH CENTRE2902137398",
+      "ten": "CÔNG TY CỔ PHẦN THƯƠNG MẠI VINH CENTRE"
+    },
+    {
+      "ma": "VINSCHOOL0106156871-001",
+      "ten": "CHI NHÁNH TẠI THÀNH PHỐ HỒ CHÍ MINH - CÔNG TY CỔ PHẦN VINSCHOOL"
+    },
+    {
+      "ma": "VN PAY0102182292",
+      "ten": "CÔNG TY CỔ PHẦN  GIẢI PHÁP THANH TOÁN VIỆT NAM"
+    },
+    {
+      "ma": "YOKIDS0801365316",
+      "ten": "CÔNG TY CỔ PHẦN THƯƠNG MẠI VÀ DỊCH VỤ YOKIDS"
+    }
+  ]
+}

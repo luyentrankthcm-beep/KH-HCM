@@ -14,10 +14,16 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 
 // Luyen, 2026-08-17: khi deploy lan dau, 3 danh muc duoc tu dong nap tu file
 // Excel da parse san (157 cong trinh, 164 KH, 907 NCC).
 const SEED_FILE = require("path").join(__dirname, "../seeds/danh-muc.json");
+const SEED_FILE_MOI = require("path").join(__dirname, "../seeds/danh-muc-moi.json");
 const SEED_KEYS = {
   "ma-cong-trinh":   "ma_cong_trinh",
   "ma-khach-hang":   "ma_khach_hang",
   "ma-nha-cung-cap": "ma_nha_cung_cap",
+};
+const SEED_KEYS_MOI = {
+  "ma-cong-trinh":   "ma_cong_trinh_moi",
+  "ma-khach-hang":   "ma_khach_hang_moi",
+  "ma-nha-cung-cap": "ma_nha_cung_cap_moi",
 };
 
 function seedIfEmpty(store, slug, company) {
@@ -25,16 +31,15 @@ function seedIfEmpty(store, slug, company) {
   if (!page) return;
   const storeKey = getStoreKey(page, company);
   ensureList(store, storeKey);
-  // Chi seed cho KH Cu (du lieu goc di kem app la KH Cu)
-  if (company !== "kh_cu") return;
   if (store[storeKey].length > 0) return; // da co du lieu
+  const isMoi = company === "kh_moi";
   let seedData;
   try {
-    seedData = require(SEED_FILE);
+    seedData = require(isMoi ? SEED_FILE_MOI : SEED_FILE);
   } catch (e) {
-    return; // seed file khong ton tai thi thoi
+    return;
   }
-  const seedKey = SEED_KEYS[slug];
+  const seedKey = isMoi ? SEED_KEYS_MOI[slug] : SEED_KEYS[slug];
   const rows = seedData[seedKey] || [];
   rows.forEach((r) => {
     if (!r.ma) return;
@@ -47,6 +52,16 @@ function seedIfEmpty(store, slug, company) {
       fromExcel: true,
     });
   });
+  // Khi seed NCC moi thi dong bo luon vao chi_phi_ncc_list_moi
+  if (isMoi && slug === "ma-nha-cung-cap") {
+    if (!Array.isArray(store.chi_phi_ncc_list_moi)) store.chi_phi_ncc_list_moi = [];
+    rows.forEach((r) => {
+      if (!r.ma) return;
+      if (!store.chi_phi_ncc_list_moi.find((x) => x.maNCC === r.ma)) {
+        store.chi_phi_ncc_list_moi.push({ maNCC: r.ma, tenNCC: r.ten || "" });
+      }
+    });
+  }
 }
 
 // Moi trang dung 1 base key, tach thanh _cu / _moi theo cong ty.

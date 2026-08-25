@@ -392,6 +392,60 @@ router.get("/chi-phi/:mien(mien-nam|mien-bac)/danh-sach", (req, res) => {
     if (bestRec && best >= 1) r.maNCC = bestRec.maNCC;
   });
 
+  // Luyen, 2026-08-25: auto-fill gian tu dienGiai khi trong, va tinh maCT
+  // tu danh_muc_ma_cong_trinh theo gian.
+  const GIAN_STOP_W = new Set(["phcm","phn","kvc","mtd","posh","jp","phm","mn","mb","moi","cu","kh"]);
+  function _normGian(s) {
+    return String(s||"").toLowerCase()
+      .normalize("NFD").replace(/[̀-ͯ]/g,"")
+      .replace(/đ|Đ/g,"d")
+      .replace(/[^a-z0-9 ]/g," ").replace(/\s+/g," ").trim();
+  }
+  const _ctListForGian = (activeCompany === "kh_moi"
+    ? (store.danh_muc_ma_cong_trinh_moi || [])
+    : (store.danh_muc_ma_cong_trinh_cu || []));
+  const _ctEntries = _ctListForGian.map((ct) => {
+    const nT = _normGian(ct.ten);
+    const words = nT.split(" ").filter((w) => w.length >= 3 && !GIAN_STOP_W.has(w));
+    return { ma: ct.ma, ten: ct.ten, normTen: nT, words };
+  }).filter((ct) => ct.words.length >= 1)
+    .sort((a, b) => b.words.length - a.words.length); // greedy: dai nhat truoc
+
+  let _gianAutoChanged = false;
+  rows.forEach((r) => {
+    // 1. Auto-fill gian tu dienGiai neu trong hoac generic
+    if (!r.gian || isUpgradableGian(r.gian)) {
+      const dg = _normGian(r.dienGiai || "") + " " + _normGian(r.ncc || "");
+      let bestCt = null, bestMatched = 0;
+      for (const ct of _ctEntries) {
+        const matched = ct.words.filter((w) => dg.includes(w)).length;
+        const ratio = matched / ct.words.length;
+        if (ratio >= 0.8 && matched > bestMatched) {
+          bestCt = ct; bestMatched = matched;
+        }
+      }
+      if (bestCt) {
+        r.gian = bestCt.ten;
+        const storeRec = store.chi_phi.find((x) => x.id === r.id);
+        if (storeRec && (!storeRec.gian || isUpgradableGian(storeRec.gian))) {
+          storeRec.gian = bestCt.ten; _gianAutoChanged = true;
+        }
+      }
+    }
+    // 2. Tinh maCT tu gianAliasMap hoac danh muc cong trinh
+    const gk = (r.gian || "").trim();
+    r.maCT = (store.chi_phi_gian_alias || {})[gk] || "";
+    if (!r.maCT && gk) {
+      const nk = _normGian(gk);
+      for (const ct of _ctEntries) {
+        if (ct.normTen === nk || nk.includes(ct.normTen) || ct.normTen.includes(nk)) {
+          r.maCT = ct.ma; break;
+        }
+      }
+    }
+  });
+  if (_gianAutoChanged) save(store);
+
   const tongTien = rows.reduce((s, r) => s + (r.soTien || 0), 0);
 
   // Gian alias map cho chi phi
