@@ -4,19 +4,40 @@
   <%- include('partials/head') %>
   <title>Hồ Sơ Hóa Đơn NCC – K&H</title>
   <style>
+    .hoso-wrap { overflow-x:auto; }
     .hoso-table { width:100%; border-collapse:collapse; font-size:.88em; }
-    .hoso-table th { background:#1e3a5f; color:#fff; padding:.5rem .75rem; text-align:left; white-space:nowrap; position:sticky; top:0; z-index:1; }
+    .hoso-table th {
+      background:#1e3a5f; color:#fff; padding:.5rem .75rem;
+      text-align:left; white-space:nowrap;
+      position:sticky; top:56px; z-index:10;
+    }
     .hoso-table td { padding:.45rem .75rem; border-bottom:1px solid #eee; vertical-align:top; }
-    .hoso-table tbody tr:nth-child(odd) td { background:#f5f8ff; }
-    .hoso-table tbody tr:nth-child(even) td { background:#eef3ff; }
-    .hoso-table tr:hover td { background:#dceeff !important; }
-    .ncc-short { font-weight:700; color:#1e3a5f; }
-    .ncc-full { color:#444; }
+    /* NCC group header row */
+    .ncc-group-row td {
+      background:#1d4ed8 !important;
+      color:#fff;
+      font-weight:700;
+      cursor:pointer;
+      user-select:none;
+      border-top:3px solid #1e3a5f;
+    }
+    .ncc-group-row:hover td { background:#1e40af !important; }
+    .ncc-full { font-weight:normal; font-size:.82em; opacity:.85; margin-left:.5rem; }
+    .ncc-count { font-size:.8em; font-weight:600; opacity:.75; white-space:nowrap; }
+    .ncc-arrow { font-size:.8em; margin-right:.4rem; transition:transform .2s; display:inline-block; }
+    .ncc-group-row.open .ncc-arrow { transform:rotate(90deg); }
+    /* Invoice rows */
+    .inv-row { display:none; }
+    .inv-row.visible { display:table-row; }
+    .inv-row:nth-child(odd) td { background:#f5f8ff; }
+    .inv-row:nth-child(even) td { background:#eef3ff; }
+    .inv-row:hover td { background:#dceeff !important; }
     .tien { font-weight:600; color:#15803d; white-space:nowrap; }
     .link-hd { color:#2563eb; text-decoration:none; display:inline-flex; align-items:center; gap:.3rem; }
     .link-hd:hover { text-decoration:underline; }
     .btn-edit { background:none; border:1px solid #cbd5e1; border-radius:4px; padding:.15rem .45rem; cursor:pointer; font-size:.8em; color:#555; }
     .btn-edit:hover { background:#f1f5f9; }
+    .tag-so { background:#e0f2fe; color:#0369a1; border-radius:4px; padding:.05rem .35rem; font-size:.82em; font-weight:600; }
     .edit-modal { display:none; position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:999; align-items:center; justify-content:center; }
     .edit-modal.open { display:flex; }
     .edit-box { background:#fff; border-radius:10px; padding:1.5rem; width:min(520px,95vw); box-shadow:0 8px 32px rgba(0,0,0,.2); }
@@ -27,8 +48,6 @@
     .edit-actions { display:flex; gap:.5rem; justify-content:flex-end; margin-top:1rem; }
     .btn-save { background:#2563eb; color:#fff; border:none; border-radius:5px; padding:.4rem 1rem; cursor:pointer; font-weight:600; }
     .btn-cancel { background:#f1f5f9; border:1px solid #cbd5e1; border-radius:5px; padding:.4rem 1rem; cursor:pointer; }
-    .tag-so { background:#e0f2fe; color:#0369a1; border-radius:4px; padding:.05rem .35rem; font-size:.82em; font-weight:600; }
-    .empty-val { color:#bbb; font-style:italic; }
   </style>
 </head>
 <body>
@@ -50,12 +69,14 @@
         </select>
       </form>
       <span style="color:#666;font-size:.9em;"><strong><%= total %></strong> hóa đơn · <strong><%= groups.length %></strong> NCC</span>
+      <button onclick="toggleAll(true)" style="font-size:.82em;padding:.25rem .6rem;border:1px solid #cbd5e1;border-radius:4px;cursor:pointer;background:#f8fafc;">Mở tất cả</button>
+      <button onclick="toggleAll(false)" style="font-size:.82em;padding:.25rem .6rem;border:1px solid #cbd5e1;border-radius:4px;cursor:pointer;background:#f8fafc;">Thu tất cả</button>
     </div>
 
     <% if (groups.length === 0) { %>
     <p style="color:#888;">Chưa có dữ liệu hóa đơn.</p>
     <% } else { %>
-    <div style="overflow-x:auto;">
+    <div class="hoso-wrap">
       <table class="hoso-table">
         <thead>
           <tr>
@@ -69,33 +90,36 @@
           </tr>
         </thead>
         <tbody>
-          <% var _invNum = 0; groups.forEach(function(g) { %>
-          <tr>
-            <td colspan="2" style="padding:.55rem .75rem;background:#93c5fd !important;border-left:4px solid #1d4ed8;border-top:2px solid #1d4ed8;">
-              <span style="font-weight:700;font-size:.9em;color:#000;"><%= g.nccShort %></span>
-              <% if (g.tenDayDuNCC) { %>
-              <span style="font-weight:normal;font-size:.8em;margin-left:.5rem;color:#1e3a5f;">— <%= g.tenDayDuNCC %></span>
-              <% } %>
+          <% var _invNum = 0; groups.forEach(function(g, gi) {
+            var gid = 'g' + gi;
+          %>
+          <!-- NCC group header -->
+          <tr class="ncc-group-row" onclick="toggleGroup('<%= gid %>', this)">
+            <td colspan="2">
+              <span class="ncc-arrow">▶</span>
+              <strong><%= g.nccShort %></strong>
+              <% if (g.tenDayDuNCC) { %><span class="ncc-full">— <%= g.tenDayDuNCC %></span><% } %>
             </td>
-            <td style="padding:.55rem .75rem;background:#93c5fd !important;border-top:2px solid #1d4ed8;font-size:.8em;color:#1e3a5f;font-weight:600;white-space:nowrap;"><%= g.invoices.length %> hóa đơn</td>
-            <td colspan="4" style="background:#93c5fd !important;border-top:2px solid #1d4ed8;"></td>
+            <td class="ncc-count"><%= g.invoices.length %> hóa đơn</td>
+            <td colspan="4"></td>
           </tr>
-          <% g.invoices.forEach(function(r, ii) { _invNum++; %>
-          <tr style="background:<%= ii%2===0?'#f5f8ff':'#eef3ff' %>;">
-            <td style="color:#bbb;font-size:.78em;padding-left:1.2rem;"><%= _invNum %></td>
+          <!-- Invoice rows (hidden by default) -->
+          <% g.invoices.forEach(function(r) { _invNum++; %>
+          <tr class="inv-row" data-group="<%= gid %>">
+            <td style="color:#bbb;font-size:.78em;padding-left:1.5rem;"><%= _invNum %></td>
             <td>
               <span class="tag-so"><%= r.soHoaDon %></span>
               <span style="color:#888;font-size:.8em;margin-left:.3rem;white-space:nowrap;"><%= r.ngay ? r.ngay.split('-').reverse().join('/') : '' %></span>
             </td>
-            <td class="<%= r.tongTien ? 'tien' : '' %>" style="<%= (!r.tongTien) ? 'color:#bbb;' : (r.autoFilled ? 'color:#888;' : '') %>"><%= r.tongTien || '—' %></td>
-            <td style="max-width:220px;"><%= r.noiDung || '—' %></td>
+            <td class="<%= r.tongTien ? 'tien' : '' %>" style="<%= (!r.tongTien) ? 'color:#bbb;' : '' %>"><%= r.tongTien || '—' %></td>
+            <td style="max-width:240px;"><%= r.noiDung || '<span style="color:#bbb;">—</span>' %></td>
             <td style="color:#bbb;font-style:italic;">—</td>
             <td>
               <% if (r.driveLink) { %>
               <a href="<%= r.driveLink %>" target="_blank" rel="noopener" class="link-hd">📄 Mở</a>
               <% } else { %><span style="color:#bbb;">—</span><% } %>
             </td>
-            <td><button class="btn-edit" onclick="openEdit('<%= r.driveId %>','<%= encodeURIComponent(r.nccShort) %>','<%= encodeURIComponent(r.tenDayDuNCC||'') %>','<%= encodeURIComponent(r.tongTien||'') %>','<%= encodeURIComponent(r.noiDung||'') %>','<%= encodeURIComponent(r.hoSoLienQuan||'') %>')">✏️</button></td>
+            <td><button class="btn-edit" onclick="event.stopPropagation();openEdit('<%= r.driveId %>','<%= encodeURIComponent(r.nccShort) %>','<%= encodeURIComponent(r.tenDayDuNCC||'') %>','<%= encodeURIComponent(r.tongTien||'') %>','<%= encodeURIComponent(r.noiDung||'') %>','<%= encodeURIComponent(r.hoSoLienQuan||'') %>')">✏️</button></td>
           </tr>
           <% }); %>
           <% }); %>
@@ -128,6 +152,23 @@
   </div>
 
   <script>
+    function toggleGroup(gid, headerRow) {
+      var rows = document.querySelectorAll('.inv-row[data-group="' + gid + '"]');
+      var isOpen = headerRow.classList.toggle('open');
+      rows.forEach(function(r) {
+        r.classList.toggle('visible', isOpen);
+      });
+    }
+    function toggleAll(open) {
+      document.querySelectorAll('.ncc-group-row').forEach(function(hdr) {
+        var gid = hdr.nextElementSibling && hdr.nextElementSibling.dataset.group;
+        if (!gid) return;
+        if (open) hdr.classList.add('open'); else hdr.classList.remove('open');
+        document.querySelectorAll('.inv-row[data-group="' + gid + '"]').forEach(function(r) {
+          r.classList.toggle('visible', open);
+        });
+      });
+    }
     function openEdit(driveId, ncc, tenDayDu, tien, noiDung, hoSo) {
       document.getElementById('editTitle').textContent = 'Sửa: ' + decodeURIComponent(ncc);
       document.getElementById('editForm').action = '/ho-so/hoa-don-ncc/' + driveId + '/sua';
