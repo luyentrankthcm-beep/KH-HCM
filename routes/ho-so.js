@@ -41,10 +41,37 @@ function buildHddvLookup(store) {
   return lookup;
 }
 
-function enrichRow(r, hddvLookup) {
+// Fallback: dò tên đầy đủ NCC từ danh sách NCC (chi_phi_ncc_list) khi số HĐ
+// không khớp trong hoa_don_dau_vao. Chuẩn hoá bằng cách bỏ ký tự đặc biệt,
+// lowercase rồi kiểm tra nccShort có nằm trong tên NCC không.
+function normForMatch(s) {
+  return String(s || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+function lookupNccNameFallback(nccShort, store) {
+  const shortNorm = normForMatch(nccShort);
+  if (shortNorm.length < 3) return "";
+  const allLists = [
+    ...(store.chi_phi_ncc_list_cu || []),
+    ...(store.chi_phi_ncc_list_moi || []),
+    ...(store.chi_phi_ncc_list || []),
+    ...(store.danh_muc_ma_nha_cung_cap_cu || []).map((r) => ({ tenNCC: r.ten })),
+    ...(store.danh_muc_ma_nha_cung_cap_moi || []).map((r) => ({ tenNCC: r.ten })),
+    ...(store.danh_muc_ma_nha_cung_cap || []).map((r) => ({ tenNCC: r.ten })),
+  ];
+  for (const rec of allLists) {
+    const name = rec.tenNCC || "";
+    if (!name) continue;
+    if (normForMatch(name).includes(shortNorm)) return name;
+  }
+  return "";
+}
+
+function enrichRow(r, hddvLookup, store) {
   const parsed = parseInvoiceFileName(r.fileName || "");
   const inv = hddvLookup && parsed.soHoaDon ? hddvLookup[parsed.soHoaDon] : null;
-  const autoTen = inv ? inv.tenNCC : "";
+  const autoTenFromHD = inv ? inv.tenNCC : "";
+  const autoTenFromNCC = !autoTenFromHD ? lookupNccNameFallback(parsed.ncc, store) : "";
+  const autoTen = autoTenFromHD || autoTenFromNCC;
   const autoTien = inv && inv.tongTien ? inv.tongTien.toLocaleString("vi-VN") + "đ" : "";
   return {
     ...r,
@@ -57,7 +84,7 @@ function enrichRow(r, hddvLookup) {
     tongTien: r.tongTien || autoTien,
     noiDung: r.noiDung || "",
     hoSoLienQuan: r.hoSoLienQuan || "",
-    autoFilled: !r.tenDayDuNCC && !!autoTen, // danh dau "tu dong dien" de hien thi khac
+    autoFilled: !r.tenDayDuNCC && !!autoTen,
   };
 }
 
@@ -67,7 +94,7 @@ router.get("/ho-so/hoa-don-ncc", (req, res) => {
   const thangFilter = req.query.thang || "";
   const hddvLookup = buildHddvLookup(store);
 
-  let rows = store.ho_so_hoa_don.map((r) => enrichRow(r, hddvLookup));
+  let rows = store.ho_so_hoa_don.map((r) => enrichRow(r, hddvLookup, store));
   if (thangFilter) rows = rows.filter((r) => r.thang === thangFilter);
   rows.sort((a, b) => {
     const nccCmp = a.nccShort.toLowerCase().localeCompare(b.nccShort.toLowerCase());
