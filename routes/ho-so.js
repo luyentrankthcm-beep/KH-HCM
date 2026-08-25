@@ -28,8 +28,24 @@ function ensureHoSo(store) {
   if (!store.ho_so_hoa_don) store.ho_so_hoa_don = [];
 }
 
-function enrichRow(r) {
+// Luyen, 2026-08-25: tu dong dien Ten NCC va Tong tien tu bang hoa_don_dau_vao
+// (doi chieu theo so hoa don tu ten file). Neu da sua tay thi uu tien du lieu tay.
+function buildHddvLookup(store) {
+  const lookup = {}; // soHoaDon -> { tenNCC, tongTien }
+  (store.hoa_don_dau_vao || []).forEach((r) => {
+    const no = String(r.soHoaDon || "").trim();
+    if (!no) return;
+    if (!lookup[no]) lookup[no] = { tenNCC: r.tenNCC || "", tongTien: 0 };
+    lookup[no].tongTien += r.soTien || 0;
+  });
+  return lookup;
+}
+
+function enrichRow(r, hddvLookup) {
   const parsed = parseInvoiceFileName(r.fileName || "");
+  const inv = hddvLookup && parsed.soHoaDon ? hddvLookup[parsed.soHoaDon] : null;
+  const autoTen = inv ? inv.tenNCC : "";
+  const autoTien = inv && inv.tongTien ? inv.tongTien.toLocaleString("vi-VN") + "đ" : "";
   return {
     ...r,
     nccShort: parsed.ncc,
@@ -37,10 +53,11 @@ function enrichRow(r) {
     ngay: parsed.ngay,
     thang: parsed.thang,
     driveLink: r.driveId ? `https://drive.google.com/file/d/${r.driveId}/view` : "",
-    tenDayDuNCC: r.tenDayDuNCC || "",
-    tongTien: r.tongTien || "",
+    tenDayDuNCC: r.tenDayDuNCC || autoTen,
+    tongTien: r.tongTien || autoTien,
     noiDung: r.noiDung || "",
     hoSoLienQuan: r.hoSoLienQuan || "",
+    autoFilled: !r.tenDayDuNCC && !!autoTen, // danh dau "tu dong dien" de hien thi khac
   };
 }
 
@@ -48,8 +65,9 @@ router.get("/ho-so/hoa-don-ncc", (req, res) => {
   const store = load();
   ensureHoSo(store);
   const thangFilter = req.query.thang || "";
+  const hddvLookup = buildHddvLookup(store);
 
-  let rows = store.ho_so_hoa_don.map(enrichRow);
+  let rows = store.ho_so_hoa_don.map((r) => enrichRow(r, hddvLookup));
   if (thangFilter) rows = rows.filter((r) => r.thang === thangFilter);
   rows.sort((a, b) => {
     const nccCmp = a.nccShort.toLowerCase().localeCompare(b.nccShort.toLowerCase());

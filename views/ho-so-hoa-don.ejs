@@ -75,8 +75,8 @@
               <div class="ncc-short"><%= r.nccShort %></div>
               <div style="color:#888;font-size:.8em;margin-top:.1rem;"><span class="tag-so"><%= r.soHoaDon %></span> · <%= r.ngay ? r.ngay.split('-').reverse().join('/') : '' %></div>
             </td>
-            <td class="ncc-full"><%= r.tenDayDuNCC || '—' %></td>
-            <td class="tien"><%= r.tongTien || '—' %></td>
+            <td class="ncc-full" style="<%= r.autoFilled ? 'color:#555;font-style:italic;' : '' %>"><%= r.tenDayDuNCC || '—' %></td>
+            <td class="tien" style="<%= r.autoFilled ? 'color:#888;' : '' %>"><%= r.tongTien || '—' %></td>
             <td style="max-width:220px;"><%= r.noiDung || '—' %></td>
             <td style="max-width:180px;color:#bbb;font-style:italic;">—</td>
             <td>
