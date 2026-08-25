@@ -2106,6 +2106,71 @@ router.post("/phap-danh/hop-dong-thue-gian-tong/cap-nhat-tu-sheet", requireAdmin
     }
 });
 
+// Nhan, 2026-08-25: cap nhat tung truong gian (tu modal chi tiet tren trang
+// Hop Dong Thue Gian Tong) -- luu cac truong form vao ban ghi trong store.
+router.post("/phap-danh/hop-dong-thue-gian-tong/:id/cap-nhat", requireAdmin, (req, res) => {
+  const store = load();
+  ensureShape(store);
+  const r = store.phap_danh_hop_dong_thue_tong.find(x => String(x.id) === req.params.id);
+  if (!r) return res.json({ success: false, error: "Không tìm thấy" });
+  const fields = ['tenNoiBo','maCongTrinh','mstKhachHang','tenKhachHang','hinhThucThue',
+    'tienThueThang','thoiHanBatDau','thoiHanKetThuc','thoiHanThueRaw','ghiChu','linkHopDong'];
+  fields.forEach(f => { if (req.body[f] !== undefined) r[f] = (req.body[f]||'').trim(); });
+  // Dong bo voi ten truong cu (ngayBatDauThue/ngayHetHanThue) de khong gay sai
+  // le voi cac ham tinh trang thai mau / loc thang dang dung ten truong cu.
+  if (req.body.thoiHanBatDau !== undefined) r.ngayBatDauThue = r.thoiHanBatDau;
+  if (req.body.thoiHanKetThuc !== undefined) r.ngayHetHanThue = r.thoiHanKetThuc;
+  const amt = Number(String(r.tienThueThang||'').replace(/[.,\s]/g,''));
+  if (!isNaN(amt)) r.tienThueThang = amt;
+  save(store);
+  res.json({ success: true });
+});
+
+// Nhan, 2026-08-25: doc noi dung hop dong PDF tu Google Drive (link co san
+// trong truong linkHopDong cua ban ghi). Lay file qua Drive API bang access
+// token hien co (dung chung voi Gmail OAuth), parse PDF bang pdf-parse, trich
+// xuat cac dieu khoan chinh (vi tri, tien thue, thoi han, thanh toan).
+function extractHopDongInfo(text) {
+  const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+  let dieuKhoanThanhToan = '', viTri = '', tienThue = '', thoiHan = '';
+  const dkIdx = lines.findIndex(l => /thanh\s*to[áa]n|payment/i.test(l));
+  if (dkIdx >= 0) dieuKhoanThanhToan = lines.slice(dkIdx, dkIdx+5).join('\n');
+  const vtIdx = lines.findIndex(l => /v[ịi]\s*tr[íi]|di[eệ]n\s*t[íi]ch|location|premises/i.test(l));
+  if (vtIdx >= 0) viTri = lines.slice(vtIdx, vtIdx+3).join('\n');
+  const ttIdx = lines.findIndex(l => /ti[eề]n\s*thu[eê]|gi[áa]\s*thu[eê]|rent|fee/i.test(l));
+  if (ttIdx >= 0) tienThue = lines.slice(ttIdx, ttIdx+3).join('\n');
+  const thIdx = lines.findIndex(l => /th[oờ]i\s*h[aạ]n|term|duration|hi[eệ]u\s*l[uự]c/i.test(l));
+  if (thIdx >= 0) thoiHan = lines.slice(thIdx, thIdx+3).join('\n');
+  return { dieuKhoanThanhToan, viTri, tienThue, thoiHan };
+}
+
+router.get("/phap-danh/hop-dong-thue-gian-tong/:id/doc-hop-dong", async (req, res) => {
+  const store = load();
+  ensureShape(store);
+  const r = store.phap_danh_hop_dong_thue_tong.find(x => String(x.id) === req.params.id);
+  if (!r || !r.linkHopDong) return res.json({ success: false, error: "Không có link hợp đồng" });
+  const driveMatch = r.linkHopDong.match(/\/d\/([a-zA-Z0-9_-]{10,})/);
+  const openMatch = r.linkHopDong.match(/[?&]id=([a-zA-Z0-9_-]{10,})/);
+  const fileId = (driveMatch && driveMatch[1]) || (openMatch && openMatch[1]);
+  if (!fileId) return res.json({ success: false, error: "Không nhận dạng được file ID từ link Drive" });
+  try {
+    const gmailApi = require('../utils/gmailApi');
+    const accessToken = await gmailApi.getValidAccessToken(store);
+    const dlResp = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
+      headers: { Authorization: 'Bearer ' + accessToken }
+    });
+    if (!dlResp.ok) throw new Error('Drive trả lỗi ' + dlResp.status + ': ' + await dlResp.text());
+    const arrayBuffer = await dlResp.arrayBuffer();
+    const pdfBuffer = Buffer.from(arrayBuffer);
+    const pdfParse = require('pdf-parse');
+    const data = await pdfParse(pdfBuffer);
+    const result = extractHopDongInfo(data.text || '');
+    res.json({ success: true, ...result, rawText: (data.text||'').substring(0, 3000) });
+  } catch(e) {
+    res.json({ success: false, error: e.message });
+  }
+});
+
 // "Đối chiếu gian XHD, Tiền thuê" (routes/hoa-don-dau-vao.js) can doc lai
 // danh sach hop dong thue gian (benChoThue/tienThueThang/...) -- xuat them
 // cac ham nay (truoc gio chi co router duoc export) de dung LAI, khong doan

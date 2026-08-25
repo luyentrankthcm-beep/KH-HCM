@@ -2,104 +2,280 @@
 <html lang="vi">
 <head>
   <%- include('partials/head') %>
-  </head>
-  <body>
-    <%- include('partials/nav') %>
-      <main class="container">
-          <h1>Hợp Đồng Thuê Gian Tổng</h1>
-              <p class="muted" style="margin-top:-10px;margin-bottom:6px;">
-                    Danh sách tổng hợp tất cả các gian (4 sheet KVC MN / KVC MB / MTD MN / MTD MB), nạp từ Google Sheet
-                          "Bản sao của Danh sách các gian Luyến.xlsx". Đang xem: <strong><%= COMPANIES[activeCompany].label %></strong>
-                                (<%= rows.length %> gian ở tab này). Đổi công ty ở nút "Cũ/Mới" trên đầu trang nếu muốn xem công ty kia.
-                                      Dòng nào ghi "Cả 2" trên sheet gốc sẽ hiện ở cả 2 công ty.
-                                          </p>
-                                              <p class="muted" style="margin-bottom:14px;">
-                                                    Tô nền <span style="background:#fdf1e0; padding:1px 6px; border-radius:3px;">cam</span> = hợp đồng hết hạn
-                                                          TRONG THÁNG NÀY, <span style="background:#fdeceb; padding:1px 6px; border-radius:3px;">đỏ</span> = hợp đồng ĐÃ
-                                                                HẾT HẠN (so với ngày hệ thống hôm nay). Gian chưa có ngày hết hạn rõ ràng trên sheet (thời hạn ghi dạng tự do,
-                                                                      hoặc để trống) sẽ không tô màu -- chị xem cột "Thời hạn thuê" để tự kiểm tra thêm.
-                                                                          </p>
+</head>
+<body>
+  <%- include('partials/nav') %>
+  <main class="container">
+    <h1>Hợp Đồng Thuê Gian Tổng</h1>
+    <p class="muted" style="margin-top:-10px;margin-bottom:6px;">
+      Danh sách tổng hợp tất cả các gian (4 sheet KVC MN / KVC MB / MTD MN / MTD MB), nạp từ Google Sheet
+      "Bản sao của Danh sách các gian Luyến.xlsx". Đang xem: <strong><%= COMPANIES[activeCompany].label %></strong>
+      (<%= rows.length %> gian ở tab này). Đổi công ty ở nút "Cũ/Mới" trên đầu trang nếu muốn xem công ty kia.
+      Dòng nào ghi "Cả 2" trên sheet gốc sẽ hiện ở cả 2 công ty.
+    </p>
+    <p class="muted" style="margin-bottom:14px;">
+      Tô nền <span style="background:#fdf1e0; padding:1px 6px; border-radius:3px;">cam</span> = hợp đồng hết hạn
+      TRONG THÁNG NÀY, <span style="background:#fdeceb; padding:1px 6px; border-radius:3px;">đỏ</span> = hợp đồng ĐÃ
+      HẾT HẠN (so với ngày hệ thống hôm nay). Gian chưa có ngày hết hạn rõ ràng trên sheet (thời hạn ghi dạng tự do,
+      hoặc để trống) sẽ không tô màu -- chị xem cột "Thời hạn thuê" để tự kiểm tra thêm.
+      <strong>Bấm vào dòng bất kỳ</strong> để xem chi tiết và chỉnh sửa.
+    </p>
 
-                                                                              <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
-                                                                                  <% if (success) { %><div class="alert alert-success"><%= success %></div><% } %>
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+    <% if (success) { %><div class="alert alert-success"><%= success %></div><% } %>
 
-                                                                                      <section class="panel">
-                                                                                            <div class="panel-head">
+    <section class="panel">
+      <div class="panel-head">
         <form method="POST" action="/phap-danh/hop-dong-thue-gian-tong/cap-nhat-tu-sheet"
               onsubmit="return confirm('Đồng bộ từ Google Sheet? Dữ liệu hiện có sẽ được GIỮ NGUYÊN, chỉ bù thêm vào các ô đang trống.');">
           <button type="submit" class="btn btn-primary">🔄 Cập nhật từ Google Sheet</button>
         </form>
-                                                                                                    <h2>Chọn sheet</h2>
-                                                                                                          </div>
-                                                                                                                <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:16px;">
-                                                                                                                        <% sheets.forEach(function(s) { %>
-                                                                                                                                <a class="btn btn-secondary <%= sheetParam === s.key ? 'is-active' : '' %>"
-                                                                                                                                           href="/phap-danh/hop-dong-thue-gian-tong?sheet=<%= s.key %>"><%= s.label %> (<%= counts[s.key] %>)</a>
-                                                                                                                                                   <% }) %>
-                                                                                                                                                         </div>
-                                                                                                                                                         
-                                                                                                    <form method="GET" action="/phap-danh/hop-dong-thue-gian-tong" style="display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-bottom:14px;">
-  <input type="hidden" name="sheet" value="<%= sheetParam %>" />
-  <label style="font-size:13px;">Xem hợp đồng còn hiệu lực trong tháng
-    <input type="month" name="thang" value="<%= thangFilter %>" style="margin-left:6px;" />
-  </label>
-  <button type="submit" class="btn btn-secondary">Lọc theo tháng</button>
-  <a class="link-btn" href="/phap-danh/hop-dong-thue-gian-tong?sheet=<%= sheetParam %>&thang=all">Xem tất cả các tháng</a>
-</form>
+        <h2>Chọn sheet</h2>
+      </div>
 
-<div class="table-scroll">
-                                                                                                                                                                       <table class="table">
-                                                                                                                                                                                 <thead>
-                                                                                                                                                                                             <tr>
-                                                                                                                                                                                                           <th>Tên nội bộ</th>
-                                                                                                                                                                                                                         <th>Mã công trình</th>
-                                                                                                                                                                                                                                       <th>MST khách hàng</th>
-                                                                                                                                                                                                                                                     <th>Tên khách hàng</th>
-                                                                                                                                                                                                                                                                   <th>Hình thức thuê</th>
-                                                                                                                                                                                                                                                                                 <th style="text-align:right;">Tiền thuê/tháng</th>
-                                                                                                                                                                                                                                                                                 <th>Thời hạn thuê</th>
-                                                                                                                                                                                                                                                                                               <th>Ghi chú</th>
-                                                                                                                                                                                                                                                                                                             <th>Link hợp đồng</th>
-                                                                                                                                                                                                                                                                                                                         </tr>
-                                                                                                                                                                                                                                                                                                                                   </thead>
-                                                                                                                                                                                                                                                                                                                                             <tbody>
-                                                                                                                                                                                                                                                                                                                                                         <% rows.forEach(function(r) {
-                                                                                                                                                                                                                                                                                                                                                                       var rowStyle = '';
-                                                                                                                                                                                                                                                                                                                                                                                     if (r.trangThaiMau === 'het_han') rowStyle = 'background:#fdeceb;';
-                                                                                                                                                                                                                                                                                                                                                                                                   else if (r.trangThaiMau === 'het_han_thang_nay') rowStyle = 'background:#fdf1e0;';
-                                                                                                                                                                                                                                                                                                                                                                                                               %>
-                                                                                                                                                                                                                                                                                                                                                                                                                           <tr style="<%= rowStyle %>">
-                                                                                                                                                                                                                                                                                                                                                                                                                                         <td><%= r.tenNoiBo || '(không có)' %></td>
-                                                                                                                                                                                                                                                                                                                                                                                                                                                       <td><%= r.maCongTrinh || '(không có)' %></td>
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                     <td><%= r.mstKhachHang %></td>
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   <td><%= r.tenKhachHang %></td>
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 <td><%= r.hinhThucThue %></td>
-                                                                                                                                                                                                                                                                                                               <td style="text-align:right;"><%= r.tienThueThang ? Number(r.tienThueThang).toLocaleString('vi-VN') + ' đ' : '' %></td>
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               <td style="white-space:pre-line;">
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               <%= r.thoiHanThueRaw %>
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               <% if (r.trangThaiMau === 'het_han') { %><span class="badge badge-chi" style="margin-left:6px;">Đã hết hạn</span><% } %>
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               <% if (r.trangThaiMau === 'het_han_thang_nay') { %><span class="badge badge-warn" style="margin-left:6px;">Hết hạn tháng này</span><% } %>
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             </td>
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           <td><%= r.ghiChu %></td>
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         <td>
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         <% if (r.linkHopDong && /^https?:\/\//i.test(r.linkHopDong)) { %>
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         <a href="<%= r.linkHopDong %>" target="_blank" rel="noopener">Xem HĐ ↗</a>
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         <% } else if (r.linkHopDong) { %>
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         <%= r.linkHopDong %>
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         <% } else { %>
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         <span class="muted">(không có)</span>
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         <% } %>
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       </td>
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   </tr>
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               <% }) %>
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           <% if (rows.length === 0) { %>
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       <tr><td colspan="9" class="muted">Chưa có gian nào ở tab này cho công ty đang chọn.</td></tr>
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   <% } %>
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             </tbody>
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     </table>
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           </div>
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               </section>
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 </main>
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 </body>
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 </html>
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 
+      <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:16px;">
+        <% sheets.forEach(function(s) { %>
+          <a class="btn btn-secondary <%= sheetParam === s.key ? 'is-active' : '' %>"
+             href="/phap-danh/hop-dong-thue-gian-tong?sheet=<%= s.key %>"><%= s.label %> (<%= counts[s.key] %>)</a>
+        <% }) %>
+      </div>
+
+      <form method="GET" action="/phap-danh/hop-dong-thue-gian-tong" style="display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-bottom:14px;">
+        <input type="hidden" name="sheet" value="<%= sheetParam %>" />
+        <label style="font-size:13px;">Xem hợp đồng còn hiệu lực trong tháng
+          <input type="month" name="thang" value="<%= thangFilter %>" style="margin-left:6px;" />
+        </label>
+        <button type="submit" class="btn btn-secondary">Lọc theo tháng</button>
+        <a class="link-btn" href="/phap-danh/hop-dong-thue-gian-tong?sheet=<%= sheetParam %>&thang=all">Xem tất cả các tháng</a>
+      </form>
+
+      <div class="table-scroll">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Tên nội bộ</th>
+              <th>Mã công trình</th>
+              <th>MST khách hàng</th>
+              <th>Tên khách hàng</th>
+              <th>Hình thức thuê</th>
+              <th style="text-align:right;">Tiền thuê/tháng</th>
+              <th>Thời hạn thuê</th>
+              <th>Ghi chú</th>
+              <th>Link hợp đồng</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% rows.forEach(function(r) {
+              var rowStyle = 'cursor:pointer;';
+              if (r.trangThaiMau === 'het_han') rowStyle += 'background:#fdeceb;';
+              else if (r.trangThaiMau === 'het_han_thang_nay') rowStyle += 'background:#fdf1e0;';
+            %>
+            <tr style="<%= rowStyle %>" onclick="openGianModal('<%= r.id %>')" title="Bấm để xem chi tiết">
+              <td><%= r.tenNoiBo || '(không có)' %></td>
+              <td><%= r.maCongTrinh || '(không có)' %></td>
+              <td><%= r.mstKhachHang %></td>
+              <td><%= r.tenKhachHang %></td>
+              <td><%= r.hinhThucThue %></td>
+              <td style="text-align:right;"><%= r.tienThueThang ? Number(r.tienThueThang).toLocaleString('vi-VN') + ' đ' : '' %></td>
+              <td style="white-space:pre-line;">
+                <%= r.thoiHanThueRaw %>
+                <% if (r.trangThaiMau === 'het_han') { %><span class="badge badge-chi" style="margin-left:6px;">Đã hết hạn</span><% } %>
+                <% if (r.trangThaiMau === 'het_han_thang_nay') { %><span class="badge badge-warn" style="margin-left:6px;">Hết hạn tháng này</span><% } %>
+              </td>
+              <td><%= r.ghiChu %></td>
+              <td onclick="event.stopPropagation();">
+                <% if (r.linkHopDong && /^https?:\/\//i.test(r.linkHopDong)) { %>
+                  <a href="<%= r.linkHopDong %>" target="_blank" rel="noopener">Xem HĐ ↗</a>
+                <% } else if (r.linkHopDong) { %>
+                  <%= r.linkHopDong %>
+                <% } else { %>
+                  <span class="muted">(không có)</span>
+                <% } %>
+              </td>
+            </tr>
+            <% }) %>
+            <% if (rows.length === 0) { %>
+            <tr><td colspan="9" class="muted">Chưa có gian nào ở tab này cho công ty đang chọn.</td></tr>
+            <% } %>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <!-- Modal chi tiết gian -->
+  <div id="gianModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.45); z-index:1000; overflow-y:auto;">
+    <div style="background:#fff; max-width:660px; margin:40px auto; border-radius:8px; box-shadow:0 4px 24px rgba(0,0,0,0.18); padding:28px 32px;">
+      <h2 style="margin-top:0; font-size:1.2rem;" id="gianModalTitle">Chi tiết gian</h2>
+
+      <h3 style="font-size:1rem; margin-bottom:12px; color:#555;">Thông tin cơ bản</h3>
+      <form id="gianModalForm">
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px 18px;">
+          <label style="grid-column:1/-1;">
+            <span style="font-size:13px; color:#555;">Tên nội bộ</span>
+            <input type="text" id="f_tenNoiBo" name="tenNoiBo" style="width:100%; margin-top:3px;" />
+          </label>
+          <label>
+            <span style="font-size:13px; color:#555;">Mã công trình</span>
+            <input type="text" id="f_maCongTrinh" name="maCongTrinh" style="width:100%; margin-top:3px;" />
+          </label>
+          <label>
+            <span style="font-size:13px; color:#555;">MST khách hàng</span>
+            <input type="text" id="f_mstKhachHang" name="mstKhachHang" style="width:100%; margin-top:3px;" />
+          </label>
+          <label style="grid-column:1/-1;">
+            <span style="font-size:13px; color:#555;">Tên khách hàng</span>
+            <input type="text" id="f_tenKhachHang" name="tenKhachHang" style="width:100%; margin-top:3px;" />
+          </label>
+          <label style="grid-column:1/-1;">
+            <span style="font-size:13px; color:#555;">Hình thức thuê</span>
+            <input type="text" id="f_hinhThucThue" name="hinhThucThue" style="width:100%; margin-top:3px;" />
+          </label>
+          <label>
+            <span style="font-size:13px; color:#555;">Tiền thuê/tháng</span>
+            <input type="number" id="f_tienThueThang" name="tienThueThang" style="width:100%; margin-top:3px;" />
+          </label>
+          <label>
+            <span style="font-size:13px; color:#555;">Thời hạn thuê (raw)</span>
+            <input type="text" id="f_thoiHanThueRaw" name="thoiHanThueRaw" style="width:100%; margin-top:3px;" />
+          </label>
+          <label>
+            <span style="font-size:13px; color:#555;">Thời hạn bắt đầu</span>
+            <input type="date" id="f_thoiHanBatDau" name="thoiHanBatDau" style="width:100%; margin-top:3px;" />
+          </label>
+          <label>
+            <span style="font-size:13px; color:#555;">Thời hạn kết thúc</span>
+            <input type="date" id="f_thoiHanKetThuc" name="thoiHanKetThuc" style="width:100%; margin-top:3px;" />
+          </label>
+          <label style="grid-column:1/-1;">
+            <span style="font-size:13px; color:#555;">Ghi chú</span>
+            <textarea id="f_ghiChu" name="ghiChu" rows="3" style="width:100%; margin-top:3px;"></textarea>
+          </label>
+          <label style="grid-column:1/-1;">
+            <span style="font-size:13px; color:#555;">Link hợp đồng</span>
+            <input type="text" id="f_linkHopDong" name="linkHopDong" style="width:100%; margin-top:3px;" />
+          </label>
+        </div>
+
+        <div id="saveMsg" style="display:none; margin-top:8px; font-size:13px;"></div>
+
+        <div style="display:flex; gap:10px; margin-top:16px; flex-wrap:wrap;">
+          <button type="button" class="btn btn-primary" onclick="saveGian()">💾 Lưu</button>
+          <button type="button" class="btn btn-secondary" onclick="docHopDong()">📄 Đọc hợp đồng</button>
+          <button type="button" class="btn btn-secondary" onclick="closeGianModal()" style="margin-left:auto;">✕ Đóng</button>
+        </div>
+      </form>
+
+      <div id="docHopDongSection" style="display:none; margin-top:22px; border-top:1px solid #e5e7eb; padding-top:16px;">
+        <h3 style="font-size:1rem; margin-bottom:10px; color:#555;">Nội dung hợp đồng</h3>
+        <div id="docHopDongContent"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const GIAN_ROWS = <%- JSON.stringify(rows).replace(/<\/script>/gi, '<\\/script>') %>;
+    let currentId = null;
+
+    function openGianModal(id) {
+      const row = GIAN_ROWS.find(r => String(r.id) === String(id));
+      if (!row) return;
+      currentId = String(id);
+
+      document.getElementById('gianModalTitle').textContent = 'Chi tiết gian — ' + (row.tenNoiBo || '(không tên)');
+      document.getElementById('f_tenNoiBo').value = row.tenNoiBo || '';
+      document.getElementById('f_maCongTrinh').value = row.maCongTrinh || '';
+      document.getElementById('f_mstKhachHang').value = row.mstKhachHang || '';
+      document.getElementById('f_tenKhachHang').value = row.tenKhachHang || '';
+      document.getElementById('f_hinhThucThue').value = row.hinhThucThue || '';
+      document.getElementById('f_tienThueThang').value = row.tienThueThang || '';
+      document.getElementById('f_thoiHanBatDau').value = row.thoiHanBatDau || row.ngayBatDauThue || '';
+      document.getElementById('f_thoiHanKetThuc').value = row.thoiHanKetThuc || row.ngayHetHanThue || '';
+      document.getElementById('f_thoiHanThueRaw').value = row.thoiHanThueRaw || '';
+      document.getElementById('f_ghiChu').value = row.ghiChu || '';
+      document.getElementById('f_linkHopDong').value = row.linkHopDong || '';
+
+      document.getElementById('saveMsg').style.display = 'none';
+      document.getElementById('docHopDongSection').style.display = 'none';
+      document.getElementById('docHopDongContent').innerHTML = '';
+      document.getElementById('gianModal').style.display = 'block';
+    }
+
+    function closeGianModal() {
+      document.getElementById('gianModal').style.display = 'none';
+    }
+
+    document.getElementById('gianModal').addEventListener('click', function(e) {
+      if (e.target === this) closeGianModal();
+    });
+
+    function saveGian() {
+      const form = document.getElementById('gianModalForm');
+      const data = new FormData(form);
+      const msgEl = document.getElementById('saveMsg');
+      msgEl.style.display = 'block';
+      msgEl.style.color = '#555';
+      msgEl.textContent = 'Đang lưu...';
+
+      fetch('/phap-danh/hop-dong-thue-gian-tong/' + currentId + '/cap-nhat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams(data)
+      })
+      .then(r => r.json())
+      .then(res => {
+        if (res.success) {
+          msgEl.style.color = '#16a34a';
+          msgEl.textContent = '✓ Đã lưu thành công.';
+          // Update local row data
+          const row = GIAN_ROWS.find(r => String(r.id) === currentId);
+          if (row) {
+            for (const [k, v] of new URLSearchParams(data).entries()) row[k] = v;
+          }
+        } else {
+          msgEl.style.color = '#dc2626';
+          msgEl.textContent = '✗ Lỗi: ' + (res.error || 'Không rõ');
+        }
+      })
+      .catch(e => {
+        msgEl.style.color = '#dc2626';
+        msgEl.textContent = '✗ Lỗi kết nối: ' + e.message;
+      });
+    }
+
+    function docHopDong() {
+      const section = document.getElementById('docHopDongSection');
+      const content = document.getElementById('docHopDongContent');
+      section.style.display = 'block';
+      content.innerHTML = '<p style="color:#555; font-size:13px;">Đang tải nội dung hợp đồng...</p>';
+
+      fetch('/phap-danh/hop-dong-thue-gian-tong/' + currentId + '/doc-hop-dong')
+      .then(r => r.json())
+      .then(res => {
+        if (!res.success) {
+          if (res.error && /token|access|oauth|credential|drive/i.test(res.error)) {
+            content.innerHTML = '<div style="background:#fef9c3; border:1px solid #fde047; border-radius:6px; padding:12px; font-size:13px;">⚠️ Chưa kết nối Google Drive hoặc token hết hạn. Vui lòng kết nối lại Drive trong phần Cài đặt.<br><small style="color:#555;">' + res.error + '</small></div>';
+          } else {
+            content.innerHTML = '<p style="color:#dc2626; font-size:13px;">✗ ' + (res.error || 'Không đọc được hợp đồng') + '</p>';
+          }
+          return;
+        }
+        let html = '';
+        if (res.viTri) html += '<div style="margin-bottom:10px;"><strong style="font-size:13px;">Vị trí thuê:</strong><pre style="font-size:12px; white-space:pre-wrap; margin:4px 0 0 0; background:#f8f9fa; padding:8px; border-radius:4px;">' + esc(res.viTri) + '</pre></div>';
+        if (res.tienThue) html += '<div style="margin-bottom:10px;"><strong style="font-size:13px;">Tiền thuê từ HĐ:</strong><pre style="font-size:12px; white-space:pre-wrap; margin:4px 0 0 0; background:#f8f9fa; padding:8px; border-radius:4px;">' + esc(res.tienThue) + '</pre></div>';
+        if (res.thoiHan) html += '<div style="margin-bottom:10px;"><strong style="font-size:13px;">Thời hạn từ HĐ:</strong><pre style="font-size:12px; white-space:pre-wrap; margin:4px 0 0 0; background:#f8f9fa; padding:8px; border-radius:4px;">' + esc(res.thoiHan) + '</pre></div>';
+        if (res.dieuKhoanThanhToan) html += '<div style="margin-bottom:10px;"><strong style="font-size:13px;">Điều khoản thanh toán:</strong><pre style="font-size:12px; white-space:pre-wrap; margin:4px 0 0 0; background:#f8f9fa; padding:8px; border-radius:4px;">' + esc(res.dieuKhoanThanhToan) + '</pre></div>';
+        if (!html) html = '<p style="color:#555; font-size:13px;">Đọc được file nhưng không tìm thấy điều khoản cụ thể.</p>';
+        content.innerHTML = html;
+      })
+      .catch(e => {
+        content.innerHTML = '<p style="color:#dc2626; font-size:13px;">✗ Lỗi kết nối: ' + e.message + '</p>';
+      });
+    }
+
+    function esc(s) {
+      return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+  </script>
+</body>
+</html>
