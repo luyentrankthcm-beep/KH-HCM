@@ -47,15 +47,23 @@ router.get("/ho-so/hoa-don-ncc", (req, res) => {
 
   if (thangFilter) rows = rows.filter((r) => r.thang === thangFilter);
 
-  // Group by NCC
+  // Group by NCC (case-insensitive, giu ten hien thi theo chu hoa dau tien)
   const groups = {};
+  const groupLabel = {};
   rows.forEach((r) => {
-    const key = r.nccParsed || "(Chưa rõ)";
-    if (!groups[key]) groups[key] = [];
+    const raw = r.nccParsed || "(Chưa rõ)";
+    const key = raw.toLowerCase();
+    if (!groups[key]) {
+      groups[key] = [];
+      // Uu tien ALL-CAPS lam label (AEON > Aeon), neu bang nhau lay cai dau
+      groupLabel[key] = raw;
+    } else if (raw === raw.toUpperCase()) {
+      groupLabel[key] = raw; // ALL-CAPS thang
+    }
     groups[key].push(r);
   });
   const nccGroups = Object.entries(groups)
-    .map(([ncc, items]) => ({ ncc, items: items.sort((a, b) => a.ngay.localeCompare(b.ngay)) }))
+    .map(([key, items]) => ({ ncc: groupLabel[key], items: items.sort((a, b) => a.ngay.localeCompare(b.ngay)) }))
     .sort((a, b) => a.ncc.localeCompare(b.ncc));
 
   // Distinct months for filter
