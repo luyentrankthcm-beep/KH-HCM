@@ -296,21 +296,24 @@
 
     <section class="panel">
       <h2>Danh sách giao dịch</h2>
-      <form method="GET" action="/transactions" class="form-inline filter-bar">
+      <form method="GET" action="/transactions" class="form-inline filter-bar" style="flex-wrap:wrap;gap:6px;">
         <select name="bank_id">
-          <option value="">Tất cả ngân hàng</option>
+          <option value="">Tất cả TK</option>
           <% banks.forEach(function(b) { %>
-          <option value="<%= b.id %>" <%= filters.bank_id == b.id ? 'selected' : '' %>><%= b.name %><%= b.khu_vuc ? ' - ' + b.khu_vuc : '' %></option>
+          <option value="<%= b.id %>" <%= filters.bank_id == b.id ? 'selected' : '' %>><%= b.name %><%= b.khu_vuc ? ' (' + b.khu_vuc + ')' : '' %></option>
           <% }) %>
         </select>
-        <input type="date" name="from" value="<%= filters.from %>" />
-        <input type="date" name="to" value="<%= filters.to %>" />
+        <input type="date" name="from" value="<%= filters.from %>" title="Từ ngày" />
+        <input type="date" name="to" value="<%= filters.to %>" title="Đến ngày" />
         <select name="type">
-          <option value="">Tất cả Thu/Chi</option>
-          <option value="thu" <%= filters.type === 'thu' ? 'selected' : '' %>>Chỉ Thu</option>
-          <option value="chi" <%= filters.type === 'chi' ? 'selected' : '' %>>Chỉ Chi</option>
+          <option value="">Thu + Chi</option>
+          <option value="thu" <%= filters.type === 'thu' ? 'selected' : '' %>>Chỉ Thu (đến)</option>
+          <option value="chi" <%= filters.type === 'chi' ? 'selected' : '' %>>Chỉ Chi (đi)</option>
         </select>
+        <input type="text" name="q" value="<%= filters.q %>" placeholder="🔍 Đối ứng / diễn giải..." style="min-width:190px;" title="Tìm theo tên đối ứng hoặc nội dung diễn giải" />
         <button type="submit" class="btn btn-secondary">Lọc</button>
+        <a class="btn btn-secondary" href="/transactions?bank_id=<%= filters.bank_id %>&from=<%= filters.from %>&to=<%= filters.to %>&type=<%= filters.type %>&q=<%= encodeURIComponent(filters.q) %>">Reset →
+        </a>
         <a class="btn btn-secondary" href="/export.xlsx?bank_id=<%= filters.bank_id %>&from=<%= filters.from %>&to=<%= filters.to %>">Xuất Excel</a>
       </form>
 
@@ -484,7 +487,7 @@
                ung (ben kia giao dich, doc tu file sao ke neu co, xem
                utils/bankStatementParser.js), giup do ai/NCC nao thanh toan/
                nhan tien ma khong can doc het Dien giai dai. -->
-          <tr><th>Ngày</th><th>Ngân hàng</th><th>Diễn giải</th><th>Tên đối ứng</th><th>Gian</th><th class="num">Thu</th><th class="num">Chi</th><th class="num">Số dư</th><% if (isAdmin) { %><th></th><% } %></tr>
+          <tr><th>Ngày</th><th>Ngân hàng</th><th>Diễn giải</th><th>Tên đối ứng</th><th>Gian</th><th class="num">Thu</th><th class="num">Chi</th><th class="num">Số dư</th><th title="Cross-check: giao dịch đối ứng nội bộ">🔗</th><% if (isAdmin) { %><th></th><% } %></tr>
         </thead>
         <tbody>
           <% rows.forEach(function(t) { %>
@@ -497,6 +500,11 @@
             <td class="num text-pos"><%= t.type === 'thu' ? t.amount.toLocaleString('vi-VN') + ' đ' : '' %></td>
             <td class="num text-neg"><%= t.type === 'chi' ? t.amount.toLocaleString('vi-VN') + ' đ' : '' %></td>
             <td class="num"><%= t.balance != null ? t.balance.toLocaleString('vi-VN') + ' đ' : '-' %></td>
+            <td style="text-align:center;font-size:12px;white-space:nowrap;">
+              <% if (t._crossMatch) { %>
+              <span title="<%= t._crossMatch === 'thu' ? 'Chi này khớp Thu ở ' : 'Thu này khớp Chi ở ' %><%= t._crossBank %> cùng ngày cùng số tiền" style="color:#15803d;cursor:default;">✅ <span style="font-size:10px;color:#555;"><%= t._crossBank %></span></span>
+              <% } else { %><span style="color:#ccc;">—</span><% } %>
+            </td>
             <% if (isAdmin) { %>
             <td class="num"><button type="button" class="link-btn" style="font-size:11px;" onclick="txToggleEdit(event, '<%= t.id %>')">Sửa</button></td>
             <% } %>
@@ -506,7 +514,7 @@
                vậy" -- truoc gio khong co cach sua 1 giao dich da nhap sai (chi
                them moi), them form sua an san ngay duoi dong, mo ra khi bam "Sửa". -->
           <tr class="tx-edit-row" id="txEdit-<%= t.id %>" style="display:none; background:#fffbe6;">
-            <td colspan="9">
+            <td colspan="10">
               <form method="POST" action="/transactions/<%= t.id %>/sua" class="form-inline tx-edit-form" data-id="<%= t.id %>" style="gap:6px; padding:6px 0;">
                 <input type="date" name="date" value="<%= t.date %>" required style="font-size:12px;" />
                 <input type="text" name="description" value="<%= t.description %>" style="width:260px; font-size:12px;" placeholder="Diễn giải" />
@@ -534,7 +542,7 @@
           <% } %>
           <% }) %>
           <% if (rows.length === 0) { %>
-          <tr><td colspan="9" class="muted">Không có giao dịch nào.</td></tr>
+          <tr><td colspan="10" class="muted">Không có giao dịch nào.</td></tr>
           <% } %>
         </tbody>
       </table>

@@ -38,15 +38,63 @@ function companyBankIds(store, company) {
   return new Set(companyBanks(store, company).map((b) => b.id));
 }
 
-function filterTransactions(store, { bank_id, from, to, type, bankIds }) {
+function filterTransactions(store, { bank_id, from, to, type, bankIds, q }) {
   let rows = [...store.transactions];
   if (bankIds) rows = rows.filter((t) => bankIds.has(t.bank_id));
   if (bank_id) rows = rows.filter((t) => t.bank_id === Number(bank_id));
   if (from) rows = rows.filter((t) => t.date >= from);
   if (to) rows = rows.filter((t) => t.date <= to);
   if (type === "thu" || type === "chi") rows = rows.filter((t) => t.type === type);
+  // Luyen, 2026-08-25: loc theo ten doi ung / dien giai
+  if (q) {
+    const ql = q.toLowerCase();
+    rows = rows.filter((t) =>
+      (t.tenDoiUng || "").toLowerCase().includes(ql) ||
+      (t.description || "").toLowerCase().includes(ql)
+    );
+  }
   rows.sort((a, b) => (b.date > a.date ? 1 : b.date < a.date ? -1 : b.id - a.id));
   return rows.map((t) => withBankLabel(store, t));
+}
+
+// Luyen, 2026-08-25: cross-check noi bo -- voi moi giao dich Chi, tim xem co
+// giao dich Thu trong cung kho (bat ky ngan hang nao khac) cung ngay + cung
+// so tien hay khong. Neu co → matched. Dung de xac nhan chuyen tien noi bo
+// (vd VTB982 chi → VP58888 thu 276tr cung ngay).
+function addInternalCrossCheck(store, rows) {
+  // Build lookup: "YYYY-MM-DD|amount" → [{id, bank_id, type}]
+  const thuLookup = {};
+  for (const t of store.transactions) {
+    if (t.type !== "thu") continue;
+    const key = t.date + "|" + t.amount;
+    if (!thuLookup[key]) thuLookup[key] = [];
+    thuLookup[key].push(t);
+  }
+  const chiLookup = {};
+  for (const t of store.transactions) {
+    if (t.type !== "chi") continue;
+    const key = t.date + "|" + t.amount;
+    if (!chiLookup[key]) chiLookup[key] = [];
+    chiLookup[key].push(t);
+  }
+  return rows.map((t) => {
+    if (t.type === "chi") {
+      const key = t.date + "|" + t.amount;
+      const candidates = (thuLookup[key] || []).filter((x) => x.bank_id !== t.bank_id);
+      if (candidates.length > 0) {
+        const bank = store.banks.find((b) => b.id === candidates[0].bank_id);
+        return { ...t, _crossMatch: "thu", _crossBank: bank ? bank.name : "TK khác", _crossCount: candidates.length };
+      }
+    } else if (t.type === "thu") {
+      const key = t.date + "|" + t.amount;
+      const candidates = (chiLookup[key] || []).filter((x) => x.bank_id !== t.bank_id);
+      if (candidates.length > 0) {
+        const bank = store.banks.find((b) => b.id === candidates[0].bank_id);
+        return { ...t, _crossMatch: "chi", _crossBank: bank ? bank.name : "TK khác", _crossCount: candidates.length };
+      }
+    }
+    return t;
+  });
 }
 
 function bankBalanceBefore(store, bankId, beforeDate) {
@@ -175,7 +223,7 @@ router.get("/transactions", (req, res) => {
   const store = load();
   const activeCompany = getCompany(req);
   const banks = companyBanks(store, activeCompany);
-  const { bank_id, from, to, type } = req.query;
+  const { bank_id, from, to, type, q } = req.query;
 
   // Chi Nhan (2026-07-22): "tách thu chi thành 2 cột ... cộng tổng thu chi
   // đang hiển thị ... lọc thu chi ở đây theo ngày tháng" -- tinh tong Thu/Chi
@@ -186,9 +234,12 @@ router.get("/transactions", (req, res) => {
     from,
     to,
     type,
+    q,
     bankIds: companyBankIds(store, activeCompany),
   });
-  const rows = allFiltered.slice(0, 500);
+  // Luyen, 2026-08-25: danh dau giao dich noi bo (cross-check)
+  const rowsWithCross = addInternalCrossCheck(store, allFiltered.slice(0, 500));
+  const rows = rowsWithCross;
   const totalThu = allFiltered.filter((t) => t.type === "thu").reduce((s, t) => s + Number(t.amount || 0), 0);
   const totalChi = allFiltered.filter((t) => t.type === "chi").reduce((s, t) => s + Number(t.amount || 0), 0);
 
@@ -206,7 +257,7 @@ router.get("/transactions", (req, res) => {
     totalThu,
     totalChi,
     filteredCount: allFiltered.length,
-    filters: { bank_id: bank_id || "", from: from || "", to: to || "", type: type || "" },
+    filters: { bank_id: bank_id || "", from: from || "", to: to || "", type: type || "", q: q || "" },
     userName: req.session.userName,
     pasteResult: null,
     uploadResult: null,
