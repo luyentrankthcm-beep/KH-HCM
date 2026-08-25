@@ -898,6 +898,70 @@ router.get("/chi-phi/:mien(mien-nam|mien-bac)/de-xuat-hoa-don", requireDataEntry
   return res.json({ success: true, matches: results, total: chiPhiRows.length });
 });
 
+// Luyen, 2026-08-25: "các gian trống bạn kiếm trong diễn giải đi rồi gợi ý cho
+// tôi nhá rồi tôi sẽ xem qua" -- tim dong gian trong / generic, khop dien giai
+// voi danh muc cong trinh, tra ve danh sach de nguoi dung review + chon truoc
+// khi ap dung (nguong 0.5 thay vi 0.8 auto-apply vi nguoi dung se xac nhan).
+router.get("/chi-phi/:mien(mien-nam|mien-bac)/goi-y-gian", requireDataEntry, (req, res) => {
+  const store = load();
+  ensureShape(store);
+  const activeCompany = getCompany(req);
+  const mien = mienFromSeg(req.params.mien);
+  const thangFilter = req.query.thang || "";
+
+  const GIAN_STOP_W2 = new Set(["phcm","phn","kvc","mtd","posh","jp","phm","mn","mb","moi","cu","kh"]);
+  function _normG(s) {
+    return String(s||"").toLowerCase()
+      .normalize("NFD").replace(/[̀-ͯ]/g,"")
+      .replace(/đ|Đ/g,"d")
+      .replace(/[^a-z0-9 ]/g," ").replace(/\s+/g," ").trim();
+  }
+  const _ctList2 = (activeCompany === "kh_moi"
+    ? (store.danh_muc_ma_cong_trinh_moi || [])
+    : (store.danh_muc_ma_cong_trinh_cu || []));
+  const _ctE2 = _ctList2.map((ct) => {
+    const nT = _normG(ct.ten);
+    const words = nT.split(" ").filter((w) => w.length >= 3 && !GIAN_STOP_W2.has(w));
+    return { ma: ct.ma, ten: ct.ten, normTen: nT, words };
+  }).filter((ct) => ct.words.length >= 1)
+    .sort((a, b) => b.words.length - a.words.length);
+
+  let rows = (store.chi_phi || [])
+    .map(ensureChiPhiDefaults)
+    .filter((r) => r.congTy === activeCompany && r.mien === mien && (!r.gian || isUpgradableGian(r.gian)));
+  if (thangFilter) rows = rows.filter((r) => (r.ngay || "").slice(0, 7) === thangFilter);
+
+  const THRESHOLD = 0.5; // thap hon 0.8 (auto-apply) vi nguoi dung se review
+  const matches = [];
+  rows.forEach((r) => {
+    const dg = _normG(r.dienGiai || "") + " " + _normG(r.ncc || "");
+    let bestCt = null, bestMatched = 0, bestRatio = 0;
+    for (const ct of _ctE2) {
+      const matched = ct.words.filter((w) => dg.includes(w)).length;
+      const ratio = matched / ct.words.length;
+      if (ratio >= THRESHOLD && matched > bestMatched) {
+        bestCt = ct; bestMatched = matched; bestRatio = ratio;
+      }
+    }
+    if (bestCt) {
+      matches.push({
+        id: r.id,
+        ngay: r.ngay,
+        ncc: r.ncc,
+        dienGiai: r.dienGiai,
+        soTien: r.soTien,
+        currentGian: r.gian || "",
+        suggestedGian: bestCt.ten,
+        suggestedMa: bestCt.ma,
+        confidence: Math.round(bestRatio * 100),
+      });
+    }
+  });
+
+  matches.sort((a, b) => (a.ngay < b.ngay ? 1 : -1));
+  return res.json({ success: true, matches, totalEmpty: rows.length });
+});
+
 // Bulk cap nhat soHoaDon tu de xuat
 router.post("/chi-phi/cap-nhat-hoa-don-hang-loat", requireDataEntry, (req, res) => {
   const store = load();

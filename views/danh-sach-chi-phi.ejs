@@ -63,6 +63,7 @@
       <button type="button" class="btn btn-secondary" onclick="openMapGian()" style="padding:5px 12px;white-space:nowrap;">🗂 Map Gian</button>
       <button type="button" class="btn btn-secondary" onclick="openDeXuatHD()" style="padding:5px 12px;white-space:nowrap;">🔍 Gợi ý số HĐ</button>
       <button type="button" class="btn btn-secondary" id="autoMapHDBtn" onclick="autoMapHD()" style="padding:5px 12px;white-space:nowrap;" title="Tự động tìm và áp dụng tất cả gợi ý số HĐ">⚡ Tự động map HĐ</button>
+      <button type="button" class="btn btn-secondary" onclick="openGoiYGian()" style="padding:5px 12px;white-space:nowrap;" title="Gợi ý Gian cho các dòng gian trống">💡 Gợi ý Gian</button>
       <span id="autoMapStatus" style="font-size:12px;color:#388e3c;"></span>
     </form>
 
@@ -620,6 +621,122 @@
       }
     })
     .catch(function(){ btn.disabled = false; status.textContent = 'Lỗi kết nối.'; });
+  }
+  </script>
+
+  <!-- Modal Gợi ý Gian -->
+  <div id="goiYGianOverlay" onclick="if(event.target===this)closeGoiYGian()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:9100;align-items:center;justify-content:center;">
+    <div style="background:#fff;border-radius:10px;padding:22px 24px;width:960px;max-width:97vw;max-height:90vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,0.22);">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+        <h3 style="margin:0;font-size:15px;">💡 Gợi ý Gian từ Diễn Giải</h3>
+        <button type="button" class="link-btn" onclick="closeGoiYGian()" style="font-size:20px;line-height:1;">×</button>
+      </div>
+      <div id="goiYGianContent" style="font-size:13px;">
+        <p class="muted">Đang tìm kiếm...</p>
+      </div>
+    </div>
+  </div>
+
+  <script>
+  function openGoiYGian() {
+    document.getElementById('goiYGianOverlay').style.display = 'flex';
+    document.getElementById('goiYGianContent').innerHTML = '<p class="muted">Đang tìm kiếm...</p>';
+    var url = '/chi-phi/mien-' + _hdGoiYMien + '/goi-y-gian';
+    if (_hdGoiYThang) url += '?thang=' + encodeURIComponent(_hdGoiYThang);
+    fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+      .then(function(r){ return r.json(); })
+      .then(function(data) {
+        if (!data.success) { document.getElementById('goiYGianContent').innerHTML = '<p class="muted">Lỗi tải dữ liệu.</p>'; return; }
+        renderGoiYGian(data.matches, data.totalEmpty);
+      })
+      .catch(function(){ document.getElementById('goiYGianContent').innerHTML = '<p class="muted">Lỗi kết nối.</p>'; });
+  }
+
+  function closeGoiYGian() {
+    document.getElementById('goiYGianOverlay').style.display = 'none';
+  }
+
+  function renderGoiYGian(matches, totalEmpty) {
+    if (matches.length === 0) {
+      document.getElementById('goiYGianContent').innerHTML =
+        '<p class="muted">Không tìm được gợi ý nào ('+totalEmpty+' dòng gian trống, nhưng diễn giải không khớp với danh mục công trình).</p>'
+        + '<p class="muted" style="margin-top:8px;">Bấm <strong>🗂 Map Gian</strong> để điền thủ công.</p>';
+      return;
+    }
+    var html = '<p class="muted" style="margin-bottom:10px;">Tìm được <strong>'+matches.length+'</strong> gợi ý (trong '+totalEmpty+' dòng gian trống). Xem kỹ rồi tích chọn dòng muốn áp dụng.</p>';
+    html += '<div style="margin-bottom:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">'
+      + '<label style="font-size:13px;cursor:pointer;"><input type="checkbox" id="gianSelectAll" onchange="gianToggleAll(this)"> Chọn tất cả</label>'
+      + '<button type="button" class="btn btn-primary" onclick="apDungGoiYGian()" id="gianApDungBtn" style="padding:4px 14px;">✓ Áp dụng đã chọn</button>'
+      + '<span id="gianApDungStatus" style="font-size:12px;color:#388e3c;"></span>'
+      + '<span style="margin-left:auto;font-size:12px;color:#888;">Sau khi áp dụng, bấm <strong>🗂 Map Gian</strong> để lưu alias nếu cần.</span>'
+      + '</div>';
+    html += '<div style="overflow-x:auto;"><table class="table" style="font-size:12px;min-width:800px;">'
+      + '<thead><tr><th style="width:32px;"></th><th>Ngày</th><th>NCC</th><th>Diễn giải</th>'
+      + '<th style="text-align:right;">Số tiền</th><th>Gian gợi ý</th><th>Mã CT</th><th>Độ khớp</th></tr></thead><tbody>';
+    matches.forEach(function(m) {
+      var confColor = m.confidence >= 80 ? '#2e7d32' : m.confidence >= 60 ? '#e65100' : '#888';
+      html += '<tr>'
+        + '<td><input type="checkbox" class="gian-check" data-id="'+m.id+'" data-gian="'+esc2(m.suggestedGian)+'" checked /></td>'
+        + '<td style="white-space:nowrap;color:#666;">'+fmtDate(m.ngay)+'</td>'
+        + '<td><div style="max-width:120px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;" title="'+esc2(m.ncc)+'">'+esc2(m.ncc||'—')+'</div></td>'
+        + '<td><div style="max-width:260px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;" title="'+esc2(m.dienGiai)+'">'+esc2(m.dienGiai||'—')+'</div></td>'
+        + '<td style="text-align:right;white-space:nowrap;font-weight:600;">'+Number(m.soTien||0).toLocaleString('vi-VN')+' đ</td>'
+        + '<td style="font-weight:600;color:#1565c0;">'+esc2(m.suggestedGian)+'</td>'
+        + '<td style="font-size:11px;color:#666;">'+esc2(m.suggestedMa||'—')+'</td>'
+        + '<td style="color:'+confColor+';font-weight:600;white-space:nowrap;">'+m.confidence+'%</td>'
+        + '</tr>';
+    });
+    html += '</tbody></table></div>';
+    document.getElementById('goiYGianContent').innerHTML = html;
+  }
+
+  function gianToggleAll(cb) {
+    document.querySelectorAll('.gian-check').forEach(function(c){ c.checked = cb.checked; });
+  }
+
+  function apDungGoiYGian() {
+    var checks = document.querySelectorAll('.gian-check:checked');
+    if (checks.length === 0) { alert('Chưa chọn dòng nào.'); return; }
+    var btn = document.getElementById('gianApDungBtn');
+    var status = document.getElementById('gianApDungStatus');
+    btn.disabled = true;
+    status.textContent = 'Đang lưu...';
+    var queue = Array.from(checks);
+    var saved = 0, errors = 0;
+    function next() {
+      if (queue.length === 0) {
+        btn.disabled = false;
+        if (errors > 0) {
+          status.textContent = '✓ Đã lưu ' + saved + ' dòng (' + errors + ' lỗi).';
+        } else {
+          status.textContent = '✓ Đã lưu ' + saved + ' dòng. Bấm 🗂 Map Gian để lưu alias.';
+        }
+        return;
+      }
+      var c = queue.shift();
+      var id = c.dataset.id;
+      var gian = c.dataset.gian;
+      var body = new URLSearchParams();
+      body.append('gian', gian);
+      fetch('/chi-phi/' + id + '/gian', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-Requested-With': 'XMLHttpRequest' },
+        body: body.toString()
+      })
+      .then(function(r){ return r.json(); })
+      .then(function(data) {
+        if (data.success) {
+          saved++;
+          if (_dschMap[id]) _dschMap[id].gian = data.gian;
+          var tr = document.getElementById('dsch-tr-' + id);
+          if (tr) { var gc = tr.querySelector('.dsch-cell-1'); if (gc) gc.textContent = data.gian; }
+          c.closest('tr').style.opacity = '0.4';
+        } else { errors++; }
+        next();
+      })
+      .catch(function(){ errors++; next(); });
+    }
+    next();
   }
   </script>
 
