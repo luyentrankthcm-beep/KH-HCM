@@ -47,30 +47,30 @@
       </form>
     </div>
 
-    <!-- Upload ảnh biên lai → PDF → Drive -->
+    <!-- Upload biên lai → PDF → Drive (nhận PDF + ảnh, PDF tự đọc nội dung) -->
     <div class="add-form" style="border-color:#2563eb22;background:#eff6ff;">
-      <h3>📷 Tải ảnh biên lai → PDF → Drive</h3>
-      <form method="POST" action="/ho-so/phi-cang-phu-quoc/upload-anh" enctype="multipart/form-data">
+      <h3>📎 Tải biên lai → Drive <span id="docStatus" style="font-size:.78em;color:#2563eb;margin-left:.5rem;"></span></h3>
+      <form method="POST" action="/ho-so/phi-cang-phu-quoc/upload-anh" enctype="multipart/form-data" id="uploadPhiCangForm">
         <div class="form-row" style="margin-bottom:.55rem;">
           <div>
-            <label>Ảnh biên lai <span style="color:#ef4444">*</span></label>
-            <input type="file" name="anh" accept=".jpg,.jpeg,.png" multiple required style="font-size:.83em;padding:.25rem;" />
+            <label>File biên lai <span style="color:#ef4444">*</span></label>
+            <input type="file" name="anh" id="pcFileInput" accept=".jpg,.jpeg,.png,.pdf" multiple required style="font-size:.83em;padding:.25rem;" onchange="docPhiCangFile(this)" />
           </div>
           <div>
             <label>Ngày <span style="color:#ef4444">*</span></label>
-            <input type="date" name="ngay" required />
+            <input type="date" name="ngay" id="pcNgay" required />
           </div>
           <div>
             <label>Số hóa đơn</label>
-            <input type="text" name="soHoaDon" placeholder="VD: 0000192" style="min-width:110px;" />
+            <input type="text" name="soHoaDon" id="pcSoHD" placeholder="VD: 0000192" style="min-width:110px;" />
           </div>
           <div style="min-width:200px;flex:1;">
             <label>Loại phí</label>
-            <input type="text" name="loaiPhi" placeholder="VD: Phí kiểm tra an ninh hàng hóa..." style="width:100%;" />
+            <input type="text" name="loaiPhi" id="pcLoaiPhi" placeholder="VD: Phí kiểm tra an ninh hàng hóa..." style="width:100%;" />
           </div>
           <div>
             <label>Số tiền (đ)</label>
-            <input type="text" name="soTien" placeholder="VD: 42.100" style="min-width:110px;" />
+            <input type="text" name="soTien" id="pcSoTien" placeholder="VD: 42.100" style="min-width:110px;" />
           </div>
           <div style="flex:1;min-width:150px;">
             <label>Ghi chú</label>
@@ -81,9 +81,35 @@
             <button type="submit" class="btn-add" style="background:#2563eb;">⬆️ Upload</button>
           </div>
         </div>
-        <p style="margin:.2rem 0 0;font-size:.78em;color:#64748b;">Ảnh JPG/PNG sẽ tự chuyển sang PDF, đặt tên <em>PhiCang_SoHD_DD-MM-YYYY.pdf</em> và lưu vào Drive.</p>
+        <p style="margin:.2rem 0 0;font-size:.78em;color:#64748b;">PDF: tự đọc nội dung &amp; điền form. Ảnh JPG/PNG: tự chuyển sang PDF. Tên file: <em>PhiCang_SoHD_DD-MM-YYYY.pdf</em>.</p>
       </form>
     </div>
+    <script>
+    async function docPhiCangFile(input) {
+      const files = input.files;
+      if (!files || files.length === 0) return;
+      // Chi doc tu dong khi co 1 file PDF
+      const pdfFiles = Array.from(files).filter(f => f.name.toLowerCase().endsWith('.pdf'));
+      if (pdfFiles.length !== 1) return;
+      const status = document.getElementById('docStatus');
+      status.textContent = '⏳ Đang đọc PDF...';
+      try {
+        const fd = new FormData();
+        fd.append('file', pdfFiles[0]);
+        const resp = await fetch('/ho-so/phi-cang-phu-quoc/doc-file', { method: 'POST', body: fd });
+        const data = await resp.json();
+        if (!data.success) { status.textContent = '⚠️ ' + (data.error || 'Không đọc được'); return; }
+        if (data.ngay) document.getElementById('pcNgay').value = data.ngay;
+        if (data.soHoaDon) document.getElementById('pcSoHD').value = data.soHoaDon;
+        if (data.loaiPhi) document.getElementById('pcLoaiPhi').value = data.loaiPhi;
+        if (data.soTien) document.getElementById('pcSoTien').value = data.soTien;
+        status.textContent = '✅ Đã điền từ PDF — kiểm tra lại trước khi Upload';
+        status.style.color = '#15803d';
+      } catch(e) {
+        status.textContent = '⚠️ Lỗi: ' + e.message;
+      }
+    }
+    </script>
 
     <div class="add-form">
       <h3>➕ Thêm chứng từ phí cảng (nhập tay)</h3>

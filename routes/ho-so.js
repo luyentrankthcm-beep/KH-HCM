@@ -286,6 +286,22 @@ router.post("/ho-so/doanh-thu-chia-se/:id/sua", requireAdmin, (req, res) => {
   res.redirect("/ho-so/doanh-thu-chia-se?success=Đã+lưu");
 });
 
+// ─── Đọc PDF biên lai → trả về fields để auto-fill form ─────────────────────
+// Luyen, 2026-08-25: "tải file PDF, đọc nội dung, điền vào form" -- nhan PDF
+// qua multer (memoryStorage), goi driveApi.extractPhiCangInfo, tra JSON.
+// Khong can auth (chi doc, khong luu gi).
+router.post("/ho-so/phi-cang-phu-quoc/doc-file", uploadMem.single("file"), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: "Vui lòng chọn file PDF." });
+    const mt = (req.file.mimetype || "").toLowerCase();
+    if (!mt.includes("pdf")) return res.status(400).json({ error: "Chỉ hỗ trợ file PDF để đọc tự động." });
+    const info = await driveApi.extractPhiCangInfo(req.file.buffer);
+    return res.json({ success: true, ...info });
+  } catch (e) {
+    return res.status(500).json({ error: e.message });
+  }
+});
+
 // ─── Upload ảnh Phí Cảng → PDF → Google Drive ────────────────────────────────
 // Luyen, 2026-08-25: "tải lên ảnh, lưu ảnh qua PDF đặt tên số HĐ + ngày, lưu
 // vào Drive, điền thông tin cơ bản hiển thị trên web" -- nhan anh tu form,
@@ -312,7 +328,9 @@ router.post("/ho-so/phi-cang-phu-quoc/upload-anh", requireAdmin, uploadMem.array
     try {
       const suffix = req.files.length > 1 ? `_${i + 1}` : "";
       const fileName = `PhiCang_${soHD || "HoaDon"}${suffix}_${dateStr}.pdf`;
-      const pdfBuffer = await driveApi.imageToPdf(f.buffer, f.mimetype);
+      // PDF upload thang, anh (JPG/PNG) moi convert
+      const isPdf = (f.mimetype || "").toLowerCase().includes("pdf");
+      const pdfBuffer = isPdf ? f.buffer : await driveApi.imageToPdf(f.buffer, f.mimetype);
       const driveFile = await driveApi.uploadFileToDrive(
         store, driveApi.DRIVE_PHI_CANG_FOLDER_ID, fileName, pdfBuffer, "application/pdf"
       );

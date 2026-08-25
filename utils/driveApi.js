@@ -104,4 +104,62 @@ async function uploadFileToDrive(store, folderId, fileName, fileBuffer, mimeType
   return await resp.json(); // { id, name }
 }
 
-module.exports = { listFolderFiles, imageToPdf, uploadFileToDrive, DRIVE_HOADON_FOLDER_ID, DRIVE_PHI_CANG_FOLDER_ID };
+// Doc PDF bien lai phi cang, trich xuat cac truong chinh.
+// Tra ve { ngay, soHoaDon, loaiPhi, soTien, rawText }.
+// Dung pdf-parse de lay text, sau do dung regex tim cac gia tri.
+async function extractPhiCangInfo(pdfBuffer) {
+  const pdfParse = require("pdf-parse");
+  const data = await pdfParse(pdfBuffer);
+  const text = data.text || "";
+  const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+  const fullText = lines.join(" ");
+
+  // --- So hoa don: "Số 0000192", "So: 0000192", "HD: 0000192", "No: 0000192" ---
+  let soHoaDon = "";
+  const hdMatch = fullText.match(/[Ss][ốo]\s*[Hh][oóđ][aà]\s*[Đđ][oơ][nà]?\s*[:\-]?\s*(\d+)/i)
+    || fullText.match(/[Ss][ốo]\s*[:\-]?\s*(\d+)/i)
+    || fullText.match(/[Hh][Dd]\s*[:\-]?\s*(\d+)/i)
+    || fullText.match(/[Nn]o\.?\s*(\d{4,})/i);
+  if (hdMatch) soHoaDon = hdMatch[1].replace(/^0+/, "").padStart(hdMatch[1].length, "0");
+
+  // --- Ngay: dd/mm/yyyy hoac yyyy-mm-dd ---
+  let ngay = "";
+  const dateMatch = fullText.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+  if (dateMatch) {
+    const d = dateMatch[1].padStart(2, "0");
+    const m = dateMatch[2].padStart(2, "0");
+    const y = dateMatch[3];
+    ngay = `${y}-${m}-${d}`; // YYYY-MM-DD cho input[type=date]
+  }
+
+  // --- So tien: 42.100 hoac 42,100 hoac 42100 ---
+  let soTien = "";
+  // Tim so tien lon nhat (tien phi thuong nho, bo qua so < 1000)
+  const moneyMatches = [...fullText.matchAll(/(\d{1,3}(?:[.,]\d{3})+(?:[.,]\d{1,2})?|\d{4,})/g)];
+  if (moneyMatches.length > 0) {
+    // Lay gia tri lon nhat co kha nang la so tien
+    let best = 0, bestStr = "";
+    moneyMatches.forEach(m => {
+      const num = parseInt(m[1].replace(/[.,]/g, ""));
+      if (num > best && num < 100000000) { best = num; bestStr = m[1]; }
+    });
+    if (bestStr) soTien = bestStr.replace(/,/g, ".");
+  }
+
+  // --- Loai phi: dong dau tien co chu "phi" hoac "le phi" hoac toan bo text ngan ---
+  let loaiPhi = "";
+  for (const line of lines) {
+    if (/[Pp]h[ií]|[Ll][eệ]\s*[Pp]h[ií]/i.test(line) && line.length > 8 && line.length < 200) {
+      loaiPhi = line.replace(/\s+/g, " ").trim();
+      break;
+    }
+  }
+  // Fallback: lay dong thu 2-4 neu chua co
+  if (!loaiPhi && lines.length > 2) {
+    loaiPhi = lines.slice(1, 4).join(" ").trim().substring(0, 150);
+  }
+
+  return { ngay, soHoaDon, loaiPhi, soTien, rawText: text.substring(0, 500) };
+}
+
+module.exports = { listFolderFiles, imageToPdf, uploadFileToDrive, extractPhiCangInfo, DRIVE_HOADON_FOLDER_ID, DRIVE_PHI_CANG_FOLDER_ID };
