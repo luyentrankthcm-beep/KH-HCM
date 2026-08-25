@@ -376,6 +376,22 @@ router.get("/chi-phi/:mien(mien-nam|mien-bac)/danh-sach", (req, res) => {
   });
   if (_hdDGChanged) save(store);
 
+  // Luyen, 2026-08-25: tra cuu maNCC tu danh sach NCC (chi_phi_ncc_list) theo
+  // ten NCC cua tung dong chi phi -- hien thi trong modal chi tiet de tham khao.
+  const _nccListLookup = (activeCompany === "kh_moi"
+    ? (store.chi_phi_ncc_list_moi || store.chi_phi_ncc_list)
+    : (store.chi_phi_ncc_list_cu || store.chi_phi_ncc_list)) || [];
+  rows.forEach((r) => {
+    if (r.maNCC) return;
+    if (!r.ncc) return;
+    let best = 0, bestRec = null;
+    for (const rec of _nccListLookup) {
+      const s = matchNccScore(r.ncc, rec.tenNCC || "");
+      if (s > best) { best = s; bestRec = rec; }
+    }
+    if (bestRec && best >= 1) r.maNCC = bestRec.maNCC;
+  });
+
   const tongTien = rows.reduce((s, r) => s + (r.soTien || 0), 0);
 
   // Gian alias map cho chi phi

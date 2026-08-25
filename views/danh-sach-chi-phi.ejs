@@ -229,6 +229,7 @@
         return s;
       })()],
       ['NCC', fmt(r.ncc)],
+      ['Mã NCC', r.maNCC ? '<span style="font-weight:700;color:#1565c0;background:#e3f2fd;padding:2px 8px;border-radius:99px;font-size:12px;">'+esc(r.maNCC)+'</span>' : null],
       ['Số hóa đơn', fmt(r.soHoaDon)],
       ['Phân loại', (function(){
         var pl = r.phanLoai || r._phanLoaiAuto || 'DV';
