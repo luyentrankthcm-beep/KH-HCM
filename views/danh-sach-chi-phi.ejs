@@ -169,6 +169,13 @@
     </section>
   </main>
 
+  <!-- Datalist gian cho modal edit -->
+  <datalist id="dsch-gian-list">
+    <% var _gianSet = {}; rows.forEach(function(r){ if(r.gian) _gianSet[r.gian]=1; }); Object.keys(_gianSet).sort().forEach(function(g){ %>
+    <option value="<%- g %>">
+    <% }); %>
+  </datalist>
+
   <!-- Modal chi tiet -->
   <div id="dschOverlay" onclick="if(event.target===this)closeDschModal()">
     <div id="dschModal">
@@ -278,7 +285,9 @@
     var ro = function(val) { return '<span style="color:#666;">'+fmt(val)+'</span>'; };
     var html = '';
     html += '<div class="dsch-field"><label>Ngày</label>'+ro(fmtDate(r.ngay))+'</div>';
-    html += '<div class="dsch-field"><label>Gian</label>'+ro(r.gian)+'</div>';
+    html += '<div class="dsch-field"><label>Gian</label>'
+      + '<input type="text" name="gian" list="dsch-gian-list" value="'+esc(r.gian||'')+'" placeholder="VD: Lotte Mart Phan Thiết..." style="width:100%;font-size:13px;padding:4px 6px;border:1px solid #ccc;border-radius:4px;" />'
+      + '</div>';
     html += '<div class="dsch-field"><label>Số tiền</label>'+ro(fmtMoney(r.soTien))+'</div>';
     html += '<div class="dsch-field"><label>NCC</label>'+inp('ncc', r.ncc, 'Nhà cung cấp...')+'</div>';
     html += '<div class="dsch-field"><label>Số hóa đơn</label>'+inp('soHoaDon', r.soHoaDon, 'Số HĐ...')+'</div>';

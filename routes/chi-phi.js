@@ -996,7 +996,7 @@ router.post("/chi-phi/:id/update", requireDataEntry, (req, res) => {
   ensureShape(store);
   const r = store.chi_phi.find((x) => String(x.id) === req.params.id);
   if (!r) return res.status(404).json({ error: "Không tìm thấy khoản chi." });
-  const editableFields = ["ncc", "soHoaDon", "soUNC", "soChungTuLienQuan", "dienGiai", "loaiChiPhi", "ghiChu", "linkHoaDon", "trangThaiHoaDon", "phanLoai"];
+  const editableFields = ["gian", "ncc", "soHoaDon", "soUNC", "soChungTuLienQuan", "dienGiai", "loaiChiPhi", "ghiChu", "linkHoaDon", "trangThaiHoaDon", "phanLoai"];
   editableFields.forEach((f) => {
     if (req.body[f] !== undefined) r[f] = (req.body[f] || "").trim();
   });
