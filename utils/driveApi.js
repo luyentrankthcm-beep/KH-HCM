@@ -132,22 +132,36 @@ async function extractPhiCangInfo(pdfBuffer) {
     ngay = `${y}-${m}-${d}`; // YYYY-MM-DD cho input[type=date]
   }
 
-  // --- So tien: 42.100 hoac 42,100 hoac 42100 ---
+  // --- So tien: tim gan "Tong cong" / "Total" / "Thanh tien" truoc, fallback largest ---
   let soTien = "";
-  // Tim so tien lon nhat (tien phi thuong nho, bo qua so < 1000)
-  const moneyMatches = [...fullText.matchAll(/(\d{1,3}(?:[.,]\d{3})+(?:[.,]\d{1,2})?|\d{4,})/g)];
-  if (moneyMatches.length > 0) {
-    // Lay gia tri lon nhat co kha nang la so tien
-    let best = 0, bestStr = "";
-    moneyMatches.forEach(m => {
-      const num = parseInt(m[1].replace(/[.,]/g, ""));
-      if (num > best && num < 100000000) { best = num; bestStr = m[1]; }
-    });
-    if (bestStr) {
-      // Chuan hoa: bo dau phay/cham, format lai voi dau cham phan ngan
-      const rawNum = parseInt(bestStr.replace(/[.,]/g, ""));
-      soTien = rawNum.toLocaleString("de-DE"); // dung de-DE vi no dung dau cham (1.234.567)
+  // Uu tien: lay so tien sau "Tong cong", "Total", "Thanh tien", "So tien"
+  const tongCongPatterns = [
+    /[Tt][oô]?ng\s*c[oộ]ng[^0-9]{0,30}([\d.,]+)/i,
+    /[Tt]otal[^0-9]{0,20}([\d.,]+)/i,
+    /[Tt]h[àa]nh\s*ti[eề]n[^0-9]{0,20}([\d.,]+)/i,
+    /[Ss][oố]\s*ti[eề]n[^0-9]{0,20}([\d.,]+)/i,
+  ];
+  let foundByKeyword = false;
+  for (const pat of tongCongPatterns) {
+    const m = fullText.match(pat);
+    if (m) {
+      const raw = parseInt(m[1].replace(/[.,]/g, ""));
+      if (raw > 0 && raw < 100000000) {
+        soTien = raw.toLocaleString("de-DE");
+        foundByKeyword = true;
+        break;
+      }
     }
+  }
+  // Fallback: lay so co dau cham phan ngan (vd 42.100, 63.225) - chi nhan 3-8 chu so
+  if (!foundByKeyword) {
+    const dotThousands = [...fullText.matchAll(/\b(\d{1,3}(?:\.\d{3})+)\b/g)];
+    let best = 0, bestStr = "";
+    dotThousands.forEach(m => {
+      const num = parseInt(m[1].replace(/\./g, ""));
+      if (num > best && num < 10000000) { best = num; bestStr = m[1]; }
+    });
+    if (bestStr) soTien = bestStr;
   }
 
   // --- Loai phi: dong dau tien co chu "phi" hoac "le phi" hoac toan bo text ngan ---
