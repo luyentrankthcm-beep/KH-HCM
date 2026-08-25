@@ -143,7 +143,11 @@ async function extractPhiCangInfo(pdfBuffer) {
       const num = parseInt(m[1].replace(/[.,]/g, ""));
       if (num > best && num < 100000000) { best = num; bestStr = m[1]; }
     });
-    if (bestStr) soTien = bestStr.replace(/,/g, ".");
+    if (bestStr) {
+      // Chuan hoa: bo dau phay/cham, format lai voi dau cham phan ngan
+      const rawNum = parseInt(bestStr.replace(/[.,]/g, ""));
+      soTien = rawNum.toLocaleString("de-DE"); // dung de-DE vi no dung dau cham (1.234.567)
+    }
   }
 
   // --- Loai phi: dong dau tien co chu "phi" hoac "le phi" hoac toan bo text ngan ---

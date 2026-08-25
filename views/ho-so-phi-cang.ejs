@@ -172,7 +172,12 @@
             <td><%= r.ngay ? r.ngay.split('-').reverse().join('/') : '—' %></td>
             <td style="font-family:monospace;font-size:.85em;"><%= r.soHoaDon || '—' %></td>
             <td><%= r.loaiPhi || '—' %></td>
-            <td class="<%= r.soTien ? 'tien' : '' %>"><%= r.soTien || '—' %></td>
+            <td class="<%= r.soTien ? 'tien' : '' %>"><%
+              if (r.soTien) {
+                const n = parseInt(String(r.soTien).replace(/[.,\s]/g,''));
+                %><%= isNaN(n) ? r.soTien : n.toLocaleString('de-DE') %> đ<%
+              } else { %>—<% } %>
+            </td>
             <td>
               <% if (r.linkFile) { %>
               <a href="<%= r.linkFile %>" target="_blank" class="link-doc">📄 Xem</a>
