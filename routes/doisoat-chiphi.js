@@ -1038,6 +1038,42 @@ router.get("/doi-soat/chi-phi/export.xlsx", (req, res) => {
 // lấy ra 2 ngân hàng đó cho tôi và đối ứng chi của ngân hàng đó với lại dựa
 // vào chi phí hay hóa đơn đầu vào hay diễn giải á để lấy ra cho tôi số hóa
 // đơn với gian đó dựa vào chi phí á số tiền tên đối tác diễn giải"
+// Luyen, 2026-08-25: helper lookup NCC tu hoa don dau vao (theo so HD) roi match
+// vao danh sach NCC de lay ten day du / chi nhanh. Fallback = cp.ncc (UNC).
+function _normSoHDSaoke(s) {
+  const str = String(s || "").trim();
+  return str.replace(/^0+/, "") || str;
+}
+function _normForMatchSaoke(s) {
+  return String(s || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+// Tra ve ten NCC (co the co chi nhanh) tu hoa_don_dau_vao + chi_phi_ncc_list.
+// Neu khong tim duoc tra ve "".
+function _lookupNccFromInvoice(soHoaDon, store, activeCompany) {
+  if (!soHoaDon) return "";
+  // 1. Tim tenNCC tu hoa_don_dau_vao
+  const hddv = store.hoa_don_dau_vao || [];
+  const soNorm = _normSoHDSaoke(soHoaDon);
+  let tenNCC = "";
+  for (const r of hddv) {
+    const no = String(r.soHoaDon || "").trim();
+    if (no === soHoaDon || _normSoHDSaoke(no) === soNorm) { tenNCC = r.tenNCC || ""; break; }
+  }
+  if (!tenNCC) return "";
+  // 2. Match tenNCC vao danh sach NCC lay ten day du
+  const nccList = (activeCompany === "kh_moi"
+    ? (store.chi_phi_ncc_list_moi || store.chi_phi_ncc_list)
+    : (store.chi_phi_ncc_list_cu || store.chi_phi_ncc_list)) || [];
+  const tenNorm = _normForMatchSaoke(tenNCC);
+  for (const rec of nccList) {
+    if (_normForMatchSaoke(rec.tenNCC || "").includes(tenNorm) ||
+        tenNorm.includes(_normForMatchSaoke(rec.tenNCC || "").slice(0, 6))) {
+      return rec.tenNCC || tenNCC;
+    }
+  }
+  return tenNCC; // fallback: dung ten tu hoa don
+}
+
 // Trang nay: doc truc tiep tu store.transactions (sao ke song), lay tat ca GD
 // type="chi" cua 2 tai khoan chi cua cong ty dang xem, cross-ref voi
 // store.chi_phi (uu tien bankTxId chinh xac, fallback so tien +-1000 + ngay
@@ -1182,7 +1218,12 @@ function buildSaokeRows(store, activeCompany, selectedMonth, selectedBankName, s
       if (cp) matchType = "fuzzy";
     }
     const cpGian = (cp && cp.gian) || "";
-    const cpTk = cp ? (store.chi_phi_gian_tk_manual[String(cp.id)] || getGianTK(cp.gian, chiaSeTKSet, gianNameTkMap)) : "";
+    // Luyen, 2026-08-25: neu cp.dtChiaSe=true thi TK No la 1388 (chi chia se),
+    // con lai dung getGianTK binh thuong. manual override uu tien cao nhat.
+    const cpTk = cp
+      ? (store.chi_phi_gian_tk_manual[String(cp.id)] ||
+         (cp.dtChiaSe ? "1388" : getGianTK(cp.gian, chiaSeTKSet, gianNameTkMap)))
+      : "";
     const ovr = saokGianOvr[String(t.id)] || null;
     // Luyen, 2026-08-21: dung gian tu giao dich (t.gian, da gan tren trang sao ke)
     // lam fallback neu chua co tu chi_phi hoac override tay.
@@ -1198,7 +1239,13 @@ function buildSaokeRows(store, activeCompany, selectedMonth, selectedBankName, s
       id: t.id, txType: t.type || "chi", date: t.date, bankName, bankLabel,
       tenDoiUng: t.tenDoiUng || "", description: t.description || "", amount: t.amount,
       soHoaDon: (cp && cp.soHoaDon) || findSoHoaDonFromHD(t.tenDoiUng, t.amount, t.date),
-      gian: finalGian, ncc: (cp && cp.ncc) || "",
+      gian: finalGian,
+      // Luyen, 2026-08-25: uu tien NCC tu hoa don (hoa_don_dau_vao+ncc_list),
+      // fallback = cp.ncc (UNC matching nhu truoc).
+      ncc: _lookupNccFromInvoice(
+        (cp && cp.soHoaDon) || findSoHoaDonFromHD(t.tenDoiUng, t.amount, t.date),
+        store, activeCompany
+      ) || (cp && cp.ncc) || "",
       daHachToan: cp ? !!cp.daHachToan : false, chiPhiId: (cp && cp.id) || "",
       matchType, tk: finalTk, hasOvr: !!ovr, suggestedGian, suggestedTk, bankOpLabel: bankOpLabel || "",
     };
