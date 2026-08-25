@@ -3,73 +3,136 @@
 <head>
   <%- include('partials/head') %>
   <title>Hồ Sơ Hóa Đơn NCC – K&H</title>
+  <style>
+    .hoso-table { width:100%; border-collapse:collapse; font-size:.88em; }
+    .hoso-table th { background:#1e3a5f; color:#fff; padding:.5rem .75rem; text-align:left; white-space:nowrap; position:sticky; top:0; z-index:1; }
+    .hoso-table td { padding:.45rem .75rem; border-bottom:1px solid #eee; vertical-align:top; }
+    .hoso-table tr:hover td { background:#f0f6ff; }
+    .ncc-short { font-weight:700; color:#1e3a5f; }
+    .ncc-full { color:#444; }
+    .tien { font-weight:600; color:#15803d; white-space:nowrap; }
+    .link-hd { color:#2563eb; text-decoration:none; display:inline-flex; align-items:center; gap:.3rem; }
+    .link-hd:hover { text-decoration:underline; }
+    .btn-edit { background:none; border:1px solid #cbd5e1; border-radius:4px; padding:.15rem .45rem; cursor:pointer; font-size:.8em; color:#555; }
+    .btn-edit:hover { background:#f1f5f9; }
+    .edit-modal { display:none; position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:999; align-items:center; justify-content:center; }
+    .edit-modal.open { display:flex; }
+    .edit-box { background:#fff; border-radius:10px; padding:1.5rem; width:min(520px,95vw); box-shadow:0 8px 32px rgba(0,0,0,.2); }
+    .edit-box h3 { margin:0 0 1rem; font-size:1rem; color:#1e3a5f; }
+    .edit-box label { display:block; font-size:.85em; font-weight:600; margin:.6rem 0 .2rem; color:#444; }
+    .edit-box input, .edit-box textarea { width:100%; box-sizing:border-box; border:1px solid #cbd5e1; border-radius:5px; padding:.4rem .6rem; font-size:.9em; }
+    .edit-box textarea { resize:vertical; min-height:60px; }
+    .edit-actions { display:flex; gap:.5rem; justify-content:flex-end; margin-top:1rem; }
+    .btn-save { background:#2563eb; color:#fff; border:none; border-radius:5px; padding:.4rem 1rem; cursor:pointer; font-weight:600; }
+    .btn-cancel { background:#f1f5f9; border:1px solid #cbd5e1; border-radius:5px; padding:.4rem 1rem; cursor:pointer; }
+    .tag-so { background:#e0f2fe; color:#0369a1; border-radius:4px; padding:.05rem .35rem; font-size:.82em; font-weight:600; }
+    .empty-val { color:#bbb; font-style:italic; }
+  </style>
 </head>
 <body>
   <%- include('partials/nav') %>
-<main>
-  <h1 class="page-title">Hồ Sơ Hóa Đơn NCC</h1>
+  <main class="container">
+    <h1 class="page-title">Hồ Sơ Hóa Đơn NCC</h1>
 
-  <% if (typeof error !== 'undefined' && error) { %>
-  <div class="alert-error"><%= error %></div>
-  <% } %>
-  <% if (typeof success !== 'undefined' && success) { %>
-  <div class="alert-success"><%= success %></div>
-  <% } %>
+    <% if (typeof error !== 'undefined' && error) { %><div class="alert-error"><%= error %></div><% } %>
+    <% if (typeof success !== 'undefined' && success) { %><div class="alert-success"><%= success %></div><% } %>
 
-  <!-- Lọc tháng -->
-  <form method="GET" action="/ho-so/hoa-don-ncc" style="margin-bottom:1rem;display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;">
-    <label style="font-weight:600;">Tháng:</label>
-    <select name="thang" onchange="this.form.submit()" style="padding:.3rem .6rem;border-radius:4px;border:1px solid #ccc;">
-      <option value="">-- Tất cả --</option>
-      <% (allThang||[]).forEach(function(t){ %>
-      <option value="<%= t %>" <%= thangFilter===t?'selected':'' %>><%= t %></option>
-      <% }); %>
-    </select>
-    <span style="color:#666;font-size:.9em;"><%= total %> hóa đơn / <%= nccGroups.length %> NCC</span>
-  </form>
+    <div style="display:flex;gap:.75rem;align-items:center;margin-bottom:1rem;flex-wrap:wrap;">
+      <form method="GET" action="/ho-so/hoa-don-ncc" style="display:flex;gap:.5rem;align-items:center;">
+        <label style="font-weight:600;white-space:nowrap;">Tháng:</label>
+        <select name="thang" onchange="this.form.submit()" style="padding:.3rem .6rem;border-radius:4px;border:1px solid #ccc;min-width:120px;">
+          <option value="">-- Tất cả --</option>
+          <% (allThang||[]).forEach(function(t){ %>
+          <option value="<%= t %>" <%= thangFilter===t?'selected':'' %>><%= t %></option>
+          <% }); %>
+        </select>
+      </form>
+      <span style="color:#666;font-size:.9em;"><strong><%= total %></strong> hóa đơn</span>
+    </div>
 
-  <% if (nccGroups.length === 0) { %>
-  <p style="color:#888;">Chưa có dữ liệu hóa đơn.</p>
-  <% } %>
+    <% if (rows.length === 0) { %>
+    <p style="color:#888;">Chưa có dữ liệu hóa đơn.</p>
+    <% } else { %>
+    <div style="overflow-x:auto;">
+      <table class="hoso-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>NCC</th>
+            <th>Tên đầy đủ NCC</th>
+            <th>Tổng tiền TT</th>
+            <th>Nội dung tóm tắt</th>
+            <th>Hồ sơ liên quan</th>
+            <th>Link HĐ</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          <% rows.forEach(function(r, i) { %>
+          <tr>
+            <td style="color:#999;font-size:.8em;"><%= i+1 %></td>
+            <td>
+              <div class="ncc-short"><%= r.nccShort %></div>
+              <div style="color:#888;font-size:.8em;margin-top:.1rem;"><span class="tag-so"><%= r.soHoaDon %></span> · <%= r.ngay ? r.ngay.split('-').reverse().join('/') : '' %></div>
+            </td>
+            <td class="ncc-full"><%= r.tenDayDuNCC || '<span class="empty-val">—</span>' %></td>
+            <td class="tien"><%= r.tongTien || '<span class="empty-val">—</span>' %></td>
+            <td style="max-width:220px;"><%= r.noiDung || '<span class="empty-val">—</span>' %></td>
+            <td style="max-width:180px;"><%= r.hoSoLienQuan || '<span class="empty-val">—</span>' %></td>
+            <td>
+              <% if (r.driveLink) { %>
+              <a href="<%= r.driveLink %>" target="_blank" rel="noopener" class="link-hd">📄 Mở HĐ</a>
+              <% } else { %><span class="empty-val">—</span><% } %>
+            </td>
+            <td><button class="btn-edit" onclick="openEdit('<%= r.driveId %>','<%= encodeURIComponent(r.nccShort) %>','<%= encodeURIComponent(r.tenDayDuNCC||'') %>','<%= encodeURIComponent(r.tongTien||'') %>','<%= encodeURIComponent(r.noiDung||'') %>','<%= encodeURIComponent(r.hoSoLienQuan||'') %>')">✏️</button></td>
+          </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+    <% } %>
+  </main>
 
-  <% nccGroups.forEach(function(g) { %>
-  <details open style="margin-bottom:.6rem;border:1px solid #ddd;border-radius:6px;overflow:hidden;">
-    <summary style="background:#f5f7fa;padding:.6rem 1rem;cursor:pointer;font-weight:600;display:flex;align-items:center;gap:.6rem;">
-      <span style="flex:1;"><%= g.ncc %></span>
-      <span style="background:#2563eb;color:#fff;border-radius:99px;padding:.1rem .55rem;font-size:.82em;font-weight:700;"><%= g.items.length %></span>
-    </summary>
-    <table style="width:100%;border-collapse:collapse;font-size:.9em;">
-      <thead>
-        <tr style="background:#f0f4ff;">
-          <th style="padding:.4rem .75rem;text-align:left;border-bottom:1px solid #ddd;">Số HĐ</th>
-          <th style="padding:.4rem .75rem;text-align:left;border-bottom:1px solid #ddd;">Ngày</th>
-          <th style="padding:.4rem .75rem;text-align:left;border-bottom:1px solid #ddd;">File</th>
-        </tr>
-      </thead>
-      <tbody>
-        <% g.items.forEach(function(inv) { %>
-        <tr style="border-bottom:1px solid #f0f0f0;">
-          <td style="padding:.4rem .75rem;"><%= inv.soHoaDon %></td>
-          <td style="padding:.4rem .75rem;white-space:nowrap;">
-            <% if (inv.ngay) { %>
-              <%= inv.ngay.split('-').reverse().join('/') %>
-            <% } %>
-          </td>
-          <td style="padding:.4rem .75rem;">
-            <% if (inv.driveLink) { %>
-            <a href="<%= inv.driveLink %>" target="_blank" rel="noopener" style="color:#2563eb;text-decoration:none;">
-              📄 <%= inv.fileName %>
-            </a>
-            <% } else { %>
-            <%= inv.fileName %>
-            <% } %>
-          </td>
-        </tr>
-        <% }); %>
-      </tbody>
-    </table>
-  </details>
-  <% }); %>
-</main>
+  <!-- Edit modal -->
+  <div class="edit-modal" id="editModal">
+    <div class="edit-box">
+      <h3 id="editTitle">Chỉnh sửa hóa đơn</h3>
+      <form method="POST" id="editForm">
+        <input type="hidden" name="thang" value="<%= thangFilter %>" />
+        <label>Tên đầy đủ NCC</label>
+        <input type="text" name="tenDayDuNCC" id="eNcc" placeholder="VD: CÔNG TY TNHH AEON VIỆT NAM" />
+        <label>Tổng tiền thanh toán</label>
+        <input type="text" name="tongTien" id="eTien" placeholder="VD: 12.500.000" />
+        <label>Nội dung tóm tắt</label>
+        <textarea name="noiDung" id="eNoiDung" placeholder="VD: Tiền điện tháng 8/2026"></textarea>
+        <label>Hồ sơ liên quan</label>
+        <input type="text" name="hoSoLienQuan" id="eHoSo" placeholder="VD: HĐ số 123, phụ lục..." />
+        <div class="edit-actions">
+          <button type="button" class="btn-cancel" onclick="closeEdit()">Hủy</button>
+          <button type="submit" class="btn-save">Lưu</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    function openEdit(driveId, ncc, tenDayDu, tien, noiDung, hoSo) {
+      document.getElementById('editTitle').textContent = 'Sửa: ' + decodeURIComponent(ncc);
+      document.getElementById('editForm').action = '/ho-so/hoa-don-ncc/' + driveId + '/sua';
+      document.getElementById('eNcc').value = decodeURIComponent(tenDayDu);
+      document.getElementById('eTien').value = decodeURIComponent(tien);
+      document.getElementById('eNoiDung').value = decodeURIComponent(noiDung);
+      document.getElementById('eHoSo').value = decodeURIComponent(hoSo);
+      document.getElementById('editModal').classList.add('open');
+      document.body.style.overflow = 'hidden';
+    }
+    function closeEdit() {
+      document.getElementById('editModal').classList.remove('open');
+      document.body.style.overflow = '';
+    }
+    document.getElementById('editModal').addEventListener('click', function(e) {
+      if (e.target === this) closeEdit();
+    });
+  </script>
 </body>
 </html>
