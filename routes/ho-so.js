@@ -207,6 +207,7 @@ router.get("/ho-so/phi-cang-phu-quoc", (req, res) => {
     rows,
     error: req.query.error || null,
     success: req.query.success || null,
+    warn: req.query.warn || null,
   });
 });
 
@@ -307,11 +308,11 @@ router.post("/ho-so/phi-cang-phu-quoc/doc-file", uploadMem.single("file"), async
 // vào Drive, điền thông tin cơ bản hiển thị trên web" -- nhan anh tu form,
 // chuyen sang PDF bang pdf-lib, upload len folder "Phi Cang HK" tren Drive,
 // luu record vao store.ho_so_phi_cang voi link Drive.
-router.post("/ho-so/phi-cang-phu-quoc/upload-anh", requireAdmin, uploadMem.array("anh", 10), async (req, res) => {
+router.post("/ho-so/phi-cang-phu-quoc/upload-anh", requireDataEntry, uploadMem.array("anh", 10), async (req, res) => {
   const store = load();
   if (!store.ho_so_phi_cang) store.ho_so_phi_cang = [];
   if (!req.files || req.files.length === 0) {
-    return res.redirect("/ho-so/phi-cang-phu-quoc?error=" + encodeURIComponent("Vui lòng chọn ít nhất 1 ảnh."));
+    return res.redirect("/ho-so/phi-cang-phu-quoc?error=" + encodeURIComponent("Vui lòng chọn ít nhất 1 file."));
   }
   const { ngay, soHoaDon, loaiPhi, soTien, ghiChu } = req.body;
   const soHD = (soHoaDon || "").trim();
@@ -320,44 +321,49 @@ router.post("/ho-so/phi-cang-phu-quoc/upload-anh", requireAdmin, uploadMem.array
     ? ngay.split("-").reverse().join("-") // YYYY-MM-DD → DD-MM-YYYY
     : new Date().toLocaleDateString("vi-VN").replace(/\//g, "-");
 
-  const errors = [];
+  const driveWarnings = [];
   let added = 0;
 
   for (let i = 0; i < req.files.length; i++) {
     const f = req.files[i];
+    const suffix = req.files.length > 1 ? `_${i + 1}` : "";
+    const fileName = `PhiCang_${soHD || "HoaDon"}${suffix}_${dateStr}.pdf`;
+    let linkFile = "";
+    let driveId = "";
+
+    // Thu upload Drive; neu loi (chua ket noi OAuth) thi van luu record khong co link
     try {
-      const suffix = req.files.length > 1 ? `_${i + 1}` : "";
-      const fileName = `PhiCang_${soHD || "HoaDon"}${suffix}_${dateStr}.pdf`;
-      // PDF upload thang, anh (JPG/PNG) moi convert
       const isPdf = (f.mimetype || "").toLowerCase().includes("pdf");
       const pdfBuffer = isPdf ? f.buffer : await driveApi.imageToPdf(f.buffer, f.mimetype);
       const driveFile = await driveApi.uploadFileToDrive(
         store, driveApi.DRIVE_PHI_CANG_FOLDER_ID, fileName, pdfBuffer, "application/pdf"
       );
-      const linkFile = "https://drive.google.com/file/d/" + driveFile.id + "/view";
-      store.ho_so_phi_cang.push({
-        id: nextId(store),
-        ngay: ngay || "",
-        soHoaDon: soHD,
-        loaiPhi: (loaiPhi || "").trim(),
-        soTien: (soTien || "").trim(),
-        linkFile,
-        driveId: driveFile.id,
-        ghiChu: (ghiChu || "").trim(),
-        createdAt: new Date().toISOString(),
-      });
-      added++;
+      linkFile = "https://drive.google.com/file/d/" + driveFile.id + "/view";
+      driveId = driveFile.id;
     } catch (e) {
-      errors.push(f.originalname + ": " + e.message);
+      driveWarnings.push("⚠️ Chưa kết nối Drive — đã lưu hồ sơ trên web nhưng chưa upload file lên Google Drive. Vào Chi Phí → Kết nối Gmail để cấp quyền.");
     }
+
+    store.ho_so_phi_cang.push({
+      id: nextId(store),
+      ngay: ngay || "",
+      soHoaDon: soHD,
+      loaiPhi: (loaiPhi || "").trim(),
+      soTien: (soTien || "").trim(),
+      linkFile,
+      driveId,
+      ghiChu: (ghiChu || "").trim(),
+      tenFile: fileName,
+      createdAt: new Date().toISOString(),
+    });
+    added++;
   }
 
   save(store);
-  if (errors.length > 0 && added === 0) {
-    return res.redirect("/ho-so/phi-cang-phu-quoc?error=" + encodeURIComponent(errors.join(" | ")));
+  let msg = "Đã lưu " + added + " hồ sơ" + (driveWarnings.length > 0 ? " (chưa có link Drive)." : " lên Drive.");
+  if (driveWarnings.length > 0) {
+    return res.redirect("/ho-so/phi-cang-phu-quoc?success=" + encodeURIComponent(msg) + "&warn=" + encodeURIComponent(driveWarnings[0]));
   }
-  let msg = "Đã upload " + added + " ảnh thành PDF lên Drive và lưu hồ sơ.";
-  if (errors.length > 0) msg += " Lỗi: " + errors.join(" | ");
   res.redirect("/ho-so/phi-cang-phu-quoc?success=" + encodeURIComponent(msg));
 });
 
