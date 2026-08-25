@@ -124,12 +124,29 @@ router.get("/ho-so/hoa-don-ncc", (req, res) => {
   rows.forEach((r) => {
     const key = r.nccShort.toLowerCase();
     if (!groupMap.has(key)) {
-      groupMap.set(key, { nccShort: r.nccShort, tenDayDuNCC: "", invoices: [] });
+      groupMap.set(key, { nccShort: r.nccShort, tenDayDuNCC: "", invoices: [], hopDong: [], chungTu: "" });
     }
     const g = groupMap.get(key);
     if (!g.tenDayDuNCC && r.tenDayDuNCC) g.tenDayDuNCC = r.tenDayDuNCC;
     g.invoices.push(r);
   });
+
+  // Auto-match hop dong NCC tu phap_danh_hop_dong_ncc
+  const hdNccList = store.phap_danh_hop_dong_ncc || [];
+  const nccChungTuMap = store.ho_so_ncc_chungtu || {};
+  groupMap.forEach((g, key) => {
+    const shortNorm = normForMatch(g.nccShort);
+    const fullNorm = normForMatch(g.tenDayDuNCC);
+    g.hopDong = hdNccList.filter((hd) => {
+      const hdShort = normForMatch(hd.tenNCC || "");
+      const hdFull = normForMatch(hd.tenDayDuNCC || "");
+      return (shortNorm.length >= 3 && (hdShort.includes(shortNorm) || shortNorm.includes(hdShort))) ||
+             (fullNorm.length >= 5 && (hdFull.includes(fullNorm) || fullNorm.includes(hdFull)));
+    });
+    g.chungTu = (nccChungTuMap[key] || {}).chungTu || "";
+    g.ghiChuNCC = (nccChungTuMap[key] || {}).ghiChu || "";
+  });
+
   const groups = Array.from(groupMap.values()).sort((a, b) =>
     a.nccShort.toLowerCase().localeCompare(b.nccShort.toLowerCase())
   );
@@ -160,6 +177,21 @@ router.post("/ho-so/hoa-don-ncc/:driveId/sua", requireAdmin, (req, res) => {
   save(store);
   const qs = thang ? "?thang=" + encodeURIComponent(thang) : "";
   res.redirect("/ho-so/hoa-don-ncc" + qs + "&success=Đã+lưu");
+});
+
+// Luu chung tu / ghi chu cap NCC (bien ban, bao gia, link, v.v.)
+router.post("/ho-so/hoa-don-ncc/ncc/:nccKey/luu-chungtu", requireAdmin, (req, res) => {
+  const store = load();
+  if (!store.ho_so_ncc_chungtu) store.ho_so_ncc_chungtu = {};
+  const key = req.params.nccKey;
+  store.ho_so_ncc_chungtu[key] = {
+    chungTu: (req.body.chungTu || "").trim(),
+    ghiChu: (req.body.ghiChu || "").trim(),
+    updatedAt: new Date().toISOString(),
+  };
+  save(store);
+  const qs = req.body.thang ? "?thang=" + encodeURIComponent(req.body.thang) : "";
+  res.json({ ok: true });
 });
 
 module.exports = router;

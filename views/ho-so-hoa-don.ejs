@@ -4,50 +4,60 @@
   <%- include('partials/head') %>
   <title>Hồ Sơ Hóa Đơn NCC – K&H</title>
   <style>
-    .hoso-wrap { overflow-x:auto; }
-    .hoso-table { width:100%; border-collapse:collapse; font-size:.88em; }
-    .hoso-table th {
-      background:#1e3a5f; color:#fff; padding:.5rem .75rem;
-      text-align:left; white-space:nowrap;
-      position:sticky; top:0; z-index:10;
-    }
-    .hoso-table td { padding:.45rem .75rem; border-bottom:1px solid #eee; vertical-align:top; }
-    /* NCC group header row */
-    .ncc-group-row td {
-      background:#fff !important;
-      color:#1d4ed8;
-      font-weight:700;
-      cursor:pointer;
-      user-select:none;
-      border-top:3px solid #bfdbfe;
-      border-bottom:1px solid #bfdbfe;
-    }
-    .ncc-group-row:hover td { background:#eff6ff !important; }
-    .ncc-full { font-weight:normal; font-size:.82em; color:#3b82f6; margin-left:.5rem; }
-    .ncc-count { font-size:.8em; font-weight:600; opacity:.75; white-space:nowrap; }
-    .ncc-arrow { font-size:.8em; margin-right:.4rem; transition:transform .2s; display:inline-block; }
-    .ncc-group-row.open .ncc-arrow { transform:rotate(90deg); }
-    /* Invoice rows */
-    .inv-row { display:none; }
-    .inv-row.visible { display:table-row; }
-    .inv-row:nth-child(odd) td { background:#f5f8ff; }
-    .inv-row:nth-child(even) td { background:#eef3ff; }
-    .inv-row:hover td { background:#dceeff !important; }
-    .tien { font-weight:600; color:#15803d; white-space:nowrap; }
-    .link-hd { color:#2563eb; text-decoration:none; display:inline-flex; align-items:center; gap:.3rem; }
-    .link-hd:hover { text-decoration:underline; }
-    .btn-edit { background:none; border:1px solid #cbd5e1; border-radius:4px; padding:.15rem .45rem; cursor:pointer; font-size:.8em; color:#555; }
-    .btn-edit:hover { background:#f1f5f9; }
+    /* NCC list table */
+    .hoso-list { width:100%; border-collapse:collapse; font-size:.9em; }
+    .hoso-list th { background:#1e3a5f; color:#fff; padding:.5rem .75rem; text-align:left; white-space:nowrap; position:sticky; top:0; z-index:5; }
+    .hoso-list td { padding:.5rem .75rem; border-bottom:1px solid #e2e8f0; vertical-align:middle; }
+    .hoso-list tbody tr { cursor:pointer; }
+    .hoso-list tbody tr:hover td { background:#eff6ff; }
+    .ncc-name { font-weight:700; color:#1d4ed8; }
+    .ncc-full-name { font-size:.82em; color:#64748b; display:block; margin-top:.1rem; }
+    .badge { display:inline-block; background:#dbeafe; color:#1e40af; border-radius:12px; padding:.1rem .55rem; font-size:.78em; font-weight:600; }
+    .badge-green { background:#dcfce7; color:#166534; }
+    /* Detail modal */
+    .detail-overlay { display:none; position:fixed; inset:0; background:rgba(15,23,42,.5); z-index:200; overflow-y:auto; padding:1.5rem; }
+    .detail-overlay.open { display:block; }
+    .detail-panel { background:#fff; border-radius:12px; max-width:900px; margin:0 auto; box-shadow:0 20px 60px rgba(0,0,0,.25); overflow:hidden; }
+    .detail-header { background:#1e3a5f; color:#fff; padding:1rem 1.25rem; display:flex; align-items:center; justify-content:space-between; gap:.75rem; }
+    .detail-header h2 { margin:0; font-size:1.05rem; }
+    .detail-header .ncc-sub { font-size:.82em; opacity:.75; margin-top:.2rem; }
+    .btn-close { background:none; border:none; color:#fff; font-size:1.4rem; cursor:pointer; line-height:1; padding:.1rem .4rem; border-radius:4px; }
+    .btn-close:hover { background:rgba(255,255,255,.15); }
+    .detail-body { padding:1.25rem; }
+    .section-title { font-size:.82em; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:#64748b; margin:1rem 0 .5rem; }
+    /* Invoice mini table */
+    .inv-table { width:100%; border-collapse:collapse; font-size:.85em; margin-bottom:.5rem; }
+    .inv-table th { background:#f1f5f9; color:#334155; padding:.4rem .6rem; text-align:left; white-space:nowrap; border-bottom:2px solid #e2e8f0; }
+    .inv-table td { padding:.4rem .6rem; border-bottom:1px solid #f1f5f9; vertical-align:top; }
+    .inv-table tbody tr:hover td { background:#f8fafc; }
     .tag-so { background:#e0f2fe; color:#0369a1; border-radius:4px; padding:.05rem .35rem; font-size:.82em; font-weight:600; }
-    .edit-modal { display:none; position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:999; align-items:center; justify-content:center; }
-    .edit-modal.open { display:flex; }
-    .edit-box { background:#fff; border-radius:10px; padding:1.5rem; width:min(520px,95vw); box-shadow:0 8px 32px rgba(0,0,0,.2); }
-    .edit-box h3 { margin:0 0 1rem; font-size:1rem; color:#1e3a5f; }
-    .edit-box label { display:block; font-size:.85em; font-weight:600; margin:.6rem 0 .2rem; color:#444; }
-    .edit-box input, .edit-box textarea { width:100%; box-sizing:border-box; border:1px solid #cbd5e1; border-radius:5px; padding:.4rem .6rem; font-size:.9em; }
-    .edit-box textarea { resize:vertical; min-height:60px; }
+    .tien { font-weight:600; color:#15803d; white-space:nowrap; }
+    .link-hd { color:#2563eb; text-decoration:none; }
+    .link-hd:hover { text-decoration:underline; }
+    .btn-edit-inv { background:none; border:1px solid #cbd5e1; border-radius:4px; padding:.1rem .35rem; cursor:pointer; font-size:.75em; color:#555; }
+    /* Contract cards */
+    .hd-card { background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:.75rem 1rem; margin-bottom:.5rem; }
+    .hd-card .hd-num { font-weight:700; color:#1d4ed8; font-size:.88em; }
+    .hd-card .hd-meta { font-size:.8em; color:#64748b; margin-top:.2rem; }
+    .hd-link { color:#2563eb; font-size:.82em; text-decoration:none; }
+    .hd-link:hover { text-decoration:underline; }
+    .no-hd { color:#94a3b8; font-style:italic; font-size:.85em; }
+    /* Chung tu save area */
+    .chungtu-box { background:#fafafa; border:1px solid #e2e8f0; border-radius:8px; padding:.85rem 1rem; margin-top:.5rem; }
+    .chungtu-box textarea, .chungtu-box input { width:100%; box-sizing:border-box; border:1px solid #cbd5e1; border-radius:5px; padding:.4rem .6rem; font-size:.85em; margin-top:.25rem; }
+    .chungtu-box textarea { resize:vertical; min-height:60px; }
+    .btn-save-ct { background:#2563eb; color:#fff; border:none; border-radius:5px; padding:.4rem 1rem; cursor:pointer; font-weight:600; font-size:.85em; margin-top:.5rem; }
+    .btn-save-ct:hover { background:#1d4ed8; }
+    .save-ok { color:#16a34a; font-size:.82em; margin-left:.5rem; display:none; }
+    /* Edit invoice modal */
+    .inv-edit-modal { display:none; position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:400; align-items:center; justify-content:center; }
+    .inv-edit-modal.open { display:flex; }
+    .inv-edit-box { background:#fff; border-radius:10px; padding:1.5rem; width:min(500px,95vw); box-shadow:0 8px 32px rgba(0,0,0,.25); }
+    .inv-edit-box h3 { margin:0 0 1rem; font-size:1rem; color:#1e3a5f; }
+    .inv-edit-box label { display:block; font-size:.85em; font-weight:600; margin:.6rem 0 .2rem; color:#444; }
+    .inv-edit-box input, .inv-edit-box textarea { width:100%; box-sizing:border-box; border:1px solid #cbd5e1; border-radius:5px; padding:.4rem .6rem; font-size:.9em; }
+    .inv-edit-box textarea { resize:vertical; min-height:60px; }
     .edit-actions { display:flex; gap:.5rem; justify-content:flex-end; margin-top:1rem; }
-    .btn-save { background:#2563eb; color:#fff; border:none; border-radius:5px; padding:.4rem 1rem; cursor:pointer; font-weight:600; }
     .btn-cancel { background:#f1f5f9; border:1px solid #cbd5e1; border-radius:5px; padding:.4rem 1rem; cursor:pointer; }
   </style>
 </head>
@@ -70,59 +80,36 @@
         </select>
       </form>
       <span style="color:#666;font-size:.9em;"><strong><%= total %></strong> hóa đơn · <strong><%= groups.length %></strong> NCC</span>
-      <button onclick="toggleAll(true)" style="font-size:.82em;padding:.25rem .6rem;border:1px solid #cbd5e1;border-radius:4px;cursor:pointer;background:#f8fafc;">Mở tất cả</button>
-      <button onclick="toggleAll(false)" style="font-size:.82em;padding:.25rem .6rem;border:1px solid #cbd5e1;border-radius:4px;cursor:pointer;background:#f8fafc;">Thu tất cả</button>
     </div>
 
     <% if (groups.length === 0) { %>
     <p style="color:#888;">Chưa có dữ liệu hóa đơn.</p>
     <% } else { %>
-    <div class="hoso-wrap">
-      <table class="hoso-table">
+    <div style="overflow-x:auto;">
+      <table class="hoso-list">
         <thead>
           <tr>
             <th style="width:36px;">#</th>
-            <th style="width:170px;">Số HĐ · Ngày</th>
-            <th>Tổng tiền TT</th>
-            <th>Nội dung tóm tắt</th>
-            <th>Hồ sơ liên quan</th>
-            <th>Link HĐ</th>
-            <th style="width:36px;"></th>
+            <th>NCC</th>
+            <th style="width:100px;text-align:center;">Hóa đơn</th>
+            <th style="width:120px;text-align:center;">Hợp đồng</th>
           </tr>
         </thead>
         <tbody>
-          <% var _invNum = 0; groups.forEach(function(g, gi) {
-            var gid = 'g' + gi;
-          %>
-          <!-- NCC group header -->
-          <tr class="ncc-group-row" onclick="toggleGroup('<%= gid %>', this)">
-            <td colspan="2">
-              <span class="ncc-arrow">▶</span>
-              <strong><%= g.nccShort %></strong>
-              <% if (g.tenDayDuNCC) { %><span class="ncc-full">— <%= g.tenDayDuNCC %></span><% } %>
-            </td>
-            <td class="ncc-count"><%= g.invoices.length %> hóa đơn</td>
-            <td colspan="4"></td>
-          </tr>
-          <!-- Invoice rows (hidden by default) -->
-          <% g.invoices.forEach(function(r) { _invNum++; %>
-          <tr class="inv-row" data-group="<%= gid %>">
-            <td style="color:#bbb;font-size:.78em;padding-left:1.5rem;"><%= _invNum %></td>
+          <% groups.forEach(function(g, gi) { %>
+          <tr onclick="openDetail(<%= gi %>)">
+            <td style="color:#94a3b8;font-size:.8em;"><%= gi+1 %></td>
             <td>
-              <span class="tag-so"><%= r.soHoaDon %></span>
-              <span style="color:#888;font-size:.8em;margin-left:.3rem;white-space:nowrap;"><%= r.ngay ? r.ngay.split('-').reverse().join('/') : '' %></span>
+              <span class="ncc-name"><%= g.nccShort %></span>
+              <% if (g.tenDayDuNCC) { %><span class="ncc-full-name"><%= g.tenDayDuNCC %></span><% } %>
             </td>
-            <td class="<%= r.tongTien ? 'tien' : '' %>" style="<%= (!r.tongTien) ? 'color:#bbb;' : '' %>"><%= r.tongTien || '—' %></td>
-            <td style="max-width:240px;"><%= r.noiDung || '<span style="color:#bbb;">—</span>' %></td>
-            <td style="color:#bbb;font-style:italic;">—</td>
-            <td>
-              <% if (r.driveLink) { %>
-              <a href="<%= r.driveLink %>" target="_blank" rel="noopener" class="link-hd">📄 Mở</a>
-              <% } else { %><span style="color:#bbb;">—</span><% } %>
+            <td style="text-align:center;"><span class="badge"><%= g.invoices.length %></span></td>
+            <td style="text-align:center;">
+              <% if (g.hopDong && g.hopDong.length > 0) { %>
+              <span class="badge badge-green"><%= g.hopDong.length %> HĐ</span>
+              <% } else { %><span style="color:#cbd5e1;font-size:.8em;">—</span><% } %>
             </td>
-            <td><button class="btn-edit" onclick="event.stopPropagation();openEdit('<%= r.driveId %>','<%= encodeURIComponent(r.nccShort) %>','<%= encodeURIComponent(r.tenDayDuNCC||'') %>','<%= encodeURIComponent(r.tongTien||'') %>','<%= encodeURIComponent(r.noiDung||'') %>','<%= encodeURIComponent(r.hoSoLienQuan||'') %>')">✏️</button></td>
           </tr>
-          <% }); %>
           <% }); %>
         </tbody>
       </table>
@@ -130,63 +117,189 @@
     <% } %>
   </main>
 
-  <!-- Edit modal -->
-  <div class="edit-modal" id="editModal">
-    <div class="edit-box">
-      <h3 id="editTitle">Chỉnh sửa hóa đơn</h3>
-      <form method="POST" id="editForm">
+  <!-- Detail panel overlay -->
+  <div class="detail-overlay" id="detailOverlay" onclick="closeDetailIfBg(event)">
+    <div class="detail-panel" id="detailPanel">
+      <div class="detail-header">
+        <div>
+          <h2 id="dpTitle">NCC</h2>
+          <div class="ncc-sub" id="dpSub"></div>
+        </div>
+        <button class="btn-close" onclick="closeDetail()">✕</button>
+      </div>
+      <div class="detail-body" id="dpBody">
+        <!-- Filled by JS -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Invoice edit modal -->
+  <div class="inv-edit-modal" id="invEditModal">
+    <div class="inv-edit-box">
+      <h3 id="invEditTitle">Sửa hóa đơn</h3>
+      <form method="POST" id="invEditForm">
         <input type="hidden" name="thang" value="<%= thangFilter %>" />
         <label>Tên đầy đủ NCC</label>
-        <input type="text" name="tenDayDuNCC" id="eNcc" placeholder="VD: CÔNG TY TNHH AEON VIỆT NAM" />
+        <input type="text" name="tenDayDuNCC" id="eNcc" />
         <label>Tổng tiền thanh toán</label>
-        <input type="text" name="tongTien" id="eTien" placeholder="VD: 12.500.000" />
+        <input type="text" name="tongTien" id="eTien" />
         <label>Nội dung tóm tắt</label>
-        <textarea name="noiDung" id="eNoiDung" placeholder="VD: Tiền điện tháng 8/2026"></textarea>
-        <label>Hồ sơ liên quan</label>
-        <input type="text" name="hoSoLienQuan" id="eHoSo" placeholder="VD: HĐ số 123, phụ lục..." />
+        <textarea name="noiDung" id="eNoiDung"></textarea>
+        <label>Hồ sơ liên quan (hóa đơn này)</label>
+        <input type="text" name="hoSoLienQuan" id="eHoSo" />
         <div class="edit-actions">
-          <button type="button" class="btn-cancel" onclick="closeEdit()">Hủy</button>
-          <button type="submit" class="btn-save">Lưu</button>
+          <button type="button" class="btn-cancel" onclick="closeInvEdit()">Hủy</button>
+          <button type="submit" class="btn-save" style="background:#2563eb;color:#fff;border:none;border-radius:5px;padding:.4rem 1rem;cursor:pointer;font-weight:600;">Lưu</button>
         </div>
       </form>
     </div>
   </div>
 
   <script>
-    function toggleGroup(gid, headerRow) {
-      var rows = document.querySelectorAll('.inv-row[data-group="' + gid + '"]');
-      var isOpen = headerRow.classList.toggle('open');
-      rows.forEach(function(r) {
-        r.classList.toggle('visible', isOpen);
-      });
+    // Group data embedded from server
+    var GROUPS = <%- JSON.stringify(groups.map(function(g){ return {
+      nccShort: g.nccShort,
+      tenDayDuNCC: g.tenDayDuNCC || '',
+      invoices: g.invoices.map(function(r){ return {
+        driveId: r.driveId||'',
+        soHoaDon: r.soHoaDon||'',
+        ngay: r.ngay||'',
+        tongTien: r.tongTien||'',
+        noiDung: r.noiDung||'',
+        driveLink: r.driveLink||'',
+        tenDayDuNCC: r.tenDayDuNCC||'',
+        hoSoLienQuan: r.hoSoLienQuan||''
+      };}),
+      hopDong: (g.hopDong||[]).map(function(hd){ return {
+        soHopDong: hd.soHopDong||'',
+        noiDung: hd.noiDung||'',
+        ngayKy: hd.ngayKy||'',
+        ngayHetHan: hd.ngayHetHan||'',
+        baoHanHD: hd.baoHanHD||'',
+        giaTriHopDong: hd.giaTriHopDong||0,
+        linkHopDong: hd.linkHopDong||'',
+        chiTiet: (hd.chiTiet||[]).map(function(c){ return {soHopDong:c.soHopDong||'',noiDung:c.noiDung||'',link:c.link||'',soTienHD:c.soTienHD||''}; })
+      };}),
+      chungTu: g.chungTu||'',
+      ghiChuNCC: g.ghiChuNCC||''
+    };})) %>;
+
+    var currentGi = -1;
+
+    function openDetail(gi) {
+      currentGi = gi;
+      var g = GROUPS[gi];
+      document.getElementById('dpTitle').textContent = g.nccShort;
+      document.getElementById('dpSub').textContent = g.tenDayDuNCC;
+      document.getElementById('dpBody').innerHTML = buildDetailHTML(gi, g);
+      document.getElementById('detailOverlay').classList.add('open');
+      document.body.style.overflow = 'hidden';
     }
-    function toggleAll(open) {
-      document.querySelectorAll('.ncc-group-row').forEach(function(hdr) {
-        var gid = hdr.nextElementSibling && hdr.nextElementSibling.dataset.group;
-        if (!gid) return;
-        if (open) hdr.classList.add('open'); else hdr.classList.remove('open');
-        document.querySelectorAll('.inv-row[data-group="' + gid + '"]').forEach(function(r) {
-          r.classList.toggle('visible', open);
+
+    function buildDetailHTML(gi, g) {
+      var html = '';
+
+      // Invoices
+      html += '<div class="section-title">📄 Hóa đơn (' + g.invoices.length + ')</div>';
+      html += '<table class="inv-table"><thead><tr><th>#</th><th>Số HĐ · Ngày</th><th>Tổng tiền TT</th><th>Nội dung</th><th>Link</th><th></th></tr></thead><tbody>';
+      g.invoices.forEach(function(r, ii) {
+        var ngayFmt = r.ngay ? r.ngay.split('-').reverse().join('/') : '';
+        html += '<tr>';
+        html += '<td style="color:#94a3b8;font-size:.78em;">' + (ii+1) + '</td>';
+        html += '<td><span class="tag-so">' + (r.soHoaDon||'—') + '</span> <span style="color:#888;font-size:.8em;">' + ngayFmt + '</span></td>';
+        html += '<td class="' + (r.tongTien ? 'tien' : '') + '" style="' + (!r.tongTien ? 'color:#bbb;' : '') + '">' + (r.tongTien||'—') + '</td>';
+        html += '<td style="max-width:200px;font-size:.83em;">' + (r.noiDung||'<span style="color:#bbb;">—</span>') + '</td>';
+        html += '<td>' + (r.driveLink ? '<a href="' + r.driveLink + '" target="_blank" class="link-hd">📄 Mở</a>' : '<span style="color:#bbb;">—</span>') + '</td>';
+        html += '<td><button class="btn-edit-inv" onclick="openInvEdit(\'' + r.driveId + '\',\'' + encodeURIComponent(r.nccShort||g.nccShort) + '\',\'' + encodeURIComponent(r.tenDayDuNCC) + '\',\'' + encodeURIComponent(r.tongTien) + '\',\'' + encodeURIComponent(r.noiDung) + '\',\'' + encodeURIComponent(r.hoSoLienQuan) + '\')">✏️</button></td>';
+        html += '</tr>';
+      });
+      html += '</tbody></table>';
+
+      // Contracts
+      html += '<div class="section-title">📋 Hợp đồng NCC</div>';
+      if (g.hopDong.length === 0) {
+        html += '<p class="no-hd">Chưa tìm thấy hợp đồng phù hợp trong dữ liệu pháp danh.</p>';
+      } else {
+        g.hopDong.forEach(function(hd) {
+          html += '<div class="hd-card">';
+          html += '<div class="hd-num">📑 ' + (hd.soHopDong||'(chưa có số HĐ)') + '</div>';
+          html += '<div class="hd-meta">';
+          if (hd.noiDung) html += '<span>' + hd.noiDung + '</span> · ';
+          if (hd.ngayKy) html += 'Ký: <strong>' + hd.ngayKy + '</strong> · ';
+          if (hd.ngayHetHan) html += 'Hết hạn: <strong>' + hd.ngayHetHan + '</strong>';
+          if (hd.baoHanHD) html += ' <span style="color:' + (hd.baoHanHD==='quá hạn'?'#dc2626':'#16a34a') + ';font-size:.8em;">(' + hd.baoHanHD + ')</span>';
+          html += '</div>';
+          if (hd.linkHopDong) html += '<a href="' + hd.linkHopDong + '" target="_blank" class="hd-link">🔗 Xem hợp đồng</a>';
+          // Chi tiet
+          if (hd.chiTiet && hd.chiTiet.length > 1) {
+            hd.chiTiet.forEach(function(c) {
+              if (!c.soHopDong && !c.noiDung) return;
+              html += '<div style="margin-top:.35rem;padding-top:.35rem;border-top:1px dashed #e2e8f0;font-size:.8em;color:#475569;">';
+              if (c.soHopDong) html += '<strong>' + c.soHopDong + '</strong> · ';
+              if (c.noiDung) html += c.noiDung;
+              if (c.soTienHD) html += ' · ' + c.soTienHD;
+              if (c.link) html += ' <a href="' + c.link + '" target="_blank" class="hd-link">🔗</a>';
+              html += '</div>';
+            });
+          }
+          html += '</div>';
         });
+      }
+
+      // Chứng từ liên quan (NCC level)
+      html += '<div class="section-title">📁 Chứng từ liên quan (biên bản, báo giá…)</div>';
+      html += '<div class="chungtu-box">';
+      html += '<label style="font-size:.82em;font-weight:600;color:#475569;">Link / danh sách chứng từ</label>';
+      html += '<textarea id="ctInput" rows="3" placeholder="VD: Biên bản nghiệm thu tháng 8: https://drive.google.com/...\nBáo giá số 001: https://...">' + escHtml(g.chungTu) + '</textarea>';
+      html += '<label style="font-size:.82em;font-weight:600;color:#475569;">Ghi chú</label>';
+      html += '<input type="text" id="ctGhiChu" value="' + escAttr(g.ghiChuNCC) + '" placeholder="Ghi chú thêm về NCC này..." />';
+      html += '<div style="display:flex;align-items:center;">';
+      html += '<button class="btn-save-ct" onclick="saveChungTu(' + gi + ')">💾 Lưu chứng từ</button>';
+      html += '<span class="save-ok" id="saveOk">✓ Đã lưu</span>';
+      html += '</div>';
+      html += '</div>';
+
+      return html;
+    }
+
+    function saveChungTu(gi) {
+      var g = GROUPS[gi];
+      var key = g.nccShort.toLowerCase();
+      var ct = document.getElementById('ctInput') ? document.getElementById('ctInput').value : '';
+      var gc = document.getElementById('ctGhiChu') ? document.getElementById('ctGhiChu').value : '';
+      fetch('/ho-so/hoa-don-ncc/ncc/' + encodeURIComponent(key) + '/luu-chungtu', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ chungTu: ct, ghiChu: gc })
+      }).then(function(r) { return r.json(); }).then(function() {
+        GROUPS[gi].chungTu = ct;
+        GROUPS[gi].ghiChuNCC = gc;
+        var ok = document.getElementById('saveOk');
+        if (ok) { ok.style.display = 'inline'; setTimeout(function(){ ok.style.display='none'; }, 2000); }
       });
     }
-    function openEdit(driveId, ncc, tenDayDu, tien, noiDung, hoSo) {
-      document.getElementById('editTitle').textContent = 'Sửa: ' + decodeURIComponent(ncc);
-      document.getElementById('editForm').action = '/ho-so/hoa-don-ncc/' + driveId + '/sua';
+
+    function closeDetail() {
+      document.getElementById('detailOverlay').classList.remove('open');
+      document.body.style.overflow = '';
+      currentGi = -1;
+    }
+    function closeDetailIfBg(e) { if (e.target === document.getElementById('detailOverlay')) closeDetail(); }
+
+    function openInvEdit(driveId, ncc, tenDayDu, tien, noiDung, hoSo) {
+      document.getElementById('invEditTitle').textContent = 'Sửa: ' + decodeURIComponent(ncc);
+      document.getElementById('invEditForm').action = '/ho-so/hoa-don-ncc/' + driveId + '/sua';
       document.getElementById('eNcc').value = decodeURIComponent(tenDayDu);
       document.getElementById('eTien').value = decodeURIComponent(tien);
       document.getElementById('eNoiDung').value = decodeURIComponent(noiDung);
       document.getElementById('eHoSo').value = decodeURIComponent(hoSo);
-      document.getElementById('editModal').classList.add('open');
-      document.body.style.overflow = 'hidden';
+      document.getElementById('invEditModal').classList.add('open');
     }
-    function closeEdit() {
-      document.getElementById('editModal').classList.remove('open');
-      document.body.style.overflow = '';
-    }
-    document.getElementById('editModal').addEventListener('click', function(e) {
-      if (e.target === this) closeEdit();
-    });
+    function closeInvEdit() { document.getElementById('invEditModal').classList.remove('open'); }
+    document.getElementById('invEditModal').addEventListener('click', function(e){ if(e.target===this) closeInvEdit(); });
+
+    function escHtml(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+    function escAttr(s) { return String(s||'').replace(/"/g,'&quot;'); }
   </script>
 </body>
 </html>
