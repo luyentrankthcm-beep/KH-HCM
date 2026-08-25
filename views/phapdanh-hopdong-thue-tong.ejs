@@ -226,12 +226,8 @@
       .then(res => {
         if (res.success) {
           msgEl.style.color = '#16a34a';
-          msgEl.textContent = '✓ Đã lưu thành công.';
-          // Update local row data
-          const row = GIAN_ROWS.find(r => String(r.id) === currentId);
-          if (row) {
-            for (const [k, v] of new URLSearchParams(data).entries()) row[k] = v;
-          }
+          msgEl.textContent = '✓ Đã lưu — đang tải lại...';
+          setTimeout(() => location.reload(), 800);
         } else {
           msgEl.style.color = '#dc2626';
           msgEl.textContent = '✗ Lỗi: ' + (res.error || 'Không rõ');
