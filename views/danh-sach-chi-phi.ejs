@@ -786,18 +786,21 @@
       + '<span id="mgianSaveStatus" style="font-size:12px;color:#388e3c;"></span>'
       + '</div>';
 
+    // Tach gian chua map va da map
+    var chuaMap = gians.filter(function(g){ return !_gianAliasMap[g]; });
+    var daMapTrangNay = gians.filter(function(g){ return !!_gianAliasMap[g]; });
+
     html += '<div style="display:grid;grid-template-columns:160px 1fr auto;gap:6px;font-size:12px;font-weight:600;color:var(--muted);padding-bottom:6px;border-bottom:2px solid #eee;margin-bottom:4px;">'
-      + '<span>Gian</span><span>Mã công trình</span><span></span></div>';
-    gians.forEach(function(g) {
-      var cur = _gianAliasMap[g] || '';
+      + '<span>Gian chưa map</span><span>Mã công trình</span><span></span></div>';
+    chuaMap.forEach(function(g) {
       var eid = 'mgian-' + g.replace(/[^a-zA-Z0-9]/g,'_');
       html += '<div class="mgian-row" id="mgrow-'+eid+'">'
         + '<span style="font-weight:500;word-break:break-word;">'+esc2(g)+'</span>'
-        + '<input type="text" id="'+eid+'" data-gian="'+esc2(g)+'" value="'+esc2(cur)+'" list="mgianSuggest" placeholder="Nhập hoặc chọn..." style="font-size:13px;padding:4px 6px;border:1px solid #ccc;border-radius:4px;width:100%;" />'
+        + '<input type="text" id="'+eid+'" data-gian="'+esc2(g)+'" value="" list="mgianSuggest" placeholder="Nhập hoặc chọn..." style="font-size:13px;padding:4px 6px;border:1px solid #ccc;border-radius:4px;width:100%;" />'
         + '<button type="button" onclick="saveGianAlias(\''+esc2(g)+'\',\''+eid+'\')" style="background:var(--color-primary,#d46a9f);color:#fff;border:none;border-radius:4px;padding:4px 10px;cursor:pointer;font-size:13px;">✓</button>'
         + '</div>';
     });
-    if (gians.length === 0) html += '<p class="muted">Không có gian nào trong bộ lọc hiện tại.</p>';
+    if (chuaMap.length === 0) html += '<p class="muted" style="color:#16a34a;">✓ Tất cả gian trong trang đã được map.</p>';
 
     // Lich su map (tat ca gian da luu, ke ca gian trong bo loc hien tai)
     var allMappedKeys = Object.keys(_gianAliasMap);
