@@ -53,6 +53,34 @@
       <% }); %>
     </div>
 
+    <!-- Sync Drive button — chỉ hiện cho tab mall-tru-chi-phi -->
+    <% if (activeTab === 'mall-tru-chi-phi') { %>
+    <div style="display:flex;justify-content:flex-end;margin-bottom:.75rem;">
+      <button id="btn-sync-drive"
+              onclick="showSyncGuide()"
+              style="background:#0f766e;color:#fff;border:none;border-radius:6px;padding:.4rem 1rem;font-size:.85em;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:.4rem;">
+        🔄 Sync từ Drive
+      </button>
+    </div>
+    <div id="sync-guide-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:99999;align-items:center;justify-content:center;">
+      <div style="background:#fff;border-radius:12px;padding:1.75rem 2rem;max-width:480px;width:90%;box-shadow:0 8px 40px rgba(0,0,0,.25);position:relative;">
+        <button onclick="document.getElementById('sync-guide-modal').style.display='none'"
+                style="position:absolute;top:.6rem;right:.8rem;background:none;border:none;font-size:1.3rem;cursor:pointer;color:#888;">✕</button>
+        <h3 style="margin:0 0 .75rem;color:#0f766e;font-size:1rem;">🔄 Sync dữ liệu từ Google Drive</h3>
+        <p style="margin:.3rem 0;font-size:.9em;color:#374151;">Sau khi upload PDF đối soát mới lên Drive, mở <strong>Claude Cowork</strong> và nhắn:</p>
+        <div style="background:#f0fdf4;border:1.5px solid #86efac;border-radius:6px;padding:.6rem 1rem;margin:.75rem 0;font-size:.95em;font-weight:700;color:#166534;letter-spacing:.01em;user-select:all;">
+          sync mall drive
+        </div>
+        <p style="margin:0;font-size:.8em;color:#6b7280;">Claude sẽ tự đọc Drive, trích xuất số liệu từ 3 gian (Ghost, Snow, Tutu) và thêm vào đây — bỏ qua các kỳ đã có.</p>
+      </div>
+    </div>
+    <script>
+    function showSyncGuide() {
+      document.getElementById('sync-guide-modal').style.display = 'flex';
+    }
+    </script>
+    <% } %>
+
     <!-- ═══ TẤT CẢ TAB: Điểm → Tháng (modal) ═══ -->
     <style>
       .diem-table { width:100%; border-collapse:collapse; font-size:.88em; }

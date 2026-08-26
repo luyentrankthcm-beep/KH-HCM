@@ -602,4 +602,39 @@ router.post("/ho-so/tien-thue/:id/xoa", requireAdmin, (req, res) => {
   res.redirect("/ho-so/tien-thue?success=Đã+xóa");
 });
 
+// POST /ho-so/dtcs-chiase/mall/bulk-upsert
+// Body JSON: { records: [{diemId, thang, tongDT, tienThue, khoauTru, soTienMinhNhan, linkDoiSoat, ghiChu}] }
+// Skip duplicates by (diemId, thang). Used by Cowork Claude Drive-sync skill.
+router.post("/ho-so/dtcs-chiase/mall/bulk-upsert", requireAdmin, express.json(), (req, res) => {
+  const store = load();
+  if (!store.dtcs_chiase_thang) store.dtcs_chiase_thang = [];
+  const records = req.body && Array.isArray(req.body.records) ? req.body.records : [];
+  let added = 0;
+  let skipped = 0;
+  records.forEach(r => {
+    const diemId = String(r.diemId || "").trim();
+    const thang  = String(r.thang  || "").trim();
+    if (!diemId || !thang) { skipped++; return; }
+    const exists = store.dtcs_chiase_thang.some(
+      t => String(t.diemId) === diemId && String(t.thang) === thang
+    );
+    if (exists) { skipped++; return; }
+    store.dtcs_chiase_thang.push({
+      id: nextId(store),
+      diemId,
+      thang,
+      tongDT:          String(r.tongDT          || "").trim(),
+      tienThue:        String(r.tienThue        || "").trim(),
+      khoauTru:        String(r.khoauTru        || "").trim(),
+      soTienMinhNhan:  String(r.soTienMinhNhan  || "").trim(),
+      linkDoiSoat:     String(r.linkDoiSoat     || "").trim(),
+      ghiChu:          String(r.ghiChu          || "").trim(),
+      createdAt: new Date().toISOString(),
+    });
+    added++;
+  });
+  save(store);
+  res.json({ success: true, added, skipped });
+});
+
 module.exports = router;
