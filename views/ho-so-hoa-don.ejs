@@ -293,8 +293,10 @@
           if (hd.baoHanHD) html += ' <span style="color:' + (hd.baoHanHD==='quá hạn'?'#dc2626':'#16a34a') + ';font-size:.8em;">(' + hd.baoHanHD + ')</span>';
           html += '</div>';
           if (hd.linkHopDong) html += '<a href="' + hd.linkHopDong + '" target="_blank" class="hd-link">🔗 Xem hợp đồng</a>';
-          // Chi tiet (phu luc only — bien ban da tach ra rieng)
-          var phuLuc = (hd.chiTiet||[]).filter(function(c){ return !isBienBanItem(c.soHopDong, c.noiDung, c.phanLoaiHD); });
+          // Chi tiet (phu luc only — bien ban da tach ra rieng, dedup theo soHopDong)
+          var bb = (hd.chiTiet||[]).filter(function(c){ return isBienBanItem(c.soHopDong, c.noiDung, c.phanLoaiHD); });
+          var bbSoHDs = new Set(bb.map(function(c){ return c.soHopDong; }).filter(Boolean));
+          var phuLuc = (hd.chiTiet||[]).filter(function(c){ return !isBienBanItem(c.soHopDong, c.noiDung, c.phanLoaiHD) && !bbSoHDs.has(c.soHopDong); });
           if (phuLuc.length > 1) {
             phuLuc.forEach(function(c) {
               if (!c.soHopDong && !c.noiDung) return;
