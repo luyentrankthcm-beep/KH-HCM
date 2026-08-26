@@ -323,7 +323,7 @@ router.post("/ho-so/dtcs-chiase/diem/:id/thang/them", requireAdmin, (req, res) =
   const store = load();
   if (!store.dtcs_chiase_thang) store.dtcs_chiase_thang = [];
   const { thang, phanTramHo, phanTramMiNh, tongDT, soTienMinhNhan, soTienMinhTra,
-          hoaDonHo, tkThanhToan, ngayThanhToan, ghiChu } = req.body;
+          hoaDonHo, tkThanhToan, ngayThanhToan, linkDoiSoat, ghiChu } = req.body;
   store.dtcs_chiase_thang.push({
     id: nextId(store),
     diemId: req.params.id,
@@ -336,6 +336,7 @@ router.post("/ho-so/dtcs-chiase/diem/:id/thang/them", requireAdmin, (req, res) =
     hoaDonHo: (hoaDonHo||"").trim(),
     tkThanhToan: (tkThanhToan||"").trim(),
     ngayThanhToan: (ngayThanhToan||"").trim(),
+    linkDoiSoat: (linkDoiSoat||"").trim(),
     ghiChu: (ghiChu||"").trim(),
     createdAt: new Date().toISOString(),
   });
@@ -348,7 +349,7 @@ router.post("/ho-so/dtcs-chiase/diem/:id/thang/:thangId/sua", requireAdmin, (req
   const r = (store.dtcs_chiase_thang||[]).find(x=>String(x.id)===req.params.thangId && String(x.diemId)===req.params.id);
   if (!r) return res.json({ success: false, error: "Không tìm thấy" });
   ['thang','phanTramHo','phanTramMiNh','tongDT','soTienMinhNhan','soTienMinhTra',
-   'hoaDonHo','tkThanhToan','ngayThanhToan','ghiChu'].forEach(k => {
+   'hoaDonHo','tkThanhToan','ngayThanhToan','linkDoiSoat','ghiChu'].forEach(k => {
     r[k] = (req.body[k]||"").trim();
   });
   save(store);

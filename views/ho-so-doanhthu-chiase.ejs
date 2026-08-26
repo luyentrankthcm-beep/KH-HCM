@@ -64,8 +64,9 @@
       .badge-n { display:inline-block; background:#1e3a5f; color:#fff; border-radius:10px; padding:.1rem .55rem; font-size:.78em; font-weight:700; margin-left:.4rem; }
 
       /* Modal */
-      #diem-modal-bg { display:none; position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:1000; overflow-y:auto; }
-      #diem-modal { background:#fff; border-radius:12px; max-width:900px; margin:2rem auto; padding:1.5rem 1.75rem; position:relative; box-shadow:0 8px 40px rgba(0,0,0,.2); }
+      #diem-modal-bg { display:none; position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:9999; overflow-y:auto; display:none; }
+      #diem-modal-bg.open { display:flex; align-items:flex-start; justify-content:center; padding:2rem 1rem; }
+      #diem-modal { background:#fff; border-radius:12px; width:100%; max-width:860px; padding:1.5rem 1.75rem; position:relative; box-shadow:0 8px 40px rgba(0,0,0,.25); flex-shrink:0; }
       #diem-modal .modal-close { position:absolute; top:.75rem; right:1rem; font-size:1.4rem; cursor:pointer; color:#888; background:none; border:none; }
       #diem-modal .modal-close:hover { color:#333; }
       .modal-title { font-size:1.1rem; font-weight:700; color:#1e3a5f; margin-bottom:.25rem; }
@@ -207,6 +208,10 @@
               <input type="date" id="t-ngaytt" />
             </div>
             <div class="full">
+              <label>Link Drive đối soát (biên bản, bảng kê...)</label>
+              <input type="text" id="t-link-ds" placeholder="https://drive.google.com/..." />
+            </div>
+            <div class="full">
               <label>Ghi chú</label>
               <input type="text" id="t-ghichu" placeholder="Ghi chú thêm..." />
             </div>
@@ -226,7 +231,7 @@
       _curDiemId = id;
       document.getElementById('modal-ten-diem').textContent = d ? (d.tenDiem || '—') : '—';
       document.getElementById('modal-ma-ct').textContent = 'Mã công trình: ' + (d ? (d.maCongTrinh || '—') : '—');
-      document.getElementById('diem-modal-bg').style.display = 'block';
+      document.getElementById('diem-modal-bg').classList.add('open');
       loadThang(id);
     }
 
@@ -255,7 +260,7 @@
     }
 
     function closeModal() {
-      document.getElementById('diem-modal-bg').style.display = 'none';
+      document.getElementById('diem-modal-bg').classList.remove('open');
       _curDiemId = null;
     }
 
@@ -273,13 +278,16 @@
           let html = '<div style="overflow-x:auto"><table class="thang-table"><thead><tr>'
             + '<th>#</th><th>Tháng</th><th>% Họ</th><th>% Mình</th>'
             + '<th>Tổng DT</th><th>Mình nhận</th><th>Mình trả</th>'
-            + '<th>HĐ họ xuất</th><th>TK TT</th><th>Ngày TT</th><th>Ghi chú</th><th></th>'
+            + '<th>HĐ họ xuất</th><th>TK TT</th><th>Ngày TT</th><th>Đối soát</th><th>Ghi chú</th><th></th>'
             + '</tr></thead><tbody>';
           list.forEach((t,i)=>{
             const hdCell = t.hoaDonHo && t.hoaDonHo.startsWith('http')
               ? '<a href="'+t.hoaDonHo+'" target="_blank" style="color:#2563eb;text-decoration:none;">📄 Xem</a>'
               : (t.hoaDonHo||'—');
             const ngayTT = t.ngayThanhToan ? t.ngayThanhToan.split('-').reverse().join('/') : '—';
+            const dsCell = t.linkDoiSoat && t.linkDoiSoat.startsWith('http')
+              ? '<a href="'+t.linkDoiSoat+'" target="_blank" style="color:#7c3aed;text-decoration:none;">🔗 Drive</a>'
+              : (t.linkDoiSoat ? '<span style="font-size:.78em;color:#555;">'+t.linkDoiSoat+'</span>' : '—');
             html += '<tr>'
               + '<td style="color:#bbb;font-size:.78em;">'+(i+1)+'</td>'
               + '<td style="font-weight:700;color:#1e3a5f;white-space:nowrap;">'+(t.thang||'—')+'</td>'
@@ -291,6 +299,7 @@
               + '<td style="font-size:.82em;">'+hdCell+'</td>'
               + '<td style="font-size:.82em;white-space:nowrap;">'+(t.tkThanhToan||'—')+'</td>'
               + '<td style="font-size:.82em;white-space:nowrap;">'+ngayTT+'</td>'
+              + '<td style="font-size:.82em;">'+dsCell+'</td>'
               + '<td style="font-size:.82em;color:#555;">'+(t.ghiChu||'')+'</td>'
               + '<td><button class="btn-del-thang" onclick="xoaThang(\''+t.id+'\',\''+t.thang+'\')" title="Xóa">🗑️</button></td>'
               + '</tr>';
@@ -320,6 +329,7 @@
         'hoaDonHo='+encodeURIComponent(document.getElementById('t-hoadon').value),
         'tkThanhToan='+encodeURIComponent(document.getElementById('t-tk').value),
         'ngayThanhToan='+encodeURIComponent(document.getElementById('t-ngaytt').value),
+        'linkDoiSoat='+encodeURIComponent(document.getElementById('t-link-ds').value),
         'ghiChu='+encodeURIComponent(document.getElementById('t-ghichu').value),
       ].join('&');
       const msg = document.getElementById('thang-msg');
@@ -330,7 +340,7 @@
         if (d.success) {
           msg.textContent = '✓ Đã lưu'; msg.style.color = '#16a34a';
           // Clear form
-          ['t-thang','t-pct-ho','t-pct-minh','t-tongdt','t-nhan','t-tra','t-hoadon','t-tk','t-ngaytt','t-ghichu']
+          ['t-thang','t-pct-ho','t-pct-minh','t-tongdt','t-nhan','t-tra','t-hoadon','t-tk','t-ngaytt','t-link-ds','t-ghichu']
             .forEach(id => { document.getElementById(id).value=''; });
           loadThang(_curDiemId);
           setTimeout(()=>{ msg.textContent=''; }, 2500);
