@@ -52,8 +52,7 @@
       <% }); %>
     </div>
 
-    <% if (activeTab === 'tien-thue-co-dinh') { %>
-    <!-- ═══ TAB ĐẶC BIỆT: Chia sẻ trên %DT — Điểm → Tháng ═══ -->
+    <!-- ═══ TẤT CẢ TAB: Điểm → Tháng (modal) ═══ -->
     <style>
       .diem-table { width:100%; border-collapse:collapse; font-size:.88em; }
       .diem-table th { background:#1e3a5f; color:#fff; padding:.5rem .75rem; text-align:left; white-space:nowrap; }
@@ -100,6 +99,7 @@
     <!-- Add Điểm form -->
     <div class="add-diem-form">
       <h3>➕ Thêm điểm mới</h3>
+      <input type="hidden" id="inp-tab-key" value="<%= activeTab %>" />
       <div class="fd">
         <div>
           <label>Tên điểm / Gian</label>
@@ -250,9 +250,10 @@
       if (!ten) { alert('Vui lòng nhập tên điểm'); return; }
       const btn = event.target;
       btn.disabled = true; btn.textContent = 'Đang lưu...';
+      const tabKey = document.getElementById('inp-tab-key').value;
       fetch('/ho-so/dtcs-chiase/diem/them', {
         method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'},
-        body: 'tenDiem='+encodeURIComponent(ten)+'&maCongTrinh='+encodeURIComponent(ma)+'&ghiChu='+encodeURIComponent(ghi)
+        body: 'tenDiem='+encodeURIComponent(ten)+'&maCongTrinh='+encodeURIComponent(ma)+'&ghiChu='+encodeURIComponent(ghi)+'&tabKey='+encodeURIComponent(tabKey)
       }).then(r=>r.json()).then(d=>{
         if(d.success) location.reload();
         else { alert(d.error||'Lỗi'); btn.disabled=false; btn.textContent='Thêm điểm'; }
@@ -349,90 +350,6 @@
     }
     </script>
 
-    <% } else { %>
-    <!-- ═══ CÁC TAB KHÁC (không phải tien-thue-co-dinh) ═══ -->
-    <!-- Add form -->
-    <div class="add-form">
-      <h3>➕ Thêm chứng từ — <%= tabs.find(t=>t.key===activeTab).label %></h3>
-      <form method="POST" action="/ho-so/doanh-thu-chia-se/them">
-        <input type="hidden" name="loaiTab" value="<%= activeTab %>" />
-        <div class="form-row">
-          <div>
-            <label>Ngày</label>
-            <input type="date" name="ngay" required />
-          </div>
-          <div>
-            <label>Gian</label>
-            <input type="text" name="gian" placeholder="VD: Lotte Phú Thọ..." style="min-width:160px;" />
-          </div>
-          <div>
-            <label>Loại</label>
-            <input type="text" name="loai" placeholder="VD: Biên bản DT, Hợp đồng..." style="min-width:160px;" />
-          </div>
-          <div>
-            <label>Số tiền DT chia sẻ</label>
-            <input type="text" name="soTien" placeholder="VD: 12.500.000" style="min-width:130px;" />
-          </div>
-          <div style="flex:1;min-width:200px;">
-            <label>Link tài liệu (Drive)</label>
-            <input type="text" name="linkFile" placeholder="https://drive.google.com/..." style="width:100%;" />
-          </div>
-          <div style="flex:1;min-width:160px;">
-            <label>Ghi chú</label>
-            <input type="text" name="ghiChu" placeholder="Ghi chú..." style="width:100%;" />
-          </div>
-          <div>
-            <label>&nbsp;</label>
-            <button type="submit" class="btn-add">Thêm</button>
-          </div>
-        </div>
-      </form>
-    </div>
-
-    <% if (rows.length === 0) { %>
-    <p style="color:#888;">Chưa có dữ liệu. Thêm chứng từ ở trên.</p>
-    <% } else { %>
-    <div style="overflow-x:auto;">
-      <table class="doc-table">
-        <thead>
-          <tr>
-            <th style="width:36px;">#</th>
-            <th style="width:110px;">Ngày</th>
-            <th>Gian</th>
-            <th>Loại</th>
-            <th style="width:140px;">Số tiền DT CS</th>
-            <th>Link tài liệu</th>
-            <th>Ghi chú</th>
-            <th style="width:36px;"></th>
-          </tr>
-        </thead>
-        <tbody>
-          <% rows.forEach(function(r, i) { %>
-          <tr>
-            <td style="color:#bbb;font-size:.78em;"><%= i+1 %></td>
-            <td><%= r.ngay ? r.ngay.split('-').reverse().join('/') : '—' %></td>
-            <td><%= r.gian || '—' %></td>
-            <td><%= r.loai || '—' %></td>
-            <td class="<%= r.soTien ? 'tien' : '' %>"><%= r.soTien || '—' %></td>
-            <td>
-              <% if (r.linkFile) { %>
-              <a href="<%= r.linkFile %>" target="_blank" class="link-doc">📄 Xem</a>
-              <% } else { %><span style="color:#bbb;">—</span><% } %>
-            </td>
-            <td style="color:#555;font-size:.85em;"><%= r.ghiChu || '' %></td>
-            <td>
-              <form method="POST" action="/ho-so/doanh-thu-chia-se/<%= r.id %>/xoa" onsubmit="return confirm('Xóa dòng này?')">
-                <button type="submit" class="btn-del" title="Xóa">🗑️</button>
-              </form>
-            </td>
-          </tr>
-          <% }); %>
-        </tbody>
-      </table>
-    </div>
-    <p style="color:#888;font-size:.82em;margin-top:.5rem;"><strong><%= rows.length %></strong> chứng từ</p>
-    <% } %>
-    <% } %>
   </main>
 </body>
 </html>

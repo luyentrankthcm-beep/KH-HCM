@@ -255,8 +255,10 @@ router.get("/ho-so/doanh-thu-chia-se", (req, res) => {
   const activeTab = DTCS_TABS.some(t => t.key === req.query.tab) ? req.query.tab : DTCS_TABS[0].key;
   const allRows = (store.ho_so_doanhthu_chiase || []).slice().sort((a,b) => (b.ngay||'').localeCompare(a.ngay||''));
   const rows = allRows.filter(r => (r.loaiTab || DTCS_TABS[0].key) === activeTab);
-  // For "tien-thue-co-dinh" tab: load danh sach Diem
-  const diemList = (store.dtcs_chiase_diem || []).slice().sort((a,b) => (a.tenDiem||'').localeCompare(b.tenDiem||''));
+  // Load danh sach Diem theo tab hiện tại
+  const diemList = (store.dtcs_chiase_diem || [])
+    .filter(d => (d.tabKey || 'tien-thue-co-dinh') === activeTab)
+    .sort((a,b) => (a.tenDiem||'').localeCompare(b.tenDiem||''));
   res.render("ho-so-doanhthu-chiase", {
     userName: req.session.userName,
     rows,
@@ -272,9 +274,10 @@ router.get("/ho-so/doanh-thu-chia-se", (req, res) => {
 router.post("/ho-so/dtcs-chiase/diem/them", requireAdmin, (req, res) => {
   const store = load();
   if (!store.dtcs_chiase_diem) store.dtcs_chiase_diem = [];
-  const { tenDiem, maCongTrinh, ghiChu } = req.body;
+  const { tenDiem, maCongTrinh, ghiChu, tabKey } = req.body;
   store.dtcs_chiase_diem.push({
     id: nextId(store),
+    tabKey: (tabKey||"tien-thue-co-dinh").trim(),
     tenDiem: (tenDiem||"").trim(),
     maCongTrinh: (maCongTrinh||"").trim(),
     ghiChu: (ghiChu||"").trim(),
