@@ -188,7 +188,7 @@
             <td style="color:#555;font-size:.84em;"><%= d.ghiChu || '' %></td>
             <td style="text-align:center;" id="diem-count-<%= d.id %>"><span style="color:#bbb;">—</span></td>
             <td onclick="event.stopPropagation()" style="white-space:nowrap;display:flex;gap:4px;align-items:center;">
-              <button class="btn-edit-thang" title="Sửa thông tin điểm" onclick="moiEditDiem('<%= d.id %>','<%= (d.tenDiem||'').replace(/'/g,\"\\\\'\" ) %>','<%= (d.maCongTrinh||'').replace(/'/g,\"\\\\'\" ) %>','<%= (d.tuThang||'').replace(/'/g,\"\\\\'\" ) %>','<%= (d.denThang||'').replace(/'/g,\"\\\\'\" ) %>','<%= (d.ghiChu||'').replace(/'/g,\"\\\\'\" ) %>')" style="font-size:13px;">✏️</button>
+              <button class="btn-edit-thang" title="Sửa thông tin điểm" onclick="moiEditDiem('<%= d.id %>')" style="font-size:13px;">✏️</button>
               <button class="btn-del" title="Xóa điểm này" onclick="xoaDiem('<%= d.id %>')">🗑️</button>
             </td>
           </tr>
@@ -315,13 +315,15 @@
     }
 
     var _editDiemId = null;
-    function moiEditDiem(id, ten, ma, tuThang, denThang, ghiChu) {
+    function moiEditDiem(id) {
+      const d = DIEM_DATA.find(x => String(x.id) === String(id));
+      if (!d) return;
       _editDiemId = id;
-      document.getElementById('edit-diem-ten').value = ten;
-      document.getElementById('edit-diem-ma').value = ma;
-      document.getElementById('edit-diem-tu').value = tuThang;
-      document.getElementById('edit-diem-den').value = denThang;
-      document.getElementById('edit-diem-ghichu').value = ghiChu;
+      document.getElementById('edit-diem-ten').value = d.tenDiem || '';
+      document.getElementById('edit-diem-ma').value = d.maCongTrinh || '';
+      document.getElementById('edit-diem-tu').value = d.tuThang || '';
+      document.getElementById('edit-diem-den').value = d.denThang || '';
+      document.getElementById('edit-diem-ghichu').value = d.ghiChu || '';
       document.getElementById('edit-diem-msg').textContent = '';
       document.getElementById('edit-diem-bg').classList.add('open');
     }
