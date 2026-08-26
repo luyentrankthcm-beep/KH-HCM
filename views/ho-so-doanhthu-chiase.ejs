@@ -52,6 +52,286 @@
       <% }); %>
     </div>
 
+    <% if (activeTab === 'tien-thue-co-dinh') { %>
+    <!-- ═══ TAB ĐẶC BIỆT: Chia sẻ trên %DT — Điểm → Tháng ═══ -->
+    <style>
+      .diem-table { width:100%; border-collapse:collapse; font-size:.88em; }
+      .diem-table th { background:#1e3a5f; color:#fff; padding:.5rem .75rem; text-align:left; white-space:nowrap; }
+      .diem-table td { padding:.5rem .75rem; border-bottom:1px solid #eee; vertical-align:middle; }
+      .diem-table tbody tr:nth-child(odd) td { background:#f5f8ff; }
+      .diem-table tbody tr:hover td { background:#dceeff !important; }
+      .diem-row { cursor:pointer; }
+      .badge-n { display:inline-block; background:#1e3a5f; color:#fff; border-radius:10px; padding:.1rem .55rem; font-size:.78em; font-weight:700; margin-left:.4rem; }
+
+      /* Modal */
+      #diem-modal-bg { display:none; position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:1000; overflow-y:auto; }
+      #diem-modal { background:#fff; border-radius:12px; max-width:900px; margin:2rem auto; padding:1.5rem 1.75rem; position:relative; box-shadow:0 8px 40px rgba(0,0,0,.2); }
+      #diem-modal .modal-close { position:absolute; top:.75rem; right:1rem; font-size:1.4rem; cursor:pointer; color:#888; background:none; border:none; }
+      #diem-modal .modal-close:hover { color:#333; }
+      .modal-title { font-size:1.1rem; font-weight:700; color:#1e3a5f; margin-bottom:.25rem; }
+      .modal-sub { font-size:.82rem; color:#64748b; margin-bottom:1rem; }
+
+      .thang-table { width:100%; border-collapse:collapse; font-size:.84em; margin-bottom:1rem; }
+      .thang-table th { background:#1e3a5f; color:#fff; padding:.45rem .65rem; white-space:nowrap; text-align:center; }
+      .thang-table td { padding:.4rem .65rem; border-bottom:1px solid #e2e8f0; vertical-align:top; }
+      .thang-table tbody tr:nth-child(odd) td { background:#f8faff; }
+      .thang-table tbody tr:hover td { background:#dceeff !important; }
+      .thang-table .num { text-align:right; font-weight:600; color:#15803d; }
+      .thang-table .pct { text-align:center; color:#1e3a5f; font-weight:600; }
+
+      .add-thang-form { background:#f1f5fd; border:1px solid #c7d7f8; border-radius:8px; padding:1rem; margin-top:1rem; }
+      .add-thang-form h4 { margin:0 0 .6rem; font-size:.88rem; color:#1e3a5f; }
+      .fg { display:grid; grid-template-columns:repeat(auto-fill,minmax(170px,1fr)); gap:.5rem; }
+      .fg label { font-size:.78em; font-weight:600; color:#475569; display:block; margin-bottom:.2rem; }
+      .fg input, .fg select { width:100%; padding:.32rem .5rem; border:1px solid #cbd5e1; border-radius:4px; font-size:.84em; box-sizing:border-box; }
+      .fg .full { grid-column:1/-1; }
+      .btn-save-thang { background:#16a34a; color:#fff; border:none; border-radius:5px; padding:.38rem 1rem; cursor:pointer; font-weight:600; font-size:.84em; margin-top:.5rem; }
+      .btn-save-thang:hover { background:#15803d; }
+      .btn-del-thang { background:none; border:none; color:#ef4444; cursor:pointer; font-size:.8em; padding:.1rem .3rem; }
+      .btn-edit-thang { background:none; border:none; color:#2563eb; cursor:pointer; font-size:.8em; padding:.1rem .3rem; }
+      .add-diem-form { background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:.85rem 1rem; margin-bottom:1rem; }
+      .add-diem-form h3 { margin:0 0 .6rem; font-size:.9rem; color:#1e3a5f; }
+      .fd { display:flex; gap:.5rem; flex-wrap:wrap; align-items:flex-end; }
+      .fd label { font-size:.78em; font-weight:600; color:#475569; display:block; margin-bottom:.15rem; }
+      .fd input { padding:.32rem .55rem; border:1px solid #cbd5e1; border-radius:4px; font-size:.84em; }
+    </style>
+
+    <!-- Add Điểm form -->
+    <div class="add-diem-form">
+      <h3>➕ Thêm điểm mới</h3>
+      <div class="fd">
+        <div>
+          <label>Tên điểm / Gian</label>
+          <input type="text" id="inp-ten-diem" placeholder="VD: Lotte Phú Thọ" style="min-width:200px;" />
+        </div>
+        <div>
+          <label>Mã công trình</label>
+          <input type="text" id="inp-ma-ct" placeholder="VD: HCM-LPT-001" style="min-width:160px;" />
+        </div>
+        <div style="flex:1;min-width:200px;">
+          <label>Ghi chú</label>
+          <input type="text" id="inp-diem-ghichu" placeholder="Ghi chú..." style="width:100%;" />
+        </div>
+        <div>
+          <label>&nbsp;</label>
+          <button class="btn-add" onclick="themDiem()">Thêm điểm</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Danh sách Điểm -->
+    <% if (diemList.length === 0) { %>
+    <p style="color:#888;margin-top:.5rem;">Chưa có điểm nào. Thêm điểm mới ở trên.</p>
+    <% } else { %>
+    <div style="overflow-x:auto;">
+      <table class="diem-table">
+        <thead>
+          <tr>
+            <th style="width:36px;">#</th>
+            <th>Tên điểm / Gian</th>
+            <th style="width:170px;">Mã công trình</th>
+            <th>Ghi chú</th>
+            <th style="width:80px;text-align:center;">Tháng</th>
+            <th style="width:70px;"></th>
+          </tr>
+        </thead>
+        <tbody>
+          <% diemList.forEach(function(d, i) { %>
+          <tr class="diem-row" onclick="openDiem('<%= d.id %>', <%- JSON.stringify(d.tenDiem) %>, <%- JSON.stringify(d.maCongTrinh) %>)">
+            <td style="color:#bbb;font-size:.78em;"><%= i+1 %></td>
+            <td><strong><%= d.tenDiem || '—' %></strong></td>
+            <td style="font-family:monospace;font-size:.85em;color:#1e3a5f;"><%= d.maCongTrinh || '—' %></td>
+            <td style="color:#555;font-size:.84em;"><%= d.ghiChu || '' %></td>
+            <td style="text-align:center;" id="diem-count-<%= d.id %>"><span style="color:#bbb;">—</span></td>
+            <td onclick="event.stopPropagation()">
+              <button class="btn-del" title="Xóa điểm này" onclick="xoaDiem('<%= d.id %>', <%- JSON.stringify(d.tenDiem) %>)">🗑️</button>
+            </td>
+          </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+    <p style="color:#888;font-size:.82em;margin-top:.4rem;"><strong><%= diemList.length %></strong> điểm</p>
+    <% } %>
+
+    <!-- Modal chi tiết Điểm -->
+    <div id="diem-modal-bg" onclick="if(event.target===this)closeModal()">
+      <div id="diem-modal">
+        <button class="modal-close" onclick="closeModal()">✕</button>
+        <div class="modal-title" id="modal-ten-diem">—</div>
+        <div class="modal-sub" id="modal-ma-ct">—</div>
+
+        <!-- Bảng các tháng -->
+        <div id="thang-table-wrap">
+          <p style="color:#888;font-size:.85em;">Đang tải...</p>
+        </div>
+
+        <!-- Form thêm tháng -->
+        <div class="add-thang-form">
+          <h4>➕ Thêm tháng mới</h4>
+          <div class="fg">
+            <div>
+              <label>Tháng/Năm</label>
+              <input type="text" id="t-thang" placeholder="VD: 08/2026" />
+            </div>
+            <div>
+              <label>% DT bên họ giữ</label>
+              <input type="text" id="t-pct-ho" placeholder="VD: 30%" />
+            </div>
+            <div>
+              <label>% DT bên mình giữ</label>
+              <input type="text" id="t-pct-minh" placeholder="VD: 70%" />
+            </div>
+            <div>
+              <label>Tổng DT tháng (đ)</label>
+              <input type="text" id="t-tongdt" placeholder="VD: 150.000.000" />
+            </div>
+            <div>
+              <label>Mình nhận (đ)</label>
+              <input type="text" id="t-nhan" placeholder="Số tiền mình nhận" />
+            </div>
+            <div>
+              <label>Mình trả cho họ (đ)</label>
+              <input type="text" id="t-tra" placeholder="Số tiền mình trả họ" />
+            </div>
+            <div>
+              <label>HĐ họ xuất (link/số)</label>
+              <input type="text" id="t-hoadon" placeholder="Link Drive hoặc số HĐ" />
+            </div>
+            <div>
+              <label>TK thanh toán</label>
+              <input type="text" id="t-tk" placeholder="VD: MB Bank 123..." />
+            </div>
+            <div>
+              <label>Ngày thanh toán</label>
+              <input type="date" id="t-ngaytt" />
+            </div>
+            <div class="full">
+              <label>Ghi chú</label>
+              <input type="text" id="t-ghichu" placeholder="Ghi chú thêm..." />
+            </div>
+          </div>
+          <button class="btn-save-thang" onclick="themThang()">💾 Lưu tháng</button>
+          <span id="thang-msg" style="margin-left:.75rem;font-size:.84em;"></span>
+        </div>
+      </div>
+    </div>
+
+    <script>
+    let _curDiemId = null;
+
+    function themDiem() {
+      const ten = document.getElementById('inp-ten-diem').value.trim();
+      const ma  = document.getElementById('inp-ma-ct').value.trim();
+      const ghi = document.getElementById('inp-diem-ghichu').value.trim();
+      if (!ten) { alert('Vui lòng nhập tên điểm'); return; }
+      fetch('/ho-so/dtcs-chiase/diem/them', {
+        method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'},
+        body: `tenDiem=${encodeURIComponent(ten)}&maCongTrinh=${encodeURIComponent(ma)}&ghiChu=${encodeURIComponent(ghi)}`
+      }).then(r=>r.json()).then(d=>{ if(d.success) location.reload(); else alert(d.error||'Lỗi'); });
+    }
+
+    function xoaDiem(id, ten) {
+      if (!confirm('Xóa điểm "' + ten + '" và toàn bộ dữ liệu tháng?')) return;
+      fetch('/ho-so/dtcs-chiase/diem/' + id + '/xoa', { method:'POST' })
+        .then(r=>r.json()).then(d=>{ if(d.success) location.reload(); else alert(d.error||'Lỗi'); });
+    }
+
+    function openDiem(id, ten, maCT) {
+      _curDiemId = id;
+      document.getElementById('modal-ten-diem').textContent = ten || '—';
+      document.getElementById('modal-ma-ct').textContent = 'Mã công trình: ' + (maCT || '—');
+      document.getElementById('diem-modal-bg').style.display = 'block';
+      loadThang(id);
+    }
+
+    function closeModal() {
+      document.getElementById('diem-modal-bg').style.display = 'none';
+      _curDiemId = null;
+    }
+
+    function loadThang(id) {
+      fetch('/ho-so/dtcs-chiase/diem/' + id + '/thang')
+        .then(r=>r.json()).then(data=>{
+          const wrap = document.getElementById('thang-table-wrap');
+          if (!data.success) { wrap.innerHTML='<p style="color:red">Lỗi tải dữ liệu</p>'; return; }
+          const list = data.thangList;
+          // Update count badge
+          const badge = document.getElementById('diem-count-' + id);
+          if (badge) badge.innerHTML = list.length ? '<span class="badge-n">' + list.length + '</span>' : '<span style="color:#bbb;">0</span>';
+
+          if (!list.length) { wrap.innerHTML='<p style="color:#888;font-size:.85em;">Chưa có dữ liệu tháng. Thêm bên dưới.</p>'; return; }
+          let html = '<div style="overflow-x:auto"><table class="thang-table"><thead><tr>'
+            + '<th>#</th><th>Tháng</th><th>% Họ</th><th>% Mình</th>'
+            + '<th>Tổng DT</th><th>Mình nhận</th><th>Mình trả</th>'
+            + '<th>HĐ họ xuất</th><th>TK TT</th><th>Ngày TT</th><th>Ghi chú</th><th></th>'
+            + '</tr></thead><tbody>';
+          list.forEach((t,i)=>{
+            const hdCell = t.hoaDonHo && t.hoaDonHo.startsWith('http')
+              ? '<a href="'+t.hoaDonHo+'" target="_blank" style="color:#2563eb;text-decoration:none;">📄 Xem</a>'
+              : (t.hoaDonHo||'—');
+            const ngayTT = t.ngayThanhToan ? t.ngayThanhToan.split('-').reverse().join('/') : '—';
+            html += '<tr>'
+              + '<td style="color:#bbb;font-size:.78em;">'+(i+1)+'</td>'
+              + '<td style="font-weight:700;color:#1e3a5f;white-space:nowrap;">'+(t.thang||'—')+'</td>'
+              + '<td class="pct">'+(t.phanTramHo||'—')+'</td>'
+              + '<td class="pct">'+(t.phanTramMiNh||'—')+'</td>'
+              + '<td class="num">'+(t.tongDT||'—')+'</td>'
+              + '<td class="num" style="color:#15803d;">'+(t.soTienMinhNhan||'—')+'</td>'
+              + '<td class="num" style="color:#b91c1c;">'+(t.soTienMinhTra||'—')+'</td>'
+              + '<td style="font-size:.82em;">'+hdCell+'</td>'
+              + '<td style="font-size:.82em;white-space:nowrap;">'+(t.tkThanhToan||'—')+'</td>'
+              + '<td style="font-size:.82em;white-space:nowrap;">'+ngayTT+'</td>'
+              + '<td style="font-size:.82em;color:#555;">'+(t.ghiChu||'')+'</td>'
+              + '<td><button class="btn-del-thang" onclick="xoaThang(\''+t.id+'\',\''+t.thang+'\')" title="Xóa">🗑️</button></td>'
+              + '</tr>';
+          });
+          html += '</tbody></table></div>';
+          wrap.innerHTML = html;
+        });
+    }
+
+    function xoaThang(thangId, thangLabel) {
+      if (!confirm('Xóa dữ liệu tháng ' + thangLabel + '?')) return;
+      fetch('/ho-so/dtcs-chiase/diem/' + _curDiemId + '/thang/' + thangId + '/xoa', { method:'POST' })
+        .then(r=>r.json()).then(d=>{ if(d.success) loadThang(_curDiemId); else alert(d.error||'Lỗi'); });
+    }
+
+    function themThang() {
+      if (!_curDiemId) return;
+      const thang = document.getElementById('t-thang').value.trim();
+      if (!thang) { alert('Vui lòng nhập tháng/năm'); return; }
+      const body = [
+        'thang='+encodeURIComponent(thang),
+        'phanTramHo='+encodeURIComponent(document.getElementById('t-pct-ho').value),
+        'phanTramMiNh='+encodeURIComponent(document.getElementById('t-pct-minh').value),
+        'tongDT='+encodeURIComponent(document.getElementById('t-tongdt').value),
+        'soTienMinhNhan='+encodeURIComponent(document.getElementById('t-nhan').value),
+        'soTienMinhTra='+encodeURIComponent(document.getElementById('t-tra').value),
+        'hoaDonHo='+encodeURIComponent(document.getElementById('t-hoadon').value),
+        'tkThanhToan='+encodeURIComponent(document.getElementById('t-tk').value),
+        'ngayThanhToan='+encodeURIComponent(document.getElementById('t-ngaytt').value),
+        'ghiChu='+encodeURIComponent(document.getElementById('t-ghichu').value),
+      ].join('&');
+      const msg = document.getElementById('thang-msg');
+      msg.textContent = 'Đang lưu...'; msg.style.color = '#888';
+      fetch('/ho-so/dtcs-chiase/diem/' + _curDiemId + '/thang/them', {
+        method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body
+      }).then(r=>r.json()).then(d=>{
+        if (d.success) {
+          msg.textContent = '✓ Đã lưu'; msg.style.color = '#16a34a';
+          // Clear form
+          ['t-thang','t-pct-ho','t-pct-minh','t-tongdt','t-nhan','t-tra','t-hoadon','t-tk','t-ngaytt','t-ghichu']
+            .forEach(id => { document.getElementById(id).value=''; });
+          loadThang(_curDiemId);
+          setTimeout(()=>{ msg.textContent=''; }, 2500);
+        } else { msg.textContent = d.error||'Lỗi'; msg.style.color='red'; }
+      });
+    }
+    </script>
+
+    <% } else { %>
+    <!-- ═══ CÁC TAB KHÁC (không phải tien-thue-co-dinh) ═══ -->
     <!-- Add form -->
     <div class="add-form">
       <h3>➕ Thêm chứng từ — <%= tabs.find(t=>t.key===activeTab).label %></h3>
@@ -132,6 +412,7 @@
       </table>
     </div>
     <p style="color:#888;font-size:.82em;margin-top:.5rem;"><strong><%= rows.length %></strong> chứng từ</p>
+    <% } %>
     <% } %>
   </main>
 </body>

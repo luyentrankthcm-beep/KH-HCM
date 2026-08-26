@@ -255,14 +255,113 @@ router.get("/ho-so/doanh-thu-chia-se", (req, res) => {
   const activeTab = DTCS_TABS.some(t => t.key === req.query.tab) ? req.query.tab : DTCS_TABS[0].key;
   const allRows = (store.ho_so_doanhthu_chiase || []).slice().sort((a,b) => (b.ngay||'').localeCompare(a.ngay||''));
   const rows = allRows.filter(r => (r.loaiTab || DTCS_TABS[0].key) === activeTab);
+  // For "tien-thue-co-dinh" tab: load danh sach Diem
+  const diemList = (store.dtcs_chiase_diem || []).slice().sort((a,b) => (a.tenDiem||'').localeCompare(b.tenDiem||''));
   res.render("ho-so-doanhthu-chiase", {
     userName: req.session.userName,
     rows,
     tabs: DTCS_TABS,
     activeTab,
+    diemList,
     error: req.query.error || null,
     success: req.query.success || null,
   });
+});
+
+// ─── DTCS Chia Sẻ — Điểm (location) CRUD ─────────────────────────────────────
+router.post("/ho-so/dtcs-chiase/diem/them", requireAdmin, (req, res) => {
+  const store = load();
+  if (!store.dtcs_chiase_diem) store.dtcs_chiase_diem = [];
+  const { tenDiem, maCongTrinh, ghiChu } = req.body;
+  store.dtcs_chiase_diem.push({
+    id: nextId(store),
+    tenDiem: (tenDiem||"").trim(),
+    maCongTrinh: (maCongTrinh||"").trim(),
+    ghiChu: (ghiChu||"").trim(),
+    createdAt: new Date().toISOString(),
+  });
+  save(store);
+  res.json({ success: true });
+});
+
+router.post("/ho-so/dtcs-chiase/diem/:id/sua", requireAdmin, (req, res) => {
+  const store = load();
+  const r = (store.dtcs_chiase_diem||[]).find(x=>String(x.id)===req.params.id);
+  if (!r) return res.json({ success: false, error: "Không tìm thấy" });
+  r.tenDiem = (req.body.tenDiem||"").trim();
+  r.maCongTrinh = (req.body.maCongTrinh||"").trim();
+  r.ghiChu = (req.body.ghiChu||"").trim();
+  save(store);
+  res.json({ success: true });
+});
+
+router.post("/ho-so/dtcs-chiase/diem/:id/xoa", requireAdmin, (req, res) => {
+  const store = load();
+  store.dtcs_chiase_diem = (store.dtcs_chiase_diem||[]).filter(x=>String(x.id)!==req.params.id);
+  // Also delete all thang records for this diem
+  store.dtcs_chiase_thang = (store.dtcs_chiase_thang||[]).filter(x=>String(x.diemId)!==req.params.id);
+  save(store);
+  res.json({ success: true });
+});
+
+// ─── DTCS Chia Sẻ — Tháng (month records per Điểm) ──────────────────────────
+router.get("/ho-so/dtcs-chiase/diem/:id/thang", (req, res) => {
+  const store = load();
+  const diem = (store.dtcs_chiase_diem||[]).find(x=>String(x.id)===req.params.id);
+  if (!diem) return res.json({ success: false, error: "Không tìm thấy điểm" });
+  const thangList = (store.dtcs_chiase_thang||[])
+    .filter(x=>String(x.diemId)===req.params.id)
+    .sort((a,b)=>{
+      // Sort by thang MM/YYYY descending
+      const toNum = s => { const p=(s||'').split('/'); return (parseInt(p[1]||0)*100+parseInt(p[0]||0)); };
+      return toNum(b.thang) - toNum(a.thang);
+    });
+  res.json({ success: true, diem, thangList });
+});
+
+router.post("/ho-so/dtcs-chiase/diem/:id/thang/them", requireAdmin, (req, res) => {
+  const store = load();
+  if (!store.dtcs_chiase_thang) store.dtcs_chiase_thang = [];
+  const { thang, phanTramHo, phanTramMiNh, tongDT, soTienMinhNhan, soTienMinhTra,
+          hoaDonHo, tkThanhToan, ngayThanhToan, ghiChu } = req.body;
+  store.dtcs_chiase_thang.push({
+    id: nextId(store),
+    diemId: req.params.id,
+    thang: (thang||"").trim(),
+    phanTramHo: (phanTramHo||"").trim(),
+    phanTramMiNh: (phanTramMiNh||"").trim(),
+    tongDT: (tongDT||"").trim(),
+    soTienMinhNhan: (soTienMinhNhan||"").trim(),
+    soTienMinhTra: (soTienMinhTra||"").trim(),
+    hoaDonHo: (hoaDonHo||"").trim(),
+    tkThanhToan: (tkThanhToan||"").trim(),
+    ngayThanhToan: (ngayThanhToan||"").trim(),
+    ghiChu: (ghiChu||"").trim(),
+    createdAt: new Date().toISOString(),
+  });
+  save(store);
+  res.json({ success: true });
+});
+
+router.post("/ho-so/dtcs-chiase/diem/:id/thang/:thangId/sua", requireAdmin, (req, res) => {
+  const store = load();
+  const r = (store.dtcs_chiase_thang||[]).find(x=>String(x.id)===req.params.thangId && String(x.diemId)===req.params.id);
+  if (!r) return res.json({ success: false, error: "Không tìm thấy" });
+  ['thang','phanTramHo','phanTramMiNh','tongDT','soTienMinhNhan','soTienMinhTra',
+   'hoaDonHo','tkThanhToan','ngayThanhToan','ghiChu'].forEach(k => {
+    r[k] = (req.body[k]||"").trim();
+  });
+  save(store);
+  res.json({ success: true });
+});
+
+router.post("/ho-so/dtcs-chiase/diem/:id/thang/:thangId/xoa", requireAdmin, (req, res) => {
+  const store = load();
+  store.dtcs_chiase_thang = (store.dtcs_chiase_thang||[]).filter(
+    x=>!(String(x.id)===req.params.thangId && String(x.diemId)===req.params.id)
+  );
+  save(store);
+  res.json({ success: true });
 });
 
 router.post("/ho-so/doanh-thu-chia-se/them", requireAdmin, (req, res) => {
