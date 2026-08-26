@@ -95,9 +95,22 @@
       <input id="srchSoHD" type="text" placeholder="🔍 Số hóa đơn…" oninput="filterTable()"
         style="padding:.3rem .6rem;border-radius:4px;border:1px solid #ccc;min-width:140px;font-size:.88em;" />
       <span id="countBadge" style="color:#666;font-size:.9em;"><strong><%= total %></strong> hóa đơn · <strong><%= groups.length %></strong> NCC</span>
-      <form method="POST" action="/ho-so/sync-drive-hoa-don" style="margin-left:auto;">
-        <button type="submit" style="background:#0f766e;color:#fff;border:none;border-radius:5px;padding:.35rem .85rem;font-size:.85em;font-weight:600;cursor:pointer;white-space:nowrap;" title="Sync PDF từ Google Drive vào danh sách">🔄 Sync Drive</button>
-      </form>
+      <button onclick="showHdSyncGuide()" style="margin-left:auto;background:#0f766e;color:#fff;border:none;border-radius:5px;padding:.35rem .85rem;font-size:.85em;font-weight:600;cursor:pointer;white-space:nowrap;">🔄 Sync Drive</button>
+
+      <!-- Sync guide modal -->
+      <div id="hd-sync-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:99999;align-items:center;justify-content:center;">
+        <div style="background:#fff;border-radius:12px;padding:1.75rem 2rem;max-width:480px;width:90%;box-shadow:0 8px 40px rgba(0,0,0,.25);position:relative;">
+          <button onclick="document.getElementById('hd-sync-modal').style.display='none'"
+                  style="position:absolute;top:.6rem;right:.8rem;background:none;border:none;font-size:1.3rem;cursor:pointer;color:#888;">✕</button>
+          <h3 style="margin:0 0 .75rem;color:#0f766e;font-size:1rem;">🔄 Sync hóa đơn từ Google Drive</h3>
+          <p style="margin:.3rem 0;font-size:.9em;color:#374151;">Sau khi upload PDF hóa đơn vào thư mục Drive, mở <strong>Claude Cowork</strong> và nhắn:</p>
+          <div style="background:#f0fdf4;border:1.5px solid #86efac;border-radius:6px;padding:.6rem 1rem;margin:.75rem 0;font-size:.95em;font-weight:700;color:#166534;user-select:all;">
+            sync hóa đơn drive tháng 8
+          </div>
+          <p style="margin:0;font-size:.8em;color:#6b7280;">Claude sẽ tự đọc folder <em>Hóa đơn tháng X</em> trên Drive, lấy tên file (NCC_SoHD_Ngay.pdf) và thêm vào đây — bỏ qua file đã có.</p>
+        </div>
+      </div>
+      <script>function showHdSyncGuide(){ document.getElementById('hd-sync-modal').style.display='flex'; }</script>
     </div>
 
     <% if (groups.length === 0) { %>
@@ -244,12 +257,33 @@
       });
       html += '</tbody></table>';
 
-      // Contracts
+      // Helper: detect bien ban / nghiem thu / ban giao items
+      function isBienBanItem(soHD, nd, plhd) {
+        var s = ((soHD||'') + ' ' + (nd||'') + ' ' + (plhd||'')).toLowerCase();
+        return /\bbb\b|biên bản|bien ban|bbnt|bbbg|nghiệm thu|nghiem thu|bàn giao|ban giao/.test(s);
+      }
+
+      // Contracts + collect bien ban
+      var allBienBan = [];
+      var hdContracts = [];
+      g.hopDong.forEach(function(hd) {
+        if (isBienBanItem(hd.soHopDong, hd.noiDung, hd.phanLoaiHD)) {
+          // Main record IS a bien ban
+          allBienBan.push({ soHopDong: hd.soHopDong, noiDung: hd.noiDung, ngayKy: hd.ngayKy, ngayHetHan: hd.ngayHetHan, soTienHD: hd.giaTriHopDong||'', link: hd.linkHopDong||'' });
+        } else {
+          hdContracts.push(hd);
+          // Split chiTiet into phu luc vs bien ban
+          if (hd.chiTiet) {
+            hd.chiTiet.filter(function(c){ return isBienBanItem(c.soHopDong, c.noiDung, c.phanLoaiHD); }).forEach(function(c){ allBienBan.push(c); });
+          }
+        }
+      });
+
       html += '<div class="section-title">📋 Hợp đồng NCC</div>';
-      if (g.hopDong.length === 0) {
+      if (hdContracts.length === 0) {
         html += '<p class="no-hd">Chưa tìm thấy hợp đồng phù hợp trong dữ liệu pháp danh.</p>';
       } else {
-        g.hopDong.forEach(function(hd) {
+        hdContracts.forEach(function(hd) {
           html += '<div class="hd-card">';
           html += '<div class="hd-num">📑 ' + (hd.soHopDong||'(chưa có số HĐ)') + '</div>';
           html += '<div class="hd-meta">';
@@ -259,9 +293,10 @@
           if (hd.baoHanHD) html += ' <span style="color:' + (hd.baoHanHD==='quá hạn'?'#dc2626':'#16a34a') + ';font-size:.8em;">(' + hd.baoHanHD + ')</span>';
           html += '</div>';
           if (hd.linkHopDong) html += '<a href="' + hd.linkHopDong + '" target="_blank" class="hd-link">🔗 Xem hợp đồng</a>';
-          // Chi tiet
-          if (hd.chiTiet && hd.chiTiet.length > 1) {
-            hd.chiTiet.forEach(function(c) {
+          // Chi tiet (phu luc only — bien ban da tach ra rieng)
+          var phuLuc = (hd.chiTiet||[]).filter(function(c){ return !isBienBanItem(c.soHopDong, c.noiDung, c.phanLoaiHD); });
+          if (phuLuc.length > 1) {
+            phuLuc.forEach(function(c) {
               if (!c.soHopDong && !c.noiDung) return;
               html += '<div style="margin-top:.35rem;padding-top:.35rem;border-top:1px dashed #e2e8f0;font-size:.8em;color:#475569;">';
               if (c.soHopDong) html += '<strong>' + c.soHopDong + '</strong> · ';
@@ -271,6 +306,24 @@
               html += '</div>';
             });
           }
+          html += '</div>';
+        });
+      }
+
+      // Bien ban section (tach rieng khoi hop dong)
+      if (allBienBan.length > 0) {
+        html += '<div class="section-title">📄 Biên bản nghiệm thu / Bàn giao</div>';
+        allBienBan.forEach(function(c) {
+          if (!c.soHopDong && !c.noiDung) return;
+          html += '<div class="hd-card" style="border-left:3px solid #f59e0b;">';
+          if (c.soHopDong) html += '<div class="hd-num" style="color:#92400e;font-size:.9em;">📝 ' + c.soHopDong + '</div>';
+          html += '<div class="hd-meta">';
+          if (c.noiDung) html += '<span>' + c.noiDung + '</span>';
+          if (c.ngayKy) html += ' · Ngày ký: <strong>' + c.ngayKy + '</strong>';
+          if (c.ngayHetHan) html += ' · Hết hạn: <strong>' + c.ngayHetHan + '</strong>';
+          html += '</div>';
+          if (c.soTienHD) html += '<div style="font-size:.82em;color:#475569;margin-top:.2rem;">Giá trị: ' + c.soTienHD + '</div>';
+          if (c.link) html += '<a href="' + c.link + '" target="_blank" class="hd-link">🔗 Xem biên bản</a>';
           html += '</div>';
         });
       }
