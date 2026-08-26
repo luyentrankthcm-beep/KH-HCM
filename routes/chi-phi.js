@@ -81,6 +81,20 @@ function ensureShape(store) {
     store.migrated_t8_hach_toan_reset = true;
     save(store);
   }
+  // Luyen, 2026-08-26: fix daChi cho tat ca row co bankTxId ma chua set daChi
+  // (truong hop import truoc khi co field daChi, hoac migration cu chi check
+  // bankTxId && daHachToan nhung bank rows moi nhap co daHachToan=false).
+  if (!store.migrated_dachi_bankfix) {
+    let fixed = 0;
+    (store.chi_phi || []).forEach((r) => {
+      if (r.bankTxId && !r.daChi) {
+        r.daChi = true;
+        fixed++;
+      }
+    });
+    store.migrated_dachi_bankfix = true;
+    save(store);
+  }
   if (!store.migrated_danang_mien_bac) {
     let changed = 0;
     (store.chi_phi || []).forEach((r) => {
