@@ -573,14 +573,12 @@ function buildReconciliation(store) {
   store.zvp_offline_uploads.forEach((u) => {
     if (u.unmapped && u.unmapped.length) unmappedWarnings.push(`Offline "${u.file_name}": chua khop diem ${u.unmapped.join(", ")}`);
   });
-  // Collect unique unmapped Payoo gians across all uploads (not in current map)
+  // Collect unique unmapped Payoo gians from raw_tx (source of truth, KH Cu only)
   const payooDiemMap = store.zvp_payoo_diem_map || {};
   const uniqueUnmappedPayoo = new Set();
-  store.zvp_payoo_uploads.forEach((u) => {
-    if (u.unmapped && u.unmapped.length) {
-      u.unmapped.forEach((g) => { if (!payooDiemMap[g]) uniqueUnmappedPayoo.add(g); });
-    }
-  });
+  for (const tx of Object.values(store.zvp_payoo_raw_tx || {})) {
+    if (tx.gian && !payooDiemMap[tx.gian]) uniqueUnmappedPayoo.add(tx.gian);
+  }
   const unmappedPayooGians = Array.from(uniqueUnmappedPayoo).sort();
   if (unmappedPayooGians.length > 0) {
     unmappedWarnings.push(`Payoo: ${unmappedPayooGians.length} cửa hàng chưa có mã công trình (${unmappedPayooGians.join(", ")}) — xem mục bên dưới để thêm.`);
