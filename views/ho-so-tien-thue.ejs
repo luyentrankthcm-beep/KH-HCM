@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <%- include('partials/head') %>
+  <title>Tiền Thuê Bình Thường – K&H</title>
+  <style>
+    .tab-bar { display:flex; gap:0; border-bottom:2px solid #1e3a5f; margin-bottom:1.25rem; }
+    .tab-btn { padding:.5rem 1.25rem; font-weight:600; font-size:.88em; cursor:pointer; border:none; background:#e8f0fe; color:#1e3a5f; border-radius:6px 6px 0 0; margin-right:3px; text-decoration:none; display:inline-block; }
+    .tab-btn.active { background:#1e3a5f; color:#fff; }
+    .tab-btn:hover:not(.active) { background:#c7d7f8; }
+    .doc-table { width:100%; border-collapse:collapse; font-size:.88em; }
+    .doc-table th { background:#1e3a5f; color:#fff; padding:.5rem .75rem; text-align:left; white-space:nowrap; position:sticky; top:0; z-index:5; }
+    .doc-table td { padding:.45rem .75rem; border-bottom:1px solid #eee; vertical-align:middle; }
+    .doc-table tbody tr:nth-child(odd) td { background:#f5f8ff; }
+    .doc-table tbody tr:hover td { background:#dceeff !important; }
+    .tien { font-weight:600; color:#15803d; }
+    .link-doc { color:#2563eb; text-decoration:none; }
+    .link-doc:hover { text-decoration:underline; }
+    .add-form { background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:1rem 1.25rem; margin-bottom:1.25rem; }
+    .add-form h3 { margin:0 0 .75rem; font-size:.92rem; color:#1e3a5f; }
+    .form-row { display:flex; gap:.6rem; flex-wrap:wrap; align-items:flex-end; }
+    .form-row label { font-size:.8em; font-weight:600; color:#475569; display:block; margin-bottom:.2rem; }
+    .form-row input { padding:.35rem .55rem; border:1px solid #cbd5e1; border-radius:4px; font-size:.85em; }
+    .btn-add { background:#2563eb; color:#fff; border:none; border-radius:5px; padding:.38rem .9rem; cursor:pointer; font-weight:600; font-size:.85em; white-space:nowrap; }
+    .btn-del { background:none; border:none; color:#ef4444; cursor:pointer; font-size:.85em; padding:.1rem .3rem; }
+    .btn-del:hover { color:#b91c1c; }
+  </style>
+</head>
+<body>
+  <%- include('partials/nav') %>
+  <main class="container">
+    <h1 class="page-title">Hồ Sơ</h1>
+
+    <div class="tab-bar">
+      <a href="/ho-so/hoa-don-ncc" class="tab-btn">📄 Hóa Đơn NCC</a>
+      <a href="/ho-so/phi-cang-phu-quoc" class="tab-btn">🚢 Phí Cảng Phú Quốc</a>
+      <a href="/ho-so/doanh-thu-chia-se" class="tab-btn">📊 Doanh Thu Chia Sẻ</a>
+      <a href="/ho-so/tien-thue" class="tab-btn active">🏠 Tiền Thuê</a>
+    </div>
+
+    <% if (typeof error !== 'undefined' && error) { %><div class="alert-error"><%= error %></div><% } %>
+    <% if (typeof success !== 'undefined' && success) { %><div class="alert-success"><%= success %></div><% } %>
+
+    <!-- Add form -->
+    <div class="add-form">
+      <h3>➕ Thêm tiền thuê</h3>
+      <form method="POST" action="/ho-so/tien-thue/them">
+        <div class="form-row">
+          <div>
+            <label>Tháng/Năm</label>
+            <input type="text" name="thang" placeholder="VD: 08/2026" style="min-width:110px;" required />
+          </div>
+          <div>
+            <label>Gian</label>
+            <input type="text" name="gian" placeholder="VD: Lotte Phú Thọ" style="min-width:180px;" />
+          </div>
+          <div>
+            <label>Số HĐ / Chứng từ</label>
+            <input type="text" name="soHoaDon" placeholder="VD: HĐ00123" style="min-width:140px;" />
+          </div>
+          <div>
+            <label>Số tiền thuê (đ)</label>
+            <input type="text" name="soTien" placeholder="VD: 50.000.000" style="min-width:140px;" />
+          </div>
+          <div style="flex:1;min-width:200px;">
+            <label>Link tài liệu (Drive)</label>
+            <input type="text" name="linkFile" placeholder="https://drive.google.com/..." style="width:100%;" />
+          </div>
+          <div style="flex:1;min-width:160px;">
+            <label>Ghi chú</label>
+            <input type="text" name="ghiChu" placeholder="Ghi chú..." style="width:100%;" />
+          </div>
+          <div>
+            <label>&nbsp;</label>
+            <button type="submit" class="btn-add">Thêm</button>
+          </div>
+        </div>
+      </form>
+    </div>
+
+    <% if (rows.length === 0) { %>
+    <p style="color:#888;">Chưa có dữ liệu. Thêm tiền thuê ở trên.</p>
+    <% } else { %>
+    <div style="overflow-x:auto;">
+      <table class="doc-table">
+        <thead>
+          <tr>
+            <th style="width:36px;">#</th>
+            <th style="width:100px;">Tháng</th>
+            <th>Gian</th>
+            <th style="width:140px;">Số HĐ / Chứng từ</th>
+            <th style="width:140px;">Số tiền thuê</th>
+            <th>Link tài liệu</th>
+            <th>Ghi chú</th>
+            <th style="width:36px;"></th>
+          </tr>
+        </thead>
+        <tbody>
+          <% rows.forEach(function(r, i) { %>
+          <tr>
+            <td style="color:#bbb;font-size:.78em;"><%= i+1 %></td>
+            <td style="font-weight:700;color:#1e3a5f;white-space:nowrap;"><%= r.thang || '—' %></td>
+            <td><%= r.gian || '—' %></td>
+            <td style="font-size:.85em;"><%= r.soHoaDon || '—' %></td>
+            <td class="<%= r.soTien ? 'tien' : '' %>"><%= r.soTien || '—' %></td>
+            <td>
+              <% if (r.linkFile) { %>
+              <a href="<%= r.linkFile %>" target="_blank" class="link-doc">📄 Xem</a>
+              <% } else { %><span style="color:#bbb;">—</span><% } %>
+            </td>
+            <td style="color:#555;font-size:.85em;"><%= r.ghiChu || '' %></td>
+            <td>
+              <form method="POST" action="/ho-so/tien-thue/<%= r.id %>/xoa" onsubmit="return confirm('Xóa dòng này?')">
+                <button type="submit" class="btn-del" title="Xóa">🗑️</button>
+              </form>
+            </td>
+          </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+    <p style="color:#888;font-size:.82em;margin-top:.5rem;"><strong><%= rows.length %></strong> bản ghi</p>
+    <% } %>
+  </main>
+</body>
+</html>

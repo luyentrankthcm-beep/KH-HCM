@@ -563,4 +563,41 @@ router.post("/ho-so/phi-cang-phu-quoc/sync-drive", requireAdmin, async (req, res
   }
 });
 
+// ─── Tiền Thuê Bình Thường ────────────────────────────────────────────────────
+router.get("/ho-so/tien-thue", (req, res) => {
+  const store = load();
+  const rows = (store.ho_so_tien_thue || []).slice().sort((a,b) => (b.thang||'').localeCompare(a.thang||''));
+  res.render("ho-so-tien-thue", {
+    userName: req.session.userName,
+    rows,
+    error: req.query.error || null,
+    success: req.query.success || null,
+  });
+});
+
+router.post("/ho-so/tien-thue/them", requireAdmin, (req, res) => {
+  const store = load();
+  if (!store.ho_so_tien_thue) store.ho_so_tien_thue = [];
+  const { thang, gian, soHoaDon, soTien, linkFile, ghiChu } = req.body;
+  store.ho_so_tien_thue.push({
+    id: nextId(store),
+    thang: (thang||"").trim(),
+    gian: (gian||"").trim(),
+    soHoaDon: (soHoaDon||"").trim(),
+    soTien: (soTien||"").trim(),
+    linkFile: (linkFile||"").trim(),
+    ghiChu: (ghiChu||"").trim(),
+    createdAt: new Date().toISOString(),
+  });
+  save(store);
+  res.redirect("/ho-so/tien-thue?success=Đã+thêm");
+});
+
+router.post("/ho-so/tien-thue/:id/xoa", requireAdmin, (req, res) => {
+  const store = load();
+  store.ho_so_tien_thue = (store.ho_so_tien_thue||[]).filter(r=>String(r.id)!==req.params.id);
+  save(store);
+  res.redirect("/ho-so/tien-thue?success=Đã+xóa");
+});
+
 module.exports = router;
