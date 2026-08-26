@@ -225,10 +225,15 @@
       const ma  = document.getElementById('inp-ma-ct').value.trim();
       const ghi = document.getElementById('inp-diem-ghichu').value.trim();
       if (!ten) { alert('Vui lòng nhập tên điểm'); return; }
+      const btn = event.target;
+      btn.disabled = true; btn.textContent = 'Đang lưu...';
       fetch('/ho-so/dtcs-chiase/diem/them', {
         method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'},
         body: `tenDiem=${encodeURIComponent(ten)}&maCongTrinh=${encodeURIComponent(ma)}&ghiChu=${encodeURIComponent(ghi)}`
-      }).then(r=>r.json()).then(d=>{ if(d.success) location.reload(); else alert(d.error||'Lỗi'); });
+      }).then(r=>r.json()).then(d=>{
+        if(d.success) location.reload();
+        else { alert(d.error||'Lỗi'); btn.disabled=false; btn.textContent='Thêm điểm'; }
+      }).catch(()=>{ btn.disabled=false; btn.textContent='Thêm điểm'; });
     }
 
     function xoaDiem(id, ten) {
