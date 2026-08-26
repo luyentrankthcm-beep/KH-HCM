@@ -559,6 +559,34 @@ File xuất chỉ gồm các khoản có ngày về ngân hàng nằm trong kho�
       if (viewDiv) viewDiv.style.display = editMode ? 'none' : '';
       if (editDiv) editDiv.style.display = editMode ? '' : 'none';
     };
+
+    // Khi bam "Hien" tren cac section 3/3c/3b -> tu dong mo edit mode luon
+    var _autoEditMap = {
+      'tkCo':      '3. TK Có theo từng mã công trình',
+      'gianHidden':'3c. Ẩn gian không thuộc công ty này',
+      'diemAlias': '3b. Ánh xạ tên/mã điểm khác trên hóa đơn'
+    };
+    document.addEventListener('DOMContentLoaded', function() {
+      setTimeout(function() {
+        document.querySelectorAll('section.panel').forEach(function(panel) {
+          var h2 = panel.querySelector('h2');
+          if (!h2) return;
+          var title = h2.textContent.trim();
+          var matchId = null;
+          Object.keys(_autoEditMap).forEach(function(id) {
+            if (title.indexOf(_autoEditMap[id]) === 0) matchId = id;
+          });
+          if (!matchId) return;
+          var btn = h2.querySelector('.panel-toggle-btn');
+          if (!btn) return;
+          btn.addEventListener('click', function() {
+            var wrapper = panel.querySelector('.panel-collapsible-body');
+            var willExpand = wrapper && wrapper.style.display === 'none';
+            if (willExpand) setTimeout(function(){ window.mDsToggle(matchId, true); }, 60);
+          });
+        });
+      }, 300); // panel-toggle init xong roi moi hook
+    });
   </script>
 </body>
 </html>

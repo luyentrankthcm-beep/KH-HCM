@@ -853,7 +853,7 @@
       })
       .then(function(r){ return r.json(); })
       .then(function(data) {
-        if (data.success) _gianAliasMap[data.from] = data.to;
+        if (data.success) { _gianAliasMap[data.from] = data.to; updateMaCTCells(data.from, data.to); }
         saveNext();
       })
       .catch(function(){ saveNext(); });
@@ -866,6 +866,21 @@
   }
 
   function esc2(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+
+  // Cap nhat cot Ma CT trong bang sau khi map
+  function updateMaCTCells(gian, maCT) {
+    document.querySelectorAll('.dsch-row').forEach(function(tr) {
+      var g1 = tr.querySelector('.dsch-cell-1');
+      if (!g1 || g1.textContent.trim() !== gian) return;
+      var tds = tr.querySelectorAll('td');
+      var td = tds[tds.length - 1];
+      if (!td) return;
+      td.title = maCT || 'Chưa map gian';
+      td.innerHTML = maCT
+        ? '<span style="background:#e8f5e9;color:#2e7d32;padding:1px 5px;border-radius:4px;font-size:10px;font-weight:600;">' + maCT + '</span>'
+        : '<span style="color:#bbb;font-size:10px;">—</span>';
+    });
+  }
 
   function saveGianAlias(gian, inputId) {
     var val = document.getElementById(inputId).value.trim();
@@ -882,6 +897,7 @@
     .then(function(data) {
       if (data.success) {
         _gianAliasMap[data.from] = data.to;
+        updateMaCTCells(data.from, data.to);
         var row = document.getElementById('mgrow-' + inputId);
         if (row) { row.style.background = 'rgba(56,142,60,0.08)'; setTimeout(function(){ row.style.background=''; }, 1200); }
       }
