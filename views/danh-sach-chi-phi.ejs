@@ -798,16 +798,24 @@
     });
     if (gians.length === 0) html += '<p class="muted">Không có gian nào trong bộ lọc hiện tại.</p>';
 
-    var existingKeys = Object.keys(_gianAliasMap).filter(function(k){ return !seen[k]; });
-    if (existingKeys.length > 0) {
-      html += '<div style="margin-top:16px;padding-top:12px;border-top:1px dashed #ddd;font-size:12px;color:var(--muted);font-weight:600;margin-bottom:6px;">Mapping đã lưu (gian không có trong bộ lọc hiện tại)</div>';
-      existingKeys.forEach(function(k) {
+    // Lich su map (tat ca gian da luu, ke ca gian trong bo loc hien tai)
+    var allMappedKeys = Object.keys(_gianAliasMap);
+    if (allMappedKeys.length > 0) {
+      var histId = 'mgianHist_' + Date.now();
+      html += '<div style="margin-top:16px;padding-top:12px;border-top:1px dashed #ddd;">'
+        + '<button type="button" onclick="var h=document.getElementById(\''+histId+'\');var arr=this.querySelector(\'.arr\');if(h.style.display===\'none\'){h.style.display=\'\';arr.textContent=\'▲\';}else{h.style.display=\'none\';arr.textContent=\'▼\';}" '
+        + 'style="background:none;border:none;cursor:pointer;font-size:12px;font-weight:600;color:var(--muted);padding:0;">'
+        + '📋 Lịch sử đã map (' + allMappedKeys.length + ' gian) <span class="arr">▼</span></button>'
+        + '<div id="'+histId+'" style="display:none;margin-top:8px;">';
+      allMappedKeys.forEach(function(k) {
+        var isInPage = !!seen[k];
         html += '<div class="mgian-row">'
-          + '<span style="color:#999;">'+esc2(k)+'</span>'
-          + '<span>→ '+esc2(_gianAliasMap[k])+'</span>'
+          + '<span style="color:'+(isInPage?'#333':'#999')+';">'+esc2(k)+(isInPage?' <span style="font-size:10px;color:#2563eb;">(trang này)</span>':'')+' </span>'
+          + '<span style="color:#555;">→ '+esc2(_gianAliasMap[k])+'</span>'
           + '<button type="button" onclick="deleteGianAlias(\''+esc2(k)+'\')" style="background:none;border:1px solid #e57373;color:#e57373;border-radius:4px;padding:3px 8px;cursor:pointer;font-size:12px;">✕</button>'
           + '</div>';
       });
+      html += '</div></div>';
     }
     document.getElementById('mapGianList').innerHTML = html;
     document.getElementById('mapGianOverlay').classList.add('open');
@@ -821,11 +829,11 @@
     inputs.forEach(function(inp) {
       var val = inp.value.trim();
       if (!val) return;
-      // Lấy tên gian từ id: 'mgian-ADV_An_Lac' → cần lấy từ data hoặc gian list
-      // Dùng data-gian attribute
+      var origVal = _gianAliasMap[inp.dataset.gian] || '';
+      if (val === origVal) return; // bo qua neu khong thay doi
       toSave.push({ gian: inp.dataset.gian, val: val });
     });
-    if (toSave.length === 0) { alert('Chưa điền mã công trình cho dòng nào.'); return; }
+    if (toSave.length === 0) { status.textContent = '(Không có gian mới nào cần lưu.)'; return; }
     status.textContent = 'Đang lưu ' + toSave.length + ' dòng...';
     var saved = 0;
     function saveNext() {

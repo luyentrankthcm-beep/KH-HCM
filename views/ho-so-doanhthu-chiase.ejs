@@ -187,7 +187,8 @@
             </td>
             <td style="color:#555;font-size:.84em;"><%= d.ghiChu || '' %></td>
             <td style="text-align:center;" id="diem-count-<%= d.id %>"><span style="color:#bbb;">—</span></td>
-            <td onclick="event.stopPropagation()">
+            <td onclick="event.stopPropagation()" style="white-space:nowrap;display:flex;gap:4px;align-items:center;">
+              <button class="btn-edit-thang" title="Sửa thông tin điểm" onclick="moiEditDiem('<%= d.id %>','<%= (d.tenDiem||'').replace(/'/g,\"\\\\'\" ) %>','<%= (d.maCongTrinh||'').replace(/'/g,\"\\\\'\" ) %>','<%= (d.tuThang||'').replace(/'/g,\"\\\\'\" ) %>','<%= (d.denThang||'').replace(/'/g,\"\\\\'\" ) %>','<%= (d.ghiChu||'').replace(/'/g,\"\\\\'\" ) %>')" style="font-size:13px;">✏️</button>
               <button class="btn-del" title="Xóa điểm này" onclick="xoaDiem('<%= d.id %>')">🗑️</button>
             </td>
           </tr>
@@ -311,6 +312,40 @@
       if (!confirm('Xóa điểm "' + ten + '" và toàn bộ dữ liệu tháng?')) return;
       fetch('/ho-so/dtcs-chiase/diem/' + id + '/xoa', { method:'POST' })
         .then(r=>r.json()).then(d=>{ if(d.success) location.reload(); else alert(d.error||'Lỗi'); });
+    }
+
+    var _editDiemId = null;
+    function moiEditDiem(id, ten, ma, tuThang, denThang, ghiChu) {
+      _editDiemId = id;
+      document.getElementById('edit-diem-ten').value = ten;
+      document.getElementById('edit-diem-ma').value = ma;
+      document.getElementById('edit-diem-tu').value = tuThang;
+      document.getElementById('edit-diem-den').value = denThang;
+      document.getElementById('edit-diem-ghichu').value = ghiChu;
+      document.getElementById('edit-diem-msg').textContent = '';
+      document.getElementById('edit-diem-bg').classList.add('open');
+    }
+    function dongEditDiem() {
+      document.getElementById('edit-diem-bg').classList.remove('open');
+      _editDiemId = null;
+    }
+    function luuEditDiem() {
+      if (!_editDiemId) return;
+      const msg = document.getElementById('edit-diem-msg');
+      msg.textContent = 'Đang lưu...'; msg.style.color = '#888';
+      const body = [
+        'tenDiem='+encodeURIComponent(document.getElementById('edit-diem-ten').value.trim()),
+        'maCongTrinh='+encodeURIComponent(document.getElementById('edit-diem-ma').value.trim()),
+        'tuThang='+encodeURIComponent(document.getElementById('edit-diem-tu').value.trim()),
+        'denThang='+encodeURIComponent(document.getElementById('edit-diem-den').value.trim()),
+        'ghiChu='+encodeURIComponent(document.getElementById('edit-diem-ghichu').value.trim()),
+      ].join('&');
+      fetch('/ho-so/dtcs-chiase/diem/' + _editDiemId + '/sua', {
+        method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body
+      }).then(r=>r.json()).then(d=>{
+        if (d.success) { msg.textContent='✓ Đã lưu'; msg.style.color='#16a34a'; setTimeout(()=>location.reload(),800); }
+        else { msg.textContent = d.error||'Lỗi'; msg.style.color='#dc2626'; }
+      }).catch(()=>{ msg.textContent='Lỗi kết nối'; msg.style.color='#dc2626'; });
     }
 
     function themDiem() {
@@ -442,6 +477,36 @@
       });
     }
     </script>
+
+  <!-- Modal sửa thông tin điểm -->
+  <div id="edit-diem-bg" onclick="if(event.target===this)dongEditDiem()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:9000;align-items:center;justify-content:center;">
+    <style>#edit-diem-bg.open{display:flex!important;}</style>
+    <div style="background:#fff;border-radius:10px;padding:22px 26px;width:480px;max-width:95vw;box-shadow:0 8px 32px rgba(0,0,0,0.22);">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+        <strong style="font-size:15px;">✏️ Sửa thông tin điểm</strong>
+        <button onclick="dongEditDiem()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#888;">×</button>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        <div><label style="font-size:12px;font-weight:600;color:#475569;">Tên điểm / Gian</label><br>
+          <input id="edit-diem-ten" type="text" style="width:100%;padding:6px 8px;border:1px solid #d1d5db;border-radius:5px;font-size:14px;" /></div>
+        <div><label style="font-size:12px;font-weight:600;color:#475569;">Mã công trình</label><br>
+          <input id="edit-diem-ma" type="text" style="width:100%;padding:6px 8px;border:1px solid #d1d5db;border-radius:5px;font-size:14px;" /></div>
+        <div style="display:flex;gap:10px;">
+          <div style="flex:1"><label style="font-size:12px;font-weight:600;color:#475569;">Từ tháng</label><br>
+            <input id="edit-diem-tu" type="text" placeholder="VD: 01/2025" style="width:100%;padding:6px 8px;border:1px solid #d1d5db;border-radius:5px;font-size:14px;" /></div>
+          <div style="flex:1"><label style="font-size:12px;font-weight:600;color:#475569;">Đến tháng</label><br>
+            <input id="edit-diem-den" type="text" placeholder="Bỏ trống = đang HĐ" style="width:100%;padding:6px 8px;border:1px solid #d1d5db;border-radius:5px;font-size:14px;" /></div>
+        </div>
+        <div><label style="font-size:12px;font-weight:600;color:#475569;">Ghi chú</label><br>
+          <input id="edit-diem-ghichu" type="text" style="width:100%;padding:6px 8px;border:1px solid #d1d5db;border-radius:5px;font-size:14px;" /></div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;margin-top:16px;">
+        <button onclick="luuEditDiem()" style="background:#2563eb;color:#fff;border:none;border-radius:5px;padding:8px 20px;cursor:pointer;font-weight:600;">💾 Lưu</button>
+        <button onclick="dongEditDiem()" style="background:#f3f4f6;border:1px solid #d1d5db;border-radius:5px;padding:8px 14px;cursor:pointer;">Hủy</button>
+        <span id="edit-diem-msg" style="font-size:12px;"></span>
+      </div>
+    </div>
+  </div>
 
   </main>
 </body>
