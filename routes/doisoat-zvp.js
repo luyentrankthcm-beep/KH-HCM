@@ -573,9 +573,18 @@ function buildReconciliation(store) {
   store.zvp_offline_uploads.forEach((u) => {
     if (u.unmapped && u.unmapped.length) unmappedWarnings.push(`Offline "${u.file_name}": chua khop diem ${u.unmapped.join(", ")}`);
   });
+  // Collect unique unmapped Payoo gians across all uploads (not in current map)
+  const payooDiemMap = store.zvp_payoo_diem_map || {};
+  const uniqueUnmappedPayoo = new Set();
   store.zvp_payoo_uploads.forEach((u) => {
-    if (u.unmapped && u.unmapped.length) unmappedWarnings.push(`Payoo "${u.file_name}": chua khop diem ${u.unmapped.join(", ")}`);
+    if (u.unmapped && u.unmapped.length) {
+      u.unmapped.forEach((g) => { if (!payooDiemMap[g]) uniqueUnmappedPayoo.add(g); });
+    }
   });
+  const unmappedPayooGians = Array.from(uniqueUnmappedPayoo).sort();
+  if (unmappedPayooGians.length > 0) {
+    unmappedWarnings.push(`Payoo: ${unmappedPayooGians.length} cửa hàng chưa có mã công trình (${unmappedPayooGians.join(", ")}) — xem mục bên dưới để thêm.`);
+  }
   // Luyen, 2026-07-27: canh bao TON TAI (khong chi flash 1 lan) cho cac GD
   // Online bi bo qua vi khong tim thay so don hang trong file OrderDetails --
   // day la DOANH THU THAT bi mat, khac voi "unmapped ten san pham" (van con
@@ -637,6 +646,7 @@ function buildReconciliation(store) {
     lockDate,
     allCodes: Array.from(allCodes).sort(),
     unmappedWarnings,
+    unmappedPayooGians,
     invoiceDiemAlias,
     unmatchedInvoiceCodes: Array.from(unmatchedInvoiceCodesSet).sort(),
     pendingOnlineGian,
@@ -748,6 +758,7 @@ router.get("/doi-soat/zvp", (req, res) => {
     gianMapping: store.zvp_gian_mapping,
     allCodes: built.allCodes || [],
     unmappedWarnings: built.unmappedWarnings || [],
+    unmappedPayooGians: built.unmappedPayooGians || [],
     invoiceDiemAlias: built.invoiceDiemAlias || {},
     unmatchedInvoiceCodes: built.unmatchedInvoiceCodes || [],
     pendingOnlineGian: built.pendingOnlineGian || [],
@@ -1445,6 +1456,22 @@ router.post("/doi-soat/zvp/upload-payoo-raw", requireDataEntry, upload.single("f
   } catch (e) {
     res.redirect("/doi-soat/zvp?error=" + encodeURIComponent(e.message));
   }
+});
+
+// ---------- Them thu cong 1 Payoo gian moi vao diem_map ----------
+router.post("/doi-soat/zvp/payoo-gian-add", requireAdmin, (req, res) => {
+  const store = load();
+  const storeCode = (req.body.storeCode || "").trim();
+  const maCongTrinh = (req.body.maCongTrinh || "").trim();
+  const isCse = req.body.isCse === "on" || req.body.isCse === "1" || req.body.isCse === "true";
+  if (!storeCode || !maCongTrinh) {
+    return res.redirect("/doi-soat/zvp?error=" + encodeURIComponent("Cần nhập mã cửa hàng và mã công trình."));
+  }
+  if (!store.zvp_payoo_diem_map) store.zvp_payoo_diem_map = {};
+  store.zvp_payoo_diem_map[storeCode] = { maCongTrinh, isCse };
+  seedGianMappingDefaults(store, [maCongTrinh]);
+  save(store);
+  res.redirect("/doi-soat/zvp?success=" + encodeURIComponent(`Đã thêm mapping: ${storeCode} → ${maCongTrinh}. Tải lại file Payoo thô để áp dụng.`));
 });
 
 // ---------- Upload: bang gian tong hop hang ngay (sheet "gian ") ----------
