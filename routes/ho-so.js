@@ -493,36 +493,35 @@ router.post("/ho-so/phi-cang-phu-quoc/upload-anh", requireDataEntry, uploadMem.a
 
 // ─── Sync Hóa Đơn NCC từ Google Drive ────────────────────────────────────────
 // Luyen, 2026-08-25: "cập nhật hóa đơn hàng ngày từ gg drive" -- list PDF
-// trong folder Drive, upsert vao store.ho_so_hoa_don (dedup theo driveId).
-// Scope drive.readonly da duoc them vao buildAuthUrl trong gmailApi.js -- neu
-// token cu chua co scope nay, Drive API tra 403, error message huong dan re-auth.
-router.post("/ho-so/sync-drive-hoa-don", requireAdmin, async (req, res) => {
+// POST /ho-so/hoa-don-ncc/bulk-upsert
+// Body JSON: { files: [{driveId, fileName}] }
+// Upsert theo driveId. Dung cho Claude Cowork sync tu Google Drive (khong can OAuth Railway).
+router.post("/ho-so/hoa-don-ncc/bulk-upsert", requireAdmin, express.json(), (req, res) => {
   const store = load();
   ensureHoSo(store);
-  try {
-    const files = await driveApi.listFolderFiles(store, driveApi.DRIVE_HOADON_FOLDER_ID, "application/pdf");
-    const existingIds = new Set(store.ho_so_hoa_don.map((r) => r.driveId));
-    let added = 0;
-    files.forEach((f) => {
-      if (!existingIds.has(f.id)) {
-        store.ho_so_hoa_don.push({
-          driveId: f.id,
-          fileName: f.name,
-          addedAt: new Date().toISOString(),
-        });
-        added++;
-      }
+  const files = req.body && Array.isArray(req.body.files) ? req.body.files : [];
+  const existingIds = new Set(store.ho_so_hoa_don.map((r) => r.driveId));
+  let added = 0, skipped = 0;
+  files.forEach((f) => {
+    const driveId  = String(f.driveId  || "").trim();
+    const fileName = String(f.fileName || "").trim();
+    if (!driveId || !fileName) { skipped++; return; }
+    if (existingIds.has(driveId)) { skipped++; return; }
+    store.ho_so_hoa_don.push({
+      driveId,
+      fileName,
+      addedAt: new Date().toISOString(),
     });
-    save(store);
-    res.redirect(
-      "/ho-so/hoa-don-ncc?success=" +
-        encodeURIComponent(
-          "Đã sync Drive: thêm " + added + " file mới (tổng " + files.length + " file trong folder)."
-        )
-    );
-  } catch (e) {
-    res.redirect("/ho-so/hoa-don-ncc?error=" + encodeURIComponent(e.message));
-  }
+    existingIds.add(driveId);
+    added++;
+  });
+  save(store);
+  res.json({ success: true, added, skipped });
+});
+
+// Route cu - giu lai de khong bi 404 nhung khong dung OAuth nua
+router.post("/ho-so/sync-drive-hoa-don", requireAdmin, (req, res) => {
+  res.redirect("/ho-so/hoa-don-ncc?error=" + encodeURIComponent("Vui lòng dùng Claude Cowork → nhắn: sync hóa đơn drive"));
 });
 
 // ─── Sync Phí Cảng từ Google Drive ───────────────────────────────────────────
