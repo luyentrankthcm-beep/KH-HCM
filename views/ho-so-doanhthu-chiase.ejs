@@ -109,6 +109,14 @@
           <label>Mã công trình</label>
           <input type="text" id="inp-ma-ct" placeholder="VD: HCM-LPT-001" style="min-width:160px;" />
         </div>
+        <div>
+          <label>Từ tháng</label>
+          <input type="text" id="inp-tu-thang" placeholder="VD: 01/2025" style="min-width:110px;" />
+        </div>
+        <div>
+          <label>Đến tháng</label>
+          <input type="text" id="inp-den-thang" placeholder="VD: 12/2025 (bỏ trống = đang HĐ)" style="min-width:170px;" />
+        </div>
         <div style="flex:1;min-width:200px;">
           <label>Ghi chú</label>
           <input type="text" id="inp-diem-ghichu" placeholder="Ghi chú..." style="width:100%;" />
@@ -131,6 +139,7 @@
             <th style="width:36px;">#</th>
             <th>Tên điểm / Gian</th>
             <th style="width:170px;">Mã công trình</th>
+            <th style="width:160px;">Thời gian HĐ</th>
             <th>Ghi chú</th>
             <th style="width:80px;text-align:center;">Tháng</th>
             <th style="width:70px;"></th>
@@ -142,6 +151,11 @@
             <td style="color:#bbb;font-size:.78em;"><%= i+1 %></td>
             <td><strong><%= d.tenDiem || '—' %></strong></td>
             <td style="font-family:monospace;font-size:.85em;color:#1e3a5f;"><%= d.maCongTrinh || '—' %></td>
+            <td style="font-size:.82em;color:#475569;white-space:nowrap;">
+              <% if (d.tuThang || d.denThang) { %>
+                <%= d.tuThang || '?' %> → <%= d.denThang ? d.denThang : '<span style="color:#16a34a;font-weight:600;">Đang HĐ</span>' %>
+              <% } else { %>—<% } %>
+            </td>
             <td style="color:#555;font-size:.84em;"><%= d.ghiChu || '' %></td>
             <td style="text-align:center;" id="diem-count-<%= d.id %>"><span style="color:#bbb;">—</span></td>
             <td onclick="event.stopPropagation()">
@@ -251,9 +265,13 @@
       const btn = event.target;
       btn.disabled = true; btn.textContent = 'Đang lưu...';
       const tabKey = document.getElementById('inp-tab-key').value;
+      const tuThang  = document.getElementById('inp-tu-thang').value.trim();
+      const denThang = document.getElementById('inp-den-thang').value.trim();
       fetch('/ho-so/dtcs-chiase/diem/them', {
         method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'},
-        body: 'tenDiem='+encodeURIComponent(ten)+'&maCongTrinh='+encodeURIComponent(ma)+'&ghiChu='+encodeURIComponent(ghi)+'&tabKey='+encodeURIComponent(tabKey)
+        body: 'tenDiem='+encodeURIComponent(ten)+'&maCongTrinh='+encodeURIComponent(ma)
+          +'&tuThang='+encodeURIComponent(tuThang)+'&denThang='+encodeURIComponent(denThang)
+          +'&ghiChu='+encodeURIComponent(ghi)+'&tabKey='+encodeURIComponent(tabKey)
       }).then(r=>r.json()).then(d=>{
         if(d.success) location.reload();
         else { alert(d.error||'Lỗi'); btn.disabled=false; btn.textContent='Thêm điểm'; }

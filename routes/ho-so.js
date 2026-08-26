@@ -274,12 +274,14 @@ router.get("/ho-so/doanh-thu-chia-se", (req, res) => {
 router.post("/ho-so/dtcs-chiase/diem/them", requireAdmin, (req, res) => {
   const store = load();
   if (!store.dtcs_chiase_diem) store.dtcs_chiase_diem = [];
-  const { tenDiem, maCongTrinh, ghiChu, tabKey } = req.body;
+  const { tenDiem, maCongTrinh, ghiChu, tabKey, tuThang, denThang } = req.body;
   store.dtcs_chiase_diem.push({
     id: nextId(store),
     tabKey: (tabKey||"tien-thue-co-dinh").trim(),
     tenDiem: (tenDiem||"").trim(),
     maCongTrinh: (maCongTrinh||"").trim(),
+    tuThang: (tuThang||"").trim(),
+    denThang: (denThang||"").trim(),
     ghiChu: (ghiChu||"").trim(),
     createdAt: new Date().toISOString(),
   });
@@ -293,6 +295,8 @@ router.post("/ho-so/dtcs-chiase/diem/:id/sua", requireAdmin, (req, res) => {
   if (!r) return res.json({ success: false, error: "Không tìm thấy" });
   r.tenDiem = (req.body.tenDiem||"").trim();
   r.maCongTrinh = (req.body.maCongTrinh||"").trim();
+  r.tuThang = (req.body.tuThang||"").trim();
+  r.denThang = (req.body.denThang||"").trim();
   r.ghiChu = (req.body.ghiChu||"").trim();
   save(store);
   res.json({ success: true });
