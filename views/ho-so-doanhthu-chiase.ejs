@@ -137,14 +137,14 @@
         </thead>
         <tbody>
           <% diemList.forEach(function(d, i) { %>
-          <tr class="diem-row" onclick="openDiem('<%= d.id %>', <%- JSON.stringify(d.tenDiem) %>, <%- JSON.stringify(d.maCongTrinh) %>)">
+          <tr class="diem-row" onclick="openDiem('<%= d.id %>')">
             <td style="color:#bbb;font-size:.78em;"><%= i+1 %></td>
             <td><strong><%= d.tenDiem || '—' %></strong></td>
             <td style="font-family:monospace;font-size:.85em;color:#1e3a5f;"><%= d.maCongTrinh || '—' %></td>
             <td style="color:#555;font-size:.84em;"><%= d.ghiChu || '' %></td>
             <td style="text-align:center;" id="diem-count-<%= d.id %>"><span style="color:#bbb;">—</span></td>
             <td onclick="event.stopPropagation()">
-              <button class="btn-del" title="Xóa điểm này" onclick="xoaDiem('<%= d.id %>', <%- JSON.stringify(d.tenDiem) %>)">🗑️</button>
+              <button class="btn-del" title="Xóa điểm này" onclick="xoaDiem('<%= d.id %>')">🗑️</button>
             </td>
           </tr>
           <% }); %>
@@ -218,7 +218,25 @@
     </div>
 
     <script>
+    const DIEM_DATA = <%- JSON.stringify(diemList) %>;
     let _curDiemId = null;
+
+    function openDiem(id) {
+      const d = DIEM_DATA.find(x => String(x.id) === String(id));
+      _curDiemId = id;
+      document.getElementById('modal-ten-diem').textContent = d ? (d.tenDiem || '—') : '—';
+      document.getElementById('modal-ma-ct').textContent = 'Mã công trình: ' + (d ? (d.maCongTrinh || '—') : '—');
+      document.getElementById('diem-modal-bg').style.display = 'block';
+      loadThang(id);
+    }
+
+    function xoaDiem(id) {
+      const d = DIEM_DATA.find(x => String(x.id) === String(id));
+      const ten = d ? d.tenDiem : id;
+      if (!confirm('Xóa điểm "' + ten + '" và toàn bộ dữ liệu tháng?')) return;
+      fetch('/ho-so/dtcs-chiase/diem/' + id + '/xoa', { method:'POST' })
+        .then(r=>r.json()).then(d=>{ if(d.success) location.reload(); else alert(d.error||'Lỗi'); });
+    }
 
     function themDiem() {
       const ten = document.getElementById('inp-ten-diem').value.trim();
@@ -229,25 +247,11 @@
       btn.disabled = true; btn.textContent = 'Đang lưu...';
       fetch('/ho-so/dtcs-chiase/diem/them', {
         method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'},
-        body: `tenDiem=${encodeURIComponent(ten)}&maCongTrinh=${encodeURIComponent(ma)}&ghiChu=${encodeURIComponent(ghi)}`
+        body: 'tenDiem='+encodeURIComponent(ten)+'&maCongTrinh='+encodeURIComponent(ma)+'&ghiChu='+encodeURIComponent(ghi)
       }).then(r=>r.json()).then(d=>{
         if(d.success) location.reload();
         else { alert(d.error||'Lỗi'); btn.disabled=false; btn.textContent='Thêm điểm'; }
       }).catch(()=>{ btn.disabled=false; btn.textContent='Thêm điểm'; });
-    }
-
-    function xoaDiem(id, ten) {
-      if (!confirm('Xóa điểm "' + ten + '" và toàn bộ dữ liệu tháng?')) return;
-      fetch('/ho-so/dtcs-chiase/diem/' + id + '/xoa', { method:'POST' })
-        .then(r=>r.json()).then(d=>{ if(d.success) location.reload(); else alert(d.error||'Lỗi'); });
-    }
-
-    function openDiem(id, ten, maCT) {
-      _curDiemId = id;
-      document.getElementById('modal-ten-diem').textContent = ten || '—';
-      document.getElementById('modal-ma-ct').textContent = 'Mã công trình: ' + (maCT || '—');
-      document.getElementById('diem-modal-bg').style.display = 'block';
-      loadThang(id);
     }
 
     function closeModal() {
