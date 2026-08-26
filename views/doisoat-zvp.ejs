@@ -447,6 +447,32 @@
         <input type="file" name="file" accept=".xlsx,.xls" required />
         <button type="submit" class="btn btn-primary">Tải lên</button>
       </form>
+      <% var payooRawUploads = (payooUploads || []).filter(function(u){ return u.file_name && u.file_name.startsWith('[File thô]'); }); %>
+      <% if (payooRawUploads.length > 0) { %>
+      <details style="margin-top:12px;">
+        <summary class="muted" style="cursor:pointer;">Đã tải <%= payooRawUploads.length %> file thô (bấm để xem / xóa)</summary>
+        <table class="table" style="margin-top:8px;font-size:12px;">
+          <thead><tr><th>File</th><th>Ngày tải</th><th>Khoảng ngày</th><th>Gian</th><th></th></tr></thead>
+          <tbody>
+          <% payooRawUploads.slice().reverse().forEach(function(u) { %>
+          <tr>
+            <td style="word-break:break-all;max-width:200px;"><%= u.file_name.replace('[File thô] ','') %></td>
+            <td style="white-space:nowrap;"><%= new Date(u.uploaded_at).toLocaleString('vi-VN') %></td>
+            <td style="white-space:nowrap;font-size:11px;"><%= (u.dates||[]).length > 0 ? (u.dates[0] + (u.dates.length > 1 ? ' → ' + u.dates[u.dates.length-1] : '')) : '—' %></td>
+            <td style="font-size:11px;max-width:160px;"><%= (u.codes||[]).join(', ') || ((u.unmapped||[]).length > 0 ? '⚠️ chưa map' : '—') %></td>
+            <% if (isAdmin) { %>
+            <td>
+              <form method="POST" action="/doi-soat/zvp/upload-payoo/<%= u.id %>/delete" onsubmit="return confirm('Xóa lần tải này?');" style="display:inline;">
+                <button type="submit" class="btn btn-danger btn-sm" style="font-size:11px;padding:2px 8px;">Xóa</button>
+              </form>
+            </td>
+            <% } %>
+          </tr>
+          <% }) %>
+          </tbody>
+        </table>
+      </details>
+      <% } %>
         </div>
       </details>
     </section>
