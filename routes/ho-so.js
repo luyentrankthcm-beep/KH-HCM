@@ -245,15 +245,16 @@ router.post("/ho-so/phi-cang-phu-quoc/:id/sua", requireAdmin, (req, res) => {
 
 // ─── Doanh Thu Chia Sẻ ────────────────────────────────────────────────────
 const DTCS_TABS = [
-  { key: 'mall-giu-tien',      label: '🏦 Mall giữ tiền' },
+  { key: 'mall-tru-chi-phi',   label: '🏦 Mall giữ tiền — Trừ chi phí' },
+  { key: 'mall-phan-tram-dt',  label: '🏦 Mall giữ tiền — % Doanh thu' },
   { key: 'tien-thue-vuot',     label: '📈 Tiền thuê vượt' },
-  { key: 'tien-thue-co-dinh',  label: '📋 Tiền thuê chia cố định' },
+  { key: 'tien-thue-co-dinh',  label: '📊 Chia sẻ trên %DT (mình giữ tiền)' },
 ];
 router.get("/ho-so/doanh-thu-chia-se", (req, res) => {
   const store = load();
   const activeTab = DTCS_TABS.some(t => t.key === req.query.tab) ? req.query.tab : DTCS_TABS[0].key;
   const allRows = (store.ho_so_doanhthu_chiase || []).slice().sort((a,b) => (b.ngay||'').localeCompare(a.ngay||''));
-  const rows = allRows.filter(r => (r.loaiTab || 'mall-giu-tien') === activeTab);
+  const rows = allRows.filter(r => (r.loaiTab || DTCS_TABS[0].key) === activeTab);
   res.render("ho-so-doanhthu-chiase", {
     userName: req.session.userName,
     rows,
