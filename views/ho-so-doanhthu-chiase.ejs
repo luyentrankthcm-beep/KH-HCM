@@ -187,51 +187,51 @@
           <h4>➕ Thêm tháng mới</h4>
           <div class="fg">
             <div>
-              <label>Tháng/Năm</label>
+              <label id="lbl-thang">Tháng/Năm</label>
               <input type="text" id="t-thang" placeholder="VD: 08/2026" />
             </div>
-            <div>
+            <div data-field-generic>
               <label>% DT bên họ giữ</label>
               <input type="text" id="t-pct-ho" placeholder="VD: 30%" />
             </div>
-            <div>
+            <div data-field-generic>
               <label>% DT bên mình giữ</label>
               <input type="text" id="t-pct-minh" placeholder="VD: 70%" />
             </div>
             <div>
-              <label>Tổng DT tháng (đ)</label>
+              <label>Tổng DT (đ)</label>
               <input type="text" id="t-tongdt" placeholder="VD: 150.000.000" />
             </div>
             <div>
-              <label>Mình nhận (đ)</label>
+              <label id="lbl-nhan">Mình nhận (đ)</label>
               <input type="text" id="t-nhan" placeholder="Số tiền mình nhận" />
             </div>
-            <div>
+            <div data-field-generic>
               <label>Mình trả cho họ (đ)</label>
               <input type="text" id="t-tra" placeholder="Số tiền mình trả họ" />
             </div>
-            <div>
+            <div data-field-generic>
               <label>HĐ họ xuất (link/số)</label>
               <input type="text" id="t-hoadon" placeholder="Link Drive hoặc số HĐ" />
             </div>
-            <div>
+            <div data-field-generic>
               <label>TK thanh toán</label>
               <input type="text" id="t-tk" placeholder="VD: MB Bank 123..." />
             </div>
-            <div>
+            <div data-field-generic>
               <label>Ngày thanh toán</label>
               <input type="date" id="t-ngaytt" />
             </div>
-            <div>
+            <div data-field-mall>
               <label>Tiền thuê kỳ (2)</label>
               <input type="text" id="t-tien-thue" placeholder="VD: 50.000.000" />
             </div>
-            <div>
-              <label>Khấu trừ khác (3)</label>
+            <div data-field-mall>
+              <label>Khấu trừ (3)</label>
               <input type="text" id="t-khoau-tru" placeholder="VD: 32.000.000" />
             </div>
             <div class="full">
-              <label>Link Drive đối soát (biên bản, bảng kê...)</label>
+              <label>Link Drive đối soát</label>
               <input type="text" id="t-link-ds" placeholder="https://drive.google.com/..." />
             </div>
             <div class="full">
@@ -257,7 +257,24 @@
       document.getElementById('modal-ma-ct').textContent = 'Mã công trình: ' + (d ? (d.maCongTrinh || '—') : '—');
       _curTabKey = d ? (d.tabKey || '') : '';
       document.getElementById('diem-modal-bg').classList.add('open');
+      adaptForm(_curTabKey);
       loadThang(id);
+    }
+
+    function adaptForm(tabKey) {
+      const isMall = tabKey === 'mall-tru-chi-phi';
+      // Toggle generic fields (% DT, Mình trả, HĐ họ xuất, TK TT, Ngày TT)
+      document.querySelectorAll('[data-field-generic]').forEach(el => {
+        el.style.display = isMall ? 'none' : '';
+      });
+      // Toggle mall-only fields (Tiền thuê, Khấu trừ)
+      document.querySelectorAll('[data-field-mall]').forEach(el => {
+        el.style.display = isMall ? '' : 'none';
+      });
+      // Relabel
+      document.getElementById('lbl-thang').textContent = isMall ? 'Kỳ đối soát' : 'Tháng/Năm';
+      document.getElementById('lbl-nhan').textContent  = isMall ? 'Settlement (nhận) (đ)' : 'Mình nhận (đ)';
+      document.getElementById('t-thang').placeholder   = isMall ? 'VD: 01-15/08/2026' : 'VD: 08/2026';
     }
 
     function xoaDiem(id) {
