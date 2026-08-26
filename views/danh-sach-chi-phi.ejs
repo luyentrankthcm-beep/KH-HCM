@@ -404,6 +404,7 @@
           var r = data.record;
           var cells = tr.querySelectorAll('td');
           // cells: 0=ngày,1=gian,2=tkKT,3=ncc,4=soHD,5=Loại(phanLoai),6=soUNC,7=CTLQ,8=dienGiai,9=soTien,10=chi,11=HT
+          if (cells[1]) { var _g1=cells[1].querySelector('.dsch-cell-1'); if(_g1){_g1.textContent=r.gian||'—';_g1.title=r.gian||'';} }
           if (cells[3]) cells[3].querySelector('div').textContent = r.ncc || '—';
           if (cells[4]) cells[4].textContent = r.soHoaDon || '—';
           if (cells[5]) {
