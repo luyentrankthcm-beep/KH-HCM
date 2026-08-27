@@ -2073,7 +2073,12 @@ function renderVietQrPage(req, res, activeKeys, pageTitle, pageSubtitle) {
     }
     rows.forEach((r) => {
       r.lines.forEach((l) => {
-        const maCongTrinh = resolveMaCongTrinh(l.code);
+        // Luyen 2026-08-27: neu code la __VANG_LAI__ thi dung l.maCongTrinh
+        // (da duoc map sang vangLaiCode trong reconcileVietQr) thay vi goi
+        // displayMaCongTrinhFor(__VANG_LAI__) tra ve "_VANG_LAI_" sai.
+        const maCongTrinh = l.code === "__VANG_LAI__" && l.maCongTrinh
+          ? l.maCongTrinh
+          : resolveMaCongTrinh(l.code);
         // Chi Nhan (2026-07-27): khong con chia theo chia se (CSE)/khong
         // chia se nua -- gop thang theo ten Ma Cong Trinh da quy ve.
         const groupKey = maCongTrinh;
