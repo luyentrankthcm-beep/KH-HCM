@@ -757,6 +757,7 @@ router.get("/doi-soat/zvp", (req, res) => {
     allCodes: built.allCodes || [],
     unmappedWarnings: built.unmappedWarnings || [],
     unmappedPayooGians: built.unmappedPayooGians || [],
+    payooDiemMap: store.zvp_payoo_diem_map || {},
     invoiceDiemAlias: built.invoiceDiemAlias || {},
     unmatchedInvoiceCodes: built.unmatchedInvoiceCodes || [],
     pendingOnlineGian: built.pendingOnlineGian || [],
@@ -1397,7 +1398,10 @@ router.post("/doi-soat/zvp/upload-payoo-raw", requireDataEntry, upload.single("f
       addedCount++;
     }
 
-    if (addedCount === 0 && upgradedCount === 0) {
+    // Ke ca khi all dup (addedCount=0), van tinh lai toan bo vi mapping co the
+    // vua duoc cap nhat — gian truoc bi unmapped nay duoc tinh. Chi skip neu
+    // raw_tx hoan toan trong (khong co du lieu gi de tinh).
+    if (addedCount === 0 && upgradedCount === 0 && Object.keys(store.zvp_payoo_raw_tx).length === 0) {
       return res.redirect(
         "/doi-soat/zvp?success=" +
           encodeURIComponent(`File "${req.file.originalname}": ca ${dupCount} giao dich deu da co roi (bo qua toan bo, khong trung lap).`)

@@ -625,11 +625,17 @@ router.get("/doi-soat/momo", (req, res) => {
       lines.forEach((l) => {
         const mm = momoManual[`${r.settlementDate}|${l.code}`];
         if (!mm) return;
+        if (mm.grossAdjustment) {
+          l.grossOriginal = l.gross;
+          l.gross += mm.grossAdjustment;
+          l.grossAdjusted = true;
+        }
         if (mm.invoiceNumbers) l.invoiceNumbers = mm.invoiceNumbers;
         if (mm.amount !== null && mm.amount !== undefined) l.invoiceTotal = mm.amount;
         l.diff = l.invoiceTotal - l.gross;
         l.matched = l.invoiceNumbers.length > 0 && Math.abs(l.diff) <= 1000;
         l.manualOverride = true;
+        l.grossAdjustmentVal = mm.grossAdjustment || 0;
       });
       if (activeCompany !== "kh_moi") return { ...r, lines };
       // pendingBank (chua co giao dich ngan hang that cho ngay nay -- xem
@@ -1176,7 +1182,7 @@ router.post("/doi-soat/momo/manual-match", requireDataEntry, (req, res) => {
   const store = load();
   if (!store.momo_manual_matches) store.momo_manual_matches = {};
   try {
-    const { settlementDate, code, invoiceNumbers, amount } = req.body;
+    const { settlementDate, code, invoiceNumbers, amount, grossAdjustment } = req.body;
     if (!settlementDate || !code) throw new Error("Thiếu settlementDate hoặc code.");
     const key = `${settlementDate}|${code}`;
     const invoiceList = (invoiceNumbers || "")
@@ -1184,9 +1190,14 @@ router.post("/doi-soat/momo/manual-match", requireDataEntry, (req, res) => {
       .map((s) => s.trim())
       .filter(Boolean);
     const amt = amount ? Number(String(amount).replace(/[^\d]/g, "")) : null;
+    const existing = store.momo_manual_matches[key] || {};
+    const grossAdj = grossAdjustment !== undefined && grossAdjustment !== ""
+      ? Number(String(grossAdjustment).replace(/[^\d\-]/g, "")) || 0
+      : (existing.grossAdjustment || 0);
     store.momo_manual_matches[key] = {
       invoiceNumbers: invoiceList,
       amount: amt,
+      grossAdjustment: grossAdj,
       created_at: new Date().toISOString(),
     };
     save(store);

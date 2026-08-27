@@ -1132,6 +1132,32 @@ function buildSaokeRows(store, activeCompany, selectedMonth, selectedBankName, s
     if (r.bankTxId) chiPhiByBankTxId[r.bankTxId] = r;
     chiPhiCompany.push(r);
   });
+  // Luyen, 2026-08-27: "thường diễn giải dò bên chi phí đó á danh sách chi phí Mn
+  // rồi điền gian, bên kia 1388 thì đem qua đây 1388 luôn" -- xay chi_phi NCC→gian
+  // index tu cac dong chi_phi DA CO gian, de dung lam fallback khi khong khop duoc
+  // qua so tien+ngay+NCC name (VD: NCC tra theo nhieu lan nho, so tien kha khac nhau).
+  const cpNccGianIdx = {};
+  chiPhiCompany.forEach((r) => {
+    if (!r.ncc || !r.gian) return;
+    const k = normText(r.ncc);
+    if (!cpNccGianIdx[k]) cpNccGianIdx[k] = [];
+    if (!cpNccGianIdx[k].find((x) => x.gian === r.gian))
+      cpNccGianIdx[k].push({ gian: r.gian, dtChiaSe: !!r.dtChiaSe });
+  });
+  function suggestGianFromChiPhiList(tenDoiUng) {
+    const normDU = normText(tenDoiUng || "");
+    if (!normDU) return null;
+    let hits = [];
+    for (const [k, list] of Object.entries(cpNccGianIdx)) {
+      const words = k.split(/\s+/).filter((w) => w.length >= 5);
+      if (words.length > 0 && words.some((w) => normDU.includes(w))) hits = hits.concat(list);
+    }
+    if (hits.length === 0) return null;
+    // Chi ap dung khi tat ca ket qua deu tro ve cung 1 gian (tranh loan khi 1 NCC co nhieu gian)
+    const uniqueGians = [...new Set(hits.map((h) => h.gian))];
+    if (uniqueGians.length !== 1) return null;
+    return hits[0];
+  }
   const saokGianOvr = store.chi_phi_saoke_gian_override || {};
   const AMOUNT_TOL = 1000;
   const DATE_WIN_MS = 7 * 86400000;
@@ -1227,19 +1253,39 @@ function buildSaokeRows(store, activeCompany, selectedMonth, selectedBankName, s
     const ovr = saokGianOvr[String(t.id)] || null;
     // Luyen, 2026-08-21: dung gian tu giao dich (t.gian, da gan tren trang sao ke)
     // lam fallback neu chua co tu chi_phi hoac override tay.
-    const finalGian = cpGian || (ovr && ovr.gian) || t.gian || "";
-    const finalTk = cpTk || (ovr && ovr.tk) || (t.gian ? getGianTK(t.gian, chiaSeTKSet, gianNameTkMap) : "") || "";
+    // Override tay (tu modal saoke) uu tien cao nhat, ke ca khi da khop chi_phi.
+    const finalGian = (ovr && ovr.gian) || cpGian || t.gian || "";
+    const finalTk = (ovr && ovr.tk) || cpTk || (t.gian ? getGianTK(t.gian, chiaSeTKSet, gianNameTkMap) : "") || "";
     const bankOpLabel = detectBankOp(t.description, t.tenDoiUng);
+    // Auto-fill gian tu NCC→gian lookup (hoa_don_dau_vao_gian_list, fallback chi_phi list)
+    // theo yeu cau Luyen 2026-08-27: tu dong dien gian ma khong can bam xac nhan.
     let suggestedGian = "", suggestedTk = "";
     if (!finalGian && t.type === "chi" && !bankOpLabel) {
-      const sug = suggestGianForTx(t.tenDoiUng, t.description);
-      if (sug) { suggestedGian = sug.gianHang; suggestedTk = getGianTK(sug.gianHang, chiaSeTKSet, gianNameTkMap); }
+      const sug1 = suggestGianForTx(t.tenDoiUng, t.description);
+      if (sug1) {
+        suggestedGian = sug1.gianHang;
+        suggestedTk = getGianTK(sug1.gianHang, chiaSeTKSet, gianNameTkMap);
+      } else {
+        const sug2 = suggestGianFromChiPhiList(t.tenDoiUng);
+        if (sug2) {
+          suggestedGian = sug2.gian;
+          suggestedTk = sug2.dtChiaSe ? "1388" : getGianTK(sug2.gian, chiaSeTKSet, gianNameTkMap);
+        }
+      }
     }
+    // Neu user da co y xoa gian (cleared=true), bo qua moi auto-fill/suggestion.
+    const userCleared = !!(ovr && ovr.cleared);
+    // Auto-apply suggestion: dien vao finalGian/finalTk luon, khong can bam xac nhan.
+    const finalGianFull = userCleared ? "" : (finalGian || suggestedGian || "");
+    const finalTkFull = userCleared ? "" : (finalTk || suggestedTk || "");
+    // Van giu suggestedGian trong row de view biet day la goi y (hien thi icon ≈)
+    // nhung KHONG hien nut xac nhan nua vi da tu dong ap dung.
+    const gianFromSuggestion = !userCleared && !finalGian && !!suggestedGian;
     return {
       id: t.id, txType: t.type || "chi", date: t.date, bankName, bankLabel,
       tenDoiUng: t.tenDoiUng || "", description: t.description || "", amount: t.amount,
       soHoaDon: (cp && cp.soHoaDon) || findSoHoaDonFromHD(t.tenDoiUng, t.amount, t.date),
-      gian: finalGian,
+      gian: finalGianFull,
       // Luyen, 2026-08-25: uu tien NCC tu hoa don (hoa_don_dau_vao+ncc_list),
       // fallback = cp.ncc (UNC matching nhu truoc).
       ncc: _lookupNccFromInvoice(
@@ -1247,7 +1293,13 @@ function buildSaokeRows(store, activeCompany, selectedMonth, selectedBankName, s
         store, activeCompany
       ) || (cp && cp.ncc) || "",
       daHachToan: cp ? !!cp.daHachToan : false, chiPhiId: (cp && cp.id) || "",
-      matchType, tk: finalTk, hasOvr: !!ovr, suggestedGian, suggestedTk, bankOpLabel: bankOpLabel || "",
+      matchType, tk: finalTkFull,
+      hasOvr: !!ovr,
+      // gianFromSuggestion=true: gian duoc tu dong dien tu NCC lookup (khong phai tu chi_phi match),
+      // view hien thi "≈" de phan biet nhung KHONG hien nut xac nhan nua.
+      suggestedGian: gianFromSuggestion ? finalGianFull : "",
+      suggestedTk: gianFromSuggestion ? finalTkFull : "",
+      bankOpLabel: bankOpLabel || "",
     };
   }).sort((a, b) => a.date.localeCompare(b.date));
 
@@ -1597,8 +1649,11 @@ router.post("/doi-soat/chi-phi-saoke/set-gian-banktx", requireDataEntry, (req, r
     const { bankTxId, gian, tk } = req.body;
     if (!bankTxId) throw new Error("Thieu bankTxId.");
     if (tk && tk !== "1388" && tk !== "331") throw new Error("TK phai la 1388 hoac 331.");
-    if (!gian && !tk) {
-      delete store.chi_phi_saoke_gian_override[String(bankTxId)];
+    if (!gian) {
+      // Giu lai entry voi cleared=true thay vi xoa han, de auto-suggestion
+      // khong fill lai khi user co y xoa gian (Luyen, 2026-08-27).
+      // Dung !gian (khong can !tk) vi user co the giu TK nhung van muon xoa Gian.
+      store.chi_phi_saoke_gian_override[String(bankTxId)] = { gian: "", tk: tk || "", cleared: true };
     } else {
       store.chi_phi_saoke_gian_override[String(bankTxId)] = { gian: gian || "", tk: tk || "" };
     }

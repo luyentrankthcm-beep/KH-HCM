@@ -126,12 +126,14 @@
 
     <% if (unmappedWarnings && unmappedWarnings.length > 0) { %>
     <section class="panel">
-      <h2>⚠️ Cảnh báo chưa khớp / doanh thu có thể bị thiếu</h2>
-      <ul>
-        <% unmappedWarnings.forEach(function(w) { %>
-        <li class="badge badge-warn" style="display:block; margin-bottom:6px; white-space:normal;"><%= w %></li>
-        <% }) %>
-      </ul>
+      <details>
+        <summary style="cursor:pointer;font-weight:700;font-size:15px;">⚠️ Cảnh báo chưa khớp / doanh thu có thể bị thiếu (<%= unmappedWarnings.length %>)</summary>
+        <ul style="margin-top:10px;">
+          <% unmappedWarnings.forEach(function(w) { %>
+          <li class="badge badge-warn" style="display:block; margin-bottom:6px; white-space:normal;"><%= w %></li>
+          <% }) %>
+        </ul>
+      </details>
     </section>
     <% } %>
 
@@ -166,9 +168,13 @@
     </section>
     <% } %>
 
-    <% if (unmappedPayooGians && unmappedPayooGians.length > 0) { %>
-    <section class="panel" style="border:2px solid #f59e0b; background:#fffbeb;">
+    <%
+      var _mappedPayooList = Object.keys(payooDiemMap || {}).sort();
+    %>
+    <% if ((unmappedPayooGians && unmappedPayooGians.length > 0) || _mappedPayooList.length > 0) { %>
+    <section class="panel" style="<%= unmappedPayooGians && unmappedPayooGians.length > 0 ? 'border:2px solid #f59e0b; background:#fffbeb;' : '' %>">
       <h2>🆕 Cửa hàng Payoo mới chưa có mã công trình</h2>
+      <% if (unmappedPayooGians && unmappedPayooGians.length > 0) { %>
       <p class="muted">Các mã cửa hàng Payoo dưới đây xuất hiện trong file đã tải lên nhưng chưa được map về Mã công trình. Doanh thu của các cửa hàng này đang BỊ BỎ QUA. Điền mã công trình và bấm Lưu, sau đó tải lại file Payoo thô để áp dụng.</p>
       <% unmappedPayooGians.forEach(function(g) { %>
       <form method="POST" action="/doi-soat/zvp/payoo-gian-add" class="form-inline" style="margin-bottom:8px;">
@@ -180,6 +186,34 @@
         <button type="submit" class="btn btn-secondary" style="margin-left:6px;">💾 Lưu</button>
       </form>
       <% }) %>
+      <% } else { %>
+      <p class="muted">Tất cả cửa hàng Payoo đã được map. Xem lịch sử bên dưới.</p>
+      <% } %>
+      <% if (_mappedPayooList.length > 0) { %>
+      <details style="margin-top:12px;">
+        <summary style="cursor:pointer;font-size:13px;color:var(--color-primary,#d46a9f);font-weight:600;">
+          📋 Lịch sử đã map (<%= _mappedPayooList.length %> cửa hàng)
+        </summary>
+        <table class="table" style="margin-top:10px;font-size:13px;">
+          <thead>
+            <tr>
+              <th>Mã cửa hàng Payoo</th>
+              <th>Mã công trình</th>
+              <th style="width:80px;text-align:center;">CSE</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% _mappedPayooList.forEach(function(code) { %>
+            <tr>
+              <td><code style="font-size:12px;"><%= code %></code></td>
+              <td><strong><%= payooDiemMap[code].maCongTrinh %></strong></td>
+              <td style="text-align:center;"><%= payooDiemMap[code].isCse ? '✓' : '—' %></td>
+            </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </details>
+      <% } %>
     </section>
     <% } %>
 
@@ -731,7 +765,22 @@ Dùng khi hóa đơn cũ/trùng bị cộng nhầm vào đối soát (giống b�
               <tr<%= l.tkCo === 'SKIP' ? ' style="opacity:0.6;"' : '' %>>
                 <td><%= l.maCongTrinh %><%= l.code.endsWith('__FF') ? ' (CSE)' : '' %></td>
                 <td><%= l.tkCo === 'SKIP' ? '—' : l.tkCo %></td>
-                <td><%= l.gross.toLocaleString('vi-VN') %> đ</td>
+                <td>
+                  <%= l.gross.toLocaleString('vi-VN') %> đ<% if (l.grossAdjusted) { %> <span class="muted" style="font-size:10px;" title="Đã chỉnh: gốc <%= l.grossOriginal.toLocaleString('vi-VN') %> đ">✏️</span><% } %>
+                  <% if (isAdmin && !l.locked && l.tkCo !== 'SKIP') { %>
+                  <span onclick="var f=this.nextElementSibling;f.style.display=f.style.display==='none'?'block':'none';" style="cursor:pointer;font-size:13px;margin-left:3px;color:#e67e22;" title="Chỉnh doanh thu gộp">🖊️</span>
+                  <form method="POST" action="/doi-soat/zvp/manual-match" style="display:none;margin-top:4px;">
+                    <input type="hidden" name="channel" value="<%= ch %>" />
+                    <input type="hidden" name="settlementDate" value="<%= r.settlementDate %>" />
+                    <input type="hidden" name="code" value="<%= l.code %>" />
+                    <input type="hidden" name="invoiceNumbers" value="<%= (l.invoiceNumbers||[]).join(', ') %>" />
+                    <input type="hidden" name="amount" value="<%= l.invoiceTotal || '' %>" />
+                    <input type="hidden" name="returnMonth" value="<%= selectedMonth %>" />
+                    <input type="text" name="grossAdjustment" value="<%= l.grossAdjustmentVal || '' %>" placeholder="+/- Sửa DT" title="Nhập số âm để trừ bớt, số dương để cộng thêm doanh thu gộp" style="width:90px;font-size:11px;" />
+                    <button type="submit" class="btn btn-secondary" style="font-size:11px;padding:2px 6px;">Lưu</button>
+                  </form>
+                  <% } %>
+                </td>
                 <td>
                   <%= l.net.toLocaleString('vi-VN') %> đ
                   <% if (l.netOverridden) { %><span class="muted" style="font-size:10px;" title="Gốc: <%= l.netOriginal.toLocaleString('vi-VN') %> đ"> ✏️</span><% } %>

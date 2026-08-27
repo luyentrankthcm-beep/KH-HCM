@@ -292,9 +292,9 @@
           '<td style="padding:4px 6px;border:1px solid #ddd;white-space:nowrap;">' + r.date + '</td>' +
           '<td style="padding:4px 6px;border:1px solid #ddd;white-space:nowrap;">' + soCt + '</td>' +
           '<td style="padding:4px 6px;border:1px solid #ddd;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + (r.description||'').replace(/"/g,'&quot;') + '">' + (r.description||'') + '</td>' +
-          '<td style="padding:4px 6px;border:1px solid #ddd;font-size:11px;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + (r.tenDoiUng||'—') + '</td>' +
-          '<td style="padding:4px 6px;border:1px solid #ddd;font-size:11px;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + (r.ncc||'—') + '</td>' +
-          '<td style="padding:4px 6px;border:1px solid #ddd;"><input data-idx="' + i + '" data-field="maNCC" value="' + (r.maNCC||'') + '" placeholder="Mã NCC" style="width:95px;font-size:11px;border:1px solid #ccc;border-radius:3px;padding:2px 4px;" oninput="updateMisaRow(this)"></td>' +
+          '<td style="padding:4px 6px;border:1px solid #ddd;font-size:11px;white-space:normal;word-break:break-word;">' + (r.tenDoiUng||'—') + '</td>' +
+          '<td style="padding:4px 6px;border:1px solid #ddd;font-size:11px;white-space:normal;word-break:break-word;">' + (r.ncc||'—') + '</td>' +
+          '<td style="padding:4px 6px;border:1px solid #ddd;"><input data-idx="' + i + '" data-field="maNCC" value="' + (r.maNCC||'') + '" placeholder="Mã NCC" style="width:100%;min-width:95px;font-size:11px;border:1px solid #ccc;border-radius:3px;padding:2px 4px;" oninput="updateMisaRow(this)"></td>' +
           '<td style="padding:4px 6px;border:1px solid #ddd;font-size:11px;white-space:nowrap;">' + (r.gian||'—') + '</td>' +
           '<td style="padding:4px 6px;border:1px solid #ddd;"><select data-idx="' + i + '" data-field="tk" onchange="updateMisaRow(this)" style="font-size:11px;">' + tkOpts + '</select></td>' +
           '<td style="padding:4px 6px;border:1px solid #ddd;text-align:right;white-space:nowrap;">' + amtFmt + '</td>' +
@@ -458,18 +458,13 @@
               <td><%= r.soHoaDon || '' %></td>
               <td style="max-width:160px;white-space:nowrap;" title="<%= r.gian || r.suggestedGian || r.bankOpLabel %>">
                 <% if (r.gian) { %>
+                  <% if (r.suggestedGian) { %><span title="Tự động điền từ NCC — bấm để sửa nếu sai" style="color:var(--color-muted,#aaa);font-size:10px;margin-right:2px;">≈</span><% } %>
                   <span style="overflow:hidden;text-overflow:ellipsis;display:inline-block;max-width:120px;vertical-align:middle;" title="<%= r.gian %>"><%= r.gian %></span>
                   <% if (r.hasOvr) { %><span title="Gán tay trên saoke" style="font-size:10px;color:var(--color-muted,#aaa);margin-left:2px;">✏️</span><% } %>
                 <% } else if (r.bankOpLabel) { %>
                   <span style="color:#b08000;font-size:11px;font-style:italic;" title="Phí/nghiệp vụ ngân hàng — không tính vào chi phí gian">🏦 <%= r.bankOpLabel %></span>
                 <% } else if (r.suggestedGian) { %>
-                  <span style="color:var(--color-muted,#888);font-size:11px;font-style:italic;" title="Gợi ý từ NCC">≈ <%= r.suggestedGian %></span>
-                  <form method="POST" action="/doi-soat/chi-phi-saoke/set-gian-banktx" style="display:inline-block;margin-left:3px;">
-                    <input type="hidden" name="bankTxId" value="<%= r.id %>">
-                    <input type="hidden" name="gian" value="<%= r.suggestedGian %>">
-                    <input type="hidden" name="tk" value="<%= r.suggestedTk %>">
-                    <button type="submit" title="Xác nhận gán gian này" style="background:var(--color-success,#2d9e5f);color:#fff;border:none;border-radius:3px;padding:1px 5px;font-size:11px;cursor:pointer;">✓</button>
-                  </form>
+                  <span style="color:var(--color-muted,#888);font-size:11px;" title="Tự động điền từ NCC — bấm modal để sửa nếu sai">≈ <%= r.suggestedGian %></span>
                 <% } else { %>
                   <span class="muted" style="font-size:11px;">—</span>
                 <% } %>

@@ -1566,7 +1566,11 @@ function reconcileZvpChannel(settlements, grossData, invoiceData, gianMapping, m
   for (const inv of invoiceData.invoices) {
     if (!inv.ngayHd || !inv.days || inv.days.length === 0) continue;
     const [invY, invMo, invD] = inv.ngayHd.split("-").map(Number);
-    const baseMaDiem = alias[inv.maDiem] || inv.maDiem;
+    const baseMaDiemRaw = alias[inv.maDiem] || inv.maDiem;
+    // Luyen, 2026-08-27: chuan hoa uppercase de key trong invoicesByDiemDay
+    // khop voi normCode(code) ben duoi (maCongTrinh tu payoo_diem_map co the
+    // la mixed-case, trong khi inv.maDiem da la uppercase tu parser).
+    const baseMaDiem = normCode(baseMaDiemRaw);
     const effectiveMaDiem =
       baseMaDiem && !baseMaDiem.endsWith(FF_SUFFIX) && cseOverride.has(baseMaDiem) ? baseMaDiem + FF_SUFFIX : baseMaDiem;
     for (const day of inv.days) {
@@ -1642,7 +1646,10 @@ function reconcileZvpChannel(settlements, grossData, invoiceData, gianMapping, m
           gianLines[code].gross += gross;
           gianLines[code].net += grossData.netByCode[key] || gross;
           gianLines[code].days.add(day);
-          const invs = invoicesByDiemDay[`${code}|${day}`] || [];
+          // Luyen, 2026-08-27: normCode() da uppercase maDiem khi parse hoa don
+          // ('FARM TIMES CITY'), nhung maCongTrinh trong payoo_diem_map la mixed-case
+          // ('Farm Times City') -> dung normCode() de dong nhat truoc khi tra cuu.
+          const invs = invoicesByDiemDay[`${normCode(code)}|${day}`] || [];
           for (const inv of invs) gianLines[code].invoices.add(inv.soHd);
         }
       }
@@ -1726,6 +1733,8 @@ function reconcileZvpChannel(settlements, grossData, invoiceData, gianMapping, m
           // "amount" (so tien HD hien thi) ma khong dong den gross that su nen
           // "Chenh lech" dau ky khong bao gio het du dong da danh dau "Khop".
           if (mm.grossAdjustment) {
+            line.grossOriginal = line.gross;
+            line.grossAdjusted = true;
             line.gross += mm.grossAdjustment;
             // Chi Nhan, 2026-07-30: "lệch 40k của tàu á cộng vô doanh thu hôm
             // đó luôn nhá tiền có về rồi á là khớp" -- truoc gio grossAdjustment
@@ -1745,6 +1754,7 @@ function reconcileZvpChannel(settlements, grossData, invoiceData, gianMapping, m
           line.matched = Math.abs(line.diff) < 1;
           line.manualOverride = true;
           line.manualNote = mm.note || "";
+          line.grossAdjustmentVal = mm.grossAdjustment || 0;
         }
       }
       return line;
