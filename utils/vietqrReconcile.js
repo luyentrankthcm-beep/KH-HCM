@@ -1624,7 +1624,7 @@ function stripCseSuffix(code) {
   return code && code.endsWith(FF_SUFFIX) ? code.slice(0, -FF_SUFFIX.length) : code;
 }
 
-function reconcileVietQr(settlements, grossData, invoiceData, gianMapping, manualMatches, diemAlias, vangLaiCode) {
+function reconcileVietQr(settlements, grossData, invoiceData, gianMapping, manualMatches, diemAlias, vangLaiCode, vangLaiDateMap) {
   const alias = diemAlias || {};
   const invoicesByDiemDay = {};
   for (const inv of invoiceData.invoices) {
@@ -1659,6 +1659,9 @@ function reconcileVietQr(settlements, grossData, invoiceData, gianMapping, manua
   const results = [];
   for (const s of allSettlements) {
     const day = s.date;
+    // Luyen 2026-08-27: vangLaiCode per-date -- ngay nao co trong dateMap
+    // thi dung code do, con lai dung channel default.
+    const effectiveVangLai = (vangLaiDateMap && vangLaiDateMap[day]) || vangLaiCode;
     const gianLines = {};
     for (const rawCode of grossData.codes) {
       const key = `${day}|${rawCode}`;
@@ -1670,10 +1673,11 @@ function reconcileVietQr(settlements, grossData, invoiceData, gianMapping, manua
         // chi doi ma dung de GOM NHOM/hien thi).
         const bucketCode = stripCseSuffix(rawCode);
         if (!gianLines[bucketCode]) {
-          gianLines[bucketCode] = { code: bucketCode, gross: 0, invoices: new Set(), effectiveCode: bucketCode };
+          gianLines[bucketCode] = { code: bucketCode, gross: 0, invoices: new Set(), effectiveCode: bucketCode,
+            resolvedVangLai: bucketCode === "__VANG_LAI__" ? effectiveVangLai : null };
         }
         gianLines[bucketCode].gross += gross;
-        const invLookupCode = (bucketCode === "__VANG_LAI__" && vangLaiCode) ? vangLaiCode : bucketCode;
+        const invLookupCode = (bucketCode === "__VANG_LAI__" && effectiveVangLai) ? effectiveVangLai : bucketCode;
         const invs = invoicesByDiemDay[`${String(invLookupCode).toUpperCase()}|${day}`] || [];
         for (const inv of invs) gianLines[bucketCode].invoices.add(inv.soHd);
       }
@@ -1732,11 +1736,11 @@ function reconcileVietQr(settlements, grossData, invoiceData, gianMapping, manua
       const line = {
         code: g.code,
         maCongTrinh: effCode === "__VANG_LAI__"
-          ? (vangLaiCode ? displayCode(vangLaiCode) : "Giao dịch vãng lai")
+          ? (g.resolvedVangLai ? displayCode(g.resolvedVangLai) : "Giao dịch vãng lai")
           : displayCode(effCode),
         // Luyen, 2026-07-17: "doi xuat ra 1388 thanh 131 het" -- khong con
         // fallback ve 1388 cho gian FF/CSE nua.
-        tkCo: gianMapping[effCode] || (effCode === "__VANG_LAI__" && vangLaiCode ? gianMapping[vangLaiCode] : null) || "131",
+        tkCo: gianMapping[effCode] || (effCode === "__VANG_LAI__" && g.resolvedVangLai ? gianMapping[g.resolvedVangLai] : null) || "131",
         gross: g.gross,
         net: g.gross,
         invoiceNumbers: invoiceList,

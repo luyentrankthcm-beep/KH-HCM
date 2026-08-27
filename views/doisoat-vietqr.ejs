@@ -1215,8 +1215,12 @@
                 <td>
                   <%= l.maCongTrinh %><%= l.code.endsWith('__FF') ? ' (CSE)' : '' %>
                   <% if (l.code === '__VANG_LAI__') { %>
-                  <form method="POST" action="/doi-soat/vietqr/set-vang-lai-gian/<%= ch %>" style="display:inline-flex;align-items:center;gap:4px;margin-left:6px;">
-                    <input type="text" name="vangLaiCode" value="<%= (vangLaiGian && vangLaiGian[ch]) || '' %>"
+                  <% var dateGianForCh = (vangLaiDateGian && vangLaiDateGian[ch]) || {}; %>
+                  <% var currentDateVal = dateGianForCh[r.settlementDate] || (vangLaiGian && vangLaiGian[ch]) || ''; %>
+                  <form method="POST" action="/doi-soat/vietqr/set-vang-lai-date/<%= ch %>" style="display:inline-flex;align-items:center;gap:4px;margin-left:6px;">
+                    <input type="hidden" name="settlementDate" value="<%= r.settlementDate %>" />
+                    <input type="hidden" name="returnMonth" value="<%= selectedMonth %>" />
+                    <input type="text" name="vangLaiCode" value="<%= currentDateVal %>"
                            list="dl-ma-cong-trinh-full" autocomplete="off"
                            placeholder="Map → Mã CT" style="width:110px;font-size:11px;padding:1px 4px;" />
                     <button type="submit" class="link-btn" style="font-size:11px;">Lưu</button>

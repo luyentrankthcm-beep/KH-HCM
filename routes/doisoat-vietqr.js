@@ -1567,9 +1567,14 @@ function buildChannelReconciliation(store, channelKey) {
 
   const manualMatches = store.viet_qr_manual_matches[channelKey] || {};
   if (!store.viet_qr_vang_lai_gian) store.viet_qr_vang_lai_gian = {};
+  if (!store.viet_qr_vang_lai_date_gian) store.viet_qr_vang_lai_date_gian = {};
   // Luyen, 2026-08-21: mac dinh vang lai cua bidv7702 la "AM TP PHCM"
   const VANG_LAI_DEFAULTS = { bidv7702: "AM TP PHCM" };
   const vangLaiCode = store.viet_qr_vang_lai_gian[channelKey] || VANG_LAI_DEFAULTS[channelKey] || null;
+  // Luyen, 2026-08-27: per-date vangLai -- ngay nao duoc luu rieng thi dung
+  // gian do thay vi channel default (vi du ngay 25/08 -> AE BINH TAN PHN,
+  // ngay 22/08 -> AM TP PHCM).
+  const vangLaiDateMap = store.viet_qr_vang_lai_date_gian[channelKey] || {};
   const reconciled = reconcileVietQr(
     settlements,
     resolved,
@@ -1577,7 +1582,8 @@ function buildChannelReconciliation(store, channelKey) {
     store.gian_mapping,
     manualMatches,
     store.invoice_diem_alias,
-    vangLaiCode
+    vangLaiCode,
+    vangLaiDateMap
   );
 
   // Chi Nhan, 2026-07-30: "các đối soát tất cả các trang điều xếp theo ngày
@@ -2288,6 +2294,7 @@ function renderVietQrPage(req, res, activeKeys, pageTitle, pageSubtitle) {
     exportDenDefault: monthBounds(selectedMonth).last,
     gianMapping: store.gian_mapping,
     vangLaiGian: store.viet_qr_vang_lai_gian || {},
+    vangLaiDateGian: store.viet_qr_vang_lai_date_gian || {},
     allCodes: Array.from(allCodes).sort(),
     allUnmappedStores,
     allUnmappedBlankRows,
@@ -2444,6 +2451,36 @@ router.post("/doi-soat/vietqr/set-vang-lai-gian/:channel", requireDataEntry, (re
     save(store);
     const msg = code ? `Vãng lai kênh ${CHANNELS[channelKey].label} → ${code}` : `Đã xóa mapping vãng lai kênh ${CHANNELS[channelKey].label}.`;
     res.redirect("/doi-soat/vietqr?success=" + encodeURIComponent(msg));
+  } catch (e) {
+    res.redirect("/doi-soat/vietqr?error=" + encodeURIComponent(e.message));
+  }
+});
+
+// Luyen, 2026-08-27: per-date vangLai -- luu ma gian cho 1 ngay cu the
+// thay vi tat ca ngay trong kenh (moi ngay vang lai co the ve gian khac).
+router.post("/doi-soat/vietqr/set-vang-lai-date/:channel", requireDataEntry, (req, res) => {
+  const store = load();
+  ensureChannelShape(store);
+  const channelKey = req.params.channel;
+  try {
+    if (!CHANNELS[channelKey]) throw new Error("Kenh khong hop le.");
+    if (!store.viet_qr_vang_lai_date_gian) store.viet_qr_vang_lai_date_gian = {};
+    if (!store.viet_qr_vang_lai_date_gian[channelKey]) store.viet_qr_vang_lai_date_gian[channelKey] = {};
+    const code = (req.body.vangLaiCode || "").trim();
+    const date = (req.body.settlementDate || "").trim();
+    if (!date) throw new Error("Thieu ngay.");
+    if (code) {
+      store.viet_qr_vang_lai_date_gian[channelKey][date] = code;
+    } else {
+      delete store.viet_qr_vang_lai_date_gian[channelKey][date];
+    }
+    save(store);
+    const msg = code
+      ? `Vãng lai ${date} kênh ${CHANNELS[channelKey].label} → ${code}`
+      : `Đã xóa mapping vãng lai ${date} kênh ${CHANNELS[channelKey].label}.`;
+    const returnMonth = (req.body.returnMonth || "").trim();
+    const redirectUrl = returnMonth ? `/doi-soat/vietqr?month=${returnMonth}&success=` : "/doi-soat/vietqr?success=";
+    res.redirect(redirectUrl + encodeURIComponent(msg));
   } catch (e) {
     res.redirect("/doi-soat/vietqr?error=" + encodeURIComponent(e.message));
   }
