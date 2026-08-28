@@ -1774,6 +1774,24 @@ router.post("/chi-phi/:mien(mien-nam|mien-bac)/cap-nhat-da-chi-ngan-hang", requi
 });
 
 // Luyen, 2026-08-22: "thêm cho tôi 1 chỗ xóa tất cả bộ lọc chọn rồi bạn
+// Cap nhat soHoaDon (va cac field khac) theo filter chinh xac (Luyen, 2026-08-28)
+// POST /chi-phi/update-by-filter  body: {mien, ngay, soTien, soHoaDon, ...fields}
+router.post("/chi-phi/update-by-filter", requireDataEntry, (req, res) => {
+  const store = load();
+  ensureShape(store);
+  const { mien, ngay, soTien, ...fields } = req.body;
+  let updated = 0;
+  store.chi_phi.forEach((r) => {
+    if (mien && (r.mien || "nam") !== mien) return;
+    if (ngay && r.ngay !== ngay) return;
+    if (soTien && r.soTien !== parseInt(soTien, 10)) return;
+    Object.keys(fields).forEach((k) => { if (fields[k] !== undefined) r[k] = fields[k]; });
+    updated++;
+  });
+  save(store);
+  res.json({ ok: true, updated });
+});
+
 // Xoa 1 dong theo id hoac theo filter chinh xac (Luyen, 2026-08-28)
 // POST /chi-phi/xoa-id/:id  -- xoa theo id
 // POST /chi-phi/xoa-id/by-filter  -- xoa theo body {mien, ngay, soTien, gian}
