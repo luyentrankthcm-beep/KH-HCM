@@ -53,8 +53,13 @@
       </label>
       <input type="text" name="q" value="<%= q %>" placeholder="Tìm diễn giải, NCC, số HĐ, UNC..."
              style="width:250px;font-size:13px;" />
+      <select name="hachToan" onchange="this.form.submit()" style="font-size:13px;">
+        <option value="" <%= hachToanFilter === '' ? 'selected' : '' %>>Tất cả HT</option>
+        <option value="0" <%= hachToanFilter === '0' ? 'selected' : '' %>>Chưa hạch toán</option>
+        <option value="1" <%= hachToanFilter === '1' ? 'selected' : '' %>>Đã hạch toán</option>
+      </select>
       <button type="submit" class="btn btn-secondary" style="padding:5px 12px;">Tìm</button>
-      <% if (q || thangFilter) { %>
+      <% if (q || thangFilter || hachToanFilter) { %>
         <a href="/chi-phi/mien-<%= mien === 'nam' ? 'nam' : 'bac' %>/danh-sach" class="link-btn">✕ Bỏ lọc</a>
       <% } %>
       <span class="muted" style="font-size:13px;margin-left:auto;">
