@@ -570,7 +570,7 @@
       + '</div>';
     html += '<div style="overflow-x:auto;"><table class="table" style="font-size:12px;min-width:860px;">'
       + '<thead><tr><th style="width:32px;"></th><th>Ngày</th><th>Gian</th><th>NCC (chi phí)</th><th style="text-align:right;">Số tiền</th>'
-      + '<th>Số HĐ gợi ý</th><th>Ký hiệu HĐ</th><th>NCC trên HĐ</th><th>Ngày HĐ</th></tr></thead><tbody>';
+      + '<th>Số HĐ gợi ý</th><th>Ký hiệu HĐ</th><th>NCC trên HĐ</th><th>Ngày HĐ</th><th>Diễn giải HĐ</th></tr></thead><tbody>';
     matches.forEach(function(m, idx) {
       var ids = m.chiPhiIds || [m.chiPhiId];
       var dataIds = JSON.stringify(ids).replace(/"/g,'&quot;');
@@ -584,10 +584,11 @@
         + '<td>'+gianCell+'</td>'
         + '<td><div style="max-width:140px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;" title="'+esc2(m.ncc)+'">'+esc2(m.ncc||'—')+'</div></td>'
         + '<td style="text-align:right;white-space:nowrap;font-weight:600;">'+(isSum?'<span style="font-size:10px;color:#e65100;">∑</span> ':'')+Number(m.soTien).toLocaleString('vi-VN')+' đ</td>'
-        + '<td style="font-weight:600;color:#1565c0;white-space:nowrap;">'+esc2(m.soHoaDonGoiY)+'</td>'
+        + '<td style="font-weight:600;color:#1565c0;white-space:nowrap;">'+esc2(m.soHoaDonGoiY)+(m.monthWarn?'<br><span style="color:#e53935;font-size:10px;font-weight:normal;">⚠ '+esc2(m.monthWarn)+'</span>':'')+'</td>'
         + '<td style="color:#666;white-space:nowrap;font-size:11px;">'+esc2(m.kyHieu||'—')+'</td>'
         + '<td><div style="max-width:160px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;" title="'+esc2(m.tenNccHD)+'">'+esc2(m.tenNccHD||'—')+'</div></td>'
         + '<td style="white-space:nowrap;color:#666;">'+fmtDate(m.ngayHD)+'</td>'
+        + '<td style="max-width:200px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-size:11px;color:#555;" title="'+esc2(m.dienGiaiHD||'')+'">'+esc2(m.dienGiaiHD||'—')+'</td>'
         + '</tr>';
     });
     html += '</tbody></table></div>';

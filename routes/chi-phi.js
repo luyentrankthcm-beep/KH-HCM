@@ -803,6 +803,40 @@ function nccWords(s){
 }
 function matchNccScore(a,b){ const bW=new Set(nccWords(b)); return nccWords(a).filter(w=>bW.has(w)).length; }
 
+// Kiem tra dien giai hoa don co dung thang voi ngay chi phi khong (Luyen, 2026-08-28)
+// Tra ve: 1 = khop thang, -1 = sai thang ro rang, 0 = khong ro
+function monthMatchScore(chiPhiNgay, hdDienGiai) {
+  if (!chiPhiNgay || !hdDienGiai) return 0;
+  const m = parseInt(chiPhiNgay.slice(5, 7), 10); // 1-12
+  const y = chiPhiNgay.slice(0, 4);               // "2026"
+  const dg = hdDienGiai.toUpperCase();
+  // Cac mau nhan biet thang: "8/2026", "08/2026", "T8.", "T8.2026", "THANG 8", "08-2026"
+  const patterns = [
+    new RegExp(`\\b0?${m}[\\/\\-]${y}\\b`),
+    new RegExp(`\\bT0?${m}[.\\s]`),
+    new RegExp(`THANG\\s+0?${m}\\b`),
+    new RegExp(`THÁNG\\s+0?${m}\\b`),
+    new RegExp(`T${y.slice(2)}\\s*[/.]\\s*0?${m}\\b`),
+  ];
+  if (patterns.some(p => p.test(dg))) return 1; // khop thang nay
+  // Kiem tra co thang KHAC ro rang khong
+  const wrongMonth = /\b(T|THANG|THÁNG)\s*0?(\d{1,2})[.\s/]/gi;
+  let wm;
+  while ((wm = wrongMonth.exec(dg)) !== null) {
+    const mm = parseInt(wm[2], 10);
+    if (mm !== m && mm >= 1 && mm <= 12) return -1; // co thang khac
+  }
+  // Kiem tra "X/YYYY" hoac "X-YYYY"
+  const dateRe = /\b0?(\d{1,2})[\/\-](\d{4})\b/g;
+  let dm;
+  while ((dm = dateRe.exec(dg)) !== null) {
+    const mm = parseInt(dm[1], 10);
+    const yy = dm[2];
+    if (mm !== m && yy === y) return -1; // sai thang
+  }
+  return 0; // khong xac dinh duoc
+}
+
 router.get("/chi-phi/:mien(mien-nam|mien-bac)/de-xuat-hoa-don", requireDataEntry, (req, res) => {
   const store = load();
   ensureShape(store);
@@ -821,17 +855,27 @@ router.get("/chi-phi/:mien(mien-nam|mien-bac)/de-xuat-hoa-don", requireDataEntry
   const matchedIds = new Set();
   const results = [];
 
-  // Pass 1: khớp từng dòng 1-1 theo soTien + NCC
+  // Pass 1: khớp từng dòng 1-1 theo soTien + NCC (+thang)
   chiPhiRows.forEach((r) => {
     if (!r.soTien || !r.ncc) return;
     const byAmt = hdPool.filter((h) => Math.abs(h.soTien - r.soTien) <= 1000);
     if (byAmt.length === 0) return;
     const scored = byAmt
-      .map((h) => ({ h, score: matchNccScore(r.ncc, h.tenNCC) }))
-      .filter((x) => x.score >= 2)
-      .sort((a, b) => b.score - a.score);
+      .map((h) => {
+        const nccSc = matchNccScore(r.ncc, h.tenNCC);
+        const mthSc = monthMatchScore(r.ngay, h.dienGiai || '');
+        // sai thang ro rang: loai tru neu co loi chon khac (chi giu neu la uy nhat)
+        return { h, nccScore: nccSc, monthScore: mthSc, score: nccSc + mthSc };
+      })
+      .filter((x) => x.nccScore >= 2)
+      .sort((a, b) => b.score - a.score || b.monthScore - a.monthScore);
     if (scored.length === 0) return;
-    const best = scored[0];
+    // Uu tien HĐ dung thang, tranh chon HĐ sai thang khi co lua chon tot hon
+    let best = scored[0];
+    if (best.monthScore === -1) {
+      const better = scored.find(x => x.monthScore >= 0 && x.nccScore >= 2);
+      if (better) best = better;
+    }
     matchedIds.add(r.id);
     results.push({
       chiPhiIds: [r.id],
@@ -846,6 +890,7 @@ router.get("/chi-phi/:mien(mien-nam|mien-bac)/de-xuat-hoa-don", requireDataEntry
       dienGiaiHD: best.h.dienGiai || "",
       loaiMatch: "1:1",
       score: best.score,
+      monthWarn: best.monthScore === -1 ? "Tháng HĐ không khớp với tháng chi phí — kiểm tra lại" : (best.monthScore === 0 ? "Không xác định được tháng trong HĐ" : ""),
     });
   });
 
@@ -878,14 +923,22 @@ router.get("/chi-phi/:mien(mien-nam|mien-bac)/de-xuat-hoa-don", requireDataEntry
         if (byAmt.length === 0) return;
         const nccRef = combo[0].ncc;
         const scored = byAmt
-          .map((h) => ({ h, score: matchNccScore(nccRef, h.tenNCC) }))
-          .filter((x) => x.score >= 2)
-          .sort((a, b) => b.score - a.score);
+          .map((h) => {
+            const nccSc = matchNccScore(nccRef, h.tenNCC);
+            const mthSc = monthMatchScore(combo[0].ngay, h.dienGiai || '');
+            return { h, nccScore: nccSc, monthScore: mthSc, score: nccSc + mthSc };
+          })
+          .filter((x) => x.nccScore >= 2)
+          .sort((a, b) => b.score - a.score || b.monthScore - a.monthScore);
         if (scored.length === 0) return;
-        const best = scored[0];
+        let best = scored[0];
+        if (best.monthScore === -1) {
+          const better = scored.find(x => x.monthScore >= 0 && x.nccScore >= 2);
+          if (better) best = better;
+        }
         const ids = combo.map((r) => r.id);
         if (ids.some((id) => matchedIds.has(id))) return;
-        found.push({ combo, best, total, ids, score: best.score });
+        found.push({ combo, best, total, ids, score: best.score, monthScore: best.monthScore });
       });
       // Chọn combo score cao nhất không trùng id
       found.sort((a, b) => b.score - a.score);
@@ -907,6 +960,7 @@ router.get("/chi-phi/:mien(mien-nam|mien-bac)/de-xuat-hoa-don", requireDataEntry
           dienGiaiHD: f.best.h.dienGiai || "",
           loaiMatch: k + ":1",
           score: f.score,
+          monthWarn: (f.monthScore === -1) ? "Tháng HĐ không khớp với tháng chi phí — kiểm tra lại" : (f.monthScore === 0 ? "Không xác định được tháng trong HĐ" : ""),
         });
       });
     }
