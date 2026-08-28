@@ -1774,16 +1774,28 @@ router.post("/chi-phi/:mien(mien-nam|mien-bac)/cap-nhat-da-chi-ngan-hang", requi
 });
 
 // Luyen, 2026-08-22: "thêm cho tôi 1 chỗ xóa tất cả bộ lọc chọn rồi bạn
-// Xoa 1 dong theo id (Luyen, 2026-08-28)
+// Xoa 1 dong theo id hoac theo filter chinh xac (Luyen, 2026-08-28)
+// POST /chi-phi/xoa-id/:id  -- xoa theo id
+// POST /chi-phi/xoa-id/by-filter  -- xoa theo body {mien, ngay, soTien, gian}
 router.post("/chi-phi/xoa-id/:id", requireDataEntry, (req, res) => {
   const store = load();
   ensureShape(store);
-  const id = parseInt(req.params.id, 10);
   const before = store.chi_phi.length;
-  store.chi_phi = store.chi_phi.filter((r) => r.id !== id);
+  if (req.params.id === "by-filter") {
+    const { mien, ngay, soTien, gian } = req.body;
+    store.chi_phi = store.chi_phi.filter((r) => {
+      if (mien && (r.mien || "nam") !== mien) return true;
+      if (ngay && r.ngay !== ngay) return true;
+      if (soTien && r.soTien !== parseInt(soTien, 10)) return true;
+      if (gian && (r.gian || "") !== gian) return true;
+      return false; // xoa dong nay
+    });
+  } else {
+    const id = parseInt(req.params.id, 10);
+    store.chi_phi = store.chi_phi.filter((r) => r.id !== id);
+  }
   const deleted = before - store.chi_phi.length;
   save(store);
-  const ref = req.headers.referer || "/";
   res.json({ ok: true, deleted });
 });
 
