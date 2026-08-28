@@ -929,21 +929,7 @@
 
   document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ closeMapGian(); closeDschModal(); } });
 
-  // Luyen 2026-08-28: luu filter hach toan vao localStorage, tu dong ap dung
-  // khi vao trang lan sau ma chua co ?hachToan= tren URL.
-  var LS_KEY = 'danh_sach_hach_toan_filter_<%= mien %>';
-  function saveHachToanFilter(val) {
-    try { localStorage.setItem(LS_KEY, val); } catch(e) {}
-  }
-  (function autoRestoreFilter() {
-    var url = new URL(location.href);
-    if (url.searchParams.has('hachToan')) return; // da co filter tren URL
-    var saved;
-    try { saved = localStorage.getItem(LS_KEY); } catch(e) { return; }
-    if (saved === null || saved === '') return; // chua luu hoac la "Tat ca"
-    url.searchParams.set('hachToan', saved);
-    location.replace(url.toString());
-  })();
+  function saveHachToanFilter(val) { /* handled by filter-memory partial */ }
   </script>
 
   <%- include('partials/scroll-restore') %>

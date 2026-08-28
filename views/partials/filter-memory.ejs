@@ -1,0 +1,36 @@
+<!--
+  Luyen, 2026-08-28: "tất cả các tab luôn lưu lại cái tôi lọc" -- moi trang co
+  bo loc (thang, kenh, hachToan...) tu dong luu query string hien tai vao
+  localStorage theo pathname. Lan sau vao lai trang khong co query param nao
+  thi tu dong redirect ve URL co filter da luu, giu nguyen bo loc cu.
+  De xoa bo loc: chon "Tat ca" o dropdown roi submit -- URL moi se duoc luu de
+  ghi de gia tri cu.
+  Include 1 lan duy nhat trong nav.ejs (giong scroll-restore/panel-toggle).
+-->
+<script>
+  (function () {
+    if (window.__khbtFilterMemoryInit) return;
+    window.__khbtFilterMemoryInit = true;
+
+    var KEY = "khbt_filter:" + location.pathname;
+
+    // Neu trang hien tai co query params -> luu lai
+    if (location.search && location.search !== "?") {
+      try { localStorage.setItem(KEY, location.search); } catch (e) {}
+      return;
+    }
+
+    // Khong co query params -> thu restore filter da luu
+    var saved;
+    try { saved = localStorage.getItem(KEY); } catch (e) {}
+    if (!saved || saved === "?") return;
+
+    // Chi restore neu trang co form GET (trang co bo loc)
+    // Kiem tra sau DOMContentLoaded de tranh redirect trang khong co form loc
+    document.addEventListener("DOMContentLoaded", function () {
+      var hasFilterForm = !!document.querySelector('form[method="GET"], form[method="get"]');
+      if (!hasFilterForm) return;
+      location.replace(location.pathname + saved);
+    });
+  })();
+</script>
