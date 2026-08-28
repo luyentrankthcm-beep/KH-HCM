@@ -267,6 +267,7 @@ router.get("/chi-phi/:mien(mien-nam|mien-bac)/danh-sach", (req, res) => {
   const mien = mienFromSeg(req.params.mien);
   const q = (req.query.q || "").trim().toLowerCase();
   const thangFilter = req.query.thang || "";
+  const hachToanFilter = req.query.hachToan || "";
 
   let rows = store.chi_phi.map(ensureChiPhiDefaults).filter((r) => r.congTy === activeCompany && r.mien === mien);
 
@@ -276,6 +277,8 @@ router.get("/chi-phi/:mien(mien-nam|mien-bac)/danh-sach", (req, res) => {
   const availableMonths = [...monthSet].sort().reverse();
 
   if (thangFilter) rows = rows.filter((r) => (r.ngay || "").slice(0, 7) === thangFilter);
+  if (hachToanFilter === "1") rows = rows.filter((r) => r.daHachToan);
+  else if (hachToanFilter === "0") rows = rows.filter((r) => !r.daHachToan);
   rows.sort((a, b) => (a.ngay < b.ngay ? 1 : -1));
 
   // Dedup: bỏ qua các dòng trùng trong cùng tháng + gian + soTien
@@ -477,6 +480,7 @@ router.get("/chi-phi/:mien(mien-nam|mien-bac)/danh-sach", (req, res) => {
     tongTien,
     q,
     thangFilter,
+    hachToanFilter,
     availableMonths,
     gianAliasMap,
     allGianSuggestions,
