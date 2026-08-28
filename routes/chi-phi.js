@@ -1774,6 +1774,19 @@ router.post("/chi-phi/:mien(mien-nam|mien-bac)/cap-nhat-da-chi-ngan-hang", requi
 });
 
 // Luyen, 2026-08-22: "thêm cho tôi 1 chỗ xóa tất cả bộ lọc chọn rồi bạn
+// Xoa 1 dong theo id (Luyen, 2026-08-28)
+router.post("/chi-phi/xoa-id/:id", requireDataEntry, (req, res) => {
+  const store = load();
+  ensureShape(store);
+  const id = parseInt(req.params.id, 10);
+  const before = store.chi_phi.length;
+  store.chi_phi = store.chi_phi.filter((r) => r.id !== id);
+  const deleted = before - store.chi_phi.length;
+  save(store);
+  const ref = req.headers.referer || "/";
+  res.json({ ok: true, deleted });
+});
+
 // chọn thời gian rồi hiển thị khung cảnh báo rồi bấm xác nhận" -- xoa tat
 // ca record khop bo loc (hachToan + thang + hoaDon) cua cong ty + mien hien tai.
 router.post("/chi-phi/:mien(mien-nam|mien-bac)/xoa-het", requireDataEntry, (req, res) => {
