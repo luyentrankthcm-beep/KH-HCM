@@ -57,6 +57,7 @@ function parseInvoiceFileName(fileName) {
 
 function ensureHoSo(store) {
   if (!store.ho_so_hoa_don) store.ho_so_hoa_don = [];
+  if (!store.ho_so_chung_tu) store.ho_so_chung_tu = [];
 }
 
 // Bo so 0 dau de doi chieu so HD khong phu thuoc format (2072 = 00002072)
@@ -567,11 +568,75 @@ router.post("/ho-so/phi-cang-phu-quoc/sync-drive", requireAdmin, async (req, res
 });
 
 // ─── Tiền Thuê Bình Thường ────────────────────────────────────────────────────
-// Luyen 2026-08-31: tab Chứng Từ (nội dung sẽ bổ sung sau)
+// ─── Chứng Từ ────────────────────────────────────────────────────────────────
+// Luyen 2026-08-31: lưu file PDF chứng từ (UNC, biên lai...) từ Drive,
+// daHachToan = false mặc định, tick tay để đánh dấu đã hạch toán.
+function nextChungTuId(store) {
+  const ids = (store.ho_so_chung_tu || []).map((r) => Number(r.id) || 0);
+  return (ids.length ? Math.max(...ids) : 0) + 1;
+}
+
 router.get("/ho-so/chung-tu", (req, res) => {
+  const store = load();
+  ensureHoSo(store);
+  const q = (req.query.q || "").toLowerCase();
+  const htFilter = req.query.hachToan || "";
+  let rows = store.ho_so_chung_tu.slice().sort((a, b) =>
+    (b.ngay || "").localeCompare(a.ngay || "")
+  );
+  if (q) rows = rows.filter((r) =>
+    [r.loai, r.soChungTu, r.ncc, r.ghiChu, r.fileName].some(
+      (f) => (f || "").toLowerCase().includes(q)
+    )
+  );
+  if (htFilter === "1") rows = rows.filter((r) => r.daHachToan);
+  else if (htFilter === "0") rows = rows.filter((r) => !r.daHachToan);
   res.render("ho-so-chung-tu", {
     userName: req.session ? req.session.userName : null,
+    rows,
+    q,
+    htFilter,
+    error: req.query.error || null,
+    success: req.query.success || null,
   });
+});
+
+router.post("/ho-so/chung-tu/them", requireDataEntry, (req, res) => {
+  const store = load();
+  ensureHoSo(store);
+  const { loai, soChungTu, ngay, ncc, soTien, driveId, fileName, ghiChu } = req.body;
+  store.ho_so_chung_tu.push({
+    id: nextChungTuId(store),
+    loai: (loai || "").trim(),
+    soChungTu: (soChungTu || "").trim(),
+    ngay: (ngay || "").trim(),
+    ncc: (ncc || "").trim(),
+    soTien: Number(String(soTien || "0").replace(/[^0-9]/g, "")) || 0,
+    driveId: (driveId || "").trim(),
+    fileName: (fileName || "").trim(),
+    ghiChu: (ghiChu || "").trim(),
+    daHachToan: false,
+    createdAt: new Date().toISOString(),
+  });
+  save(store);
+  res.redirect("/ho-so/chung-tu?success=Đã+thêm+chứng+từ");
+});
+
+router.post("/ho-so/chung-tu/:id/hach-toan", requireDataEntry, (req, res) => {
+  const store = load();
+  ensureHoSo(store);
+  const r = store.ho_so_chung_tu.find((x) => String(x.id) === req.params.id);
+  if (r) r.daHachToan = req.body.value === "1";
+  save(store);
+  res.json({ success: true, daHachToan: r ? r.daHachToan : null });
+});
+
+router.post("/ho-so/chung-tu/:id/xoa", requireAdmin, (req, res) => {
+  const store = load();
+  ensureHoSo(store);
+  store.ho_so_chung_tu = store.ho_so_chung_tu.filter((x) => String(x.id) !== req.params.id);
+  save(store);
+  res.redirect("/ho-so/chung-tu?success=Đã+xóa");
 });
 
 router.get("/ho-so/tien-thue", (req, res) => {

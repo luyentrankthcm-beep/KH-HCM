@@ -8,10 +8,33 @@
     .tab-btn { padding:.5rem 1.25rem; font-weight:600; font-size:.88em; cursor:pointer; border:none; background:#e8f0fe; color:#1e3a5f; border-radius:6px 6px 0 0; margin-right:3px; text-decoration:none; display:inline-block; }
     .tab-btn.active { background:#1e3a5f; color:#fff; }
     .tab-btn:hover:not(.active) { background:#c7d7f8; }
-    .page-card { background:#fff; border-radius:10px; box-shadow:0 2px 12px rgba(0,0,0,.08); padding:1.5rem; margin-bottom:1.5rem; }
-    .empty-state { text-align:center; padding:3rem 1rem; color:#94a3b8; }
-    .empty-state .icon { font-size:3rem; margin-bottom:1rem; }
-    .empty-state p { font-size:.95rem; }
+    .page-card { background:#fff; border-radius:10px; box-shadow:0 2px 12px rgba(0,0,0,.08); padding:1.25rem 1.5rem; margin-bottom:1.25rem; }
+    .add-form { display:flex; flex-wrap:wrap; gap:.6rem; align-items:flex-end; }
+    .add-form label { display:block; font-size:.78em; font-weight:600; color:#64748b; margin-bottom:.2rem; }
+    .add-form input, .add-form select { padding:.38rem .6rem; border:1px solid #cbd5e1; border-radius:6px; font-size:.88em; background:#fff; }
+    .btn-add { background:#1e3a5f; color:#fff; border:none; border-radius:6px; padding:.42rem 1rem; font-size:.88em; font-weight:600; cursor:pointer; white-space:nowrap; }
+    .btn-add:hover { background:#2563eb; }
+    .filter-bar { display:flex; gap:.6rem; align-items:center; flex-wrap:wrap; margin-bottom:1rem; }
+    .filter-bar input, .filter-bar select { padding:.35rem .6rem; border:1px solid #cbd5e1; border-radius:6px; font-size:.85em; }
+    .ct-table { width:100%; border-collapse:collapse; font-size:.88em; }
+    .ct-table th { background:#1e3a5f; color:#fff; padding:.5rem .75rem; text-align:left; white-space:nowrap; position:sticky; top:0; z-index:5; }
+    .ct-table td { padding:.45rem .75rem; border-bottom:1px solid #e2e8f0; vertical-align:middle; }
+    .ct-table tbody tr:hover td { background:#f8fafc; }
+    .badge-loai { display:inline-block; background:#dbeafe; color:#1e40af; border-radius:10px; padding:.1rem .5rem; font-size:.78em; font-weight:700; }
+    .so-tien { font-weight:600; color:#15803d; white-space:nowrap; }
+    .link-pdf { color:#2563eb; text-decoration:none; font-size:.82em; }
+    .link-pdf:hover { text-decoration:underline; }
+    .ht-toggle { width:18px; height:18px; cursor:pointer; accent-color:#1e3a5f; }
+    .badge-ht { display:inline-block; border-radius:10px; padding:.1rem .5rem; font-size:.78em; font-weight:700; }
+    .badge-ht.done { background:#dcfce7; color:#166534; }
+    .badge-ht.pending { background:#fef9c3; color:#92400e; }
+    .btn-xoa { background:none; border:none; color:#94a3b8; cursor:pointer; font-size:1rem; padding:.1rem .3rem; border-radius:4px; }
+    .btn-xoa:hover { color:#dc2626; background:#fee2e2; }
+    .alert { padding:.65rem 1rem; border-radius:8px; margin-bottom:1rem; font-size:.88em; }
+    .alert-success { background:#dcfce7; color:#166534; border:1px solid #bbf7d0; }
+    .alert-error { background:#fee2e2; color:#991b1b; border:1px solid #fecaca; }
+    .empty-state { text-align:center; padding:2.5rem; color:#94a3b8; }
+    .count-label { font-size:.82em; color:#64748b; margin-bottom:.75rem; }
   </style>
 </head>
 <body>
@@ -26,13 +49,149 @@
       <a href="/ho-so/chung-tu" class="tab-btn active">📋 Chứng Từ</a>
     </div>
 
+    <% if (success) { %><div class="alert alert-success">✅ <%= success %></div><% } %>
+    <% if (error) { %><div class="alert alert-error">⚠️ <%= error %></div><% } %>
+
+    <!-- Form thêm mới -->
     <div class="page-card">
-      <div class="empty-state">
-        <div class="icon">📋</div>
-        <p>Tab <strong>Chứng Từ</strong> đã sẵn sàng.<br>Luyến hướng dẫn thêm nội dung để tôi tiếp tục nhé.</p>
-      </div>
+      <form method="POST" action="/ho-so/chung-tu/them">
+        <div class="add-form">
+          <div>
+            <label>Loại CT</label>
+            <select name="loai" style="min-width:100px;">
+              <option value="UNC">UNC</option>
+              <option value="Biên lai">Biên lai</option>
+              <option value="Phiếu chi">Phiếu chi</option>
+              <option value="Hóa đơn">Hóa đơn</option>
+              <option value="Khác">Khác</option>
+            </select>
+          </div>
+          <div>
+            <label>Số CT</label>
+            <input type="text" name="soChungTu" placeholder="VD: UNC001" style="min-width:110px;" />
+          </div>
+          <div>
+            <label>Ngày</label>
+            <input type="date" name="ngay" style="min-width:130px;" />
+          </div>
+          <div style="flex:1;min-width:160px;">
+            <label>NCC / Bên nhận</label>
+            <input type="text" name="ncc" placeholder="Tên đơn vị..." style="width:100%;" />
+          </div>
+          <div>
+            <label>Số tiền (đ)</label>
+            <input type="text" name="soTien" placeholder="VD: 50.000.000" style="min-width:130px;" />
+          </div>
+          <div style="flex:1;min-width:220px;">
+            <label>Link Drive (PDF)</label>
+            <input type="text" name="driveId" placeholder="ID hoặc link Drive..." style="width:100%;" />
+          </div>
+          <div style="min-width:120px;">
+            <label>Tên file</label>
+            <input type="text" name="fileName" placeholder="UNC_29-08-2026.pdf" style="width:100%;" />
+          </div>
+          <div style="flex:1;min-width:150px;">
+            <label>Ghi chú</label>
+            <input type="text" name="ghiChu" placeholder="Ghi chú..." style="width:100%;" />
+          </div>
+          <div>
+            <label>&nbsp;</label>
+            <button type="submit" class="btn-add">+ Thêm</button>
+          </div>
+        </div>
+      </form>
+    </div>
+
+    <!-- Filter -->
+    <div class="filter-bar">
+      <form method="GET" action="/ho-so/chung-tu" style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;">
+        <input type="text" name="q" value="<%= q %>" placeholder="🔍 Tìm số CT, NCC..." style="min-width:200px;" />
+        <select name="hachToan" onchange="this.form.submit()">
+          <option value="" <%- htFilter==='' ? 'selected' : '' %>>Tất cả HT</option>
+          <option value="0" <%- htFilter==='0' ? 'selected' : '' %>>Chưa hạch toán</option>
+          <option value="1" <%- htFilter==='1' ? 'selected' : '' %>>Đã hạch toán</option>
+        </select>
+        <button type="submit" style="padding:.35rem .75rem;border:1px solid #cbd5e1;border-radius:6px;background:#fff;cursor:pointer;font-size:.85em;">Lọc</button>
+        <% if (q || htFilter) { %><a href="/ho-so/chung-tu" style="font-size:.82em;color:#64748b;">× Bỏ lọc</a><% } %>
+      </form>
+    </div>
+
+    <!-- Table -->
+    <div class="page-card" style="padding:0;overflow-x:auto;">
+      <% if (rows.length === 0) { %>
+        <div class="empty-state">
+          <div style="font-size:2.5rem;margin-bottom:.75rem;">📋</div>
+          <p>Chưa có chứng từ nào.<% if (q || htFilter) { %> Thử bỏ bộ lọc.<% } %></p>
+        </div>
+      <% } else { %>
+        <div class="count-label" style="padding:.75rem 1.25rem 0;"><%= rows.length %> chứng từ</div>
+        <table class="ct-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Loại</th>
+              <th>Số CT</th>
+              <th>Ngày</th>
+              <th>NCC / Bên nhận</th>
+              <th>Số tiền</th>
+              <th>File PDF</th>
+              <th>Ghi chú</th>
+              <th style="text-align:center;">HT</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <% rows.forEach((r, i) => { %>
+            <tr id="row-<%= r.id %>">
+              <td style="color:#94a3b8;font-size:.8em;"><%= i+1 %></td>
+              <td><span class="badge-loai"><%= r.loai || '—' %></span></td>
+              <td style="font-weight:600;"><%= r.soChungTu || '—' %></td>
+              <td style="white-space:nowrap;"><%= r.ngay ? r.ngay.split('-').reverse().join('/') : '—' %></td>
+              <td><%= r.ncc || '—' %></td>
+              <td class="so-tien"><%= r.soTien ? Number(r.soTien).toLocaleString('vi-VN') + 'đ' : '—' %></td>
+              <td>
+                <% if (r.driveId) {
+                  const link = r.driveId.startsWith('http') ? r.driveId : 'https://drive.google.com/file/d/' + r.driveId + '/view';
+                %>
+                  <a href="<%= link %>" target="_blank" class="link-pdf">📄 <%= r.fileName || 'Xem file' %></a>
+                <% } else { %>
+                  <span style="color:#cbd5e1;font-size:.82em;">—</span>
+                <% } %>
+              </td>
+              <td style="font-size:.83em;color:#475569;"><%= r.ghiChu || '' %></td>
+              <td style="text-align:center;">
+                <input type="checkbox" class="ht-toggle" data-id="<%= r.id %>"
+                  <%- r.daHachToan ? 'checked' : '' %>
+                  title="<%= r.daHachToan ? 'Đã hạch toán — click để bỏ' : 'Chưa hạch toán — click để đánh dấu' %>" />
+              </td>
+              <td>
+                <form method="POST" action="/ho-so/chung-tu/<%= r.id %>/xoa" onsubmit="return confirm('Xóa chứng từ này?')">
+                  <button type="submit" class="btn-xoa" title="Xóa">🗑</button>
+                </form>
+              </td>
+            </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      <% } %>
     </div>
 
   </div>
+
+  <script>
+    document.querySelectorAll('.ht-toggle').forEach(cb => {
+      cb.addEventListener('change', function() {
+        const id = this.dataset.id;
+        const val = this.checked ? '1' : '0';
+        fetch('/ho-so/chung-tu/' + id + '/hach-toan', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: 'value=' + val
+        }).then(r => r.json()).then(data => {
+          if (!data.success) { this.checked = !this.checked; alert('Lỗi cập nhật'); }
+        }).catch(() => { this.checked = !this.checked; });
+      });
+    });
+  </script>
 </body>
 </html>
