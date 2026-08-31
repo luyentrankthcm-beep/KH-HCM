@@ -67,6 +67,9 @@ function requireLogin(req, res, next) {
 // ve trang truoc (Referer) kem thong bao loi thay vi thuc hien thao tac.
 function requireAdmin(req, res, next) {
   if (AUTH_DISABLED) return next();
+  // Luyen 2026-08-31: bypass cho Claude Cowork sync
+  const INTERNAL_SYNC_KEY = process.env.INTERNAL_SYNC_KEY || "";
+  if (INTERNAL_SYNC_KEY && req.headers["x-internal-key"] === INTERNAL_SYNC_KEY) return next();
   if (req.session && req.session.role === "admin") {
     return next();
   }
@@ -86,6 +89,9 @@ function requireAdmin(req, res, next) {
 // cho 1 dong/giao dich cu the) moi doi sang requireDataEntry o duoi day.
 function requireDataEntry(req, res, next) {
   if (AUTH_DISABLED) return next();
+  // Luyen 2026-08-31: bypass cho Claude Cowork sync
+  const INTERNAL_SYNC_KEY = process.env.INTERNAL_SYNC_KEY || "";
+  if (INTERNAL_SYNC_KEY && req.headers["x-internal-key"] === INTERNAL_SYNC_KEY) return next();
   if (req.session && (req.session.role === "admin" || req.session.role === "nhap_lieu")) {
     return next();
   }
