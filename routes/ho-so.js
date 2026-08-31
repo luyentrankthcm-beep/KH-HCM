@@ -496,7 +496,13 @@ router.post("/ho-so/phi-cang-phu-quoc/upload-anh", requireDataEntry, uploadMem.a
 // POST /ho-so/hoa-don-ncc/bulk-upsert
 // Body JSON: { files: [{driveId, fileName}] }
 // Upsert theo driveId. Dung cho Claude Cowork sync tu Google Drive (khong can OAuth Railway).
-router.post("/ho-so/hoa-don-ncc/bulk-upsert", requireAdmin, express.json(), (req, res) => {
+// Auth: session admin HOAC header X-Internal-Key = env INTERNAL_SYNC_KEY
+const INTERNAL_SYNC_KEY = process.env.INTERNAL_SYNC_KEY || "";
+function requireAdminOrKey(req, res, next) {
+  if (INTERNAL_SYNC_KEY && req.headers["x-internal-key"] === INTERNAL_SYNC_KEY) return next();
+  return requireAdmin(req, res, next);
+}
+router.post("/ho-so/hoa-don-ncc/bulk-upsert", requireAdminOrKey, express.json(), (req, res) => {
   const store = load();
   ensureHoSo(store);
   const files = req.body && Array.isArray(req.body.files) ? req.body.files : [];
