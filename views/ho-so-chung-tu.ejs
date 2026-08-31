@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <%- include('partials/head') %>
+  <title>Chứng Từ – K&H</title>
+  <style>
+    .tab-bar { display:flex; gap:0; border-bottom:2px solid #1e3a5f; margin-bottom:1.25rem; }
+    .tab-btn { padding:.5rem 1.25rem; font-weight:600; font-size:.88em; cursor:pointer; border:none; background:#e8f0fe; color:#1e3a5f; border-radius:6px 6px 0 0; margin-right:3px; text-decoration:none; display:inline-block; }
+    .tab-btn.active { background:#1e3a5f; color:#fff; }
+    .tab-btn:hover:not(.active) { background:#c7d7f8; }
+    .page-card { background:#fff; border-radius:10px; box-shadow:0 2px 12px rgba(0,0,0,.08); padding:1.5rem; margin-bottom:1.5rem; }
+    .empty-state { text-align:center; padding:3rem 1rem; color:#94a3b8; }
+    .empty-state .icon { font-size:3rem; margin-bottom:1rem; }
+    .empty-state p { font-size:.95rem; }
+  </style>
+</head>
+<body>
+  <%- include('partials/nav') %>
+  <div class="container" style="max-width:1200px;margin:0 auto;padding:1.5rem 1rem;">
+
+    <div class="tab-bar">
+      <a href="/ho-so/hoa-don-ncc" class="tab-btn">📄 Hóa Đơn NCC</a>
+      <a href="/ho-so/phi-cang-phu-quoc" class="tab-btn">🚢 Phí Cảng Phú Quốc</a>
+      <a href="/ho-so/doanh-thu-chia-se" class="tab-btn">📊 Doanh Thu Chia Sẻ</a>
+      <a href="/ho-so/tien-thue" class="tab-btn">🏠 Tiền Thuê</a>
+      <a href="/ho-so/chung-tu" class="tab-btn active">📋 Chứng Từ</a>
+    </div>
+
+    <div class="page-card">
+      <div class="empty-state">
+        <div class="icon">📋</div>
+        <p>Tab <strong>Chứng Từ</strong> đã sẵn sàng.<br>Luyến hướng dẫn thêm nội dung để tôi tiếp tục nhé.</p>
+      </div>
+    </div>
+
+  </div>
+</body>
+</html>

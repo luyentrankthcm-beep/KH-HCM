@@ -567,6 +567,13 @@ router.post("/ho-so/phi-cang-phu-quoc/sync-drive", requireAdmin, async (req, res
 });
 
 // ─── Tiền Thuê Bình Thường ────────────────────────────────────────────────────
+// Luyen 2026-08-31: tab Chứng Từ (nội dung sẽ bổ sung sau)
+router.get("/ho-so/chung-tu", (req, res) => {
+  res.render("ho-so-chung-tu", {
+    userName: req.session ? req.session.userName : null,
+  });
+});
+
 router.get("/ho-so/tien-thue", (req, res) => {
   const store = load();
   const rows = (store.ho_so_tien_thue || []).slice().sort((a,b) => (b.thang||'').localeCompare(a.thang||''));
