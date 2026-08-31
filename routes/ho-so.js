@@ -11,6 +11,33 @@ const driveApi = require("../utils/driveApi");
 const uploadMem = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
 
 const router = express.Router();
+
+// Luyen 2026-08-31: bulk-upsert tu Google Drive -- phai dang ky TRUOC router.use(requireLogin)
+// de X-Internal-Key header bypass duoc auth ma khong can session.
+const INTERNAL_SYNC_KEY = process.env.INTERNAL_SYNC_KEY || "";
+router.post("/ho-so/hoa-don-ncc/bulk-upsert", express.json(), (req, res) => {
+  const keyOk = INTERNAL_SYNC_KEY && req.headers["x-internal-key"] === INTERNAL_SYNC_KEY;
+  if (!keyOk && !(req.session && req.session.role === "admin")) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+  const store = load();
+  ensureHoSo(store);
+  const files = req.body && Array.isArray(req.body.files) ? req.body.files : [];
+  const existingIds = new Set(store.ho_so_hoa_don.map((r) => r.driveId));
+  let added = 0, skipped = 0;
+  files.forEach((f) => {
+    const driveId  = String(f.driveId  || "").trim();
+    const fileName = String(f.fileName || "").trim();
+    if (!driveId || !fileName) { skipped++; return; }
+    if (existingIds.has(driveId)) { skipped++; return; }
+    store.ho_so_hoa_don.push({ driveId, fileName, addedAt: new Date().toISOString() });
+    existingIds.add(driveId);
+    added++;
+  });
+  save(store);
+  res.json({ success: true, added, skipped });
+});
+
 router.use(requireLogin);
 
 function parseInvoiceFileName(fileName) {
@@ -491,39 +518,8 @@ router.post("/ho-so/phi-cang-phu-quoc/upload-anh", requireDataEntry, uploadMem.a
   res.redirect("/ho-so/phi-cang-phu-quoc?success=" + encodeURIComponent(msg));
 });
 
-// ─── Sync Hóa Đơn NCC từ Google Drive ────────────────────────────────────────
-// Luyen, 2026-08-25: "cập nhật hóa đơn hàng ngày từ gg drive" -- list PDF
-// POST /ho-so/hoa-don-ncc/bulk-upsert
-// Body JSON: { files: [{driveId, fileName}] }
-// Upsert theo driveId. Dung cho Claude Cowork sync tu Google Drive (khong can OAuth Railway).
-// Auth: session admin HOAC header X-Internal-Key = env INTERNAL_SYNC_KEY
-const INTERNAL_SYNC_KEY = process.env.INTERNAL_SYNC_KEY || "";
-function requireAdminOrKey(req, res, next) {
-  if (INTERNAL_SYNC_KEY && req.headers["x-internal-key"] === INTERNAL_SYNC_KEY) return next();
-  return requireAdmin(req, res, next);
-}
-router.post("/ho-so/hoa-don-ncc/bulk-upsert", requireAdminOrKey, express.json(), (req, res) => {
-  const store = load();
-  ensureHoSo(store);
-  const files = req.body && Array.isArray(req.body.files) ? req.body.files : [];
-  const existingIds = new Set(store.ho_so_hoa_don.map((r) => r.driveId));
-  let added = 0, skipped = 0;
-  files.forEach((f) => {
-    const driveId  = String(f.driveId  || "").trim();
-    const fileName = String(f.fileName || "").trim();
-    if (!driveId || !fileName) { skipped++; return; }
-    if (existingIds.has(driveId)) { skipped++; return; }
-    store.ho_so_hoa_don.push({
-      driveId,
-      fileName,
-      addedAt: new Date().toISOString(),
-    });
-    existingIds.add(driveId);
-    added++;
-  });
-  save(store);
-  res.json({ success: true, added, skipped });
-});
+// Luyen 2026-08-31: route bulk-upsert duoc chuyen len truoc router.use(requireLogin)
+// o dau file de X-Internal-Key co the bypass auth. Route cu ben duoi da xoa.
 
 // Route cu - giu lai de khong bi 404 nhung khong dung OAuth nua
 router.post("/ho-so/sync-drive-hoa-don", requireAdmin, (req, res) => {
