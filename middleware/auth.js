@@ -33,6 +33,11 @@ function autoLoginSession(req) {
 // bi/trinh duyet dang dang nhap bang mat khau CU, ke ca may khong dung de
 // doi mat khau.
 function requireLogin(req, res, next) {
+  // Luyen 2026-08-31: bypass cho Claude Cowork sync (X-Internal-Key header)
+  const INTERNAL_SYNC_KEY = process.env.INTERNAL_SYNC_KEY || "";
+  if (INTERNAL_SYNC_KEY && req.headers["x-internal-key"] === INTERNAL_SYNC_KEY) {
+    return next();
+  }
   if (AUTH_DISABLED) {
     const user = autoLoginSession(req);
     if (user) return next();
