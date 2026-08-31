@@ -2087,8 +2087,10 @@ function renderVietQrPage(req, res, activeKeys, pageTitle, pageSubtitle) {
           : resolveMaCongTrinh(l.code);
         // Chi Nhan (2026-07-27): khong con chia theo chia se (CSE)/khong
         // chia se nua -- gop thang theo ten Ma Cong Trinh da quy ve.
-        const groupKey = maCongTrinh;
-        groupInfo[groupKey] = { maCongTrinh, isCse: false };
+        // Luyen 2026-08-31: normalize key ve UPPER de tranh "Farm Times City"
+        // va "FARM TIMES CITY" tao 2 dong rieng trong pivot.
+        const groupKey = maCongTrinh.toUpperCase().trim();
+        if (!groupInfo[groupKey]) groupInfo[groupKey] = { maCongTrinh, isCse: false };
         if (!cellMap[groupKey]) cellMap[groupKey] = {};
         const existing = cellMap[groupKey][r.settlementDate];
         if (!existing) {
