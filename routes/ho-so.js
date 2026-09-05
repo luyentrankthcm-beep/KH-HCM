@@ -255,6 +255,12 @@ router.get("/v2/ho-so/hoa-don-ncc", (req, res) => {
   });
 });
 
+// V2 placeholder tabs -- chuyen ve trang tuong ung ben v1 cho den khi co v2 rieng
+router.get("/v2/ho-so/phi-cang", (req, res) => res.redirect("/ho-so/phi-cang-phu-quoc"));
+router.get("/v2/ho-so/doanh-thu-chia-se", (req, res) => res.redirect("/ho-so/doanh-thu-chia-se"));
+router.get("/v2/ho-so/tien-thue", (req, res) => res.redirect("/ho-so/tien-thue"));
+router.get("/v2/ho-so/chung-tu", (req, res) => res.redirect("/ho-so/chung-tu"));
+
 // Luu cac truong bo sung cho 1 hoa don
 router.post("/ho-so/hoa-don-ncc/:driveId/sua", requireAdmin, (req, res) => {
   const store = load();
