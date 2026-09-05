@@ -31,6 +31,26 @@ router.get("/api/ho-so/hoa-don-ncc", express.json(), (req, res) => {
   });
 });
 
+// API tong hop cho v2 -- tra ve du lieu ca 5 trang Ho So trong 1 request
+router.get("/api/ho-so/all", express.json(), (req, res) => {
+  const keyOk = INTERNAL_SYNC_KEY && req.headers["x-internal-key"] === INTERNAL_SYNC_KEY;
+  if (!keyOk) return res.status(401).json({ error: "Unauthorized" });
+  const store = load();
+  ensureHoSo(store);
+  res.json({
+    ho_so_hoa_don: store.ho_so_hoa_don || [],
+    hoa_don_dau_vao: (store.hoa_don_dau_vao || []).map((r) => ({
+      soHoaDon: r.soHoaDon, tenNCC: r.tenNCC, soTien: r.soTien,
+      dienGiai: r.dienGiai || r.tenHangHoaMisa || "",
+    })),
+    ho_so_phi_cang: store.ho_so_phi_cang || [],
+    dtcs_chiase_diem: store.dtcs_chiase_diem || [],
+    dtcs_chiase_thang: store.dtcs_chiase_thang || [],
+    ho_so_tien_thue: store.ho_so_tien_thue || [],
+    ho_so_chung_tu: store.ho_so_chung_tu || [],
+  });
+});
+
 router.post("/ho-so/hoa-don-ncc/bulk-upsert", express.json(), (req, res) => {
   const keyOk = INTERNAL_SYNC_KEY && req.headers["x-internal-key"] === INTERNAL_SYNC_KEY;
   if (!keyOk && !(req.session && req.session.role === "admin")) {
