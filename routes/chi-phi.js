@@ -95,6 +95,18 @@ function ensureShape(store) {
     store.migrated_dachi_bankfix = true;
     save(store);
   }
+  // Luyen 2026-08-31: route cap-nhat-da-chi-ngan-hang da set nham daHachToan=true
+  // thay vi daChi=true cho cac dong co bankTxId. Reset lai daHachToan=false cho
+  // toan bo thang 8/2026 (Luyen se tu tick tay khi nao da nhap MISA xong).
+  if (!store.migrated_t8_hacht_reset_v2) {
+    (store.chi_phi || []).forEach((r) => {
+      if ((r.ngay || "").startsWith("2026-08")) {
+        r.daHachToan = false;
+      }
+    });
+    store.migrated_t8_hacht_reset_v2 = true;
+    save(store);
+  }
   if (!store.migrated_danang_mien_bac) {
     let changed = 0;
     (store.chi_phi || []).forEach((r) => {
@@ -1765,9 +1777,9 @@ router.post("/chi-phi/:mien(mien-nam|mien-bac)/cap-nhat-da-chi-ngan-hang", requi
       if (r.daHachToan) { alreadyDone++; continue; }
 
       // Case 1: already has bankTxId (created by old quet-ngan-hang before
-      // the daHachToan:true fix) -- just flip the flag.
+      // the daChi fix) -- tick daChi only, NOT daHachToan (Luyen tu tick HT).
       if (r.bankTxId) {
-        r.daHachToan = true;
+        r.daChi = true;
         retroFixed++;
         continue;
       }
@@ -1804,7 +1816,7 @@ router.post("/chi-phi/:mien(mien-nam|mien-bac)/cap-nhat-da-chi-ngan-hang", requi
         }
       }
       if (found) {
-        r.daHachToan = true;
+        r.daChi = true;  // Luyen 2026-08-31: chi tick daChi, KHONG daHachToan
         r.bankTxId = found.id;
         matched++;
       }
