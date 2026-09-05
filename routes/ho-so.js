@@ -6,6 +6,7 @@ const express = require("express");
 const multer = require("multer");
 const { load, save, nextId } = require("../store");
 const { requireLogin, requireAdmin, requireDataEntry } = require("../middleware/auth");
+const { getCompany } = require("../utils/companies");
 const driveApi = require("../utils/driveApi");
 
 const uploadMem = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
@@ -23,6 +24,7 @@ router.post("/ho-so/hoa-don-ncc/bulk-upsert", express.json(), (req, res) => {
   const store = load();
   ensureHoSo(store);
   const files = req.body && Array.isArray(req.body.files) ? req.body.files : [];
+  const company = req.body && req.body.company ? String(req.body.company).trim() : "kh_cu";
   const existingIds = new Set(store.ho_so_hoa_don.map((r) => r.driveId));
   let added = 0, skipped = 0;
   files.forEach((f) => {
@@ -30,7 +32,7 @@ router.post("/ho-so/hoa-don-ncc/bulk-upsert", express.json(), (req, res) => {
     const fileName = String(f.fileName || "").trim();
     if (!driveId || !fileName) { skipped++; return; }
     if (existingIds.has(driveId)) { skipped++; return; }
-    store.ho_so_hoa_don.push({ driveId, fileName, addedAt: new Date().toISOString() });
+    store.ho_so_hoa_don.push({ driveId, fileName, company, addedAt: new Date().toISOString() });
     existingIds.add(driveId);
     added++;
   });
@@ -136,17 +138,23 @@ function enrichRow(r, hddvLookup, store) {
 router.get("/ho-so/hoa-don-ncc", (req, res) => {
   const store = load();
   ensureHoSo(store);
+  const activeCompany = getCompany(req);
   const thangFilter = req.query.thang || "";
   const hddvLookup = buildHddvLookup(store);
 
-  let rows = store.ho_so_hoa_don.map((r) => enrichRow(r, hddvLookup, store));
+  // Loc theo cong ty: ban cu khong co truong company -> thuoc kh_cu
+  const allForCompany = store.ho_so_hoa_don.filter(
+    (r) => !r.company || r.company === activeCompany
+  );
+
+  let rows = allForCompany.map((r) => enrichRow(r, hddvLookup, store));
   if (thangFilter) rows = rows.filter((r) => r.thang === thangFilter);
   rows.sort((a, b) => {
     const nccCmp = a.nccShort.toLowerCase().localeCompare(b.nccShort.toLowerCase());
     return nccCmp !== 0 ? nccCmp : a.ngay.localeCompare(b.ngay);
   });
 
-  const allThang = [...new Set(store.ho_so_hoa_don.map((r) => {
+  const allThang = [...new Set(allForCompany.map((r) => {
     return parseInvoiceFileName(r.fileName || "").thang;
   }).filter(Boolean))].sort().reverse();
 
@@ -190,6 +198,58 @@ router.get("/ho-so/hoa-don-ncc", (req, res) => {
     thangFilter,
     allThang,
     total: rows.length,
+    error: req.query.error || null,
+    success: req.query.success || null,
+  });
+});
+
+// Luyen, 2026-09-05: trang v2 -- giao dien moi, sach hon, nhanh hon.
+// Cung logic loc theo cong ty nhu route chinh, chi khac template render.
+router.get("/v2/ho-so/hoa-don-ncc", (req, res) => {
+  const store = load();
+  ensureHoSo(store);
+  const activeCompany = getCompany(req);
+  const thangFilter = req.query.thang || "";
+  const hddvLookup = buildHddvLookup(store);
+
+  const allForCompany = store.ho_so_hoa_don.filter(
+    (r) => !r.company || r.company === activeCompany
+  );
+
+  let rows = allForCompany.map((r) => enrichRow(r, hddvLookup, store));
+  if (thangFilter) rows = rows.filter((r) => r.thang === thangFilter);
+  rows.sort((a, b) => {
+    const nccCmp = a.nccShort.toLowerCase().localeCompare(b.nccShort.toLowerCase());
+    return nccCmp !== 0 ? nccCmp : a.ngay.localeCompare(b.ngay);
+  });
+
+  const allThang = [...new Set(allForCompany.map((r) =>
+    parseInvoiceFileName(r.fileName || "").thang
+  ).filter(Boolean))].sort().reverse();
+
+  const groupMap = new Map();
+  rows.forEach((r) => {
+    const key = r.nccShort.toLowerCase();
+    if (!groupMap.has(key)) {
+      groupMap.set(key, { nccShort: r.nccShort, tenDayDuNCC: "", invoices: [] });
+    }
+    const g = groupMap.get(key);
+    if (!g.tenDayDuNCC && r.tenDayDuNCC) g.tenDayDuNCC = r.tenDayDuNCC;
+    g.invoices.push(r);
+  });
+
+  const groups = Array.from(groupMap.values()).sort((a, b) =>
+    a.nccShort.toLowerCase().localeCompare(b.nccShort.toLowerCase())
+  );
+
+  res.render("v2-ho-so-hd", {
+    userName: req.session.userName,
+    rows,
+    groups,
+    thangFilter,
+    allThang,
+    total: rows.length,
+    activeCompany,
     error: req.query.error || null,
     success: req.query.success || null,
   });

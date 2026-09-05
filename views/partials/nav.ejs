@@ -161,7 +161,11 @@
         Hồ sơ <span class="caret">▾</span>
       </button>
       <div class="nav-dropdown-menu">
-        <a href="/ho-so/hoa-don-ncc">Hóa Đơn NCC</a>
+        <div class="nav-dropdown-group-label">KH Cũ</div>
+        <form method="POST" action="/chon-cong-ty"><input type="hidden" name="company" value="kh_cu" /><input type="hidden" name="redirectTo" value="/v2/ho-so/hoa-don-ncc" /><button type="submit" class="nav-dropdown-item">Hóa Đơn NCC ✨</button></form>
+        <div class="nav-dropdown-divider"></div>
+        <div class="nav-dropdown-group-label">KH Mới</div>
+        <form method="POST" action="/chon-cong-ty"><input type="hidden" name="company" value="kh_moi" /><input type="hidden" name="redirectTo" value="/v2/ho-so/hoa-don-ncc" /><button type="submit" class="nav-dropdown-item">Hóa Đơn NCC ✨</button></form>
       </div>
     </div>
     <!-- Chi Nhan, 2026-07-31: "thêm 1 mục mới kế pháp danh là Tổng hợp cho
