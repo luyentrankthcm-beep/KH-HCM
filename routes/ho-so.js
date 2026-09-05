@@ -16,6 +16,21 @@ const router = express.Router();
 // Luyen 2026-08-31: bulk-upsert tu Google Drive -- phai dang ky TRUOC router.use(requireLogin)
 // de X-Internal-Key header bypass duoc auth ma khong can session.
 const INTERNAL_SYNC_KEY = process.env.INTERNAL_SYNC_KEY || "";
+// API JSON cho v2 service doc data ma khong can session (dung X-Internal-Key)
+router.get("/api/ho-so/hoa-don-ncc", express.json(), (req, res) => {
+  const keyOk = INTERNAL_SYNC_KEY && req.headers["x-internal-key"] === INTERNAL_SYNC_KEY;
+  if (!keyOk) return res.status(401).json({ error: "Unauthorized" });
+  const store = load();
+  ensureHoSo(store);
+  res.json({
+    ho_so_hoa_don: store.ho_so_hoa_don || [],
+    hoa_don_dau_vao: (store.hoa_don_dau_vao || []).map((r) => ({
+      soHoaDon: r.soHoaDon, tenNCC: r.tenNCC, soTien: r.soTien,
+      dienGiai: r.dienGiai || r.tenHangHoaMisa || "",
+    })),
+  });
+});
+
 router.post("/ho-so/hoa-don-ncc/bulk-upsert", express.json(), (req, res) => {
   const keyOk = INTERNAL_SYNC_KEY && req.headers["x-internal-key"] === INTERNAL_SYNC_KEY;
   if (!keyOk && !(req.session && req.session.role === "admin")) {
