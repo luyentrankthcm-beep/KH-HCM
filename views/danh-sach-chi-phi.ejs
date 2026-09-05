@@ -847,7 +847,11 @@
     status.textContent = 'Đang lưu ' + toSave.length + ' dòng...';
     var saved = 0;
     function saveNext() {
-      if (saved >= toSave.length) { status.textContent = '✓ Đã lưu ' + saved + ' dòng.'; return; }
+      if (saved >= toSave.length) {
+        status.textContent = '✓ Đã lưu ' + saved + ' dòng.';
+        showCuteToast(saved);
+        return;
+      }
       var item = toSave[saved++];
       var body = new URLSearchParams();
       body.append('from', item.gian);
@@ -865,6 +869,36 @@
       .catch(function(){ saveNext(); });
     }
     saveNext();
+  }
+
+  function showCuteToast(n) {
+    var existing = document.getElementById('cuteToast');
+    if (existing) existing.remove();
+    var toast = document.createElement('div');
+    toast.id = 'cuteToast';
+    toast.innerHTML =
+      '<div style="font-size:2rem;margin-bottom:6px;">🎉</div>' +
+      '<div style="font-weight:700;font-size:1.05rem;color:#be185d;margin-bottom:4px;">Lưu xong rồi Luyến ơi~</div>' +
+      '<div style="font-size:.85rem;color:#6b7280;">Đã map xong <b>' + n + '</b> gian hàng ✨</div>';
+    toast.style.cssText = [
+      'position:fixed','top:28px','left:50%','transform:translateX(-50%) scale(.85)',
+      'background:#fff0f6','border:2px solid #f9a8d4','border-radius:16px',
+      'padding:18px 32px','box-shadow:0 8px 32px rgba(236,72,153,.18)',
+      'text-align:center','z-index:99999','transition:all .35s cubic-bezier(.34,1.56,.64,1)',
+      'opacity:0','pointer-events:none'
+    ].join(';');
+    document.body.appendChild(toast);
+    requestAnimationFrame(function() {
+      requestAnimationFrame(function() {
+        toast.style.opacity = '1';
+        toast.style.transform = 'translateX(-50%) scale(1)';
+      });
+    });
+    setTimeout(function() {
+      toast.style.opacity = '0';
+      toast.style.transform = 'translateX(-50%) scale(.85)';
+      setTimeout(function(){ toast.remove(); }, 400);
+    }, 3000);
   }
 
   function closeMapGian() {
