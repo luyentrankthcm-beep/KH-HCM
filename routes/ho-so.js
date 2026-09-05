@@ -31,6 +31,32 @@ router.get("/api/ho-so/hoa-don-ncc", express.json(), (req, res) => {
   });
 });
 
+// Bulk-upsert Phi Cang -- check theo driveId de tranh duplicate
+router.post("/api/ho-so/phi-cang/bulk-upsert", express.json(), (req, res) => {
+  const keyOk = INTERNAL_SYNC_KEY && req.headers["x-internal-key"] === INTERNAL_SYNC_KEY;
+  if (!keyOk) return res.status(401).json({ error: "Unauthorized" });
+  const store = load();
+  if (!store.ho_so_phi_cang) store.ho_so_phi_cang = [];
+  const records = Array.isArray(req.body.records) ? req.body.records : [];
+  const existingIds = new Set(store.ho_so_phi_cang.map(r => r.driveId).filter(Boolean));
+  let added = 0, skipped = 0;
+  records.forEach(r => {
+    if (r.driveId && existingIds.has(r.driveId)) { skipped++; return; }
+    store.ho_so_phi_cang.push({
+      id: nextId(store),
+      ngay: (r.ngay||"").trim(), soHoaDon: (r.soHoaDon||"").trim(),
+      loaiPhi: (r.loaiPhi||"").trim(), soTien: (r.soTien||"").trim(),
+      linkFile: r.driveId ? `https://drive.google.com/file/d/${r.driveId}/view` : (r.linkFile||"").trim(),
+      driveId: (r.driveId||"").trim(), ghiChu: (r.ghiChu||"").trim(),
+      createdAt: new Date().toISOString(),
+    });
+    if (r.driveId) existingIds.add(r.driveId);
+    added++;
+  });
+  save(store);
+  res.json({ success: true, added, skipped });
+});
+
 // API tong hop cho v2 -- tra ve du lieu ca 5 trang Ho So trong 1 request
 router.get("/api/ho-so/all", express.json(), (req, res) => {
   const keyOk = INTERNAL_SYNC_KEY && req.headers["x-internal-key"] === INTERNAL_SYNC_KEY;
