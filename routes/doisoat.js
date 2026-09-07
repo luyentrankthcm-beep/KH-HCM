@@ -643,7 +643,20 @@ router.get("/doi-soat/momo", (req, res) => {
         l.grossAdjustmentVal = mm.grossAdjustment || 0;
         l.netAdjustmentVal = mm.netAdjustment;
       });
-      if (activeCompany !== "kh_moi") return { ...r, lines };
+      if (activeCompany !== "kh_moi") {
+        // kh_cu: recalculate totalNetComputed/diffVsBank after manual matches
+        // (before this fix, header showed pre-adjustment values — bug)
+        if (r.pendingBank || typeof r.bankAmount !== "number") return { ...r, lines };
+        let totalNetComputed = lines.reduce((sum, l) => sum + l.net, 0);
+        let diffVsBank = totalNetComputed - r.bankAmount;
+        if (diffVsBank !== 0 && Math.abs(diffVsBank) <= ROUNDING_ABSORB_THRESHOLD && lines.length > 0) {
+          const biggest = lines.reduce((a, b) => (b.gross > a.gross ? b : a), lines[0]);
+          biggest.net -= diffVsBank;
+          totalNetComputed = lines.reduce((sum, l) => sum + l.net, 0);
+          diffVsBank = totalNetComputed - r.bankAmount;
+        }
+        return { ...r, lines, totalNetComputed, diffVsBank };
+      }
       // pendingBank (chua co giao dich ngan hang that cho ngay nay -- xem
       // buildPendingDaySettlements) -- giu nguyen diffVsBank = null, KHONG
       // tinh/hap thu lam tron o day (khong co r.bankAmount that de so sanh).
