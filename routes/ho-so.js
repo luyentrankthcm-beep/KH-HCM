@@ -16,6 +16,67 @@ const router = express.Router();
 // Luyen 2026-08-31: bulk-upsert tu Google Drive -- phai dang ky TRUOC router.use(requireLogin)
 // de X-Internal-Key header bypass duoc auth ma khong can session.
 const INTERNAL_SYNC_KEY = process.env.INTERNAL_SYNC_KEY || "";
+// API JSON cho v2 service doc data ma khong can session (dung X-Internal-Key)
+router.get("/api/ho-so/hoa-don-ncc", express.json(), (req, res) => {
+  const keyOk = INTERNAL_SYNC_KEY && req.headers["x-internal-key"] === INTERNAL_SYNC_KEY;
+  if (!keyOk) return res.status(401).json({ error: "Unauthorized" });
+  const store = load();
+  ensureHoSo(store);
+  res.json({
+    ho_so_hoa_don: store.ho_so_hoa_don || [],
+    hoa_don_dau_vao: (store.hoa_don_dau_vao || []).map((r) => ({
+      soHoaDon: r.soHoaDon, tenNCC: r.tenNCC, soTien: r.soTien,
+      dienGiai: r.dienGiai || r.tenHangHoaMisa || "",
+    })),
+  });
+});
+
+// Bulk-upsert Phi Cang -- check theo driveId de tranh duplicate
+router.post("/api/ho-so/phi-cang/bulk-upsert", express.json(), (req, res) => {
+  const keyOk = INTERNAL_SYNC_KEY && req.headers["x-internal-key"] === INTERNAL_SYNC_KEY;
+  if (!keyOk) return res.status(401).json({ error: "Unauthorized" });
+  const store = load();
+  if (!store.ho_so_phi_cang) store.ho_so_phi_cang = [];
+  const records = Array.isArray(req.body.records) ? req.body.records : [];
+  const existingIds = new Set(store.ho_so_phi_cang.map(r => r.driveId).filter(Boolean));
+  let added = 0, skipped = 0;
+  records.forEach(r => {
+    if (r.driveId && existingIds.has(r.driveId)) { skipped++; return; }
+    store.ho_so_phi_cang.push({
+      id: nextId(store),
+      ngay: (r.ngay||"").trim(), soHoaDon: (r.soHoaDon||"").trim(),
+      loaiPhi: (r.loaiPhi||"").trim(), soTien: (r.soTien||"").trim(),
+      linkFile: r.driveId ? `https://drive.google.com/file/d/${r.driveId}/view` : (r.linkFile||"").trim(),
+      driveId: (r.driveId||"").trim(), ghiChu: (r.ghiChu||"").trim(),
+      createdAt: new Date().toISOString(),
+    });
+    if (r.driveId) existingIds.add(r.driveId);
+    added++;
+  });
+  save(store);
+  res.json({ success: true, added, skipped });
+});
+
+// API tong hop cho v2 -- tra ve du lieu ca 5 trang Ho So trong 1 request
+router.get("/api/ho-so/all", express.json(), (req, res) => {
+  const keyOk = INTERNAL_SYNC_KEY && req.headers["x-internal-key"] === INTERNAL_SYNC_KEY;
+  if (!keyOk) return res.status(401).json({ error: "Unauthorized" });
+  const store = load();
+  ensureHoSo(store);
+  res.json({
+    ho_so_hoa_don: store.ho_so_hoa_don || [],
+    hoa_don_dau_vao: (store.hoa_don_dau_vao || []).map((r) => ({
+      soHoaDon: r.soHoaDon, tenNCC: r.tenNCC, soTien: r.soTien,
+      dienGiai: r.dienGiai || r.tenHangHoaMisa || "",
+    })),
+    ho_so_phi_cang: store.ho_so_phi_cang || [],
+    dtcs_chiase_diem: store.dtcs_chiase_diem || [],
+    dtcs_chiase_thang: store.dtcs_chiase_thang || [],
+    ho_so_tien_thue: store.ho_so_tien_thue || [],
+    ho_so_chung_tu: store.ho_so_chung_tu || [],
+  });
+});
+
 router.post("/ho-so/hoa-don-ncc/bulk-upsert", express.json(), (req, res) => {
   const keyOk = INTERNAL_SYNC_KEY && req.headers["x-internal-key"] === INTERNAL_SYNC_KEY;
   if (!keyOk && !(req.session && req.session.role === "admin")) {
@@ -254,6 +315,12 @@ router.get("/v2/ho-so/hoa-don-ncc", (req, res) => {
     success: req.query.success || null,
   });
 });
+
+// V2 placeholder tabs -- chuyen ve trang tuong ung ben v1 cho den khi co v2 rieng
+router.get("/v2/ho-so/phi-cang", (req, res) => res.redirect("/ho-so/phi-cang-phu-quoc"));
+router.get("/v2/ho-so/doanh-thu-chia-se", (req, res) => res.redirect("/ho-so/doanh-thu-chia-se"));
+router.get("/v2/ho-so/tien-thue", (req, res) => res.redirect("/ho-so/tien-thue"));
+router.get("/v2/ho-so/chung-tu", (req, res) => res.redirect("/ho-so/chung-tu"));
 
 // Luu cac truong bo sung cho 1 hoa don
 router.post("/ho-so/hoa-don-ncc/:driveId/sua", requireAdmin, (req, res) => {
