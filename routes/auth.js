@@ -64,15 +64,5 @@ router.post("/account/password", (req, res) => {
   res.redirect("/?pwsuccess=1");
 });
 
-// TEMP RESET - xoa sau khi dung xong
-router.get("/tmp-reset-kh2026", (req, res) => {
-  const store = load();
-  const user = store.users.find(u => u.username === "admin");
-  if (!user) return res.send("Khong tim thay user admin");
-  user.password_hash = bcrypt.hashSync("123456", 10);
-  user.session_version = (user.session_version || 0) + 1;
-  save(store);
-  res.send("Da reset mat khau admin thanh 123456. Vao /login de dang nhap.");
-});
 
 module.exports = router;
