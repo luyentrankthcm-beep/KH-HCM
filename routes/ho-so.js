@@ -252,7 +252,7 @@ router.get("/ho-so/hoa-don-ncc", (req, res) => {
     a.nccShort.toLowerCase().localeCompare(b.nccShort.toLowerCase())
   );
 
-  res.render("v2-ho-so-hd", {
+  res.render("ho-so-hoa-don", {
     userName: req.session.userName,
     rows,
     groups,
