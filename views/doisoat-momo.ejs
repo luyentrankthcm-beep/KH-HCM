@@ -457,7 +457,21 @@ File xuất chỉ gồm các khoản có ngày về ngân hàng nằm trong kho�
                 </form>
                 <% } %>
               </td>
-              <td><%= l.net.toLocaleString('vi-VN') %> đ</td>
+              <td>
+                <%= l.net.toLocaleString('vi-VN') %> đ<% if (l.netAdjusted) { %> <span style="font-size:10px;color:var(--color-muted,#aaa);" title="Đã chỉnh: gốc <%= l.netOriginal.toLocaleString('vi-VN') %> đ">✏️</span><% } %>
+                <% if (isAdmin && !l.locked) { %>
+                <span onclick="var f=this.nextElementSibling;f.style.display=f.style.display==='none'?'block':'none';" style="cursor:pointer;font-size:13px;margin-left:3px;color:#2980b9;" title="Chỉnh tiền về NH">🖊️</span>
+                <form method="POST" action="/doi-soat/momo/manual-match" style="display:none;margin-top:4px;">
+                  <input type="hidden" name="settlementDate" value="<%= r.settlementDate %>" />
+                  <input type="hidden" name="code" value="<%= l.code %>" />
+                  <input type="hidden" name="invoiceNumbers" value="<%= l.invoiceNumbers.join(', ') %>" />
+                  <input type="hidden" name="amount" value="<%= l.invoiceTotal || '' %>" />
+                  <input type="hidden" name="grossAdjustment" value="<%= l.grossAdjustmentVal || '' %>" />
+                  <input type="text" name="netAdjustment" value="<%= l.netAdjustmentVal != null ? l.netAdjustmentVal : '' %>" placeholder="Tiền NH thực" title="Nhập số tiền thực tế về ngân hàng (ghi đè giá trị tính toán)" style="width:110px;font-size:11px;" />
+                  <button type="submit" class="btn btn-secondary" style="font-size:11px;padding:2px 6px;">Lưu</button>
+                </form>
+                <% } %>
+              </td>
               <td><%= l.invoiceNumbers.join(', ') || '-' %></td>
               <td><%= l.invoiceTotal.toLocaleString('vi-VN') %> đ</td>
               <td>
