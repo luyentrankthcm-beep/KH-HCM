@@ -124,6 +124,7 @@
       <button class="tab-btn active" onclick="switchTab('momo', this)">🟣 Momo</button>
       <button class="tab-btn" onclick="switchTab('zvp', this)">🔵 Zalo/VNPay/Payoo</button>
       <button class="tab-btn" onclick="switchTab('vietqr', this)">🟢 Viet QR</button>
+      <button class="tab-btn" onclick="switchTab('mtt', this)">🔶 MTT / Hoàn tiền</button>
     </div>
 
     <!-- ==================== MOMO TAB ==================== -->
@@ -140,7 +141,7 @@
       <!-- Sub-tabs -->
       <div class="sub-tab-bar" id="momoSubTabs" style="display:none">
         <button class="sub-tab-btn active" onclick="switchSub('momo','pivot',this)">📊 Theo gian</button>
-        <button class="sub-tab-btn" onclick="switchSub('momo','doisoat',this); renderDoiSoatNgay()">📅 Đối soát ngày</button>
+        <button class="sub-tab-btn" onclick="switchSub('momo','doisoat',this); renderDoiSoatNgay(); fetchBankDaily()">📅 Đối soát ngày</button>
         <button class="sub-tab-btn" onclick="switchSub('momo','detail',this)">📋 Chi tiết GD</button>
         <button class="sub-tab-btn" onclick="switchSub('momo','history',this)">🕓 Lịch sử tải</button>
       </div>
@@ -238,30 +239,37 @@
     <!-- ==================== VIET QR TAB ==================== -->
     <div id="vietqr" class="tab-panel">
       <div class="channel-header">
+        <div class="acct-info">Viet QR</div>
+        <button class="btn-nhap" style="background:#16a34a" disabled>📤 Nhập liệu đối soát</button>
+      </div>
+      <div class="empty-state"><div class="big-icon">🟢</div><p>Chưa thiết lập – <%= activeCompany === 'kh_cu' ? 'KH Cũ' : 'KH Mới' %></p></div>
+    </div>
+
+    <!-- ==================== MTT TAB ==================== -->
+    <div id="mtt" class="tab-panel">
+      <div class="channel-header">
         <div class="acct-info">
-          Viet QR &nbsp;<span style="font-size:.78em;color:#64748b">· Đối soát MTT (Mẫu Tổng Thanh toán)</span>
+          MTT / Hoàn tiền &nbsp;<span style="font-size:.78em;color:#64748b">· File đối soát hoàn tiền từ các kênh thanh toán</span>
         </div>
-        <button class="btn-nhap" style="background:#16a34a" onclick="openVietQrModal()">📤 Nhập file MTT</button>
+        <button class="btn-nhap" style="background:#d97706" onclick="openMttModal()">📤 Nhập file MTT</button>
       </div>
 
-      <!-- MTT: Empty state -->
-      <div id="vqrEmpty" class="empty-state">
-        <div class="big-icon">🟢</div>
-        <p>Chưa có dữ liệu MTT<br>Nhấn <strong>Nhập file MTT</strong> để tải file lên</p>
+      <div id="mttEmpty" class="empty-state">
+        <div class="big-icon">🔶</div>
+        <p>Chưa có dữ liệu MTT<br>Nhấn <strong>Nhập file MTT</strong> để tải lên · Hệ thống tự nhận dạng KH Cũ / KH Mới</p>
       </div>
 
-      <!-- MTT: Results placeholder -->
-      <div id="vqrResults" style="display:none">
+      <div id="mttResults" style="display:none">
         <div class="results-toolbar">
-          <div class="results-meta" id="vqrMeta"></div>
+          <div class="results-meta" id="mttMeta"></div>
           <div style="display:flex;gap:.5rem">
-            <button onclick="clearVqrData()" style="background:#ef4444;color:#fff;border:none;border-radius:5px;padding:.35rem .75rem;cursor:pointer;font-size:.82em;font-weight:600">🗑️ Xóa dữ liệu</button>
+            <button onclick="clearMttData()" style="background:#ef4444;color:#fff;border:none;border-radius:5px;padding:.35rem .75rem;cursor:pointer;font-size:.82em;font-weight:600">🗑️ Xóa dữ liệu</button>
           </div>
         </div>
         <div style="overflow-x:auto;border:1px solid #e2e8f0;border-radius:8px;max-height:65vh;overflow-y:auto">
           <table style="width:100%;border-collapse:collapse;font-size:.83em">
-            <thead><tr id="vqrHead" style="background:#1e3a5f;color:#fff;position:sticky;top:0"></tr></thead>
-            <tbody id="vqrBody"></tbody>
+            <thead><tr id="mttHead" style="background:#92400e;color:#fff;position:sticky;top:0"></tr></thead>
+            <tbody id="mttBody"></tbody>
           </table>
         </div>
       </div>
@@ -315,23 +323,23 @@
     </div>
   </div>
 
-  <!-- ==================== VIET QR / MTT MODAL ==================== -->
-  <div id="vietQrModal" class="modal-overlay" onclick="if(event.target===this)closeVietQrModal()">
+  <!-- ==================== MTT MODAL ==================== -->
+  <div id="mttModal" class="modal-overlay" onclick="if(event.target===this)closeMttModal()">
     <div class="modal-box">
-      <h3>📤 Nhập file MTT – Viet QR</h3>
-      <p class="modal-sub">Tải file đối soát MTT (Excel/CSV) từ cổng Viet QR / NAPAS. Hệ thống tự nhận dạng KH Cũ hay KH Mới.</p>
-      <div class="upload-area" onclick="document.getElementById('vqrFileInput').click()">
+      <h3>📤 Nhập file MTT – Hoàn tiền</h3>
+      <p class="modal-sub">Tải file đối soát MTT (Excel/CSV). Hệ thống đọc cấu trúc để Claude thiết lập parser.</p>
+      <div class="upload-area" onclick="document.getElementById('mttFileInput').click()">
         <span class="big-icon">📂</span>
         <div>Nhấn để chọn file <strong>.xlsx / .csv</strong></div>
         <div style="font-size:.78em;margin-top:.25rem;color:#94a3b8">Hoặc kéo thả vào đây</div>
-        <input type="file" id="vqrFileInput" accept=".xlsx,.xls,.csv" style="display:none" onchange="handleVietQrFile(this.files[0])">
+        <input type="file" id="mttFileInput" accept=".xlsx,.xls,.csv" style="display:none" onchange="handleMttFile(this.files[0])">
       </div>
-      <div id="vqrUploadStatus" class="upload-status"></div>
+      <div id="mttUploadStatus" class="upload-status"></div>
       <div style="margin-top:.75rem;padding:.6rem .75rem;background:#fef9c3;border-radius:6px;font-size:.8em;color:#854d0e">
-        ⚠️ Format file MTT chưa được cấu hình. Tải file lên và Claude sẽ đọc cấu trúc để thiết lập.
+        ⚠️ Format file MTT chưa cấu hình. Tải lên → Claude xem cấu trúc → thiết lập parser.
       </div>
       <div class="modal-actions">
-        <button class="btn-cancel" onclick="closeVietQrModal()">Đóng</button>
+        <button class="btn-cancel" onclick="closeMttModal()">Đóng</button>
       </div>
     </div>
   </div>
@@ -750,10 +758,12 @@
         const dayPhi   = gianList.reduce((s,g) => s + gianData[g].fee, 0);
         const dayNet   = dayDT - dayPhi;
         const dayCnt   = gianList.reduce((s,g) => s + gianData[g].count, 0);
-        const hdDayKey = `day|${date}`;
-        const hdDay    = _hdData[hdDayKey] || {};
+        const bankNH   = _bankDaily[date] || 0;
+        const diffSign = bankNH ? (bankNH === dayNet ? '✅' : (Math.abs(bankNH - dayNet) < 1000 ? '≈' : '⚠️')) : '';
+        const diffHint = bankNH && bankNH !== dayNet
+          ? ` &nbsp;<span style="font-size:.78em;color:#f59e0b">NH: ${fmtN(bankNH)}đ (chênh ${fmtN(bankNH - dayNet)}đ)</span>` : '';
         html += `<tr class="day-row">
-          <td colspan="7">📅 <strong>${date}</strong> &nbsp;·&nbsp; DT: ${fmtN(dayDT)}đ &nbsp;·&nbsp; Phí: ${fmtN(dayPhi)}đ &nbsp;·&nbsp; Net: <strong>${fmtN(dayNet)}đ</strong></td>
+          <td colspan="7">📅 <strong>${date}</strong> &nbsp;·&nbsp; DT: ${fmtN(dayDT)}đ &nbsp;·&nbsp; Phí: ${fmtN(dayPhi)}đ &nbsp;·&nbsp; Net: <strong>${fmtN(dayNet)}đ</strong>${diffHint} &nbsp;${diffSign}</td>
         </tr>`;
         gianList.forEach(g => {
           const d   = gianData[g];
@@ -769,7 +779,7 @@
             <td style="text-align:right;color:#15803d;font-weight:600">${fmtN(d.amount)}</td>
             <td style="text-align:right;color:#dc2626">${fmtN(d.fee)}</td>
             <td style="text-align:right;color:#2563eb;font-weight:700">${fmtN(net)}</td>
-            <td><input type="text" value="${hd.tienNH||''}" placeholder="Nhập tiền NH về"
+            <td><input type="text" value="${hd.tienNH||''}" placeholder="${bankNH ? fmtN(bankNH)+' (NH)' : 'Nhập...'}"
               style="width:120px;border:1px solid #bae6fd;border-radius:4px;padding:.25rem .4rem;font-size:.8em;text-align:right;background:#f0f9ff"
               onchange="saveHdField('${hdKey}','tienNH',this.value)"></td>
             <td><input type="text" value="${hd.soHD||''}" placeholder="VD: 0000123"
@@ -807,16 +817,16 @@
       XLSX.writeFile(wb, 'Momo_pivot.xlsx');
     }
 
-    // ── Viet QR / MTT ──
-    const LS_VQR = `vqr_rows_${COMPANY}`;
-    let _vqrRows = [];
+    // ── MTT / Hoàn tiền ──
+    const LS_MTT = `mtt_rows_${COMPANY}`;
+    let _mttRows = [];
 
-    function openVietQrModal()  { document.getElementById('vietQrModal').classList.add('open'); }
-    function closeVietQrModal() { document.getElementById('vietQrModal').classList.remove('open'); }
+    function openMttModal()  { document.getElementById('mttModal').classList.add('open'); }
+    function closeMttModal() { document.getElementById('mttModal').classList.remove('open'); }
 
-    function handleVietQrFile(file) {
+    function handleMttFile(file) {
       if (!file) return;
-      const st = document.getElementById('vqrUploadStatus');
+      const st = document.getElementById('mttUploadStatus');
       st.className = 'upload-status loading';
       st.textContent = '⏳ Đang đọc file...';
       const reader = new FileReader();
@@ -825,15 +835,13 @@
           const wb   = XLSX.read(e.target.result, { type: 'array', cellDates: false });
           const ws   = wb.Sheets[wb.SheetNames[0]];
           const data = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
-          // Hiển thị 5 hàng đầu để Claude nhận dạng format
-          const preview = data.slice(0, 8).map(r => r.join(' | ')).join('\n');
+          const preview = data.slice(0, 10).map(r => r.map(c => String(c).substring(0,30)).join(' | ')).join('\n');
           st.className = 'upload-status ok';
-          st.innerHTML = `✅ Đọc được ${data.length} dòng · Sheet: <em>${wb.SheetNames[0]}</em><br>
-            <details style="margin-top:.4rem;font-size:.78em">
-              <summary>Xem cấu trúc (8 dòng đầu)</summary>
-              <pre style="background:#f1f5f9;border-radius:4px;padding:.5rem;overflow-x:auto;margin:.4rem 0;font-size:.75em;max-height:150px">${preview}</pre>
-            </details>
-            <span style="color:#64748b">Gửi ảnh chụp hoặc copy nội dung trên cho Claude để thiết lập parser.</span>`;
+          st.innerHTML = `✅ Đọc được ${data.length} dòng · ${wb.SheetNames.length} sheet · Sheet đầu: <em>${wb.SheetNames[0]}</em><br>
+            <details open style="margin-top:.4rem;font-size:.78em">
+              <summary>Cấu trúc 10 dòng đầu (gửi cho Claude để thiết lập parser)</summary>
+              <pre style="background:#f1f5f9;border-radius:4px;padding:.5rem;overflow-x:auto;margin:.4rem 0;font-size:.73em;max-height:200px;white-space:pre-wrap">${preview}</pre>
+            </details>`;
         } catch(err) {
           st.className = 'upload-status err';
           st.textContent = '❌ Lỗi đọc file: ' + err.message;
@@ -842,12 +850,34 @@
       reader.readAsArrayBuffer(file);
     }
 
-    function clearVqrData() {
-      if (!confirm('Xóa toàn bộ dữ liệu Viet QR?')) return;
-      _vqrRows = [];
-      try { localStorage.removeItem(LS_VQR); } catch(e) {}
-      document.getElementById('vqrEmpty').style.display = 'block';
-      document.getElementById('vqrResults').style.display = 'none';
+    function clearMttData() {
+      if (!confirm('Xóa toàn bộ dữ liệu MTT?')) return;
+      _mttRows = [];
+      try { localStorage.removeItem(LS_MTT); } catch(e) {}
+      document.getElementById('mttEmpty').style.display = 'block';
+      document.getElementById('mttResults').style.display = 'none';
+    }
+
+    // ── Auto-fetch bank daily totals for Đối soát ngày ──
+    let _bankDaily = {}; // { "DD-MM-YYYY": amount }
+
+    async function fetchBankDaily() {
+      if (!_dates.length) return;
+      // Lấy khoảng ngày từ _dates (format DD-MM-YYYY → convert sang YYYY-MM-DD cho API)
+      const toYMD = d => { const [dd,mm,yy] = d.split('-'); return `${yy}-${mm}-${dd}`; };
+      const sorted = [..._dates].sort();
+      const from = toYMD(sorted[0]);
+      const to   = toYMD(sorted[sorted.length - 1]);
+      // KH Mới → BIDV 7701; KH Cũ → có thể khác, tạm dùng 7701
+      const account = COMPANY === 'kh_moi' ? '7701' : '7701';
+      try {
+        const res  = await fetch(`/api/dau-ra/bank-daily?account=${account}&from=${from}&to=${to}`);
+        const json = await res.json();
+        if (json.ok) {
+          _bankDaily = json.daily || {};
+          renderDoiSoatNgay(); // re-render with bank data
+        }
+      } catch(e) { /* im lặng nếu fail */ }
     }
 
     // ── Init: restore from localStorage (script is at end of body, DOM already ready) ──
