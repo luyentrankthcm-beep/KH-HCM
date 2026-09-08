@@ -785,10 +785,10 @@
         if (!byDate[r.date][r.gian]) byDate[r.date][r.gian] = { amount: 0, fee: 0 };
         const rate = r.feeRate != null ? r.feeRate : (COMPANY === 'kh_cu' ? 0.011 : 0.01);
         byDate[r.date][r.gian].amount += r.amount;
-        byDate[r.date][r.gian].fee    += Math.round(r.amount * rate);
+        byDate[r.date][r.gian].fee    += r.amount * rate; // cộng dồn float, round 1 lần khi hiển thị
       });
 
-      const fmtN = n => n.toLocaleString('vi');
+      const fmtN = n => Math.round(n).toLocaleString('vi');
       const ddmmToISO = d => { const [dd,mm,yy] = d.split('-'); return `${yy}-${mm}-${dd}`; };
       const inRange = (date, from, to) => {
         const d = ddmmToISO(date);
@@ -801,7 +801,7 @@
         const gianList = Object.keys(gianData).sort();
         if (!gianList.length) return '';
         const dayDT  = gianList.reduce((s,g) => s + gianData[g].amount, 0);
-        const dayPhi = gianList.reduce((s,g) => s + gianData[g].fee, 0);
+        const dayPhi = Math.round(gianList.reduce((s,g) => s + gianData[g].fee, 0));
         const dayNet = dayDT - dayPhi;
         let out = `<tr style="background:#374151;color:#e5e7eb;">
           <td colspan="7" style="padding:.35rem .75rem .35rem 1.25rem;font-size:.81em">
@@ -809,7 +809,8 @@
           </td></tr>`;
         gianList.forEach(g => {
           const dg  = gianData[g];
-          const net = dg.amount - dg.fee;
+          const feeR = Math.round(dg.fee);
+          const net = dg.amount - feeR;
           const ct  = _ctMap[g] || {};
           const ctLine = ct.maCT
             ? `<span class="ct-badge">${ct.maCT}</span>${ct.isChiaSe ? '<span class="ct-chiase-badge">CS</span>' : ''}`
@@ -819,7 +820,7 @@
           out += `<tr class="gian-row">
             <td style="padding-left:2rem"><div>${ctLine}</div><div style="font-size:.77em;color:#475569;margin-top:1px">${g}</div></td>
             <td style="text-align:right;color:#15803d;font-weight:600">${fmtN(dg.amount)}</td>
-            <td style="text-align:right;color:#dc2626">${fmtN(dg.fee)}</td>
+            <td style="text-align:right;color:#dc2626">${fmtN(feeR)}</td>
             <td style="text-align:right;color:#2563eb;font-weight:700">${fmtN(net)}</td>
             <td><input type="text" value="${hd.tienNH||''}" placeholder="Nhập..."
               style="width:110px;border:1px solid #bae6fd;border-radius:4px;padding:.25rem .4rem;font-size:.8em;text-align:right;background:#f0f9ff"
@@ -846,7 +847,7 @@
           const payDates = filteredDates.filter(d => inRange(d, pay.fromDate, pay.toDate));
           // Hiển thị header đợt dù payDates rỗng (để biết NH đã trả nhưng Momo tháng này không có)
           const momoNet = payDates.reduce((s, d) => {
-            return s + Object.values(byDate[d] || {}).reduce((s2, v) => s2 + v.amount - v.fee, 0);
+            return s + Object.values(byDate[d] || {}).reduce((s2, v) => s2 + v.amount - Math.round(v.fee), 0);
           }, 0);
           const diff = pay.amount - momoNet;
           const matchIcon = payDates.length === 0 ? '' : (Math.abs(diff) < 1000 ? '✅' : '⚠️');
@@ -877,7 +878,7 @@
         if (hasBankPayments) {
           // Chỉ hiện header "Chưa có NH" khi đã có ít nhất 1 đợt NH (để phân biệt với ngày bình thường)
           const unpaidNet = unpaidDates.reduce((s, d) =>
-            s + Object.values(byDate[d] || {}).reduce((s2, v) => s2 + v.amount - v.fee, 0), 0);
+            s + Object.values(byDate[d] || {}).reduce((s2, v) => s2 + v.amount - Math.round(v.fee), 0), 0);
           html += `<tr>
             <td colspan="7" style="background:#78350f;color:#fef3c7;padding:.6rem .75rem;font-weight:700;font-size:.84em;border-top:2px solid #d97706">
               ⏳ Chưa có NH trả về &nbsp;·&nbsp; Tổng Net: ${fmtN(unpaidNet)}đ
