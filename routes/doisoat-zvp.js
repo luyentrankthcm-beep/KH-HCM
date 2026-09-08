@@ -88,6 +88,30 @@ router.post("/doi-soat/zvp/internal/patch-offline-diem", express.json(), (req, r
   res.json({ success: true, mappingsAdded: Object.keys(addMappings).length, unmapped: Array.from(unmapped).slice(0, 10), grossKeys: Object.keys(grossByCode).length });
 });
 
+// Internal: thêm grossByCode/netByCode trực tiếp vào zvp_offline_uploads (bypass raw_tx)
+router.post("/doi-soat/zvp/internal/patch-offline-direct", express.json(), (req, res) => {
+  if (req.headers["x-internal-key"] !== ZVP_INTERNAL_KEY) return res.status(401).json({ error: "Unauthorized" });
+  const { grossByCode, netByCode, label } = req.body;
+  if (!grossByCode || typeof grossByCode !== "object") return res.status(400).json({ error: "grossByCode required" });
+  const store = load();
+  if (!store.zvp_offline_uploads) store.zvp_offline_uploads = [];
+  // Xóa entry patch cũ cùng label nếu có
+  store.zvp_offline_uploads = store.zvp_offline_uploads.filter(u => u.file_name !== (label || "patch-direct"));
+  store.zvp_offline_uploads.push({
+    id: nextId(store, "zvp_offline_uploads_seq") || Date.now(),
+    uploaded_at: new Date().toISOString(),
+    file_name: label || "patch-direct",
+    sheetName: "patch",
+    dates: [...new Set(Object.keys(grossByCode).map(k => k.split("|")[0]))].sort(),
+    codes: [...new Set(Object.keys(grossByCode).map(k => k.split("|")[1]))],
+    grossByCode,
+    netByCode: netByCode || grossByCode,
+    unmapped: [],
+  });
+  save(store);
+  res.json({ success: true, added: Object.keys(grossByCode).length });
+});
+
 // Internal: xóa patch sai khỏi vnpay_khmoi_uploads (cleanup)
 router.post("/doi-soat/zvp/internal/remove-khmoi-patch", express.json(), (req, res) => {
   if (req.headers["x-internal-key"] !== ZVP_INTERNAL_KEY) return res.status(401).json({ error: "Unauthorized" });
