@@ -423,6 +423,31 @@
       _hdData[key][field] = val;
       saveHdData();
     }
+    function toggleEditPanel(dateId) {
+      const row = document.getElementById('edit_' + dateId);
+      if (!row) return;
+      row.style.display = row.style.display === 'none' ? '' : 'none';
+    }
+    function saveEditPanel(dateId, date, gianList) {
+      gianList.forEach(g => {
+        const gKey = g.replace(/[^a-zA-Z0-9]/g,'_');
+        const hdKey = `${date}|${g}`;
+        if (!_hdData[hdKey]) _hdData[hdKey] = {};
+        const tienNH   = (document.getElementById(`edit_tienNH_${dateId}_${gKey}`)   || {}).value || '';
+        const soHD     = (document.getElementById(`edit_soHD_${dateId}_${gKey}`)     || {}).value || '';
+        const soTienHD = (document.getElementById(`edit_soTienHD_${dateId}_${gKey}`) || {}).value || '';
+        _hdData[hdKey].tienNH   = tienNH;
+        _hdData[hdKey].soHD     = soHD;
+        _hdData[hdKey].soTienHD = soTienHD;
+      });
+      saveHdData();
+      renderDoiSoatNgay();
+      // Mở lại panel sau khi re-render
+      setTimeout(() => {
+        const row = document.getElementById('edit_' + dateId);
+        if (row) row.style.display = '';
+      }, 50);
+    }
 
     // ── Recompute derived arrays & refresh UI ──
     function refreshUI() {
@@ -812,7 +837,7 @@
         return d >= ddmmToISO(from) && d <= ddmmToISO(to);
       };
 
-      // Render các hàng cho 1 ngày (sub-rows theo gian)
+      // Render các hàng cho 1 ngày (sub-rows theo gian) + bảng chỉnh sửa
       const renderDateRows = (date) => {
         const gianData = byDate[date] || {};
         const gianList = Object.keys(gianData).sort();
@@ -820,9 +845,19 @@
         const dayDT  = gianList.reduce((s,g) => s + gianData[g].amount, 0);
         const dayPhi = Math.round(gianList.reduce((s,g) => s + gianData[g].fee, 0));
         const dayNet = dayDT - dayPhi;
-        let out = `<tr style="background:#374151;color:#e5e7eb;">
+        const dayNH  = gianList.reduce((s,g) => {
+          const v = parseFloat(String((_hdData[`${date}|${g}`]||{}).tienNH||'').replace(/[^0-9.]/g,''))||0;
+          return s + v;
+        }, 0);
+        const dateId = date.replace(/-/g,'_');
+        let out = `<tr style="background:#374151;color:#e5e7eb;cursor:pointer" onclick="toggleEditPanel('${dateId}')">
           <td colspan="7" style="padding:.38rem .75rem .38rem 1.25rem;font-size:.87em">
-            📅 <strong>${date}</strong> &nbsp;·&nbsp; DT: ${fmtN(dayDT)}đ &nbsp;·&nbsp; Phí: ${fmtN(dayPhi)}đ &nbsp;·&nbsp; Net: <strong style="color:#93c5fd">${fmtN(dayNet)}đ</strong>
+            📅 <strong>${date}</strong>
+            &nbsp;·&nbsp; DT: ${fmtN(dayDT)}đ
+            &nbsp;·&nbsp; Phí: ${fmtN(dayPhi)}đ
+            &nbsp;·&nbsp; Net: <strong style="color:#93c5fd">${fmtN(dayNet)}đ</strong>
+            ${dayNH ? `&nbsp;·&nbsp; NH: <strong style="color:#fbbf24">${fmtN(dayNH)}đ</strong>` : ''}
+            <span style="float:right;font-size:.8em;opacity:.7">✏️ Sửa</span>
           </td></tr>`;
         gianList.forEach(g => {
           const dg  = gianData[g];
@@ -839,17 +874,59 @@
             <td style="text-align:right;color:#15803d;font-weight:600">${fmtN(dg.amount)}</td>
             <td style="text-align:right;color:#dc2626">${fmtN(feeR)}</td>
             <td class="col-net" style="text-align:right">${fmtN(net)}</td>
-            <td><input type="text" value="${hd.tienNH||''}" placeholder="Nhập..."
-              style="width:110px;border:1px solid #bae6fd;border-radius:4px;padding:.25rem .4rem;font-size:.8em;text-align:right;background:#f0f9ff"
-              onchange="saveHdField('${hdKey}','tienNH',this.value)"></td>
-            <td><input type="text" value="${hd.soHD||''}" placeholder="0000123"
-              style="width:120px;border:1px solid #cbd5e1;border-radius:4px;padding:.25rem .4rem;font-size:.8em"
-              onchange="saveHdField('${hdKey}','soHD',this.value)"></td>
-            <td><input type="text" value="${hd.soTienHD||''}" placeholder="0"
-              style="width:100px;border:1px solid #cbd5e1;border-radius:4px;padding:.25rem .4rem;font-size:.8em;text-align:right"
-              onchange="saveHdField('${hdKey}','soTienHD',this.value)"></td>
+            <td>${hd.tienNH ? `<span style="font-size:.82em;color:#0369a1;font-weight:600">${fmtN(parseFloat(String(hd.tienNH).replace(/[^0-9.]/g,''))||0)}đ</span>` : '<span style="color:#cbd5e1;font-size:.78em">–</span>'}</td>
+            <td>${hd.soHD ? `<span style="font-size:.82em;font-weight:600">${hd.soHD}</span>` : '<span style="color:#cbd5e1;font-size:.78em">–</span>'}</td>
+            <td>${hd.soTienHD ? `<span style="font-size:.82em;font-weight:600">${fmtN(parseFloat(String(hd.soTienHD).replace(/[^0-9.]/g,''))||0)}đ</span>` : '<span style="color:#cbd5e1;font-size:.78em">–</span>'}</td>
           </tr>`;
         });
+        // Bảng chỉnh sửa (ẩn mặc định, toggle khi click header ngày)
+        out += `<tr id="edit_${dateId}" style="display:none">
+          <td colspan="7" style="padding:.75rem 1rem;background:#f8fafc;border-top:2px dashed #3b82f6">
+            <div style="font-size:.82em;font-weight:700;color:#1e3a5f;margin-bottom:.5rem">✏️ Chỉnh sửa – ${date}</div>
+            <table style="width:100%;border-collapse:collapse;font-size:.82em">
+              <thead><tr style="background:#e0e7ff;color:#1e3a5f">
+                <th style="padding:.3rem .5rem;text-align:left;border:1px solid #c7d2fe">Gian</th>
+                <th style="padding:.3rem .5rem;text-align:right;border:1px solid #c7d2fe">Doanh thu</th>
+                <th style="padding:.3rem .5rem;text-align:right;border:1px solid #c7d2fe">Net</th>
+                <th style="padding:.3rem .5rem;text-align:right;border:1px solid #c7d2fe">Tiền NH</th>
+                <th style="padding:.3rem .5rem;border:1px solid #c7d2fe">Số HĐ</th>
+                <th style="padding:.3rem .5rem;text-align:right;border:1px solid #c7d2fe">Tiền HĐ</th>
+              </tr></thead>
+              <tbody>
+                ${gianList.map(g => {
+                  const dg = gianData[g];
+                  const feeR = Math.round(dg.fee);
+                  const net = dg.amount - feeR;
+                  const hdKey = `${date}|${g}`;
+                  const hd = _hdData[hdKey] || {};
+                  return `<tr>
+                    <td style="padding:.3rem .5rem;border:1px solid #e2e8f0;color:#374151">${g}</td>
+                    <td style="padding:.3rem .5rem;border:1px solid #e2e8f0;text-align:right;color:#15803d;font-weight:600">${fmtN(dg.amount)}</td>
+                    <td style="padding:.3rem .5rem;border:1px solid #e2e8f0;text-align:right;color:#0d47a1;font-weight:700">${fmtN(net)}</td>
+                    <td style="padding:.3rem .5rem;border:1px solid #e2e8f0;text-align:right">
+                      <input id="edit_tienNH_${dateId}_${g.replace(/[^a-zA-Z0-9]/g,'_')}" type="text" value="${hd.tienNH||''}" placeholder="0"
+                        style="width:100px;border:1px solid #bae6fd;border-radius:4px;padding:.2rem .35rem;text-align:right;background:#f0f9ff">
+                    </td>
+                    <td style="padding:.3rem .5rem;border:1px solid #e2e8f0">
+                      <input id="edit_soHD_${dateId}_${g.replace(/[^a-zA-Z0-9]/g,'_')}" type="text" value="${hd.soHD||''}" placeholder="0000123"
+                        style="width:120px;border:1px solid #cbd5e1;border-radius:4px;padding:.2rem .35rem">
+                    </td>
+                    <td style="padding:.3rem .5rem;border:1px solid #e2e8f0;text-align:right">
+                      <input id="edit_soTienHD_${dateId}_${g.replace(/[^a-zA-Z0-9]/g,'_')}" type="text" value="${hd.soTienHD||''}" placeholder="0"
+                        style="width:100px;border:1px solid #cbd5e1;border-radius:4px;padding:.2rem .35rem;text-align:right">
+                    </td>
+                  </tr>`;
+                }).join('')}
+              </tbody>
+            </table>
+            <div style="margin-top:.6rem;display:flex;gap:.5rem">
+              <button onclick="saveEditPanel('${dateId}','${date}',${JSON.stringify(gianList)})"
+                style="background:#16a34a;color:#fff;border:none;border-radius:6px;padding:.35rem .9rem;font-weight:700;font-size:.82em;cursor:pointer">💾 Lưu</button>
+              <button onclick="toggleEditPanel('${dateId}')"
+                style="background:#6b7280;color:#fff;border:none;border-radius:6px;padding:.35rem .9rem;font-weight:600;font-size:.82em;cursor:pointer">✕ Đóng</button>
+            </div>
+          </td>
+        </tr>`;
         return out;
       };
 
