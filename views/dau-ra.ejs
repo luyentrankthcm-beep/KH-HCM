@@ -102,7 +102,7 @@
     .ct-input { width:150px; border:1px solid #cbd5e1; border-radius:6px; padding:.3rem .5rem; font-size:.85em; }
     .ct-input:focus { outline:none; border-color:#6366f1; box-shadow:0 0 0 2px #e0e7ff; }
     /* ĐOÁI SOÁT NGÀY */
-    .doisoat-table { width:100%; border-collapse:collapse; font-size:.83em; }
+    .doisoat-table { width:100%; border-collapse:collapse; font-size:.92em; }
     .doisoat-table .day-row td { background:#1e3a5f; color:#fff; font-weight:700; padding:.5rem .75rem; }
     .doisoat-table .gian-row td { padding:.38rem .75rem; border-bottom:1px solid #f1f5f9; }
     .doisoat-table .gian-row:nth-child(even) td { background:#f8fafc; }
@@ -804,7 +804,7 @@
         const dayPhi = Math.round(gianList.reduce((s,g) => s + gianData[g].fee, 0));
         const dayNet = dayDT - dayPhi;
         let out = `<tr style="background:#374151;color:#e5e7eb;">
-          <td colspan="7" style="padding:.35rem .75rem .35rem 1.25rem;font-size:.81em">
+          <td colspan="7" style="padding:.38rem .75rem .38rem 1.25rem;font-size:.87em">
             📅 <strong>${date}</strong> &nbsp;·&nbsp; DT: ${fmtN(dayDT)}đ &nbsp;·&nbsp; Phí: ${fmtN(dayPhi)}đ &nbsp;·&nbsp; Net: <strong style="color:#93c5fd">${fmtN(dayNet)}đ</strong>
           </td></tr>`;
         gianList.forEach(g => {
@@ -818,7 +818,7 @@
           const hdKey = `${date}|${g}`;
           const hd    = _hdData[hdKey] || {};
           out += `<tr class="gian-row">
-            <td style="padding-left:2rem"><div>${ctLine}</div><div style="font-size:.77em;color:#475569;margin-top:1px">${g}</div></td>
+            <td style="padding-left:2rem"><div>${ctLine}</div><div style="font-size:.82em;color:#475569;margin-top:1px">${g}</div></td>
             <td style="text-align:right;color:#15803d;font-weight:600">${fmtN(dg.amount)}</td>
             <td style="text-align:right;color:#dc2626">${fmtN(feeR)}</td>
             <td style="text-align:right;color:#2563eb;font-weight:700">${fmtN(net)}</td>
@@ -859,7 +859,7 @@
             : '';
 
           html += `<tr>
-            <td colspan="7" style="background:#1e4a6f;color:#e0f2fe;padding:.6rem .75rem;font-weight:700;font-size:.84em;border-top:2px solid #0ea5e9">
+            <td colspan="7" style="background:#1e4a6f;color:#e0f2fe;padding:.6rem .75rem;font-weight:700;font-size:.9em;border-top:2px solid #0ea5e9">
               📦 NH trả về <strong>${pay.payDate}</strong>: ${fmtN(pay.amount)}đ
               &nbsp;·&nbsp; Momo ngày <span style="color:#bae6fd">${pay.fromDate}</span> → <span style="color:#bae6fd">${pay.toDate}</span>${momoNetText}
             </td>
@@ -880,7 +880,7 @@
           const unpaidNet = unpaidDates.reduce((s, d) =>
             s + Object.values(byDate[d] || {}).reduce((s2, v) => s2 + v.amount - Math.round(v.fee), 0), 0);
           html += `<tr>
-            <td colspan="7" style="background:#78350f;color:#fef3c7;padding:.6rem .75rem;font-weight:700;font-size:.84em;border-top:2px solid #d97706">
+            <td colspan="7" style="background:#78350f;color:#fef3c7;padding:.6rem .75rem;font-weight:700;font-size:.9em;border-top:2px solid #d97706">
               ⏳ Chưa có NH trả về &nbsp;·&nbsp; Tổng Net: ${fmtN(unpaidNet)}đ
             </td>
           </tr>`;
