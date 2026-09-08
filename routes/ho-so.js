@@ -101,6 +101,28 @@ router.post("/ho-so/hoa-don-ncc/bulk-upsert", express.json(), (req, res) => {
   res.json({ success: true, added, skipped });
 });
 
+// Internal endpoint: add months to a diem by maCongTrinh (no session required)
+router.post("/ho-so/dtcs-chiase/diem/bulk-add-thang", express.json(), (req, res) => {
+  const keyOk = INTERNAL_SYNC_KEY && req.headers["x-internal-key"] === INTERNAL_SYNC_KEY;
+  if (!keyOk) return res.status(401).json({ error: "Unauthorized" });
+  const { maCongTrinh, thangList } = req.body;
+  if (!maCongTrinh || !Array.isArray(thangList)) return res.status(400).json({ error: "maCongTrinh and thangList required" });
+  const store = load();
+  if (!store.dtcs_chiase_diem) store.dtcs_chiase_diem = [];
+  if (!store.dtcs_chiase_thang) store.dtcs_chiase_thang = [];
+  const diem = store.dtcs_chiase_diem.find(d => d.maCongTrinh === maCongTrinh);
+  if (!diem) return res.status(404).json({ error: `Diem not found: ${maCongTrinh}` });
+  let added = 0, skipped = 0;
+  for (const t of thangList) {
+    const existing = store.dtcs_chiase_thang.find(x => String(x.diemId) === String(diem.id) && x.thang === t.thang);
+    if (existing) { skipped++; continue; }
+    store.dtcs_chiase_thang.push({ id: nextId(store), diemId: diem.id, ...t });
+    added++;
+  }
+  save(store);
+  res.json({ success: true, diemId: diem.id, added, skipped });
+});
+
 router.use(requireLogin);
 
 function parseInvoiceFileName(fileName) {
