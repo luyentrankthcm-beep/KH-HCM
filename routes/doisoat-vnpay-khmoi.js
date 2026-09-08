@@ -70,6 +70,10 @@ const TEN_DIEM_TO_MA_CONG_TRINH = {
   // hoa don 11883/11887/12026/12178, tag "VNPAY CƠ SỞ.../Vnpay CS MB...",
   // khop dung tung so tien tung ngay voi FARM SAVICO). Doi target.
   "farm savico": "PINBALL VÀ GHẾ LOTTE BAC GIANG",
+  // Luyen, 2026-09-08: "GHOST BRIDE MEGA DN la cua gian KVC TIMES" -- ten
+  // hien thi tren file "Du lieu bao cao phi theo GD thanh toan" VNPay offline,
+  // map ve ma cong trinh KVC TIMES de doi soat tu dong.
+  "ghost bride mega dn": "KVC TIMES",
 };
 
 // Chi Nhan, 2026-07-29: "payoo có 1 gian bên kh mới thôi á KVC ROYAL" -- luc
