@@ -328,7 +328,7 @@ body {
 }
 .nav-dropdown-divider { height: 1px; background: #eee; margin: 4px 2px; }
 
-.container { max-width: 1280px; margin: 0 auto; padding: 28px 24px; position: relative; z-index: 1; }
+.container { max-width: none; margin: 0 auto; padding: 28px 32px; position: relative; z-index: 1; }
 .desc-cell {
   max-width: 360px;
   white-space: nowrap;
