@@ -417,6 +417,11 @@ const VNPAY_KHMOI_INVOICE_MADIEM_MAP = {
 // "zalo" nua -- Online/Zalo Mini App luon la doanh thu ACB31268 that, du co
 // trung ten voi 1 gian VNPay KH Moi khac.
 const ZALO_MAI_TAG_PATTERN = /zalo/i;
+// Luyen, 2026-09-08: "GHOST BRIDE MEGA DN la cua gian KVC TIMES KH Cu VNPay
+// Offline" -- hoa don co tag "VNPAY CO SO" tren cot "Dich vu thu ho" la hoa
+// don KH Cu Offline, KHONG phai KH Moi, du maDiem cung la "KVC TIMES".
+// Giu nguyen trong zvp_invoices.vnpay thay vi migrate sang vnpayKhMoi.
+const VNPAY_KH_CU_OFFLINE_TAG_PATTERN = /vnpay\s+c[oô]\s*s[oở]/i;
 
 // Nhan, 2026-08-06: "hóa đơn ngày 4 5 của kvc hue đây á" -- hoa don maDiem
 // "KVC AE HUE" cua Payoo van hien "Chưa có HĐ" du gross Payoo da khop dung
@@ -450,6 +455,12 @@ function migrateVnpayKhMoiInvoices(store) {
     store.zvp_invoices[key].forEach((inv) => {
       const mapped = mapForKey[inv.maDiem];
       if (!mapped) {
+        kept.push(inv);
+        return;
+      }
+      // Giu lai hoa don KH Cu Offline (tag "VNPAY CO SO") du maDiem trung voi
+      // VNPAY_KHMOI_INVOICE_MADIEM_MAP (vd "KVC TIMES" cua GHOST BRIDE VC TIMES CITY).
+      if (key === "vnpay" && VNPAY_KH_CU_OFFLINE_TAG_PATTERN.test(inv.raw || "")) {
         kept.push(inv);
         return;
       }
@@ -491,6 +502,30 @@ function migrateVnpayKhMoiInvoices(store) {
       changed = true;
     });
     store.viet_qr_invoices.vnpayKhMoi = target.filter((inv) => !ZALO_MAI_TAG_PATTERN.test(inv.raw || ""));
+  }
+  // Sua nguoc: hoa don KH Cu Offline (tag "VNPAY CO SO") bi migrate nham sang
+  // vnpayKhMoi truoc khi co check nay -- tra ve zvp_invoices.vnpay, giu nguyen
+  // maDiem goc (KVC TIMES).
+  const stillKhCuOfflineTagged = store.viet_qr_invoices.vnpayKhMoi.filter(
+    (inv) => VNPAY_KH_CU_OFFLINE_TAG_PATTERN.test(inv.raw || "")
+  );
+  if (stillKhCuOfflineTagged.length > 0) {
+    if (!store.zvp_invoices.vnpay) store.zvp_invoices.vnpay = [];
+    const vnpayKeys = new Set(store.zvp_invoices.vnpay.map((i) => `${i.soHd}|${i.ngayHd}|${i.maDiem}`));
+    stillKhCuOfflineTagged.forEach((inv) => {
+      const originalMaDiem =
+        Object.keys(VNPAY_KHMOI_INVOICE_MADIEM_MAP).find((k) => VNPAY_KHMOI_INVOICE_MADIEM_MAP[k] === inv.maDiem) || inv.maDiem;
+      const restored = { ...inv, maDiem: originalMaDiem };
+      const k = `${restored.soHd}|${restored.ngayHd}|${restored.maDiem}`;
+      if (!vnpayKeys.has(k)) {
+        vnpayKeys.add(k);
+        store.zvp_invoices.vnpay.push(restored);
+      }
+      changed = true;
+    });
+    store.viet_qr_invoices.vnpayKhMoi = store.viet_qr_invoices.vnpayKhMoi.filter(
+      (inv) => !VNPAY_KH_CU_OFFLINE_TAG_PATTERN.test(inv.raw || "")
+    );
   }
   return changed;
 }
