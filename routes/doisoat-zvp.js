@@ -41,6 +41,66 @@ const { migrateVnpayKhMoiInvoices } = require("../utils/vietqrReconcile");
 const { getCompany } = require("../utils/companies");
 
 const router = express.Router();
+
+// Internal: patch zvp_offline_diem_map + recompute grossByCode từ raw_tx
+const ZVP_INTERNAL_KEY = process.env.INTERNAL_SYNC_KEY || "kh-sync-2026";
+router.post("/doi-soat/zvp/internal/patch-offline-diem", express.json(), (req, res) => {
+  if (req.headers["x-internal-key"] !== ZVP_INTERNAL_KEY) return res.status(401).json({ error: "Unauthorized" });
+  const { addMappings } = req.body; // { "GHOST BRIDE MEGA DN": "KVC TIMES", ... }
+  if (!addMappings || typeof addMappings !== "object") return res.status(400).json({ error: "addMappings required" });
+  const store = load();
+  if (!store.zvp_offline_diem_map) store.zvp_offline_diem_map = {};
+  if (!store.zvp_offline_raw_tx) store.zvp_offline_raw_tx = {};
+  // 1. Thêm mappings mới vào diem_map
+  for (const [chiNhanh, maCongTrinh] of Object.entries(addMappings)) {
+    store.zvp_offline_diem_map[chiNhanh] = { maCongTrinh, isCse: false };
+  }
+  // 2. Recompute grossByCode/netByCode từ toàn bộ raw_tx với diem_map mới
+  const diemMap = store.zvp_offline_diem_map;
+  const normText = (s) => s ? String(s).normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/đ/g,"d").replace(/[^a-z0-9 ]/g,"").replace(/\s+/g," ").trim() : "";
+  const normalizedDiemIndex = new Map();
+  Object.keys(diemMap).forEach((k) => { const nk = normText(k); if (!normalizedDiemIndex.has(nk)) normalizedDiemIndex.set(nk, k); });
+  const grossByCode = {}, netByCode = {}, codes = new Set(), dates = new Set(), unmapped = new Set();
+  for (const tx of Object.values(store.zvp_offline_raw_tx)) {
+    let mapped = diemMap[tx.chiNhanh];
+    if (!mapped) { const ok = normalizedDiemIndex.get(normText(tx.chiNhanh)); if (ok) mapped = diemMap[ok]; }
+    if (!mapped) { unmapped.add(tx.chiNhanh); continue; }
+    const code = mapped.maCongTrinh;
+    codes.add(code); dates.add(tx.date);
+    const key = `${tx.date}|${code}`;
+    grossByCode[key] = (grossByCode[key] || 0) + tx.gross;
+    netByCode[key] = (netByCode[key] || 0) + (tx.net || tx.gross);
+  }
+  // 3. Cập nhật upload entry "[File thô]" mới nhất hoặc thêm mới
+  if (!store.zvp_offline_uploads) store.zvp_offline_uploads = [];
+  store.zvp_offline_uploads = store.zvp_offline_uploads.filter(u => !u.file_name.startsWith("[File thô]"));
+  store.zvp_offline_uploads.push({
+    id: nextId(store, "zvp_offline_uploads_seq") || Date.now(),
+    uploaded_at: new Date().toISOString(),
+    file_name: "[File thô] patch-internal-diem-map",
+    sheetName: "patch",
+    dates: Array.from(dates).sort(),
+    codes: Array.from(codes),
+    grossByCode, netByCode,
+    unmapped: Array.from(unmapped),
+  });
+  save(store);
+  res.json({ success: true, mappingsAdded: Object.keys(addMappings).length, unmapped: Array.from(unmapped).slice(0, 10), grossKeys: Object.keys(grossByCode).length });
+});
+
+// Internal: xóa patch sai khỏi vnpay_khmoi_uploads (cleanup)
+router.post("/doi-soat/zvp/internal/remove-khmoi-patch", express.json(), (req, res) => {
+  if (req.headers["x-internal-key"] !== ZVP_INTERNAL_KEY) return res.status(401).json({ error: "Unauthorized" });
+  const { label } = req.body;
+  const store = load();
+  if (!store.vnpay_khmoi_uploads) return res.json({ success: true, removed: 0 });
+  const before = store.vnpay_khmoi_uploads.length;
+  store.vnpay_khmoi_uploads = store.vnpay_khmoi_uploads.filter(u => u.file_name !== label);
+  const removed = before - store.vnpay_khmoi_uploads.length;
+  save(store);
+  res.json({ success: true, removed });
+});
+
 router.use(requireLogin);
 
 // Luyen, 2026-07-31: mac dinh 2 o "Tu ngay/Den ngay" cua nut Xuat file MISA
