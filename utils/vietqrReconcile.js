@@ -421,7 +421,11 @@ const ZALO_MAI_TAG_PATTERN = /zalo/i;
 // Offline" -- hoa don co tag "VNPAY CO SO" tren cot "Dich vu thu ho" la hoa
 // don KH Cu Offline, KHONG phai KH Moi, du maDiem cung la "KVC TIMES".
 // Giu nguyen trong zvp_invoices.vnpay thay vi migrate sang vnpayKhMoi.
-const VNPAY_KH_CU_OFFLINE_TAG_PATTERN = /vnpay\s+c[oô]\s*s[oở]/i;
+// Dung NFD + strip non-alnum de match dung du co dau hay khong: "VNPAY CO SO".
+function isKhCuOfflineVnpay(raw) {
+  const s = (raw || "").normalize("NFD").replace(/[^a-z0-9 ]/gi, "").toLowerCase().replace(/\s+/g, " ").trim();
+  return /vnpay\s+co\s*so/.test(s);
+}
 
 // Nhan, 2026-08-06: "hóa đơn ngày 4 5 của kvc hue đây á" -- hoa don maDiem
 // "KVC AE HUE" cua Payoo van hien "Chưa có HĐ" du gross Payoo da khop dung
@@ -460,7 +464,7 @@ function migrateVnpayKhMoiInvoices(store) {
       }
       // Giu lai hoa don KH Cu Offline (tag "VNPAY CO SO") du maDiem trung voi
       // VNPAY_KHMOI_INVOICE_MADIEM_MAP (vd "KVC TIMES" cua GHOST BRIDE VC TIMES CITY).
-      if (key === "vnpay" && VNPAY_KH_CU_OFFLINE_TAG_PATTERN.test(inv.raw || "")) {
+      if (key === "vnpay" && isKhCuOfflineVnpay(inv.raw)) {
         kept.push(inv);
         return;
       }
@@ -507,7 +511,7 @@ function migrateVnpayKhMoiInvoices(store) {
   // vnpayKhMoi truoc khi co check nay -- tra ve zvp_invoices.vnpay, giu nguyen
   // maDiem goc (KVC TIMES).
   const stillKhCuOfflineTagged = store.viet_qr_invoices.vnpayKhMoi.filter(
-    (inv) => VNPAY_KH_CU_OFFLINE_TAG_PATTERN.test(inv.raw || "")
+    (inv) => isKhCuOfflineVnpay(inv.raw)
   );
   if (stillKhCuOfflineTagged.length > 0) {
     if (!store.zvp_invoices.vnpay) store.zvp_invoices.vnpay = [];
@@ -524,7 +528,7 @@ function migrateVnpayKhMoiInvoices(store) {
       changed = true;
     });
     store.viet_qr_invoices.vnpayKhMoi = store.viet_qr_invoices.vnpayKhMoi.filter(
-      (inv) => !VNPAY_KH_CU_OFFLINE_TAG_PATTERN.test(inv.raw || "")
+      (inv) => !isKhCuOfflineVnpay(inv.raw)
     );
   }
   return changed;
