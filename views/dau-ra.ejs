@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <%- include('partials/head') %>
+  <title>Đầu Ra – K&H</title>
+  <style>
+    .tab-bar { display:flex; gap:0; border-bottom:2px solid #1e3a5f; margin-bottom:1.25rem; }
+    .tab-btn { padding:.5rem 1.25rem; font-weight:600; font-size:.88em; cursor:pointer; border:none; background:#e8f0fe; color:#1e3a5f; border-radius:6px 6px 0 0; margin-right:3px; text-decoration:none; display:inline-block; }
+    .tab-btn.active { background:#1e3a5f; color:#fff; }
+    .tab-btn:hover:not(.active) { background:#c7d7f8; }
+    .sub-tab-bar { display:flex; gap:4px; margin-bottom:1rem; flex-wrap:wrap; }
+    .sub-tab-btn { padding:.3rem 1rem; font-size:.83em; font-weight:600; cursor:pointer; border:1px solid #cbd5e1; background:#f8fafc; color:#475569; border-radius:20px; text-decoration:none; display:inline-block; }
+    .sub-tab-btn.active { background:#2563eb; color:#fff; border-color:#2563eb; }
+    .sub-tab-btn:hover:not(.active) { background:#e0e7ff; border-color:#818cf8; }
+    .tab-panel { display:none; }
+    .tab-panel.active { display:block; }
+    .sub-panel { display:none; }
+    .sub-panel.active { display:block; }
+    .doc-table { width:100%; border-collapse:collapse; font-size:.88em; }
+    .doc-table th { background:#1e3a5f; color:#fff; padding:.5rem .75rem; text-align:left; white-space:nowrap; position:sticky; top:0; z-index:5; }
+    .doc-table td { padding:.45rem .75rem; border-bottom:1px solid #eee; vertical-align:middle; }
+    .doc-table tbody tr:nth-child(odd) td { background:#f5f8ff; }
+    .doc-table tbody tr:hover td { background:#dceeff !important; }
+    .add-form { background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:1rem 1.25rem; margin-bottom:1.25rem; }
+    .add-form h3 { margin:0 0 .75rem; font-size:.92rem; color:#1e3a5f; }
+    .form-row { display:flex; gap:.6rem; flex-wrap:wrap; align-items:flex-end; }
+    .form-row label { font-size:.8em; font-weight:600; color:#475569; display:block; margin-bottom:.2rem; }
+    .form-row input, .form-row select, .form-row textarea { padding:.35rem .55rem; border:1px solid #cbd5e1; border-radius:4px; font-size:.85em; }
+    .btn-add { background:#2563eb; color:#fff; border:none; border-radius:5px; padding:.38rem .9rem; cursor:pointer; font-weight:600; font-size:.85em; white-space:nowrap; }
+    .btn-add:hover { background:#1d4ed8; }
+    .btn-del { background:none; border:none; color:#ef4444; cursor:pointer; font-size:.85em; padding:.1rem .3rem; }
+    .btn-del:hover { color:#b91c1c; }
+    .empty-hint { color:#94a3b8; font-style:italic; font-size:.88em; text-align:center; padding:2rem; }
+  </style>
+</head>
+<body>
+  <%- include('partials/nav') %>
+  <main class="container">
+    <h1 class="page-title">Đầu Ra</h1>
+
+    <!-- TOP-LEVEL TABS -->
+    <div class="tab-bar">
+      <button class="tab-btn active" onclick="switchTab('tab1', this)">📄 Tab 1</button>
+      <button class="tab-btn" onclick="switchTab('tab2', this)">📊 Tab 2</button>
+      <button class="tab-btn" onclick="switchTab('tab3', this)">📋 Tab 3</button>
+    </div>
+
+    <!-- TAB 1 -->
+    <div id="tab1" class="tab-panel active">
+      <div class="sub-tab-bar">
+        <button class="sub-tab-btn active" onclick="switchSub('tab1','sub1a',this)">Sub tab A</button>
+        <button class="sub-tab-btn" onclick="switchSub('tab1','sub1b',this)">Sub tab B</button>
+      </div>
+      <div id="tab1-sub1a" class="sub-panel active">
+        <div class="add-form">
+          <h3>+ Thêm mới</h3>
+          <div class="form-row">
+            <div><label>Tên</label><input type="text" placeholder="Nhập tên..."></div>
+            <div><label>Ghi chú</label><input type="text" placeholder="Ghi chú..."></div>
+            <button class="btn-add">Thêm</button>
+          </div>
+        </div>
+        <table class="doc-table">
+          <thead><tr><th>#</th><th>Tên</th><th>Ghi chú</th><th></th></tr></thead>
+          <tbody><tr><td colspan="4" class="empty-hint">Chưa có dữ liệu</td></tr></tbody>
+        </table>
+      </div>
+      <div id="tab1-sub1b" class="sub-panel">
+        <p class="empty-hint">Nội dung Sub tab B – chưa thiết lập</p>
+      </div>
+    </div>
+
+    <!-- TAB 2 -->
+    <div id="tab2" class="tab-panel">
+      <div class="sub-tab-bar">
+        <button class="sub-tab-btn active" onclick="switchSub('tab2','sub2a',this)">Sub tab A</button>
+        <button class="sub-tab-btn" onclick="switchSub('tab2','sub2b',this)">Sub tab B</button>
+      </div>
+      <div id="tab2-sub2a" class="sub-panel active">
+        <p class="empty-hint">Nội dung Tab 2 – Sub tab A – chưa thiết lập</p>
+      </div>
+      <div id="tab2-sub2b" class="sub-panel">
+        <p class="empty-hint">Nội dung Tab 2 – Sub tab B – chưa thiết lập</p>
+      </div>
+    </div>
+
+    <!-- TAB 3 -->
+    <div id="tab3" class="tab-panel">
+      <p class="empty-hint">Nội dung Tab 3 – chưa thiết lập</p>
+    </div>
+  </main>
+
+  <script>
+    function switchTab(id, btn) {
+      document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+      document.querySelectorAll('.tab-bar .tab-btn').forEach(b => b.classList.remove('active'));
+      document.getElementById(id).classList.add('active');
+      btn.classList.add('active');
+    }
+    function switchSub(tabId, subId, btn) {
+      const panel = document.getElementById(tabId);
+      panel.querySelectorAll('.sub-panel').forEach(p => p.classList.remove('active'));
+      panel.querySelectorAll('.sub-tab-btn').forEach(b => b.classList.remove('active'));
+      document.getElementById(tabId + '-' + subId).classList.add('active');
+      btn.classList.add('active');
+    }
+  </script>
+</body>
+</html>

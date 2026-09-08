@@ -29,6 +29,7 @@ const backupRoutes = require("./routes/backup");
 const usersRoutes = require("./routes/users");
 const gmailOauthRoutes = require("./routes/gmail-oauth");
 const hoSoRoutes = require("./routes/ho-so");
+const dauRaRoutes = require("./routes/dau-ra");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -142,6 +143,7 @@ app.use("/", backupRoutes);
 app.use("/", usersRoutes);
 app.use("/", gmailOauthRoutes);
 app.use("/", hoSoRoutes);
+app.use("/", dauRaRoutes);
 
 app.use((req, res) => {
   res.status(404).send("Khong tim thay trang.");
