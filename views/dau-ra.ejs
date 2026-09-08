@@ -198,17 +198,19 @@
       <!-- Sub: Đối soát ngày -->
       <div id="momo-doisoat" class="sub-panel">
         <div class="filter-bar" style="margin-bottom:.5rem">
-          <span style="font-size:.8em;color:#64748b">Hiển thị từng ngày, gộp theo gian · Dùng để đối chiếu với ngân hàng & hóa đơn</span>
+          <span style="font-size:.8em;color:#64748b">Gộp theo ngày + gian · Đối chiếu với ngân hàng & hóa đơn · Nhập số HĐ để lưu lại</span>
         </div>
-        <div style="overflow-x:auto;max-height:65vh;overflow-y:auto;border:1px solid #e2e8f0;border-radius:8px;">
+        <div style="overflow-x:auto;max-height:70vh;overflow-y:auto;border:1px solid #e2e8f0;border-radius:8px;">
           <table class="doisoat-table">
             <thead>
-              <tr style="background:#f1f5f9">
-                <th style="padding:.45rem .75rem;min-width:180px">Gian</th>
-                <th style="padding:.45rem .75rem">Mã CT</th>
-                <th style="padding:.45rem .75rem;text-align:center">Loại</th>
-                <th style="padding:.45rem .75rem;text-align:right;min-width:120px">Số tiền (VND)</th>
-                <th style="padding:.45rem .75rem;text-align:right">Số GD</th>
+              <tr style="background:#1e3a5f;color:#fff;position:sticky;top:0;z-index:10">
+                <th style="padding:.5rem .75rem;min-width:180px;text-align:left">Gian / Mã CT</th>
+                <th style="padding:.5rem .75rem;text-align:right;min-width:110px">Doanh thu</th>
+                <th style="padding:.5rem .75rem;text-align:right;min-width:95px">Phí Momo</th>
+                <th style="padding:.5rem .75rem;text-align:right;min-width:110px">Tiền Net</th>
+                <th style="padding:.5rem .75rem;text-align:right;min-width:50px">GD</th>
+                <th style="padding:.5rem .75rem;min-width:140px">Số hóa đơn</th>
+                <th style="padding:.5rem .75rem;text-align:right;min-width:120px">Tiền HĐ</th>
               </tr>
             </thead>
             <tbody id="doiSoatBody"></tbody>
@@ -299,6 +301,7 @@
     const LS_HISTORY = `momo_history_${COMPANY}`;
     const LS_CT_MAP   = `momo_ct_map_${COMPANY}`;
     const LS_CT_CODES = `momo_ct_codes_${COMPANY}`;
+    const LS_HD_DATA  = `momo_hd_${COMPANY}`;
 
     // ── Tab switching ──
     function switchTab(id, btn) {
@@ -335,22 +338,31 @@
     let _history = []; // [{fileName, uploadedAt, added, skipped, fmt}]
     let _ctMap   = {}; // { [gian]: { maCT, isChiaSe } }
     let _ctCodes = []; // ['CT001', 'CT002', ...]
+    let _hdData  = {}; // { [`${date}|${gian}`]: { soHD, soTienHD } }
 
     // ── localStorage helpers ──
     function saveRows()    { try { localStorage.setItem(LS_ROWS, JSON.stringify(_rows)); } catch(e){} }
     function saveHistory() { try { localStorage.setItem(LS_HISTORY, JSON.stringify(_history)); } catch(e){} }
     function saveCtMap()   { try { localStorage.setItem(LS_CT_MAP, JSON.stringify(_ctMap)); localStorage.setItem(LS_CT_CODES, JSON.stringify(_ctCodes)); } catch(e){} }
+    function saveHdData()  { try { localStorage.setItem(LS_HD_DATA, JSON.stringify(_hdData)); } catch(e){} }
     function loadStored() {
       try {
-        const r = localStorage.getItem(LS_ROWS);
-        const h = localStorage.getItem(LS_HISTORY);
-        const m = localStorage.getItem(LS_CT_MAP);
-        const c = localStorage.getItem(LS_CT_CODES);
-        if (r) _rows    = JSON.parse(r);
-        if (h) _history = JSON.parse(h);
-        if (m) _ctMap   = JSON.parse(m);
-        if (c) _ctCodes = JSON.parse(c);
+        const r  = localStorage.getItem(LS_ROWS);
+        const h  = localStorage.getItem(LS_HISTORY);
+        const m  = localStorage.getItem(LS_CT_MAP);
+        const c  = localStorage.getItem(LS_CT_CODES);
+        const hd = localStorage.getItem(LS_HD_DATA);
+        if (r)  _rows    = JSON.parse(r);
+        if (h)  _history = JSON.parse(h);
+        if (m)  _ctMap   = JSON.parse(m);
+        if (c)  _ctCodes = JSON.parse(c);
+        if (hd) _hdData  = JSON.parse(hd);
       } catch(e) { _rows = []; _history = []; }
+    }
+    function saveHdField(key, field, val) {
+      if (!_hdData[key]) _hdData[key] = {};
+      _hdData[key][field] = val;
+      saveHdData();
     }
 
     // ── Recompute derived arrays & refresh UI ──
@@ -425,32 +437,46 @@
           // Parse into temp array
           const newRows = [];
 
+          // Helper: tính feeRate theo Nguồn tiền + Công ty
+          function calcFeeRate(nguonTien) {
+            if (COMPANY === 'kh_cu') return 0.011; // KH Cũ: cố định 1.1%
+            // KH Mới: theo Nguồn tiền
+            const nt = String(nguonTien || '').toLowerCase();
+            if (nt.includes('momo')) return 0.01;
+            if (nt.includes('tra sau') || nt.includes('trả sau')) return 0.012;
+            if (nt) return 0.003; // ngân hàng / ATM / QR ngân hàng
+            return 0.01; // mặc định nếu không rõ
+          }
+
           if (fmt === 'v1') {
             const C = {
-              tgian:   colIdx('Thời gian TT'),
-              den:     colIdx('Số tiền đến'),
-              status:  colIdx('Trạng thái'),
-              noiDung: colIdx('Nội dung'),
-              maDon:   colIdx('Mã đơn hàng'),
-              maTham:  colIdx('Mã tham chiếu'),
-              loaiGD:  colIdx('Loại giao dịch'),
+              tgian:     colIdx('Thời gian TT'),
+              den:       colIdx('Số tiền đến'),
+              status:    colIdx('Trạng thái'),
+              noiDung:   colIdx('Nội dung'),
+              maDon:     colIdx('Mã đơn hàng'),
+              maTham:    colIdx('Mã tham chiếu'),
+              loaiGD:    colIdx('Loại giao dịch'),
+              nguonTien: colIdx('Nguồn tiền'),
             };
             for (let i = headerIdx + 1; i < data.length; i++) {
               const r = data[i];
               if (!r[C.tgian]) continue;
               if (String(r[C.status] || '') !== 'Thành công') continue;
-              const tgian   = String(r[C.tgian]);
-              const maDon   = String(r[C.maDon] || '');
-              const maTham  = String(r[C.maTham] || '');
-              const txId    = maTham || maDon;
-              const noiDung = String(r[C.noiDung] || '');
-              const loaiGD  = String(r[C.loaiGD] || '');
+              const tgian    = String(r[C.tgian]);
+              const maDon    = String(r[C.maDon] || '');
+              const maTham   = String(r[C.maTham] || '');
+              const txId     = maTham || maDon;
+              const noiDung  = String(r[C.noiDung] || '');
+              const loaiGD   = String(r[C.loaiGD] || '');
+              const nguonTien = C.nguonTien >= 0 ? String(r[C.nguonTien] || '') : '';
+              const feeRate  = calcFeeRate(nguonTien);
               let gian = 'Vãng lai';
               const m = noiDung.match(/VQR\w+\s+(.+)/);
               if (m) { const g = m[1].trim(); gian = (g === 'PaymentForOrder' || g === '-') ? 'Vãng lai' : g; }
               else if (loaiGD === 'Vãng lai') gian = 'Vãng lai';
               newRows.push({ date: tgian.substring(0,10), time: tgian.substring(11,19),
-                gian, amount: Number(r[C.den])||0, loaiGD, maDon, txId });
+                gian, amount: Number(r[C.den])||0, loaiGD, maDon, txId, nguonTien, feeRate });
             }
           } else {
             const C = {
@@ -473,10 +499,11 @@
               const txId    = maDon || maGD;
               const tenGian = String(r[C.tenGian] || '');
               const maGian  = String(r[C.maGian] || '');
+              const feeRate = calcFeeRate(''); // v2 không có Nguồn tiền → default
               newRows.push({ date: tgian.substring(0,10), time: tgian.substring(11,19),
                 gian: tenGian || maGian || 'Vãng lai',
                 amount: Number(r[C.amount])||0,
-                loaiGD: String(r[C.loaiGD]||''), maDon, txId });
+                loaiGD: String(r[C.loaiGD]||''), maDon, txId, nguonTien: '', feeRate });
             }
           }
 
@@ -657,36 +684,52 @@
     function renderDoiSoatNgay() {
       const el = document.getElementById('doiSoatBody');
       if (!el || !_rows.length) {
-        if (el) el.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#94a3b8;padding:1.5rem">Chưa có dữ liệu</td></tr>';
+        if (el) el.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#94a3b8;padding:1.5rem">Chưa có dữ liệu</td></tr>';
         return;
       }
-      // Group: date → gian → {amount, count}
+      // Group: date → gian → {amount, fee, count}
       const byDate = {};
       _rows.forEach(r => {
         if (!byDate[r.date]) byDate[r.date] = {};
-        if (!byDate[r.date][r.gian]) byDate[r.date][r.gian] = { amount: 0, count: 0 };
+        if (!byDate[r.date][r.gian]) byDate[r.date][r.gian] = { amount: 0, fee: 0, count: 0 };
+        const rate = r.feeRate != null ? r.feeRate : (COMPANY === 'kh_cu' ? 0.011 : 0.01);
         byDate[r.date][r.gian].amount += r.amount;
+        byDate[r.date][r.gian].fee    += Math.round(r.amount * rate);
         byDate[r.date][r.gian].count++;
       });
-      const fmt = n => n.toLocaleString('vi');
+      const fmtN = n => n.toLocaleString('vi');
       let html = '';
       _dates.forEach(date => {
         const gianData = byDate[date] || {};
         const gianList = Object.keys(gianData).sort();
-        const dayTotal = gianList.reduce((s,g) => s + gianData[g].amount, 0);
-        const dayCount = gianList.reduce((s,g) => s + gianData[g].count, 0);
-        html += `<tr class="day-row"><td colspan="5">📅 ${date} &nbsp;·&nbsp; Tổng: ${fmt(dayTotal)}đ &nbsp;·&nbsp; ${dayCount} GD</td></tr>`;
+        const dayDT    = gianList.reduce((s,g) => s + gianData[g].amount, 0);
+        const dayPhi   = gianList.reduce((s,g) => s + gianData[g].fee, 0);
+        const dayNet   = dayDT - dayPhi;
+        const dayCnt   = gianList.reduce((s,g) => s + gianData[g].count, 0);
+        html += `<tr class="day-row">
+          <td colspan="7">📅 ${date} &nbsp;·&nbsp; DT: ${fmtN(dayDT)}đ &nbsp;·&nbsp; Phí: ${fmtN(dayPhi)}đ &nbsp;·&nbsp; Net: <strong>${fmtN(dayNet)}đ</strong> &nbsp;·&nbsp; ${dayCnt} GD</td>
+        </tr>`;
         gianList.forEach(g => {
-          const d = gianData[g];
-          const ct = _ctMap[g] || {};
-          const ctBadge = ct.maCT ? `<span class="ct-badge">${ct.maCT}</span>` : '<span style="color:#94a3b8;font-size:.78em">—</span>';
-          const chiaseBadge = ct.isChiaSe ? '<span class="ct-chiase-badge">Chia sẻ</span>' : '';
+          const d   = gianData[g];
+          const net = d.amount - d.fee;
+          const ct  = _ctMap[g] || {};
+          const ctLabel = ct.maCT
+            ? `<span class="ct-badge">${ct.maCT}</span>${ct.isChiaSe ? '<span class="ct-chiase-badge">CS</span>' : ''}`
+            : '<span style="color:#94a3b8;font-size:.75em">Chưa map</span>';
+          const hdKey = `${date}|${g}`;
+          const hd    = _hdData[hdKey] || {};
           html += `<tr class="gian-row">
-            <td>${g}</td>
-            <td>${ctBadge}${chiaseBadge}</td>
-            <td style="text-align:center">${ct.isChiaSe ? '✓' : ''}</td>
-            <td style="text-align:right;font-weight:600;color:#15803d">${fmt(d.amount)}</td>
+            <td><div style="font-weight:600">${g}</div><div style="margin-top:2px">${ctLabel}</div></td>
+            <td style="text-align:right;color:#15803d;font-weight:600">${fmtN(d.amount)}</td>
+            <td style="text-align:right;color:#dc2626">${fmtN(d.fee)}</td>
+            <td style="text-align:right;color:#2563eb;font-weight:700">${fmtN(net)}</td>
             <td style="text-align:right;color:#64748b">${d.count}</td>
+            <td><input type="text" value="${hd.soHD||''}" placeholder="VD: 0000123"
+              style="width:130px;border:1px solid #cbd5e1;border-radius:4px;padding:.25rem .4rem;font-size:.8em"
+              onchange="saveHdField('${hdKey}','soHD',this.value)"></td>
+            <td><input type="text" value="${hd.soTienHD||''}" placeholder="0"
+              style="width:110px;border:1px solid #cbd5e1;border-radius:4px;padding:.25rem .4rem;font-size:.8em;text-align:right"
+              onchange="saveHdField('${hdKey}','soTienHD',this.value)"></td>
           </tr>`;
         });
       });
