@@ -436,9 +436,13 @@
         const tienNH   = (document.getElementById(`edit_tienNH_${dateId}_${gKey}`)   || {}).value || '';
         const soHD     = (document.getElementById(`edit_soHD_${dateId}_${gKey}`)     || {}).value || '';
         const soTienHD = (document.getElementById(`edit_soTienHD_${dateId}_${gKey}`) || {}).value || '';
+        const dtOvr    = (document.getElementById(`edit_dtOvr_${dateId}_${gKey}`)    || {}).value;
+        const netOvr   = (document.getElementById(`edit_netOvr_${dateId}_${gKey}`)   || {}).value;
         _hdData[hdKey].tienNH   = tienNH;
         _hdData[hdKey].soHD     = soHD;
         _hdData[hdKey].soTienHD = soTienHD;
+        _hdData[hdKey].dtOvr    = dtOvr  != null ? dtOvr  : '';
+        _hdData[hdKey].netOvr   = netOvr != null ? netOvr : '';
       });
       saveHdData();
       renderDoiSoatNgay();
@@ -842,9 +846,17 @@
         const gianData = byDate[date] || {};
         const gianList = Object.keys(gianData).sort();
         if (!gianList.length) return '';
-        const dayDT  = gianList.reduce((s,g) => s + gianData[g].amount, 0);
-        const dayPhi = Math.round(gianList.reduce((s,g) => s + gianData[g].fee, 0));
-        const dayNet = dayDT - dayPhi;
+        const getGianDisplay = (g) => {
+          const dg = gianData[g];
+          const feeR = Math.round(dg.fee);
+          const hd = _hdData[`${date}|${g}`] || {};
+          const dt  = (hd.dtOvr  != null && hd.dtOvr  !== '') ? (parseFloat(String(hd.dtOvr).replace(/[^0-9.-]/g,''))||0)  : dg.amount;
+          const net = (hd.netOvr != null && hd.netOvr !== '') ? (parseFloat(String(hd.netOvr).replace(/[^0-9.-]/g,''))||0) : (dg.amount - feeR);
+          return { dt, net, fee: dt - net };
+        };
+        const dayDT  = gianList.reduce((s,g) => s + getGianDisplay(g).dt,  0);
+        const dayNet = gianList.reduce((s,g) => s + getGianDisplay(g).net, 0);
+        const dayPhi = dayDT - dayNet;
         const dayNH  = gianList.reduce((s,g) => {
           const v = parseFloat(String((_hdData[`${date}|${g}`]||{}).tienNH||'').replace(/[^0-9.]/g,''))||0;
           return s + v;
@@ -861,19 +873,19 @@
           </td></tr>`;
         gianList.forEach(g => {
           const dg  = gianData[g];
-          const feeR = Math.round(dg.fee);
-          const net = dg.amount - feeR;
+          const gDisp = getGianDisplay(g);
           const ct  = _ctMap[g] || {};
           const ctLine = ct.maCT
             ? `<span class="ct-badge">${ct.maCT}</span>${ct.isChiaSe ? '<span class="ct-chiase-badge">CS</span>' : ''}`
             : '<span style="color:#94a3b8;font-size:.74em;font-style:italic">chưa map</span>';
           const hdKey = `${date}|${g}`;
           const hd    = _hdData[hdKey] || {};
+          const hasOvr = (hd.dtOvr != null && hd.dtOvr !== '') || (hd.netOvr != null && hd.netOvr !== '');
           out += `<tr class="gian-row">
             <td style="padding-left:2rem"><div>${ctLine}</div><div style="font-size:.82em;color:#475569;margin-top:1px">${g}</div></td>
-            <td style="text-align:right;color:#15803d;font-weight:600">${fmtN(dg.amount)}</td>
-            <td style="text-align:right;color:#dc2626">${fmtN(feeR)}</td>
-            <td class="col-net" style="text-align:right">${fmtN(net)}</td>
+            <td style="text-align:right;color:#15803d;font-weight:600">${fmtN(gDisp.dt)}${hasOvr&&hd.dtOvr?'<sup style="color:#f59e0b;font-size:.7em">✏</sup>':''}</td>
+            <td style="text-align:right;color:#dc2626">${fmtN(Math.round(gDisp.fee))}</td>
+            <td class="col-net" style="text-align:right">${fmtN(Math.round(gDisp.net))}${hasOvr&&hd.netOvr?'<sup style="color:#f59e0b;font-size:.7em">✏</sup>':''}</td>
             <td>${hd.tienNH ? `<span style="font-size:.82em;color:#0369a1;font-weight:600">${fmtN(parseFloat(String(hd.tienNH).replace(/[^0-9.]/g,''))||0)}đ</span>` : '<span style="color:#cbd5e1;font-size:.78em">–</span>'}</td>
             <td>${hd.soHD ? `<span style="font-size:.82em;font-weight:600">${hd.soHD}</span>` : '<span style="color:#cbd5e1;font-size:.78em">–</span>'}</td>
             <td>${hd.soTienHD ? `<span style="font-size:.82em;font-weight:600">${fmtN(parseFloat(String(hd.soTienHD).replace(/[^0-9.]/g,''))||0)}đ</span>` : '<span style="color:#cbd5e1;font-size:.78em">–</span>'}</td>
@@ -888,7 +900,7 @@
               <thead><tr style="background:#e0e7ff;color:#1e3a5f">
                 <th style="padding:.3rem .5rem;text-align:left;border:1px solid #c7d2fe">Gian</th>
                 <th style="padding:.3rem .5rem;text-align:right;border:1px solid #c7d2fe">Doanh thu</th>
-                <th style="padding:.3rem .5rem;text-align:right;border:1px solid #c7d2fe">Net</th>
+                <th style="padding:.3rem .5rem;text-align:right;border:1px solid #c7d2fe">Net (sửa được)</th>
                 <th style="padding:.3rem .5rem;text-align:right;border:1px solid #c7d2fe">Tiền NH</th>
                 <th style="padding:.3rem .5rem;border:1px solid #c7d2fe">Số HĐ</th>
                 <th style="padding:.3rem .5rem;text-align:right;border:1px solid #c7d2fe">Tiền HĐ</th>
@@ -900,10 +912,18 @@
                   const net = dg.amount - feeR;
                   const hdKey = `${date}|${g}`;
                   const hd = _hdData[hdKey] || {};
+                  const netVal = hd.netOvr != null && hd.netOvr !== '' ? hd.netOvr : net;
+                  const dtVal  = hd.dtOvr  != null && hd.dtOvr  !== '' ? hd.dtOvr  : dg.amount;
                   return `<tr>
                     <td style="padding:.3rem .5rem;border:1px solid #e2e8f0;color:#374151">${g}</td>
-                    <td style="padding:.3rem .5rem;border:1px solid #e2e8f0;text-align:right;color:#15803d;font-weight:600">${fmtN(dg.amount)}</td>
-                    <td style="padding:.3rem .5rem;border:1px solid #e2e8f0;text-align:right;color:#0d47a1;font-weight:700">${fmtN(net)}</td>
+                    <td style="padding:.3rem .5rem;border:1px solid #e2e8f0;text-align:right">
+                      <input id="edit_dtOvr_${dateId}_${g.replace(/[^a-zA-Z0-9]/g,'_')}" type="text" value="${dtVal}"
+                        style="width:110px;border:1px solid #bbf7d0;border-radius:4px;padding:.2rem .35rem;text-align:right;background:#f0fdf4;color:#15803d;font-weight:600">
+                    </td>
+                    <td style="padding:.3rem .5rem;border:1px solid #e2e8f0;text-align:right">
+                      <input id="edit_netOvr_${dateId}_${g.replace(/[^a-zA-Z0-9]/g,'_')}" type="text" value="${netVal}"
+                        style="width:110px;border:1px solid #bfdbfe;border-radius:4px;padding:.2rem .35rem;text-align:right;background:#eff6ff;color:#0d47a1;font-weight:700">
+                    </td>
                     <td style="padding:.3rem .5rem;border:1px solid #e2e8f0;text-align:right">
                       <input id="edit_tienNH_${dateId}_${g.replace(/[^a-zA-Z0-9]/g,'_')}" type="text" value="${hd.tienNH||''}" placeholder="0"
                         style="width:100px;border:1px solid #bae6fd;border-radius:4px;padding:.2rem .35rem;text-align:right;background:#f0f9ff">
