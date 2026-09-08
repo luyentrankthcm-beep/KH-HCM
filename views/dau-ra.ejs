@@ -12,33 +12,72 @@
       border-radius:20px; padding:.2rem .75rem; font-size:.82em; font-weight:700;
       margin-bottom:1rem;
     }
+    /* TABS */
     .tab-bar { display:flex; gap:0; border-bottom:2px solid #1e3a5f; margin-bottom:1.25rem; }
-    .tab-btn { padding:.5rem 1.25rem; font-weight:600; font-size:.88em; cursor:pointer; border:none; background:#e8f0fe; color:#1e3a5f; border-radius:6px 6px 0 0; margin-right:3px; text-decoration:none; display:inline-block; }
+    .tab-btn { padding:.5rem 1.25rem; font-weight:600; font-size:.88em; cursor:pointer; border:none; background:#e8f0fe; color:#1e3a5f; border-radius:6px 6px 0 0; margin-right:3px; }
     .tab-btn.active { background:#1e3a5f; color:#fff; }
     .tab-btn:hover:not(.active) { background:#c7d7f8; }
+    .tab-panel { display:none; }
+    .tab-panel.active { display:block; }
     .sub-tab-bar { display:flex; gap:4px; margin-bottom:1rem; flex-wrap:wrap; }
     .sub-tab-btn { padding:.3rem 1rem; font-size:.83em; font-weight:600; cursor:pointer; border:1px solid #cbd5e1; background:#f8fafc; color:#475569; border-radius:20px; }
     .sub-tab-btn.active { background:#2563eb; color:#fff; border-color:#2563eb; }
     .sub-tab-btn:hover:not(.active) { background:#e0e7ff; border-color:#818cf8; }
-    .tab-panel { display:none; }
-    .tab-panel.active { display:block; }
     .sub-panel { display:none; }
     .sub-panel.active { display:block; }
-    .doc-table { width:100%; border-collapse:collapse; font-size:.88em; }
-    .doc-table th { background:#1e3a5f; color:#fff; padding:.5rem .75rem; text-align:left; white-space:nowrap; position:sticky; top:0; z-index:5; }
-    .doc-table td { padding:.45rem .75rem; border-bottom:1px solid #eee; vertical-align:middle; }
-    .doc-table tbody tr:nth-child(odd) td { background:#f5f8ff; }
-    .doc-table tbody tr:hover td { background:#dceeff !important; }
-    .add-form { background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:1rem 1.25rem; margin-bottom:1.25rem; }
-    .add-form h3 { margin:0 0 .75rem; font-size:.92rem; color:#1e3a5f; }
-    .form-row { display:flex; gap:.6rem; flex-wrap:wrap; align-items:flex-end; }
-    .form-row label { font-size:.8em; font-weight:600; color:#475569; display:block; margin-bottom:.2rem; }
-    .form-row input, .form-row select, .form-row textarea { padding:.35rem .55rem; border:1px solid #cbd5e1; border-radius:4px; font-size:.85em; }
-    .btn-add { background:#2563eb; color:#fff; border:none; border-radius:5px; padding:.38rem .9rem; cursor:pointer; font-weight:600; font-size:.85em; white-space:nowrap; }
-    .btn-add:hover { background:#1d4ed8; }
-    .btn-del { background:none; border:none; color:#ef4444; cursor:pointer; font-size:.85em; padding:.1rem .3rem; }
-    .btn-del:hover { color:#b91c1c; }
-    .empty-hint { color:#94a3b8; font-style:italic; font-size:.88em; text-align:center; padding:2rem; }
+    /* MOMO HEADER */
+    .channel-header { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:.5rem; margin-bottom:1rem; padding:.75rem 1rem; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; }
+    .acct-info { font-size:.88em; color:#475569; }
+    .acct-info strong { color:#1e3a5f; font-size:1em; }
+    .btn-nhap { background:#7c3aed; color:#fff; border:none; border-radius:6px; padding:.42rem 1rem; cursor:pointer; font-weight:600; font-size:.85em; display:inline-flex; align-items:center; gap:.35rem; }
+    .btn-nhap:hover { background:#6d28d9; }
+    /* EMPTY STATE */
+    .empty-state { text-align:center; padding:3rem 1rem; }
+    .empty-state .big-icon { font-size:3rem; margin-bottom:.75rem; }
+    .empty-state p { color:#94a3b8; font-size:.9em; }
+    /* UPLOAD MODAL */
+    .modal-overlay { display:none; position:fixed; inset:0; background:rgba(15,23,42,.55); z-index:300; align-items:center; justify-content:center; }
+    .modal-overlay.open { display:flex; }
+    .modal-box { background:#fff; border-radius:12px; width:min(500px,94vw); padding:1.5rem; box-shadow:0 20px 60px rgba(0,0,0,.25); }
+    .modal-box h3 { margin:0 0 .4rem; font-size:1.05rem; color:#1e3a5f; }
+    .modal-sub { font-size:.82em; color:#64748b; margin:0 0 1rem; }
+    .upload-area { border:2px dashed #94a3b8; border-radius:8px; padding:2rem 1rem; text-align:center; cursor:pointer; color:#64748b; font-size:.88em; transition:.2s; }
+    .upload-area:hover { border-color:#7c3aed; background:#faf5ff; color:#7c3aed; }
+    .upload-area .big-icon { font-size:2.5rem; display:block; margin-bottom:.5rem; }
+    .upload-status { margin-top:.75rem; font-size:.85em; min-height:1.5em; }
+    .upload-status.ok { color:#16a34a; }
+    .upload-status.err { color:#dc2626; }
+    .upload-status.loading { color:#2563eb; }
+    .modal-actions { display:flex; justify-content:flex-end; gap:.5rem; margin-top:1rem; }
+    .btn-cancel { background:#f1f5f9; border:1px solid #cbd5e1; border-radius:5px; padding:.38rem 1rem; cursor:pointer; font-size:.85em; }
+    /* RESULTS */
+    .results-toolbar { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:.5rem; margin-bottom:.75rem; }
+    .results-meta { font-size:.82em; color:#64748b; }
+    .btn-export { background:#16a34a; color:#fff; border:none; border-radius:5px; padding:.35rem .85rem; cursor:pointer; font-size:.82em; font-weight:600; }
+    .btn-export:hover { background:#15803d; }
+    .pivot-wrap { overflow-x:auto; max-height:60vh; overflow-y:auto; border:1px solid #e2e8f0; border-radius:8px; }
+    .pivot-table { width:100%; border-collapse:collapse; font-size:.82em; }
+    .pivot-table th { background:#1e3a5f; color:#fff; padding:.42rem .6rem; white-space:nowrap; position:sticky; top:0; z-index:5; text-align:right; }
+    .pivot-table th:first-child { text-align:left; position:sticky; left:0; z-index:10; background:#1e3a5f; }
+    .pivot-table td { padding:.38rem .6rem; border-bottom:1px solid #f1f5f9; white-space:nowrap; text-align:right; }
+    .pivot-table td:first-child { text-align:left; font-weight:600; color:#1e3a5f; position:sticky; left:0; background:#fff; z-index:2; border-right:1px solid #e2e8f0; }
+    .pivot-table tbody tr:nth-child(odd) td { background:#f8fafc; }
+    .pivot-table tbody tr:nth-child(odd) td:first-child { background:#f8fafc; }
+    .pivot-table tbody tr:hover td { background:#eff6ff !important; }
+    .pivot-table tfoot td { background:#1e3a5f !important; color:#fff; font-weight:700; position:sticky; bottom:0; }
+    .pivot-table tfoot td:first-child { background:#1e3a5f !important; }
+    .cell-zero { color:#d1d5db; }
+    .cell-val { color:#15803d; }
+    .total-col { background:#e0f2fe !important; color:#0369a1; font-weight:700; border-left:2px solid #7dd3fc; }
+    /* FILTER */
+    .filter-bar { display:flex; gap:.5rem; flex-wrap:wrap; align-items:center; margin-bottom:.75rem; font-size:.83em; }
+    .filter-bar input, .filter-bar select { padding:.28rem .5rem; border:1px solid #cbd5e1; border-radius:4px; font-size:.85em; }
+    /* DETAIL TABLE */
+    .detail-table { width:100%; border-collapse:collapse; font-size:.82em; }
+    .detail-table th { background:#1e3a5f; color:#fff; padding:.4rem .6rem; text-align:left; white-space:nowrap; position:sticky; top:0; z-index:5; }
+    .detail-table td { padding:.36rem .6rem; border-bottom:1px solid #f1f5f9; }
+    .detail-table tbody tr:hover td { background:#eff6ff; }
+    .badge-vang-lai { background:#fef9c3; color:#854d0e; border-radius:4px; padding:.05rem .3rem; font-size:.78em; }
   </style>
 </head>
 <body>
@@ -50,68 +89,119 @@
       <%= activeCompany === 'kh_cu' ? '🏢 KH Cũ' : '🏗️ KH Mới' %>
     </div>
 
-    <!-- TOP-LEVEL TABS -->
+    <!-- TOP TABS -->
     <div class="tab-bar">
       <button class="tab-btn active" onclick="switchTab('momo', this)">🟣 Momo</button>
       <button class="tab-btn" onclick="switchTab('zvp', this)">🔵 Zalo/VNPay/Payoo</button>
       <button class="tab-btn" onclick="switchTab('vietqr', this)">🟢 Viet QR</button>
     </div>
 
-    <!-- TAB MOMO -->
+    <!-- ==================== MOMO TAB ==================== -->
     <div id="momo" class="tab-panel active">
-      <div class="sub-tab-bar">
-        <button class="sub-tab-btn active" onclick="switchSub('momo','sub-a',this)">Sub tab A</button>
-        <button class="sub-tab-btn" onclick="switchSub('momo','sub-b',this)">Sub tab B</button>
+
+      <!-- Account header -->
+      <div class="channel-header">
+        <div class="acct-info">
+          Tài khoản Momo: <strong><%= activeCompany === 'kh_cu' ? '0xxx – KH Cũ' : '7701 – KH Mới' %></strong>
+        </div>
+        <button class="btn-nhap" onclick="openMomoModal()">📤 Nhập liệu đối soát</button>
       </div>
-      <div id="momo-sub-a" class="sub-panel active">
-        <div class="add-form">
-          <h3>+ Thêm mới</h3>
-          <div class="form-row">
-            <div><label>Tên</label><input type="text" placeholder="Nhập tên..."></div>
-            <div><label>Ghi chú</label><input type="text" placeholder="Ghi chú..."></div>
-            <button class="btn-add">Thêm</button>
+
+      <!-- Sub-tabs -->
+      <div class="sub-tab-bar" id="momoSubTabs" style="display:none">
+        <button class="sub-tab-btn active" onclick="switchSub('momo','pivot',this)">📊 Theo gian</button>
+        <button class="sub-tab-btn" onclick="switchSub('momo','detail',this)">📋 Chi tiết GD</button>
+      </div>
+
+      <!-- Sub: Pivot -->
+      <div id="momo-pivot" class="sub-panel active">
+        <div id="momoEmpty" class="empty-state">
+          <div class="big-icon">📂</div>
+          <p>Chưa có dữ liệu<br>Nhấn <strong>Nhập liệu đối soát</strong> để tải file Excel từ Momo Business</p>
+        </div>
+        <div id="momoResults" style="display:none">
+          <div class="results-toolbar">
+            <div class="results-meta" id="momoMeta"></div>
+            <button class="btn-export" onclick="exportPivot()">⬇️ Xuất Excel</button>
+          </div>
+          <div class="filter-bar">
+            <label>Lọc gian:</label>
+            <input type="text" id="filterGian" placeholder="Tìm mã gian..." oninput="renderPivot()">
+            <label>Nhóm:</label>
+            <select id="filterGroup" onchange="renderPivot()">
+              <option value="">Tất cả</option>
+            </select>
+          </div>
+          <div class="pivot-wrap">
+            <table class="pivot-table" id="pivotTable">
+              <thead id="pivotHead"></thead>
+              <tbody id="pivotBody"></tbody>
+              <tfoot id="pivotFoot"></tfoot>
+            </table>
           </div>
         </div>
-        <table class="doc-table">
-          <thead><tr><th>#</th><th>Tên</th><th>Ghi chú</th><th></th></tr></thead>
-          <tbody><tr><td colspan="4" class="empty-hint">Chưa có dữ liệu – <%= activeCompany === 'kh_cu' ? 'KH Cũ' : 'KH Mới' %></td></tr></tbody>
-        </table>
       </div>
-      <div id="momo-sub-b" class="sub-panel">
-        <p class="empty-hint">Sub tab B – chưa thiết lập</p>
+
+      <!-- Sub: Detail -->
+      <div id="momo-detail" class="sub-panel">
+        <div class="filter-bar">
+          <input type="text" id="filterDetail" placeholder="Tìm gian, mã GD..." oninput="renderDetail()" style="width:200px">
+          <select id="filterDate" onchange="renderDetail()"><option value="">Tất cả ngày</option></select>
+        </div>
+        <div style="overflow-x:auto;max-height:65vh;overflow-y:auto;border:1px solid #e2e8f0;border-radius:8px;">
+          <table class="detail-table">
+            <thead><tr>
+              <th>#</th><th>Ngày</th><th>Giờ</th><th>Gian</th>
+              <th>Số tiền đến</th><th>Loại GD</th><th>Mã đơn</th>
+            </tr></thead>
+            <tbody id="detailBody"></tbody>
+          </table>
+        </div>
       </div>
     </div>
 
-    <!-- TAB ZALO/VNPAY/PAYOO -->
+    <!-- ==================== ZVP TAB ==================== -->
     <div id="zvp" class="tab-panel">
-      <div class="sub-tab-bar">
-        <button class="sub-tab-btn active" onclick="switchSub('zvp','sub-a',this)">Sub tab A</button>
-        <button class="sub-tab-btn" onclick="switchSub('zvp','sub-b',this)">Sub tab B</button>
+      <div class="channel-header">
+        <div class="acct-info">Zalo/VNPay/Payoo</div>
+        <button class="btn-nhap" style="background:#2563eb" disabled>📤 Nhập liệu đối soát</button>
       </div>
-      <div id="zvp-sub-a" class="sub-panel active">
-        <p class="empty-hint">Zalo/VNPay/Payoo – Sub tab A – chưa thiết lập – <%= activeCompany === 'kh_cu' ? 'KH Cũ' : 'KH Mới' %></p>
-      </div>
-      <div id="zvp-sub-b" class="sub-panel">
-        <p class="empty-hint">Zalo/VNPay/Payoo – Sub tab B – chưa thiết lập</p>
-      </div>
+      <div class="empty-state"><div class="big-icon">🔵</div><p>Chưa thiết lập – <%= activeCompany === 'kh_cu' ? 'KH Cũ' : 'KH Mới' %></p></div>
     </div>
 
-    <!-- TAB VIET QR -->
+    <!-- ==================== VIET QR TAB ==================== -->
     <div id="vietqr" class="tab-panel">
-      <div class="sub-tab-bar">
-        <button class="sub-tab-btn active" onclick="switchSub('vietqr','sub-a',this)">Sub tab A</button>
-        <button class="sub-tab-btn" onclick="switchSub('vietqr','sub-b',this)">Sub tab B</button>
+      <div class="channel-header">
+        <div class="acct-info">Viet QR</div>
+        <button class="btn-nhap" style="background:#16a34a" disabled>📤 Nhập liệu đối soát</button>
       </div>
-      <div id="vietqr-sub-a" class="sub-panel active">
-        <p class="empty-hint">Viet QR – Sub tab A – chưa thiết lập – <%= activeCompany === 'kh_cu' ? 'KH Cũ' : 'KH Mới' %></p>
-      </div>
-      <div id="vietqr-sub-b" class="sub-panel">
-        <p class="empty-hint">Viet QR – Sub tab B – chưa thiết lập</p>
-      </div>
+      <div class="empty-state"><div class="big-icon">🟢</div><p>Chưa thiết lập – <%= activeCompany === 'kh_cu' ? 'KH Cũ' : 'KH Mới' %></p></div>
     </div>
+
   </main>
 
+  <!-- ==================== MODAL ==================== -->
+  <div id="momoModal" class="modal-overlay" onclick="if(event.target===this)closeMomoModal()">
+    <div class="modal-box">
+      <h3>📤 Nhập liệu đối soát Momo</h3>
+      <p class="modal-sub">File Excel xuất từ cổng Momo Business → Lịch sử giao dịch → Xuất file</p>
+      <div class="upload-area" onclick="document.getElementById('momoFileInput').click()">
+        <span class="big-icon">📂</span>
+        <div>Nhấn để chọn file <strong>.xlsx</strong></div>
+        <div style="font-size:.78em;margin-top:.25rem;color:#94a3b8">Hoặc kéo thả file vào đây</div>
+        <input type="file" id="momoFileInput" accept=".xlsx,.xls" style="display:none" onchange="handleMomoFile(this.files[0])">
+      </div>
+      <div id="momoUploadStatus" class="upload-status"></div>
+      <div class="modal-actions">
+        <button class="btn-cancel" onclick="closeMomoModal()">Đóng</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- SheetJS -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script>
+    // ── Tab switching ──
     function switchTab(id, btn) {
       document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
       document.querySelectorAll('.tab-bar .tab-btn').forEach(b => b.classList.remove('active'));
@@ -124,6 +214,224 @@
       panel.querySelectorAll('.sub-tab-btn').forEach(b => b.classList.remove('active'));
       document.getElementById(tabId + '-' + subId).classList.add('active');
       btn.classList.add('active');
+    }
+
+    // ── Modal ──
+    function openMomoModal() { document.getElementById('momoModal').classList.add('open'); }
+    function closeMomoModal() { document.getElementById('momoModal').classList.remove('open'); }
+
+    // ── Drag & drop ──
+    const uploadArea = document.querySelector('.upload-area');
+    uploadArea.addEventListener('dragover', e => { e.preventDefault(); uploadArea.style.borderColor = '#7c3aed'; });
+    uploadArea.addEventListener('dragleave', () => { uploadArea.style.borderColor = ''; });
+    uploadArea.addEventListener('drop', e => {
+      e.preventDefault(); uploadArea.style.borderColor = '';
+      if (e.dataTransfer.files[0]) handleMomoFile(e.dataTransfer.files[0]);
+    });
+
+    // ── Global data store ──
+    let _rows = [];     // [{date, time, gian, amount, loaiGD, maDon}]
+    let _dates = [];    // sorted unique dates
+    let _gians = [];    // sorted unique gian names
+
+    // ── Parse file ──
+    function handleMomoFile(file) {
+      if (!file) return;
+      const st = document.getElementById('momoUploadStatus');
+      st.className = 'upload-status loading';
+      st.textContent = '⏳ Đang đọc file...';
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          const wb = XLSX.read(e.target.result, { type: 'array', cellDates: false });
+          const ws = wb.Sheets[wb.SheetNames[0]];
+          const data = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+
+          // Find header row
+          let headerIdx = -1;
+          for (let i = 0; i < Math.min(5, data.length); i++) {
+            if (data[i].some(c => String(c).includes('Thời gian TT'))) { headerIdx = i; break; }
+          }
+          if (headerIdx < 0) throw new Error('Không tìm thấy header. Kiểm tra lại file.');
+
+          const hdr = data[headerIdx];
+          const colIdx = name => hdr.findIndex(h => String(h).includes(name));
+          const C = {
+            tgian:    colIdx('Thời gian TT'),
+            den:      colIdx('Số tiền đến'),
+            loai:     colIdx('Loại'),
+            status:   colIdx('Trạng thái'),
+            noiDung:  colIdx('Nội dung'),
+            maDon:    colIdx('Mã đơn hàng'),
+            loaiGD:   colIdx('Loại giao dịch'),
+          };
+
+          _rows = [];
+          for (let i = headerIdx + 1; i < data.length; i++) {
+            const r = data[i];
+            if (!r[C.tgian]) continue;
+            const tgian  = String(r[C.tgian] || '');
+            const date   = tgian.substring(0, 10);   // "DD-MM-YYYY"
+            const time   = tgian.substring(11, 19);  // "HH:MM:SS"
+            const amount = Number(r[C.den]) || 0;
+            const noiDung = String(r[C.noiDung] || '');
+            const loaiGD = String(r[C.loaiGD] || '');
+            const status = String(r[C.status] || '');
+            const maDon  = String(r[C.maDon] || '');
+
+            // Extract gian from Nội dung TT: "VQR... GIAN CODE"
+            let gian = 'Vãng lai';
+            const m = noiDung.match(/VQR\w+\s+(.+)/);
+            if (m) {
+              const g = m[1].trim();
+              gian = (g === 'PaymentForOrder' || g === '-') ? 'Vãng lai' : g;
+            } else if (loaiGD === 'Vãng lai') {
+              gian = 'Vãng lai';
+            }
+
+            if (status !== 'Thành công') continue;
+            _rows.push({ date, time, gian, amount, loaiGD, maDon });
+          }
+
+          if (!_rows.length) throw new Error('Không có dữ liệu hợp lệ trong file.');
+
+          // Unique dates & gians
+          _dates = [...new Set(_rows.map(r => r.date))].sort((a, b) => {
+            const parse = d => { const [dd,mm,yy] = d.split('-'); return `${yy}-${mm}-${dd}`; };
+            return parse(a).localeCompare(parse(b));
+          });
+          _gians = [...new Set(_rows.map(r => r.gian))].sort();
+
+          // Populate filter dropdowns
+          const grpSet = new Set(_gians.map(g => g.split(' ')[0]));
+          const grpSel = document.getElementById('filterGroup');
+          grpSel.innerHTML = '<option value="">Tất cả</option>';
+          [...grpSet].sort().forEach(g => { const o = document.createElement('option'); o.value = g; o.textContent = g; grpSel.appendChild(o); });
+
+          const dateSel = document.getElementById('filterDate');
+          dateSel.innerHTML = '<option value="">Tất cả ngày</option>';
+          _dates.forEach(d => { const o = document.createElement('option'); o.value = d; o.textContent = d; dateSel.appendChild(o); });
+
+          // Show results
+          document.getElementById('momoEmpty').style.display = 'none';
+          document.getElementById('momoResults').style.display = 'block';
+          document.getElementById('momoSubTabs').style.display = 'flex';
+          document.getElementById('momoMeta').textContent =
+            `📄 ${file.name} · ${_rows.length.toLocaleString('vi')} GD · ${_gians.length} gian · ${_dates.length} ngày`;
+
+          renderPivot();
+          renderDetail();
+
+          st.className = 'upload-status ok';
+          st.textContent = `✅ Đã đọc ${_rows.length.toLocaleString('vi')} giao dịch từ ${_dates.length} ngày`;
+          setTimeout(closeMomoModal, 1500);
+
+        } catch(err) {
+          st.className = 'upload-status err';
+          st.textContent = '❌ ' + err.message;
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    }
+
+    // ── Render pivot table ──
+    function renderPivot() {
+      const filterGian = document.getElementById('filterGian').value.toLowerCase();
+      const filterGrp  = document.getElementById('filterGroup').value;
+
+      const gians = _gians.filter(g => {
+        if (filterGian && !g.toLowerCase().includes(filterGian)) return false;
+        if (filterGrp && !g.startsWith(filterGrp)) return false;
+        return true;
+      });
+
+      // Build pivot map: gian → date → total
+      const pivot = {};
+      _rows.forEach(r => {
+        if (!gians.includes(r.gian)) return;
+        if (!pivot[r.gian]) pivot[r.gian] = {};
+        pivot[r.gian][r.date] = (pivot[r.gian][r.date] || 0) + r.amount;
+      });
+
+      const fmt = n => n ? n.toLocaleString('vi') : '<span class="cell-zero">–</span>';
+
+      // Head
+      const head = document.getElementById('pivotHead');
+      head.innerHTML = '<tr><th>Gian</th>' + _dates.map(d => `<th>${d}</th>`).join('') + '<th class="total-col">Tổng</th></tr>';
+
+      // Body
+      const tbody = document.getElementById('pivotBody');
+      let html = '';
+      gians.forEach(g => {
+        let rowTotal = 0;
+        const cells = _dates.map(d => {
+          const v = (pivot[g] || {})[d] || 0;
+          rowTotal += v;
+          return `<td>${fmt(v)}</td>`;
+        }).join('');
+        html += `<tr><td>${g}</td>${cells}<td class="total-col cell-val">${rowTotal.toLocaleString('vi')}</td></tr>`;
+      });
+      tbody.innerHTML = html || '<tr><td colspan="99" style="text-align:center;color:#94a3b8;padding:1rem">Không có gian nào khớp</td></tr>';
+
+      // Foot (totals)
+      const foot = document.getElementById('pivotFoot');
+      let grandTotal = 0;
+      const dateTotals = _dates.map(d => {
+        const t = _rows.filter(r => gians.includes(r.gian) && r.date === d).reduce((s,r) => s + r.amount, 0);
+        grandTotal += t;
+        return `<td>${t.toLocaleString('vi')}</td>`;
+      }).join('');
+      foot.innerHTML = `<tr><td>Tổng cộng</td>${dateTotals}<td class="total-col">${grandTotal.toLocaleString('vi')}</td></tr>`;
+    }
+
+    // ── Render detail table ──
+    function renderDetail() {
+      const q     = document.getElementById('filterDetail').value.toLowerCase();
+      const dFilter = document.getElementById('filterDate').value;
+      const rows = _rows.filter(r => {
+        if (dFilter && r.date !== dFilter) return false;
+        if (q && !r.gian.toLowerCase().includes(q) && !r.maDon.toLowerCase().includes(q)) return false;
+        return true;
+      }).slice(0, 500); // cap at 500 for performance
+
+      const fmt = n => n.toLocaleString('vi');
+      let html = '';
+      rows.forEach((r, i) => {
+        html += `<tr>
+          <td>${i+1}</td>
+          <td>${r.date}</td>
+          <td>${r.time}</td>
+          <td>${r.gian === 'Vãng lai' ? `<span class="badge-vang-lai">Vãng lai</span>` : r.gian}</td>
+          <td style="text-align:right;color:#15803d;font-weight:600">${fmt(r.amount)}</td>
+          <td>${r.loaiGD}</td>
+          <td style="font-size:.78em;color:#64748b">${r.maDon}</td>
+        </tr>`;
+      });
+      document.getElementById('detailBody').innerHTML = html || '<tr><td colspan="7" style="text-align:center;color:#94a3b8;padding:1rem">Không có dữ liệu</td></tr>';
+    }
+
+    // ── Export pivot ──
+    function exportPivot() {
+      if (!_rows.length) return;
+      const wb = XLSX.utils.book_new();
+      const aoa = [['Gian', ..._dates, 'Tổng']];
+      const pivot = {};
+      _rows.forEach(r => {
+        if (!pivot[r.gian]) pivot[r.gian] = {};
+        pivot[r.gian][r.date] = (pivot[r.gian][r.date] || 0) + r.amount;
+      });
+      let grandTotal = 0;
+      _gians.forEach(g => {
+        let rowT = 0;
+        const vals = _dates.map(d => { const v = (pivot[g]||{})[d]||0; rowT+=v; return v; });
+        grandTotal += rowT;
+        aoa.push([g, ...vals, rowT]);
+      });
+      aoa.push(['Tổng cộng', ..._dates.map(d => _rows.filter(r=>r.date===d).reduce((s,r)=>s+r.amount,0)), grandTotal]);
+      const ws = XLSX.utils.aoa_to_sheet(aoa);
+      XLSX.utils.book_append_sheet(wb, ws, 'Momo pivot');
+      XLSX.writeFile(wb, 'Momo_pivot.xlsx');
     }
   </script>
 </body>
