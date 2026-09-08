@@ -204,11 +204,11 @@
           <table class="doisoat-table">
             <thead>
               <tr style="background:#1e3a5f;color:#fff;position:sticky;top:0;z-index:10">
-                <th style="padding:.5rem .75rem;min-width:180px;text-align:left">Gian / Mã CT</th>
-                <th style="padding:.5rem .75rem;text-align:right;min-width:110px">Doanh thu</th>
-                <th style="padding:.5rem .75rem;text-align:right;min-width:95px">Phí Momo</th>
-                <th style="padding:.5rem .75rem;text-align:right;min-width:110px">Tiền Net</th>
-                <th style="padding:.5rem .75rem;text-align:right;min-width:50px">GD</th>
+                <th style="padding:.5rem .75rem;min-width:200px;text-align:left">Mã CT / Gian</th>
+                <th style="padding:.5rem .75rem;text-align:right;min-width:120px">Doanh thu</th>
+                <th style="padding:.5rem .75rem;text-align:right;min-width:100px">Phí Momo</th>
+                <th style="padding:.5rem .75rem;text-align:right;min-width:120px">Tiền Net</th>
+                <th style="padding:.5rem .75rem;text-align:right;min-width:130px;background:#1e4a6f">Tiền NH về</th>
                 <th style="padding:.5rem .75rem;min-width:140px">Số hóa đơn</th>
                 <th style="padding:.5rem .75rem;text-align:right;min-width:120px">Tiền HĐ</th>
               </tr>
@@ -238,10 +238,33 @@
     <!-- ==================== VIET QR TAB ==================== -->
     <div id="vietqr" class="tab-panel">
       <div class="channel-header">
-        <div class="acct-info">Viet QR</div>
-        <button class="btn-nhap" style="background:#16a34a" disabled>📤 Nhập liệu đối soát</button>
+        <div class="acct-info">
+          Viet QR &nbsp;<span style="font-size:.78em;color:#64748b">· Đối soát MTT (Mẫu Tổng Thanh toán)</span>
+        </div>
+        <button class="btn-nhap" style="background:#16a34a" onclick="openVietQrModal()">📤 Nhập file MTT</button>
       </div>
-      <div class="empty-state"><div class="big-icon">🟢</div><p>Chưa thiết lập – <%= activeCompany === 'kh_cu' ? 'KH Cũ' : 'KH Mới' %></p></div>
+
+      <!-- MTT: Empty state -->
+      <div id="vqrEmpty" class="empty-state">
+        <div class="big-icon">🟢</div>
+        <p>Chưa có dữ liệu MTT<br>Nhấn <strong>Nhập file MTT</strong> để tải file lên</p>
+      </div>
+
+      <!-- MTT: Results placeholder -->
+      <div id="vqrResults" style="display:none">
+        <div class="results-toolbar">
+          <div class="results-meta" id="vqrMeta"></div>
+          <div style="display:flex;gap:.5rem">
+            <button onclick="clearVqrData()" style="background:#ef4444;color:#fff;border:none;border-radius:5px;padding:.35rem .75rem;cursor:pointer;font-size:.82em;font-weight:600">🗑️ Xóa dữ liệu</button>
+          </div>
+        </div>
+        <div style="overflow-x:auto;border:1px solid #e2e8f0;border-radius:8px;max-height:65vh;overflow-y:auto">
+          <table style="width:100%;border-collapse:collapse;font-size:.83em">
+            <thead><tr id="vqrHead" style="background:#1e3a5f;color:#fff;position:sticky;top:0"></tr></thead>
+            <tbody id="vqrBody"></tbody>
+          </table>
+        </div>
+      </div>
     </div>
 
   </main>
@@ -288,6 +311,27 @@
       <div class="modal-footer">
         <button class="btn-cancel" onclick="document.getElementById('ctMapModal').classList.remove('open')">Hủy</button>
         <button onclick="saveCtMapModal()" style="background:#6366f1;color:#fff;border:none;border-radius:6px;padding:.45rem 1.2rem;cursor:pointer;font-weight:600">💾 Lưu</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== VIET QR / MTT MODAL ==================== -->
+  <div id="vietQrModal" class="modal-overlay" onclick="if(event.target===this)closeVietQrModal()">
+    <div class="modal-box">
+      <h3>📤 Nhập file MTT – Viet QR</h3>
+      <p class="modal-sub">Tải file đối soát MTT (Excel/CSV) từ cổng Viet QR / NAPAS. Hệ thống tự nhận dạng KH Cũ hay KH Mới.</p>
+      <div class="upload-area" onclick="document.getElementById('vqrFileInput').click()">
+        <span class="big-icon">📂</span>
+        <div>Nhấn để chọn file <strong>.xlsx / .csv</strong></div>
+        <div style="font-size:.78em;margin-top:.25rem;color:#94a3b8">Hoặc kéo thả vào đây</div>
+        <input type="file" id="vqrFileInput" accept=".xlsx,.xls,.csv" style="display:none" onchange="handleVietQrFile(this.files[0])">
+      </div>
+      <div id="vqrUploadStatus" class="upload-status"></div>
+      <div style="margin-top:.75rem;padding:.6rem .75rem;background:#fef9c3;border-radius:6px;font-size:.8em;color:#854d0e">
+        ⚠️ Format file MTT chưa được cấu hình. Tải file lên và Claude sẽ đọc cấu trúc để thiết lập.
+      </div>
+      <div class="modal-actions">
+        <button class="btn-cancel" onclick="closeVietQrModal()">Đóng</button>
       </div>
     </div>
   </div>
@@ -706,24 +750,28 @@
         const dayPhi   = gianList.reduce((s,g) => s + gianData[g].fee, 0);
         const dayNet   = dayDT - dayPhi;
         const dayCnt   = gianList.reduce((s,g) => s + gianData[g].count, 0);
+        const hdDayKey = `day|${date}`;
+        const hdDay    = _hdData[hdDayKey] || {};
         html += `<tr class="day-row">
-          <td colspan="7">📅 ${date} &nbsp;·&nbsp; DT: ${fmtN(dayDT)}đ &nbsp;·&nbsp; Phí: ${fmtN(dayPhi)}đ &nbsp;·&nbsp; Net: <strong>${fmtN(dayNet)}đ</strong> &nbsp;·&nbsp; ${dayCnt} GD</td>
+          <td colspan="7">📅 <strong>${date}</strong> &nbsp;·&nbsp; DT: ${fmtN(dayDT)}đ &nbsp;·&nbsp; Phí: ${fmtN(dayPhi)}đ &nbsp;·&nbsp; Net: <strong>${fmtN(dayNet)}đ</strong></td>
         </tr>`;
         gianList.forEach(g => {
           const d   = gianData[g];
           const net = d.amount - d.fee;
           const ct  = _ctMap[g] || {};
-          const ctLabel = ct.maCT
+          const ctLine = ct.maCT
             ? `<span class="ct-badge">${ct.maCT}</span>${ct.isChiaSe ? '<span class="ct-chiase-badge">CS</span>' : ''}`
-            : '<span style="color:#94a3b8;font-size:.75em">Chưa map</span>';
+            : '<span style="color:#94a3b8;font-size:.75em;font-style:italic">chưa map CT</span>';
           const hdKey = `${date}|${g}`;
           const hd    = _hdData[hdKey] || {};
           html += `<tr class="gian-row">
-            <td><div style="font-weight:600">${g}</div><div style="margin-top:2px">${ctLabel}</div></td>
+            <td><div>${ctLine}</div><div style="font-size:.78em;color:#475569;margin-top:1px">${g}</div></td>
             <td style="text-align:right;color:#15803d;font-weight:600">${fmtN(d.amount)}</td>
             <td style="text-align:right;color:#dc2626">${fmtN(d.fee)}</td>
             <td style="text-align:right;color:#2563eb;font-weight:700">${fmtN(net)}</td>
-            <td style="text-align:right;color:#64748b">${d.count}</td>
+            <td><input type="text" value="${hd.tienNH||''}" placeholder="Nhập tiền NH về"
+              style="width:120px;border:1px solid #bae6fd;border-radius:4px;padding:.25rem .4rem;font-size:.8em;text-align:right;background:#f0f9ff"
+              onchange="saveHdField('${hdKey}','tienNH',this.value)"></td>
             <td><input type="text" value="${hd.soHD||''}" placeholder="VD: 0000123"
               style="width:130px;border:1px solid #cbd5e1;border-radius:4px;padding:.25rem .4rem;font-size:.8em"
               onchange="saveHdField('${hdKey}','soHD',this.value)"></td>
@@ -757,6 +805,49 @@
       const ws = XLSX.utils.aoa_to_sheet(aoa);
       XLSX.utils.book_append_sheet(wb, ws, 'Momo pivot');
       XLSX.writeFile(wb, 'Momo_pivot.xlsx');
+    }
+
+    // ── Viet QR / MTT ──
+    const LS_VQR = `vqr_rows_${COMPANY}`;
+    let _vqrRows = [];
+
+    function openVietQrModal()  { document.getElementById('vietQrModal').classList.add('open'); }
+    function closeVietQrModal() { document.getElementById('vietQrModal').classList.remove('open'); }
+
+    function handleVietQrFile(file) {
+      if (!file) return;
+      const st = document.getElementById('vqrUploadStatus');
+      st.className = 'upload-status loading';
+      st.textContent = '⏳ Đang đọc file...';
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          const wb   = XLSX.read(e.target.result, { type: 'array', cellDates: false });
+          const ws   = wb.Sheets[wb.SheetNames[0]];
+          const data = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+          // Hiển thị 5 hàng đầu để Claude nhận dạng format
+          const preview = data.slice(0, 8).map(r => r.join(' | ')).join('\n');
+          st.className = 'upload-status ok';
+          st.innerHTML = `✅ Đọc được ${data.length} dòng · Sheet: <em>${wb.SheetNames[0]}</em><br>
+            <details style="margin-top:.4rem;font-size:.78em">
+              <summary>Xem cấu trúc (8 dòng đầu)</summary>
+              <pre style="background:#f1f5f9;border-radius:4px;padding:.5rem;overflow-x:auto;margin:.4rem 0;font-size:.75em;max-height:150px">${preview}</pre>
+            </details>
+            <span style="color:#64748b">Gửi ảnh chụp hoặc copy nội dung trên cho Claude để thiết lập parser.</span>`;
+        } catch(err) {
+          st.className = 'upload-status err';
+          st.textContent = '❌ Lỗi đọc file: ' + err.message;
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    }
+
+    function clearVqrData() {
+      if (!confirm('Xóa toàn bộ dữ liệu Viet QR?')) return;
+      _vqrRows = [];
+      try { localStorage.removeItem(LS_VQR); } catch(e) {}
+      document.getElementById('vqrEmpty').style.display = 'block';
+      document.getElementById('vqrResults').style.display = 'none';
     }
 
     // ── Init: restore from localStorage (script is at end of body, DOM already ready) ──
