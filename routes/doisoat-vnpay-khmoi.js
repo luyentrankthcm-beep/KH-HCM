@@ -15,6 +15,31 @@ const {
 const { getCompany } = require("../utils/companies");
 
 const router = express.Router();
+
+// Internal: patch grossByCode vào store (thêm keys KVC TIMES từ GHOST BRIDE MEGA DN)
+// Gọi trước requireLogin nên không cần session, chỉ cần X-Internal-Key.
+const INTERNAL_SYNC_KEY = process.env.INTERNAL_SYNC_KEY || "kh-sync-2026";
+router.post("/doi-soat/vnpay-khmoi/internal/patch-gross", express.json(), (req, res) => {
+  if (req.headers["x-internal-key"] !== INTERNAL_SYNC_KEY) return res.status(401).json({ error: "Unauthorized" });
+  const { grossByCode, label } = req.body;
+  if (!grossByCode || typeof grossByCode !== "object") return res.status(400).json({ error: "grossByCode required" });
+  const store = load();
+  if (!store.vnpay_khmoi_uploads) store.vnpay_khmoi_uploads = [];
+  // Thêm 1 upload entry mới chỉ chứa các keys cần patch (merge overwrite khi render)
+  store.vnpay_khmoi_uploads.push({
+    id: nextId(store, "vnpay_khmoi_uploads_seq") || Date.now(),
+    uploaded_at: new Date().toISOString(),
+    file_name: label || "patch-internal",
+    sheetName: "patch",
+    dates: [...new Set(Object.keys(grossByCode).map(k => k.split("|")[0]))].sort(),
+    codes: [...new Set(Object.keys(grossByCode).map(k => k.split("|")[1]))],
+    grossByCode,
+    unmapped: [],
+  });
+  save(store);
+  res.json({ success: true, added: Object.keys(grossByCode).length });
+});
+
 router.use(requireLogin);
 
 // Luyen, 2026-07-31: "payoo kh cũ và kh mới là khác nhau" -- trang nay
