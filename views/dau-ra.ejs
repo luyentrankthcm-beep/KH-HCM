@@ -2,14 +2,22 @@
 <html lang="vi">
 <head>
   <%- include('partials/head') %>
-  <title>Đầu Ra – K&H</title>
+  <title>Đầu Ra – Doanh Thu – K&H</title>
   <style>
+    .company-badge {
+      display:inline-flex; align-items:center; gap:.4rem;
+      background:<%= activeCompany === 'kh_cu' ? '#dbeafe' : '#dcfce7' %>;
+      color:<%= activeCompany === 'kh_cu' ? '#1e40af' : '#166534' %>;
+      border:1px solid <%= activeCompany === 'kh_cu' ? '#93c5fd' : '#86efac' %>;
+      border-radius:20px; padding:.2rem .75rem; font-size:.82em; font-weight:700;
+      margin-bottom:1rem;
+    }
     .tab-bar { display:flex; gap:0; border-bottom:2px solid #1e3a5f; margin-bottom:1.25rem; }
     .tab-btn { padding:.5rem 1.25rem; font-weight:600; font-size:.88em; cursor:pointer; border:none; background:#e8f0fe; color:#1e3a5f; border-radius:6px 6px 0 0; margin-right:3px; text-decoration:none; display:inline-block; }
     .tab-btn.active { background:#1e3a5f; color:#fff; }
     .tab-btn:hover:not(.active) { background:#c7d7f8; }
     .sub-tab-bar { display:flex; gap:4px; margin-bottom:1rem; flex-wrap:wrap; }
-    .sub-tab-btn { padding:.3rem 1rem; font-size:.83em; font-weight:600; cursor:pointer; border:1px solid #cbd5e1; background:#f8fafc; color:#475569; border-radius:20px; text-decoration:none; display:inline-block; }
+    .sub-tab-btn { padding:.3rem 1rem; font-size:.83em; font-weight:600; cursor:pointer; border:1px solid #cbd5e1; background:#f8fafc; color:#475569; border-radius:20px; }
     .sub-tab-btn.active { background:#2563eb; color:#fff; border-color:#2563eb; }
     .sub-tab-btn:hover:not(.active) { background:#e0e7ff; border-color:#818cf8; }
     .tab-panel { display:none; }
@@ -36,22 +44,26 @@
 <body>
   <%- include('partials/nav') %>
   <main class="container">
-    <h1 class="page-title">Đầu Ra</h1>
+    <h1 class="page-title">Đầu Ra – Doanh Thu</h1>
+
+    <div class="company-badge">
+      <%= activeCompany === 'kh_cu' ? '🏢 KH Cũ' : '🏗️ KH Mới' %>
+    </div>
 
     <!-- TOP-LEVEL TABS -->
     <div class="tab-bar">
-      <button class="tab-btn active" onclick="switchTab('tab1', this)">📄 Tab 1</button>
-      <button class="tab-btn" onclick="switchTab('tab2', this)">📊 Tab 2</button>
-      <button class="tab-btn" onclick="switchTab('tab3', this)">📋 Tab 3</button>
+      <button class="tab-btn active" onclick="switchTab('momo', this)">🟣 Momo</button>
+      <button class="tab-btn" onclick="switchTab('zvp', this)">🔵 Zalo/VNPay/Payoo</button>
+      <button class="tab-btn" onclick="switchTab('vietqr', this)">🟢 Viet QR</button>
     </div>
 
-    <!-- TAB 1 -->
-    <div id="tab1" class="tab-panel active">
+    <!-- TAB MOMO -->
+    <div id="momo" class="tab-panel active">
       <div class="sub-tab-bar">
-        <button class="sub-tab-btn active" onclick="switchSub('tab1','sub1a',this)">Sub tab A</button>
-        <button class="sub-tab-btn" onclick="switchSub('tab1','sub1b',this)">Sub tab B</button>
+        <button class="sub-tab-btn active" onclick="switchSub('momo','sub-a',this)">Sub tab A</button>
+        <button class="sub-tab-btn" onclick="switchSub('momo','sub-b',this)">Sub tab B</button>
       </div>
-      <div id="tab1-sub1a" class="sub-panel active">
+      <div id="momo-sub-a" class="sub-panel active">
         <div class="add-form">
           <h3>+ Thêm mới</h3>
           <div class="form-row">
@@ -62,31 +74,40 @@
         </div>
         <table class="doc-table">
           <thead><tr><th>#</th><th>Tên</th><th>Ghi chú</th><th></th></tr></thead>
-          <tbody><tr><td colspan="4" class="empty-hint">Chưa có dữ liệu</td></tr></tbody>
+          <tbody><tr><td colspan="4" class="empty-hint">Chưa có dữ liệu – <%= activeCompany === 'kh_cu' ? 'KH Cũ' : 'KH Mới' %></td></tr></tbody>
         </table>
       </div>
-      <div id="tab1-sub1b" class="sub-panel">
-        <p class="empty-hint">Nội dung Sub tab B – chưa thiết lập</p>
+      <div id="momo-sub-b" class="sub-panel">
+        <p class="empty-hint">Sub tab B – chưa thiết lập</p>
       </div>
     </div>
 
-    <!-- TAB 2 -->
-    <div id="tab2" class="tab-panel">
+    <!-- TAB ZALO/VNPAY/PAYOO -->
+    <div id="zvp" class="tab-panel">
       <div class="sub-tab-bar">
-        <button class="sub-tab-btn active" onclick="switchSub('tab2','sub2a',this)">Sub tab A</button>
-        <button class="sub-tab-btn" onclick="switchSub('tab2','sub2b',this)">Sub tab B</button>
+        <button class="sub-tab-btn active" onclick="switchSub('zvp','sub-a',this)">Sub tab A</button>
+        <button class="sub-tab-btn" onclick="switchSub('zvp','sub-b',this)">Sub tab B</button>
       </div>
-      <div id="tab2-sub2a" class="sub-panel active">
-        <p class="empty-hint">Nội dung Tab 2 – Sub tab A – chưa thiết lập</p>
+      <div id="zvp-sub-a" class="sub-panel active">
+        <p class="empty-hint">Zalo/VNPay/Payoo – Sub tab A – chưa thiết lập – <%= activeCompany === 'kh_cu' ? 'KH Cũ' : 'KH Mới' %></p>
       </div>
-      <div id="tab2-sub2b" class="sub-panel">
-        <p class="empty-hint">Nội dung Tab 2 – Sub tab B – chưa thiết lập</p>
+      <div id="zvp-sub-b" class="sub-panel">
+        <p class="empty-hint">Zalo/VNPay/Payoo – Sub tab B – chưa thiết lập</p>
       </div>
     </div>
 
-    <!-- TAB 3 -->
-    <div id="tab3" class="tab-panel">
-      <p class="empty-hint">Nội dung Tab 3 – chưa thiết lập</p>
+    <!-- TAB VIET QR -->
+    <div id="vietqr" class="tab-panel">
+      <div class="sub-tab-bar">
+        <button class="sub-tab-btn active" onclick="switchSub('vietqr','sub-a',this)">Sub tab A</button>
+        <button class="sub-tab-btn" onclick="switchSub('vietqr','sub-b',this)">Sub tab B</button>
+      </div>
+      <div id="vietqr-sub-a" class="sub-panel active">
+        <p class="empty-hint">Viet QR – Sub tab A – chưa thiết lập – <%= activeCompany === 'kh_cu' ? 'KH Cũ' : 'KH Mới' %></p>
+      </div>
+      <div id="vietqr-sub-b" class="sub-panel">
+        <p class="empty-hint">Viet QR – Sub tab B – chưa thiết lập</p>
+      </div>
     </div>
   </main>
 
