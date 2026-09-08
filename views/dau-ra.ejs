@@ -67,6 +67,12 @@
     .pivot-table tfoot td { background:#1e3a5f !important; color:#fff; font-weight:700; position:sticky; bottom:0; }
     .pivot-table tfoot td:first-child { background:#1e3a5f !important; }
     .cell-zero { color:#d1d5db; }
+    /* HISTORY */
+    .history-item { background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:.75rem 1rem; margin-bottom:.5rem; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:.5rem; }
+    .history-item .h-name { font-weight:600; color:#1e3a5f; font-size:.88em; }
+    .history-item .h-meta { font-size:.78em; color:#64748b; }
+    .badge-added { background:#dcfce7; color:#166534; border-radius:4px; padding:.05rem .4rem; font-size:.78em; font-weight:700; }
+    .badge-skip  { background:#fef9c3; color:#854d0e; border-radius:4px; padding:.05rem .4rem; font-size:.78em; font-weight:700; }
     .cell-val { color:#15803d; }
     .total-col { background:#e0f2fe !important; color:#0369a1; font-weight:700; border-left:2px solid #7dd3fc; }
     /* FILTER */
@@ -111,6 +117,7 @@
       <div class="sub-tab-bar" id="momoSubTabs" style="display:none">
         <button class="sub-tab-btn active" onclick="switchSub('momo','pivot',this)">📊 Theo gian</button>
         <button class="sub-tab-btn" onclick="switchSub('momo','detail',this)">📋 Chi tiết GD</button>
+        <button class="sub-tab-btn" onclick="switchSub('momo','history',this)">🕓 Lịch sử tải</button>
       </div>
 
       <!-- Sub: Pivot -->
@@ -122,7 +129,10 @@
         <div id="momoResults" style="display:none">
           <div class="results-toolbar">
             <div class="results-meta" id="momoMeta"></div>
-            <button class="btn-export" onclick="exportPivot()">⬇️ Xuất Excel</button>
+            <div style="display:flex;gap:.5rem">
+              <button class="btn-export" onclick="exportPivot()">⬇️ Xuất Excel</button>
+              <button onclick="clearMomoData()" style="background:#ef4444;color:#fff;border:none;border-radius:5px;padding:.35rem .75rem;cursor:pointer;font-size:.82em;font-weight:600">🗑️ Xóa dữ liệu</button>
+            </div>
           </div>
           <div class="filter-bar">
             <label>Lọc gian:</label>
@@ -156,6 +166,13 @@
             </tr></thead>
             <tbody id="detailBody"></tbody>
           </table>
+        </div>
+      </div>
+
+      <!-- Sub: History -->
+      <div id="momo-history" class="sub-panel">
+        <div id="historyList" style="max-height:60vh;overflow-y:auto">
+          <p class="empty-hint">Chưa có lịch sử tải lên</p>
         </div>
       </div>
     </div>
@@ -201,6 +218,11 @@
   <!-- SheetJS -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script>
+    // ── Company key (for localStorage namespacing) ──
+    const COMPANY = '<%= activeCompany %>';
+    const LS_ROWS    = `momo_rows_${COMPANY}`;
+    const LS_HISTORY = `momo_history_${COMPANY}`;
+
     // ── Tab switching ──
     function switchTab(id, btn) {
       document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
@@ -230,9 +252,64 @@
     });
 
     // ── Global data store ──
-    let _rows = [];     // [{date, time, gian, amount, loaiGD, maDon}]
-    let _dates = [];    // sorted unique dates
-    let _gians = [];    // sorted unique gian names
+    let _rows = [];     // [{date, time, gian, amount, loaiGD, maDon, txId}]
+    let _dates = [];
+    let _gians = [];
+    let _history = []; // [{fileName, uploadedAt, added, skipped, fmt}]
+
+    // ── localStorage helpers ──
+    function saveRows()    { try { localStorage.setItem(LS_ROWS, JSON.stringify(_rows)); } catch(e){} }
+    function saveHistory() { try { localStorage.setItem(LS_HISTORY, JSON.stringify(_history)); } catch(e){} }
+    function loadStored() {
+      try {
+        const r = localStorage.getItem(LS_ROWS);
+        const h = localStorage.getItem(LS_HISTORY);
+        if (r) _rows = JSON.parse(r);
+        if (h) _history = JSON.parse(h);
+      } catch(e) { _rows = []; _history = []; }
+    }
+
+    // ── Recompute derived arrays & refresh UI ──
+    function refreshUI() {
+      _dates = [...new Set(_rows.map(r => r.date))].sort((a, b) => {
+        const p = d => { const [dd,mm,yy] = d.split('-'); return `${yy}-${mm}-${dd}`; };
+        return p(a).localeCompare(p(b));
+      });
+      _gians = [...new Set(_rows.map(r => r.gian))].sort();
+
+      const grpSet = new Set(_gians.map(g => g.split(' ')[0]));
+      const grpSel = document.getElementById('filterGroup');
+      grpSel.innerHTML = '<option value="">Tất cả</option>';
+      [...grpSet].sort().forEach(g => { const o = document.createElement('option'); o.value = g; o.textContent = g; grpSel.appendChild(o); });
+
+      const dateSel = document.getElementById('filterDate');
+      dateSel.innerHTML = '<option value="">Tất cả ngày</option>';
+      _dates.forEach(d => { const o = document.createElement('option'); o.value = d; o.textContent = d; dateSel.appendChild(o); });
+
+      if (_rows.length) {
+        document.getElementById('momoEmpty').style.display = 'none';
+        document.getElementById('momoResults').style.display = 'block';
+        document.getElementById('momoSubTabs').style.display = 'flex';
+        const totalAmt = _rows.reduce((s,r) => s + r.amount, 0);
+        document.getElementById('momoMeta').textContent =
+          `${_rows.length.toLocaleString('vi')} GD · ${_gians.length} gian · ${_dates.length} ngày · Tổng: ${totalAmt.toLocaleString('vi')}đ`;
+      }
+
+      renderPivot();
+      renderDetail();
+      renderHistory();
+    }
+
+    // ── Clear data ──
+    function clearMomoData() {
+      if (!confirm('Xóa toàn bộ dữ liệu Momo đã lưu?')) return;
+      _rows = []; _history = [];
+      saveRows(); saveHistory();
+      document.getElementById('momoEmpty').style.display = 'block';
+      document.getElementById('momoResults').style.display = 'none';
+      document.getElementById('momoSubTabs').style.display = 'none';
+      renderHistory();
+    }
 
     // ── Parse file ──
     function handleMomoFile(file) {
@@ -261,38 +338,37 @@
           const hdr = data[headerIdx].map(c => String(c));
           const colIdx = name => hdr.findIndex(h => h.includes(name));
 
-          _rows = [];
+          // Parse into temp array
+          const newRows = [];
 
           if (fmt === 'v1') {
-            // Format 1: "transactions_*.xlsx" – Thời gian TT, Số tiền đến, Nội dung TT
             const C = {
               tgian:   colIdx('Thời gian TT'),
               den:     colIdx('Số tiền đến'),
               status:  colIdx('Trạng thái'),
               noiDung: colIdx('Nội dung'),
               maDon:   colIdx('Mã đơn hàng'),
+              maTham:  colIdx('Mã tham chiếu'),
               loaiGD:  colIdx('Loại giao dịch'),
             };
             for (let i = headerIdx + 1; i < data.length; i++) {
               const r = data[i];
               if (!r[C.tgian]) continue;
+              if (String(r[C.status] || '') !== 'Thành công') continue;
               const tgian   = String(r[C.tgian]);
-              const status  = String(r[C.status] || '');
-              if (status !== 'Thành công') continue;
-              const date    = tgian.substring(0, 10);
-              const time    = tgian.substring(11, 19);
-              const amount  = Number(r[C.den]) || 0;
+              const maDon   = String(r[C.maDon] || '');
+              const maTham  = String(r[C.maTham] || '');
+              const txId    = maTham || maDon;
               const noiDung = String(r[C.noiDung] || '');
               const loaiGD  = String(r[C.loaiGD] || '');
-              const maDon   = String(r[C.maDon] || '');
               let gian = 'Vãng lai';
               const m = noiDung.match(/VQR\w+\s+(.+)/);
               if (m) { const g = m[1].trim(); gian = (g === 'PaymentForOrder' || g === '-') ? 'Vãng lai' : g; }
               else if (loaiGD === 'Vãng lai') gian = 'Vãng lai';
-              _rows.push({ date, time, gian, amount, loaiGD, maDon });
+              newRows.push({ date: tgian.substring(0,10), time: tgian.substring(11,19),
+                gian, amount: Number(r[C.den])||0, loaiGD, maDon, txId });
             }
           } else {
-            // Format 2: "Transaction_report_*.xlsx" – Thời gian, Số tiền, Tên cửa hàng
             const C = {
               tgian:   colIdx('Thời gian'),
               amount:  colIdx('Số tiền'),
@@ -300,58 +376,50 @@
               tenGian: colIdx('Tên cửa hàng'),
               maGian:  colIdx('Mã cửa hàng'),
               maDon:   colIdx('Mã đơn hàng'),
+              maGD:    colIdx('Mã giao dịch'),
               loaiGD:  colIdx('Loại giao dịch'),
             };
             for (let i = headerIdx + 1; i < data.length; i++) {
               const r = data[i];
               if (!r[C.tgian]) continue;
-              const tgian  = String(r[C.tgian]);
-              const status = String(r[C.status] || '');
-              if (status !== 'Thành công') continue;
-              const date   = tgian.substring(0, 10);
-              const time   = tgian.substring(11, 19);
-              const amount = Number(r[C.amount]) || 0;
-              const loaiGD = String(r[C.loaiGD] || '');
-              const maDon  = String(r[C.maDon] || '');
+              if (String(r[C.status] || '') !== 'Thành công') continue;
+              const tgian   = String(r[C.tgian]);
+              const maDon   = String(r[C.maDon] || '');
+              const maGD    = String(r[C.maGD] || '');
+              const txId    = maDon || maGD;
               const tenGian = String(r[C.tenGian] || '');
               const maGian  = String(r[C.maGian] || '');
-              const gian = tenGian || maGian || 'Vãng lai';
-              _rows.push({ date, time, gian, amount, loaiGD, maDon });
+              newRows.push({ date: tgian.substring(0,10), time: tgian.substring(11,19),
+                gian: tenGian || maGian || 'Vãng lai',
+                amount: Number(r[C.amount])||0,
+                loaiGD: String(r[C.loaiGD]||''), maDon, txId });
             }
           }
 
-          if (!_rows.length) throw new Error('Không có dữ liệu hợp lệ (Thành công) trong file.');
+          if (!newRows.length) throw new Error('Không có dữ liệu hợp lệ (Thành công) trong file.');
 
-          // Unique dates & gians
-          _dates = [...new Set(_rows.map(r => r.date))].sort((a, b) => {
-            const parse = d => { const [dd,mm,yy] = d.split('-'); return `${yy}-${mm}-${dd}`; };
-            return parse(a).localeCompare(parse(b));
+          // Dedup: filter out txIds already in _rows
+          const existingIds = new Set(_rows.map(r => r.txId).filter(Boolean));
+          const toAdd   = newRows.filter(r => !r.txId || !existingIds.has(r.txId));
+          const skipped = newRows.length - toAdd.length;
+
+          // Merge
+          _rows = [..._rows, ...toAdd];
+          saveRows();
+
+          // Save history
+          _history.unshift({
+            fileName: file.name, fmt,
+            uploadedAt: new Date().toLocaleString('vi'),
+            added: toAdd.length, skipped, total: newRows.length
           });
-          _gians = [...new Set(_rows.map(r => r.gian))].sort();
+          saveHistory();
 
-          // Populate filter dropdowns
-          const grpSet = new Set(_gians.map(g => g.split(' ')[0]));
-          const grpSel = document.getElementById('filterGroup');
-          grpSel.innerHTML = '<option value="">Tất cả</option>';
-          [...grpSet].sort().forEach(g => { const o = document.createElement('option'); o.value = g; o.textContent = g; grpSel.appendChild(o); });
-
-          const dateSel = document.getElementById('filterDate');
-          dateSel.innerHTML = '<option value="">Tất cả ngày</option>';
-          _dates.forEach(d => { const o = document.createElement('option'); o.value = d; o.textContent = d; dateSel.appendChild(o); });
-
-          // Show results
-          document.getElementById('momoEmpty').style.display = 'none';
-          document.getElementById('momoResults').style.display = 'block';
-          document.getElementById('momoSubTabs').style.display = 'flex';
-          document.getElementById('momoMeta').textContent =
-            `📄 ${file.name} · ${_rows.length.toLocaleString('vi')} GD · ${_gians.length} gian · ${_dates.length} ngày (${fmt === 'v1' ? 'format Transactions' : 'format Transaction Report'})`;
-
-          renderPivot();
-          renderDetail();
+          refreshUI();
 
           st.className = 'upload-status ok';
-          st.textContent = `✅ Đã đọc ${_rows.length.toLocaleString('vi')} giao dịch từ ${_dates.length} ngày`;
-          setTimeout(closeMomoModal, 1500);
+          st.textContent = `✅ Thêm ${toAdd.length.toLocaleString('vi')} GD · Bỏ qua ${skipped} trùng lặp`;
+          setTimeout(closeMomoModal, 1800);
 
         } catch(err) {
           st.className = 'upload-status err';
@@ -437,6 +505,29 @@
       document.getElementById('detailBody').innerHTML = html || '<tr><td colspan="7" style="text-align:center;color:#94a3b8;padding:1rem">Không có dữ liệu</td></tr>';
     }
 
+    // ── Render history ──
+    function renderHistory() {
+      const el = document.getElementById('historyList');
+      if (!el) return;
+      if (!_history.length) {
+        el.innerHTML = '<p style="color:#94a3b8;text-align:center;padding:2rem">Chưa có lịch sử tải lên</p>';
+        return;
+      }
+      el.innerHTML = _history.map((h, i) => `
+        <div class="history-item">
+          <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap">
+            <strong style="color:#1e293b">📄 ${h.fileName}</strong>
+            <span style="font-size:.75em;color:#64748b">${h.uploadedAt}</span>
+            <span style="font-size:.73em;background:#e0e7ff;color:#4338ca;padding:.1rem .45rem;border-radius:999px">${h.fmt === 'v1' ? 'Transactions' : 'Transaction Report'}</span>
+          </div>
+          <div style="margin-top:.4rem;display:flex;gap:.5rem;align-items:center">
+            <span class="badge-added">+${h.added.toLocaleString('vi')} mới</span>
+            <span class="badge-skip">${h.skipped} trùng bỏ qua</span>
+            <span style="font-size:.78em;color:#64748b">Tổng trong file: ${h.total.toLocaleString('vi')} GD</span>
+          </div>
+        </div>`).join('');
+    }
+
     // ── Export pivot ──
     function exportPivot() {
       if (!_rows.length) return;
@@ -459,6 +550,13 @@
       XLSX.utils.book_append_sheet(wb, ws, 'Momo pivot');
       XLSX.writeFile(wb, 'Momo_pivot.xlsx');
     }
+
+    // ── Init: restore from localStorage on page load ──
+    window.addEventListener('DOMContentLoaded', function() {
+      loadStored();
+      if (_rows.length) refreshUI();
+      renderHistory();
+    });
   </script>
 </body>
 </html>
