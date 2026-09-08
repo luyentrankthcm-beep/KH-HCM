@@ -248,53 +248,79 @@
           const ws = wb.Sheets[wb.SheetNames[0]];
           const data = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
 
-          // Find header row
-          let headerIdx = -1;
+          // Detect format: search first 5 rows for known headers
+          let headerIdx = -1, fmt = '';
           for (let i = 0; i < Math.min(5, data.length); i++) {
-            if (data[i].some(c => String(c).includes('Thời gian TT'))) { headerIdx = i; break; }
+            const row = data[i].map(c => String(c));
+            if (row.some(c => c.includes('Thời gian TT'))) { headerIdx = i; fmt = 'v1'; break; }
+            if (row.some(c => c.includes('Mã cửa hàng') || c.includes('Tên cửa hàng'))) { headerIdx = i; fmt = 'v2'; break; }
+            if (row.some(c => c.includes('Thời gian')) && row.some(c => c.includes('Số tiền'))) { headerIdx = i; fmt = 'v2'; break; }
           }
-          if (headerIdx < 0) throw new Error('Không tìm thấy header. Kiểm tra lại file.');
+          if (headerIdx < 0) throw new Error('Không nhận ra định dạng file. Hỗ trợ file từ Momo Business (Transactions / Transaction_report).');
 
-          const hdr = data[headerIdx];
-          const colIdx = name => hdr.findIndex(h => String(h).includes(name));
-          const C = {
-            tgian:    colIdx('Thời gian TT'),
-            den:      colIdx('Số tiền đến'),
-            loai:     colIdx('Loại'),
-            status:   colIdx('Trạng thái'),
-            noiDung:  colIdx('Nội dung'),
-            maDon:    colIdx('Mã đơn hàng'),
-            loaiGD:   colIdx('Loại giao dịch'),
-          };
+          const hdr = data[headerIdx].map(c => String(c));
+          const colIdx = name => hdr.findIndex(h => h.includes(name));
 
           _rows = [];
-          for (let i = headerIdx + 1; i < data.length; i++) {
-            const r = data[i];
-            if (!r[C.tgian]) continue;
-            const tgian  = String(r[C.tgian] || '');
-            const date   = tgian.substring(0, 10);   // "DD-MM-YYYY"
-            const time   = tgian.substring(11, 19);  // "HH:MM:SS"
-            const amount = Number(r[C.den]) || 0;
-            const noiDung = String(r[C.noiDung] || '');
-            const loaiGD = String(r[C.loaiGD] || '');
-            const status = String(r[C.status] || '');
-            const maDon  = String(r[C.maDon] || '');
 
-            // Extract gian from Nội dung TT: "VQR... GIAN CODE"
-            let gian = 'Vãng lai';
-            const m = noiDung.match(/VQR\w+\s+(.+)/);
-            if (m) {
-              const g = m[1].trim();
-              gian = (g === 'PaymentForOrder' || g === '-') ? 'Vãng lai' : g;
-            } else if (loaiGD === 'Vãng lai') {
-              gian = 'Vãng lai';
+          if (fmt === 'v1') {
+            // Format 1: "transactions_*.xlsx" – Thời gian TT, Số tiền đến, Nội dung TT
+            const C = {
+              tgian:   colIdx('Thời gian TT'),
+              den:     colIdx('Số tiền đến'),
+              status:  colIdx('Trạng thái'),
+              noiDung: colIdx('Nội dung'),
+              maDon:   colIdx('Mã đơn hàng'),
+              loaiGD:  colIdx('Loại giao dịch'),
+            };
+            for (let i = headerIdx + 1; i < data.length; i++) {
+              const r = data[i];
+              if (!r[C.tgian]) continue;
+              const tgian   = String(r[C.tgian]);
+              const status  = String(r[C.status] || '');
+              if (status !== 'Thành công') continue;
+              const date    = tgian.substring(0, 10);
+              const time    = tgian.substring(11, 19);
+              const amount  = Number(r[C.den]) || 0;
+              const noiDung = String(r[C.noiDung] || '');
+              const loaiGD  = String(r[C.loaiGD] || '');
+              const maDon   = String(r[C.maDon] || '');
+              let gian = 'Vãng lai';
+              const m = noiDung.match(/VQR\w+\s+(.+)/);
+              if (m) { const g = m[1].trim(); gian = (g === 'PaymentForOrder' || g === '-') ? 'Vãng lai' : g; }
+              else if (loaiGD === 'Vãng lai') gian = 'Vãng lai';
+              _rows.push({ date, time, gian, amount, loaiGD, maDon });
             }
-
-            if (status !== 'Thành công') continue;
-            _rows.push({ date, time, gian, amount, loaiGD, maDon });
+          } else {
+            // Format 2: "Transaction_report_*.xlsx" – Thời gian, Số tiền, Tên cửa hàng
+            const C = {
+              tgian:   colIdx('Thời gian'),
+              amount:  colIdx('Số tiền'),
+              status:  colIdx('Trạng thái'),
+              tenGian: colIdx('Tên cửa hàng'),
+              maGian:  colIdx('Mã cửa hàng'),
+              maDon:   colIdx('Mã đơn hàng'),
+              loaiGD:  colIdx('Loại giao dịch'),
+            };
+            for (let i = headerIdx + 1; i < data.length; i++) {
+              const r = data[i];
+              if (!r[C.tgian]) continue;
+              const tgian  = String(r[C.tgian]);
+              const status = String(r[C.status] || '');
+              if (status !== 'Thành công') continue;
+              const date   = tgian.substring(0, 10);
+              const time   = tgian.substring(11, 19);
+              const amount = Number(r[C.amount]) || 0;
+              const loaiGD = String(r[C.loaiGD] || '');
+              const maDon  = String(r[C.maDon] || '');
+              const tenGian = String(r[C.tenGian] || '');
+              const maGian  = String(r[C.maGian] || '');
+              const gian = tenGian || maGian || 'Vãng lai';
+              _rows.push({ date, time, gian, amount, loaiGD, maDon });
+            }
           }
 
-          if (!_rows.length) throw new Error('Không có dữ liệu hợp lệ trong file.');
+          if (!_rows.length) throw new Error('Không có dữ liệu hợp lệ (Thành công) trong file.');
 
           // Unique dates & gians
           _dates = [...new Set(_rows.map(r => r.date))].sort((a, b) => {
@@ -318,7 +344,7 @@
           document.getElementById('momoResults').style.display = 'block';
           document.getElementById('momoSubTabs').style.display = 'flex';
           document.getElementById('momoMeta').textContent =
-            `📄 ${file.name} · ${_rows.length.toLocaleString('vi')} GD · ${_gians.length} gian · ${_dates.length} ngày`;
+            `📄 ${file.name} · ${_rows.length.toLocaleString('vi')} GD · ${_gians.length} gian · ${_dates.length} ngày (${fmt === 'v1' ? 'format Transactions' : 'format Transaction Report'})`;
 
           renderPivot();
           renderDetail();
