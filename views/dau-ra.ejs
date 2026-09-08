@@ -141,7 +141,7 @@
       <!-- Sub-tabs -->
       <div class="sub-tab-bar" id="momoSubTabs" style="display:none">
         <button class="sub-tab-btn active" onclick="switchSub('momo','pivot',this)">📊 Theo gian</button>
-        <button class="sub-tab-btn" onclick="switchSub('momo','doisoat',this); renderDoiSoatNgay(); fetchBankDaily()">📅 Đối soát ngày</button>
+        <button class="sub-tab-btn" onclick="switchSub('momo','doisoat',this); populateMonthFilter(); renderDoiSoatNgay(); fetchBankMomo()">📅 Đối soát ngày</button>
         <button class="sub-tab-btn" onclick="switchSub('momo','detail',this)">📋 Chi tiết GD</button>
         <button class="sub-tab-btn" onclick="switchSub('momo','history',this)">🕓 Lịch sử tải</button>
       </div>
@@ -198,8 +198,10 @@
 
       <!-- Sub: Đối soát ngày -->
       <div id="momo-doisoat" class="sub-panel">
-        <div class="filter-bar" style="margin-bottom:.5rem">
-          <span style="font-size:.8em;color:#64748b">Gộp theo ngày + gian · Đối chiếu với ngân hàng & hóa đơn · Nhập số HĐ để lưu lại</span>
+        <div class="filter-bar" style="margin-bottom:.5rem;align-items:center">
+          <label style="font-size:.82em;font-weight:600;color:#1e3a5f">Tháng:</label>
+          <select id="filterMonth" onchange="renderDoiSoatNgay()" style="padding:.3rem .6rem;border:1px solid #cbd5e1;border-radius:6px;font-size:.85em;font-weight:600;background:#fff;cursor:pointer"></select>
+          <span style="font-size:.78em;color:#94a3b8">· Nhóm theo đợt NH trả · Nhập số HĐ để lưu</span>
         </div>
         <div style="overflow-x:auto;max-height:70vh;overflow-y:auto;border:1px solid #e2e8f0;border-radius:8px;">
           <table class="doisoat-table">
@@ -384,13 +386,14 @@
     });
 
     // ── Global data store ──
-    let _rows = [];     // [{date, time, gian, amount, loaiGD, maDon, txId}]
+    let _rows = [];     // [{date, time, gian, amount, loaiGD, maDon, txId, feeRate}]
     let _dates = [];
     let _gians = [];
     let _history = []; // [{fileName, uploadedAt, added, skipped, fmt}]
     let _ctMap   = {}; // { [gian]: { maCT, isChiaSe } }
     let _ctCodes = []; // ['CT001', 'CT002', ...]
-    let _hdData  = {}; // { [`${date}|${gian}`]: { soHD, soTienHD } }
+    let _hdData  = {}; // { [`${date}|${gian}`]: { soHD, soTienHD, tienNH } }
+    let _bankMomoPayments = []; // [{ payDate:"DD-MM-YYYY", amount, fromDate, toDate }]
 
     // ── localStorage helpers ──
     function saveRows()    { try { localStorage.setItem(LS_ROWS, JSON.stringify(_rows)); } catch(e){} }
@@ -443,9 +446,31 @@
           `${_rows.length.toLocaleString('vi')} GD · ${_gians.length} gian · ${_dates.length} ngày · Tổng: ${totalAmt.toLocaleString('vi')}đ`;
       }
 
+      populateMonthFilter();
       renderPivot();
       renderDetail();
       renderHistory();
+    }
+
+    // ── Populate month filter ──
+    function populateMonthFilter() {
+      const sel = document.getElementById('filterMonth');
+      if (!sel) return;
+      const months = [...new Set(_dates.map(d => {
+        const [dd, mm, yy] = d.split('-');
+        return `${mm}/${yy}`;
+      }))].sort((a, b) => {
+        const [ma, ya] = a.split('/');
+        const [mb, yb] = b.split('/');
+        return (ya + ma).localeCompare(yb + mb);
+      });
+      const curVal = sel.value;
+      sel.innerHTML = months.map(m => `<option value="${m}">${m}</option>`).join('');
+      const today = new Date();
+      const curMonth = String(today.getMonth()+1).padStart(2,'0') + '/' + today.getFullYear();
+      sel.value = months.includes(curVal) ? curVal
+                : months.includes(curMonth) ? curMonth
+                : (months[months.length - 1] || '');
     }
 
     // ── Clear data ──
@@ -739,59 +764,130 @@
         if (el) el.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#94a3b8;padding:1.5rem">Chưa có dữ liệu</td></tr>';
         return;
       }
-      // Group: date → gian → {amount, fee, count}
+
+      // Lọc theo tháng đang chọn
+      const selMonth = (document.getElementById('filterMonth') || {}).value || '';
+      const filteredDates = _dates.filter(d => {
+        if (!selMonth) return true;
+        const [dd, mm, yy] = d.split('-');
+        return `${mm}/${yy}` === selMonth;
+      });
+      if (!filteredDates.length) {
+        el.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#94a3b8;padding:1.5rem">Không có dữ liệu cho tháng đã chọn</td></tr>';
+        return;
+      }
+
+      // Group: date → gian → {amount, fee}
       const byDate = {};
       _rows.forEach(r => {
+        if (!filteredDates.includes(r.date)) return;
         if (!byDate[r.date]) byDate[r.date] = {};
-        if (!byDate[r.date][r.gian]) byDate[r.date][r.gian] = { amount: 0, fee: 0, count: 0 };
+        if (!byDate[r.date][r.gian]) byDate[r.date][r.gian] = { amount: 0, fee: 0 };
         const rate = r.feeRate != null ? r.feeRate : (COMPANY === 'kh_cu' ? 0.011 : 0.01);
         byDate[r.date][r.gian].amount += r.amount;
         byDate[r.date][r.gian].fee    += Math.round(r.amount * rate);
-        byDate[r.date][r.gian].count++;
       });
+
       const fmtN = n => n.toLocaleString('vi');
-      let html = '';
-      _dates.forEach(date => {
+      const ddmmToISO = d => { const [dd,mm,yy] = d.split('-'); return `${yy}-${mm}-${dd}`; };
+      const inRange = (date, from, to) => {
+        const d = ddmmToISO(date);
+        return d >= ddmmToISO(from) && d <= ddmmToISO(to);
+      };
+
+      // Render các hàng cho 1 ngày (sub-rows theo gian)
+      const renderDateRows = (date) => {
         const gianData = byDate[date] || {};
         const gianList = Object.keys(gianData).sort();
-        const dayDT    = gianList.reduce((s,g) => s + gianData[g].amount, 0);
-        const dayPhi   = gianList.reduce((s,g) => s + gianData[g].fee, 0);
-        const dayNet   = dayDT - dayPhi;
-        const dayCnt   = gianList.reduce((s,g) => s + gianData[g].count, 0);
-        const bankNH   = _bankDaily[date] || 0;
-        const diffSign = bankNH ? (bankNH === dayNet ? '✅' : (Math.abs(bankNH - dayNet) < 1000 ? '≈' : '⚠️')) : '';
-        const diffHint = bankNH && bankNH !== dayNet
-          ? ` &nbsp;<span style="font-size:.78em;color:#f59e0b">NH: ${fmtN(bankNH)}đ (chênh ${fmtN(bankNH - dayNet)}đ)</span>` : '';
-        html += `<tr class="day-row">
-          <td colspan="7">📅 <strong>${date}</strong> &nbsp;·&nbsp; DT: ${fmtN(dayDT)}đ &nbsp;·&nbsp; Phí: ${fmtN(dayPhi)}đ &nbsp;·&nbsp; Net: <strong>${fmtN(dayNet)}đ</strong>${diffHint} &nbsp;${diffSign}</td>
-        </tr>`;
+        if (!gianList.length) return '';
+        const dayDT  = gianList.reduce((s,g) => s + gianData[g].amount, 0);
+        const dayPhi = gianList.reduce((s,g) => s + gianData[g].fee, 0);
+        const dayNet = dayDT - dayPhi;
+        let out = `<tr style="background:#374151;color:#e5e7eb;">
+          <td colspan="7" style="padding:.35rem .75rem .35rem 1.25rem;font-size:.81em">
+            📅 <strong>${date}</strong> &nbsp;·&nbsp; DT: ${fmtN(dayDT)}đ &nbsp;·&nbsp; Phí: ${fmtN(dayPhi)}đ &nbsp;·&nbsp; Net: <strong style="color:#93c5fd">${fmtN(dayNet)}đ</strong>
+          </td></tr>`;
         gianList.forEach(g => {
-          const d   = gianData[g];
-          const net = d.amount - d.fee;
+          const dg  = gianData[g];
+          const net = dg.amount - dg.fee;
           const ct  = _ctMap[g] || {};
           const ctLine = ct.maCT
             ? `<span class="ct-badge">${ct.maCT}</span>${ct.isChiaSe ? '<span class="ct-chiase-badge">CS</span>' : ''}`
-            : '<span style="color:#94a3b8;font-size:.75em;font-style:italic">chưa map CT</span>';
+            : '<span style="color:#94a3b8;font-size:.74em;font-style:italic">chưa map</span>';
           const hdKey = `${date}|${g}`;
           const hd    = _hdData[hdKey] || {};
-          html += `<tr class="gian-row">
-            <td><div>${ctLine}</div><div style="font-size:.78em;color:#475569;margin-top:1px">${g}</div></td>
-            <td style="text-align:right;color:#15803d;font-weight:600">${fmtN(d.amount)}</td>
-            <td style="text-align:right;color:#dc2626">${fmtN(d.fee)}</td>
+          out += `<tr class="gian-row">
+            <td style="padding-left:2rem"><div>${ctLine}</div><div style="font-size:.77em;color:#475569;margin-top:1px">${g}</div></td>
+            <td style="text-align:right;color:#15803d;font-weight:600">${fmtN(dg.amount)}</td>
+            <td style="text-align:right;color:#dc2626">${fmtN(dg.fee)}</td>
             <td style="text-align:right;color:#2563eb;font-weight:700">${fmtN(net)}</td>
-            <td><input type="text" value="${hd.tienNH||''}" placeholder="${bankNH ? fmtN(bankNH)+' (NH)' : 'Nhập...'}"
-              style="width:120px;border:1px solid #bae6fd;border-radius:4px;padding:.25rem .4rem;font-size:.8em;text-align:right;background:#f0f9ff"
+            <td><input type="text" value="${hd.tienNH||''}" placeholder="Nhập..."
+              style="width:110px;border:1px solid #bae6fd;border-radius:4px;padding:.25rem .4rem;font-size:.8em;text-align:right;background:#f0f9ff"
               onchange="saveHdField('${hdKey}','tienNH',this.value)"></td>
-            <td><input type="text" value="${hd.soHD||''}" placeholder="VD: 0000123"
-              style="width:130px;border:1px solid #cbd5e1;border-radius:4px;padding:.25rem .4rem;font-size:.8em"
+            <td><input type="text" value="${hd.soHD||''}" placeholder="0000123"
+              style="width:120px;border:1px solid #cbd5e1;border-radius:4px;padding:.25rem .4rem;font-size:.8em"
               onchange="saveHdField('${hdKey}','soHD',this.value)"></td>
             <td><input type="text" value="${hd.soTienHD||''}" placeholder="0"
-              style="width:110px;border:1px solid #cbd5e1;border-radius:4px;padding:.25rem .4rem;font-size:.8em;text-align:right"
+              style="width:100px;border:1px solid #cbd5e1;border-radius:4px;padding:.25rem .4rem;font-size:.8em;text-align:right"
               onchange="saveHdField('${hdKey}','soTienHD',this.value)"></td>
           </tr>`;
         });
-      });
-      el.innerHTML = html;
+        return out;
+      };
+
+      let html = '';
+      const coveredDates = new Set();
+
+      // Nhóm theo đợt NH trả về
+      const hasBankPayments = _bankMomoPayments.length > 0;
+      if (hasBankPayments) {
+        _bankMomoPayments.forEach(pay => {
+          // Chỉ lấy ngày Momo trong tháng đang lọc & nằm trong khoảng trả của đợt này
+          const payDates = filteredDates.filter(d => inRange(d, pay.fromDate, pay.toDate));
+          // Hiển thị header đợt dù payDates rỗng (để biết NH đã trả nhưng Momo tháng này không có)
+          const momoNet = payDates.reduce((s, d) => {
+            return s + Object.values(byDate[d] || {}).reduce((s2, v) => s2 + v.amount - v.fee, 0);
+          }, 0);
+          const diff = pay.amount - momoNet;
+          const matchIcon = payDates.length === 0 ? '' : (Math.abs(diff) < 1000 ? '✅' : '⚠️');
+          const diffText = payDates.length > 0 && Math.abs(diff) >= 1000
+            ? ` · Chênh: <span style="color:#fbbf24">${diff > 0 ? '+' : ''}${fmtN(diff)}đ</span>`
+            : '';
+          const momoNetText = payDates.length > 0
+            ? ` · Momo Net: <strong>${fmtN(momoNet)}đ</strong> ${matchIcon}${diffText}`
+            : '';
+
+          html += `<tr>
+            <td colspan="7" style="background:#1e4a6f;color:#e0f2fe;padding:.6rem .75rem;font-weight:700;font-size:.84em;border-top:2px solid #0ea5e9">
+              📦 NH trả về <strong>${pay.payDate}</strong>: ${fmtN(pay.amount)}đ
+              &nbsp;·&nbsp; Momo ngày <span style="color:#bae6fd">${pay.fromDate}</span> → <span style="color:#bae6fd">${pay.toDate}</span>${momoNetText}
+            </td>
+          </tr>`;
+
+          payDates.forEach(d => {
+            coveredDates.add(d);
+            html += renderDateRows(d);
+          });
+        });
+      }
+
+      // Ngày Momo chưa có đợt NH trả về
+      const unpaidDates = filteredDates.filter(d => !coveredDates.has(d));
+      if (unpaidDates.length) {
+        if (hasBankPayments) {
+          // Chỉ hiện header "Chưa có NH" khi đã có ít nhất 1 đợt NH (để phân biệt với ngày bình thường)
+          const unpaidNet = unpaidDates.reduce((s, d) =>
+            s + Object.values(byDate[d] || {}).reduce((s2, v) => s2 + v.amount - v.fee, 0), 0);
+          html += `<tr>
+            <td colspan="7" style="background:#78350f;color:#fef3c7;padding:.6rem .75rem;font-weight:700;font-size:.84em;border-top:2px solid #d97706">
+              ⏳ Chưa có NH trả về &nbsp;·&nbsp; Tổng Net: ${fmtN(unpaidNet)}đ
+            </td>
+          </tr>`;
+        }
+        unpaidDates.forEach(d => { html += renderDateRows(d); });
+      }
+
+      el.innerHTML = html || '<tr><td colspan="7" style="text-align:center;color:#94a3b8;padding:1.5rem">Chưa có dữ liệu</td></tr>';
     }
 
     // ── Export pivot ──
@@ -858,24 +954,20 @@
       document.getElementById('mttResults').style.display = 'none';
     }
 
-    // ── Auto-fetch bank daily totals for Đối soát ngày ──
-    let _bankDaily = {}; // { "DD-MM-YYYY": amount }
-
-    async function fetchBankDaily() {
+    // ── Fetch các đợt NH trả Momo về cho Đối soát ngày ──
+    async function fetchBankMomo() {
       if (!_dates.length) return;
-      // Lấy khoảng ngày từ _dates (format DD-MM-YYYY → convert sang YYYY-MM-DD cho API)
       const toYMD = d => { const [dd,mm,yy] = d.split('-'); return `${yy}-${mm}-${dd}`; };
-      const sorted = [..._dates].sort();
+      const sorted = [..._dates].sort((a, b) => toYMD(a).localeCompare(toYMD(b)));
       const from = toYMD(sorted[0]);
       const to   = toYMD(sorted[sorted.length - 1]);
-      // KH Mới → BIDV 7701; KH Cũ → có thể khác, tạm dùng 7701
-      const account = COMPANY === 'kh_moi' ? '7701' : '7701';
+      const account = '7701'; // BIDV 7701 – Momo KH Mới & KH Cũ
       try {
-        const res  = await fetch(`/api/dau-ra/bank-daily?account=${account}&from=${from}&to=${to}`);
+        const res  = await fetch(`/api/dau-ra/bank-momo?account=${account}&from=${from}&to=${to}`);
         const json = await res.json();
         if (json.ok) {
-          _bankDaily = json.daily || {};
-          renderDoiSoatNgay(); // re-render with bank data
+          _bankMomoPayments = json.payments || [];
+          renderDoiSoatNgay(); // re-render với dữ liệu NH
         }
       } catch(e) { /* im lặng nếu fail */ }
     }
