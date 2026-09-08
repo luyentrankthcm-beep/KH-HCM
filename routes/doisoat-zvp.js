@@ -388,6 +388,8 @@ const ZVP_GIAN_CODE_RENAMES = [
   { from: "AE BAC GIANG KVCN", to: "FARM LOTTE BAC GIANG" },
   { from: "LM NHA TRANG KVC",  to: "FARM LOTTE NHA TRANG" },
   { from: "KVC TIMES",          to: "Farm Times City" },
+  // POSH MN CGV LY CHINH THANG -> ten chinh xac trong MISA (them "INTRESSCO")
+  { from: "POSH MN CGV LÝ CHÍNH THẮNG", to: "POSH MN CGV INTRESSCO LÝ CHÍNH THẮNG" },
 ];
 
 // Cac hop redirect cu da bi thay the boi ZVP_GIAN_CODE_RENAMES moi o tren;
