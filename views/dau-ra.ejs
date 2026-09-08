@@ -551,12 +551,10 @@
       XLSX.writeFile(wb, 'Momo_pivot.xlsx');
     }
 
-    // ── Init: restore from localStorage on page load ──
-    window.addEventListener('DOMContentLoaded', function() {
-      loadStored();
-      if (_rows.length) refreshUI();
-      renderHistory();
-    });
+    // ── Init: restore from localStorage (script is at end of body, DOM already ready) ──
+    loadStored();
+    if (_rows.length) refreshUI();
+    renderHistory();
   </script>
 </body>
 </html>
