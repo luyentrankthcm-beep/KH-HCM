@@ -1853,13 +1853,11 @@
           const iTime  = fb(['Gian GD','Thời gian','gian GD'], 1);
           const iMaDiem= fb(['Mã điểm','diem thu','MaDiem'], 4);
           const iDiem  = fb(['Điểm thu','Diểm thu'], 5);
-          const iGross = fb(['trước KM','Trước KM','truoc KM','Tiền GD'], 21);
-          const iPhi   = fb(['phí thu hộ','Phí thu hộ','phi thu ho'], 26);
-          console.log('[BaoCaoPhi] cols: time=',iTime,'gross=',iGross,'phi=',iPhi,'ghichu=',iGhiChu,'madon=',iMaDonZalo);
-
-          console.log('[BaoCaoPhi] hdr cols:', hdr.slice(0,10).map((c,i)=>`${i}:${c}`));
-          const iGhiChu = hdr.findIndex(c=>String(c||'').includes('Ghi ch') || String(c||'').includes('ghi ch'));
-          const iMaDonZalo = hdr.findIndex(c=>String(c||'').includes('n hàng') && String(c||'').includes('đơn'));
+          const iGross    = fb(['trước KM','Trước KM','truoc KM','Tiền GD'], 21);
+          const iPhi      = fb(['phí thu hộ','Phí thu hộ','phi thu ho'], 26);
+          const iGhiChu   = fb(['Ghi ch','ghi ch'], 44);
+          const iMaDonZalo= fp('n hàng')>=0 ? fp('n hàng') : 8;
+          console.log('[BaoCaoPhi] hdrIdx=',hdrIdx,'time=',iTime,'gross=',iGross,'phi=',iPhi,'ghichu=',iGhiChu,'madon=',iMaDonZalo,'hdr[0]=',hdr[0]);
 
           const newRows = rows.slice(hdrIdx+1)
             .filter(r => (r[iGross]!==''&&r[iGross]!=null))
