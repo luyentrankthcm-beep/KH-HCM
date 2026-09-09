@@ -145,7 +145,7 @@
       <!-- Sub-tabs -->
       <div class="sub-tab-bar" id="momoSubTabs" style="display:none">
         <button class="sub-tab-btn active" onclick="switchSub('momo','pivot',this)">📊 Theo gian</button>
-        <button class="sub-tab-btn" onclick="switchSub('momo','doisoat',this); populateMonthFilter(); renderDoiSoatNgay(); fetchBankMomo()">📅 Đối soát ngày</button>
+        <button class="sub-tab-btn" onclick="switchSub('momo','doisoat',this); populateMonthFilter(); renderDoiSoatNgay(); fetchBankMomo(); fetchServerNet()">📅 Đối soát ngày</button>
         <button class="sub-tab-btn" onclick="switchSub('momo','detail',this)">📋 Chi tiết GD</button>
         <button class="sub-tab-btn" onclick="switchSub('momo','history',this)">🕓 Lịch sử tải</button>
       </div>
@@ -398,6 +398,8 @@
     let _ctCodes = []; // ['CT001', 'CT002', ...]
     let _hdData  = {}; // { [`${date}|${gian}`]: { soHD, soTienHD, tienNH } }
     let _bankMomoPayments = []; // [{ payDate:"DD-MM-YYYY", amount, fromDate, toDate }]
+    let _serverNet   = {}; // { "YYYY-MM-DD|CT_CODE": netAmount } từ Tổng Momo thực
+    let _serverGross = {}; // { "YYYY-MM-DD|CT_CODE": grossAmount } từ Tổng Momo thực
 
     // ── localStorage helpers ──
     function saveRows()    { try { localStorage.setItem(LS_ROWS, JSON.stringify(_rows)); } catch(e){} }
@@ -483,6 +485,8 @@
       renderPivot();
       renderDetail();
       renderHistory();
+      fetchBankMomo();
+      fetchServerNet();
     }
 
     // ── Populate month filter ──
@@ -850,9 +854,16 @@
           const dg = gianData[g];
           const feeR = Math.round(dg.fee);
           const hd = _hdData[`${date}|${g}`] || {};
-          const dt  = (hd.dtOvr  != null && hd.dtOvr  !== '') ? (parseFloat(String(hd.dtOvr).replace(/[^0-9.-]/g,''))||0)  : dg.amount;
-          const net = (hd.netOvr != null && hd.netOvr !== '') ? (parseFloat(String(hd.netOvr).replace(/[^0-9.-]/g,''))||0) : (dg.amount - feeR);
-          return { dt, net, fee: dt - net };
+          const ct = _ctMap[g] || {};
+          // Ưu tiên: 1) override thủ công, 2) số thực từ Tổng Momo, 3) ước lượng phí
+          const serverKey = ct.maCT ? `${ddmmToISO(date)}|${ct.maCT}` : null;
+          const serverNetVal = serverKey && _serverNet[serverKey] != null ? _serverNet[serverKey] : null;
+          const serverGrossVal = serverKey && _serverGross[serverKey] != null ? _serverGross[serverKey] : null;
+          const dt  = (hd.dtOvr  != null && hd.dtOvr  !== '') ? (parseFloat(String(hd.dtOvr).replace(/[^0-9.-]/g,''))||0)
+                     : (serverGrossVal != null ? serverGrossVal : dg.amount);
+          const net = (hd.netOvr != null && hd.netOvr !== '') ? (parseFloat(String(hd.netOvr).replace(/[^0-9.-]/g,''))||0)
+                     : (serverNetVal != null ? serverNetVal : (dg.amount - feeR));
+          return { dt, net, fee: dt - net, fromServer: serverNetVal != null };
         };
         const dayDT  = gianList.reduce((s,g) => s + getGianDisplay(g).dt,  0);
         const dayNet = gianList.reduce((s,g) => s + getGianDisplay(g).net, 0);
@@ -1079,13 +1090,31 @@
       const sorted = [..._dates].sort((a, b) => toYMD(a).localeCompare(toYMD(b)));
       const from = toYMD(sorted[0]);
       const to   = toYMD(sorted[sorted.length - 1]);
-      const account = '7701'; // BIDV 7701 – Momo KH Mới & KH Cũ
+      const account = '7701';
       try {
         const res  = await fetch(`/api/dau-ra/bank-momo?account=${account}&from=${from}&to=${to}`);
         const json = await res.json();
         if (json.ok) {
           _bankMomoPayments = json.payments || [];
-          renderDoiSoatNgay(); // re-render với dữ liệu NH
+          renderDoiSoatNgay();
+        }
+      } catch(e) { /* im lặng nếu fail */ }
+    }
+
+    // ── Fetch net thực từ Tổng Momo (server) để hiển thị số đúng trong Đối soát ngày ──
+    async function fetchServerNet() {
+      if (!_dates.length) return;
+      const toYMD = d => { const [dd,mm,yy] = d.split('-'); return `${yy}-${mm}-${dd}`; };
+      const sorted = [..._dates].sort((a, b) => toYMD(a).localeCompare(toYMD(b)));
+      const from = toYMD(sorted[0]);
+      const to   = toYMD(sorted[sorted.length - 1]);
+      try {
+        const res  = await fetch(`/api/dau-ra/momo-net-by-code?from=${from}&to=${to}`);
+        const json = await res.json();
+        if (json.ok) {
+          _serverNet   = json.netByCode   || {};
+          _serverGross = json.grossByCode || {};
+          renderDoiSoatNgay();
         }
       } catch(e) { /* im lặng nếu fail */ }
     }

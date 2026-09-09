@@ -1518,4 +1518,35 @@ router.get("/doi-soat/momo/export.xlsx", (req, res) => {
 router.buildMomoReconciliation = buildMomoReconciliation;
 router.MOMO_BANK_NAME = MOMO_BANK_NAME;
 
+// API: trả netByCode + grossByCode từ Tổng Momo — dùng cho trang Đầu Ra
+// để hiển thị số NET thực (từ file Tổng Momo) thay vì tính theo tỉ lệ phí ước lượng
+// GET /api/dau-ra/momo-net-by-code?from=YYYY-MM-DD&to=YYYY-MM-DD
+router.get("/api/dau-ra/momo-net-by-code", requireLogin, (req, res) => {
+  try {
+    const { from, to } = req.query;
+    const store = load();
+    const company = getCompany(req);
+    const sourceCfg = momoSourceCfg(company, store);
+    const grossData = applyCuaHangAlias(mergeGross(store[sourceCfg.grossKey] || []), store.cua_hang_mapping || {});
+    // Lọc theo khoảng ngày nếu có
+    const filterNet = {};
+    const filterGross = {};
+    for (const [key, val] of Object.entries(grossData.netByCode || {})) {
+      const date = key.split("|")[0];
+      if (from && date < from) continue;
+      if (to   && date > to)   continue;
+      filterNet[key] = val;
+    }
+    for (const [key, val] of Object.entries(grossData.grossByCode || {})) {
+      const date = key.split("|")[0];
+      if (from && date < from) continue;
+      if (to   && date > to)   continue;
+      filterGross[key] = val;
+    }
+    res.json({ ok: true, netByCode: filterNet, grossByCode: filterGross });
+  } catch (err) {
+    res.json({ ok: false, error: err.message });
+  }
+});
+
 module.exports = router;
