@@ -1836,25 +1836,35 @@
           const wb = XLSX.read(new Uint8Array(e.target.result), {type:'array'});
           const ws = wb.Sheets[wb.SheetNames[0]];
           const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
-          // Header ở row index 2, data từ index 3
-          const hdr = rows[2] || [];
-          const fc = k => hdr.indexOf(k);
+          // Tự động tìm dòng header (scan 10 dòng đầu)
+          const toNum = v => { if(typeof v==='number') return v; return parseFloat(String(v).replace(/[,. ]/g,'').replace(',','.')) || 0; };
+          let hdrIdx = -1;
+          for(let i=0;i<Math.min(10,rows.length);i++){
+            const r = rows[i] || [];
+            if(r.some(c=>String(c).includes('Thời gian')||String(c).includes('Số tiền')||String(c).includes('Mã điểm'))){
+              hdrIdx = i; break;
+            }
+          }
+          if(hdrIdx < 0){ alert('Không tìm thấy dòng header trong file BaoCaoPhi (tìm cột "Thời gian GD" / "Số tiền trước KM")'); return; }
+          const hdr = rows[hdrIdx] || [];
+          const fc = k => hdr.findIndex(c=>String(c).trim()===k.trim());
           const iTime=fc('Thời gian GD'), iMaDiem=fc('Mã điểm thu'), iDiem=fc('Điểm thu');
           const iGross=fc('Số tiền trước KM'), iPhi=fc('Số tiền phí thu hộ');
 
-          const newRows = rows.slice(3)
-            .filter(r => r[iMaDiem] && typeof r[iGross]==='number')
+          const newRows = rows.slice(hdrIdx+1)
+            .filter(r => r[iMaDiem] && (r[iGross]!==''&&r[iGross]!=null))
             .map(r => {
               const tg = String(r[iTime]||'').split(' ')[0]; // "07/09/2026"
-              const [dd,mm,yy] = tg.split('/');
+              const parts = tg.split('/');
+              const date = parts.length===3 ? `${parts[0]}-${parts[1]}-${parts[2]}` : tg;
               return {
-                date: `${dd}-${mm}-${yy}`,
+                date,
                 maDiem: String(r[iMaDiem]||'').trim(),
                 tenDiem: String(r[iDiem]||'').trim(),
-                gross: parseFloat(r[iGross])||0,
-                phi: parseFloat(r[iPhi])||0,
+                gross: toNum(r[iGross]),
+                phi: toNum(r[iPhi]),
               };
-            });
+            }).filter(r=>r.gross>0);
 
           // REPLACE (mỗi lần tải là replace để luôn có dữ liệu mới nhất)
           _zaloFee = newRows;
