@@ -259,11 +259,19 @@
         <button class="btn-nhap" style="background:#d97706" onclick="openMttModal()">📤 Nhập file MTT</button>
       </div>
 
-      <!-- Sub-tabs KH Cũ / KH Mới -->
-      <div id="mttSubTabs" style="display:none;margin:.4rem 0 0;border-bottom:2px solid #e2e8f0">
+      <!-- Sub-tabs KH Cũ / KH Mới + filter -->
+      <div id="mttSubTabs" style="display:none;margin:.4rem 0 0;border-bottom:2px solid #e2e8f0;display:none;align-items:center">
         <button id="mttTabCu"  class="sub-tab-btn active" onclick="switchMttTab('cu')">📋 KH Cũ (989)</button>
         <button id="mttTabMoi" class="sub-tab-btn"        onclick="switchMttTab('moi')">📋 KH Mới (705)</button>
+        <div style="margin-left:auto;display:flex;gap:.5rem;align-items:center;padding:.2rem .5rem">
+          <label style="font-size:.82em;font-weight:600;color:#1e3a5f">Tháng:</label>
+          <select id="mttMonthFilter" onchange="renderMttTable()" style="padding:.25rem .5rem;border:1px solid #cbd5e1;border-radius:6px;font-size:.82em;font-weight:600;background:#fff;cursor:pointer"></select>
+          <button onclick="openMttCtMapModal()" style="background:#6366f1;color:#fff;border:none;border-radius:5px;padding:.3rem .7rem;cursor:pointer;font-size:.82em;font-weight:600">🗺️ Map CT</button>
+        </div>
       </div>
+
+      <!-- Tổng hợp -->
+      <div id="mttSummary" style="display:none;gap:.75rem;padding:.5rem .75rem;flex-wrap:wrap;background:#fffbeb;border-bottom:1px solid #fde68a"></div>
 
       <div id="mttEmpty" class="empty-state">
         <div class="big-icon">🔶</div>
@@ -362,6 +370,42 @@
       </div>
       <div class="modal-actions">
         <button class="btn-cancel" onclick="closeMttModal()">Đóng</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== MTT CT MAP MODAL ==================== -->
+  <div id="mttCtMapModal" class="modal-overlay" onclick="if(event.target===this)closeMttCtMapModal()" style="z-index:1100">
+    <div class="ctmap-modal-box" style="max-width:750px">
+      <div class="modal-header">
+        <h3>🗺️ Map Mã Điểm → Mã Công Trình (MTT)</h3>
+        <button onclick="closeMttCtMapModal()" style="border:none;background:none;font-size:1.2rem;cursor:pointer;color:#64748b">✕</button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size:.8em;color:#64748b;margin:0 0 .5rem">Gán mã công trình cho từng Mã điểm HT Misa. Lưu để áp dụng vào bảng MTT.</p>
+        <div style="display:flex;gap:.5rem;margin-bottom:.6rem;flex-wrap:wrap">
+          <button onclick="exportMttCtMap()" style="background:#0369a1;color:#fff;border:none;border-radius:5px;padding:.3rem .75rem;cursor:pointer;font-size:.82em;font-weight:600">📥 Xuất Excel</button>
+          <label style="background:#059669;color:#fff;border:none;border-radius:5px;padding:.3rem .75rem;cursor:pointer;font-size:.82em;font-weight:600">
+            📤 Nhập từ Excel <input type="file" accept=".xlsx" style="display:none" onchange="importMttCtMap(this)">
+          </label>
+          <button onclick="saveMttCtMap(true)" style="background:#6366f1;color:#fff;border:none;border-radius:5px;padding:.3rem .75rem;cursor:pointer;font-size:.82em;font-weight:600">💾 Lưu tất cả</button>
+        </div>
+        <div style="overflow-x:auto;max-height:55vh;overflow-y:auto;border:1px solid #e2e8f0;border-radius:6px">
+          <table style="width:100%;border-collapse:collapse;font-size:.83em">
+            <thead>
+              <tr style="background:#4f46e5;color:#fff;position:sticky;top:0">
+                <th style="padding:.4rem .6rem;text-align:left">Mã điểm HT Misa</th>
+                <th style="padding:.4rem .6rem;text-align:center;width:80px">KH</th>
+                <th style="padding:.4rem .6rem;text-align:left">Mã công trình</th>
+              </tr>
+            </thead>
+            <tbody id="mttCtMapBody"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-cancel" onclick="closeMttCtMapModal()">Đóng</button>
+        <button onclick="saveMttCtMap(true)" style="background:#6366f1;color:#fff;border:none;border-radius:6px;padding:.45rem 1.2rem;cursor:pointer;font-weight:600">💾 Lưu tất cả</button>
       </div>
     </div>
   </div>
@@ -1162,14 +1206,17 @@
     }
 
     // ── MTT / Hóa đơn ──
-    const LS_MTT_CU  = `mtt_cu_${COMPANY}`;
-    const LS_MTT_MOI = `mtt_moi_${COMPANY}`;
-    let _mttCu  = [];
-    let _mttMoi = [];
-    let _mttActive = 'cu'; // 'cu' hoặc 'moi'
+    const LS_MTT_CU     = `mtt_cu_${COMPANY}`;
+    const LS_MTT_MOI    = `mtt_moi_${COMPANY}`;
+    const LS_MTT_CT_MAP = `mtt_ct_map_${COMPANY}`;
+    let _mttCu     = [];
+    let _mttMoi    = [];
+    let _mttActive = 'cu';
+    let _mttCtMap  = {}; // { maDiem: maCT }
 
-    try { const s = localStorage.getItem(LS_MTT_CU);  if (s) _mttCu  = JSON.parse(s); } catch(e) {}
-    try { const s = localStorage.getItem(LS_MTT_MOI); if (s) _mttMoi = JSON.parse(s); } catch(e) {}
+    try { const s = localStorage.getItem(LS_MTT_CU);     if (s) _mttCu     = JSON.parse(s); } catch(e) {}
+    try { const s = localStorage.getItem(LS_MTT_MOI);    if (s) _mttMoi    = JSON.parse(s); } catch(e) {}
+    try { const s = localStorage.getItem(LS_MTT_CT_MAP); if (s) _mttCtMap  = JSON.parse(s); } catch(e) {}
     if (_mttCu.length || _mttMoi.length) { renderMttTable(); }
 
     function openMttModal()  { document.getElementById('mttModal').classList.add('open'); }
@@ -1262,35 +1309,166 @@
       reader.readAsArrayBuffer(file);
     }
 
+    function populateMttMonthFilter(rows) {
+      const sel = document.getElementById('mttMonthFilter');
+      if (!sel) return;
+      const cur = sel.value;
+      const months = [...new Set(rows.map(r => {
+        const p = r.ngay.split('/');
+        return p.length === 3 ? `${p[1]}/${p[2]}` : '';
+      }).filter(Boolean))].sort((a,b) => {
+        const [ma,ya] = a.split('/'); const [mb,yb] = b.split('/');
+        return (ya+ma).localeCompare(yb+mb);
+      });
+      sel.innerHTML = `<option value="">Tất cả</option>` + months.map(m => `<option value="${m}">${m}</option>`).join('');
+      if (months.includes(cur)) sel.value = cur;
+    }
+
     function renderMttTable() {
-      const rows = _mttActive === 'cu' ? _mttCu : _mttMoi;
-      const label = _mttActive === 'cu' ? 'KH Cũ (989)' : 'KH Mới (705)';
-      const hasCu  = _mttCu.length > 0;
-      const hasMoi = _mttMoi.length > 0;
+      const allRows = _mttActive === 'cu' ? _mttCu : _mttMoi;
+      const label   = _mttActive === 'cu' ? 'KH Cũ (989)' : 'KH Mới (705)';
+      const hasCu   = _mttCu.length > 0;
+      const hasMoi  = _mttMoi.length > 0;
       if (!hasCu && !hasMoi) {
         document.getElementById('mttEmpty').style.display = 'block';
         document.getElementById('mttResults').style.display = 'none';
         document.getElementById('mttSubTabs').style.display = 'none';
+        document.getElementById('mttSummary').style.display = 'none';
         return;
       }
       document.getElementById('mttEmpty').style.display = 'none';
       document.getElementById('mttResults').style.display = 'block';
-      document.getElementById('mttSubTabs').style.display = 'block';
+      document.getElementById('mttSubTabs').style.display = 'flex';
+
+      // Month filter
+      populateMttMonthFilter(allRows);
+      const selMonth = (document.getElementById('mttMonthFilter')||{}).value || '';
+      const rows = selMonth ? allRows.filter(r => {
+        const p = r.ngay.split('/'); return p.length === 3 && `${p[1]}/${p[2]}` === selMonth;
+      }) : allRows;
+
       const fmt = n => Math.round(n).toLocaleString('vi');
-      const tongAll = rows.reduce((s,r) => s + r.tongTien, 0);
-      document.getElementById('mttMeta').textContent = `${label} · ${rows.length} hóa đơn · Tổng: ${fmt(tongAll)}đ`;
+      const tongAll  = rows.reduce((s,r) => s + r.tongTien, 0);
+      const tongCuAll = _mttCu.filter(r => !selMonth || (() => { const p=r.ngay.split('/'); return p.length===3&&`${p[1]}/${p[2]}`===selMonth; })()).reduce((s,r)=>s+r.tongTien,0);
+      const tongMoiAll = _mttMoi.filter(r => !selMonth || (() => { const p=r.ngay.split('/'); return p.length===3&&`${p[1]}/${p[2]}`===selMonth; })()).reduce((s,r)=>s+r.tongTien,0);
+
+      // Summary
+      const sumEl = document.getElementById('mttSummary');
+      sumEl.style.display = 'flex';
+      const cuCount  = selMonth ? _mttCu.filter(r=>{const p=r.ngay.split('/');return p.length===3&&`${p[1]}/${p[2]}`===selMonth;}).length : _mttCu.length;
+      const moiCount = selMonth ? _mttMoi.filter(r=>{const p=r.ngay.split('/');return p.length===3&&`${p[1]}/${p[2]}`===selMonth;}).length : _mttMoi.length;
+      const mkCard = (label, count, tong, color) =>
+        `<div style="background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:.4rem .85rem;display:flex;flex-direction:column;min-width:160px">
+          <span style="font-size:.75em;color:#64748b;font-weight:600">${label}</span>
+          <span style="font-size:.85em;font-weight:700;color:#1e293b">${count} HĐ</span>
+          <span style="font-size:1em;font-weight:800;color:${color}">${fmt(tong)}đ</span>
+        </div>`;
+      sumEl.innerHTML =
+        mkCard('KH Cũ (989)', cuCount, tongCuAll, '#0369a1') +
+        mkCard('KH Mới (705)', moiCount, tongMoiAll, '#7c3aed') +
+        mkCard('Tổng cộng', cuCount+moiCount, tongCuAll+tongMoiAll, '#15803d');
+
+      document.getElementById('mttMeta').textContent = `${label}${selMonth?' · '+selMonth:''} · ${rows.length} hóa đơn · Tổng: ${fmt(tongAll)}đ`;
       const tbody = document.getElementById('mttBody');
       if (!rows.length) { tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#94a3b8;padding:1.5rem">Không có dữ liệu</td></tr>'; return; }
-      tbody.innerHTML = rows.map((r,i) => `<tr style="background:${i%2?'#f8fafc':'#fff'}">
-        <td style="padding:.4rem .75rem;white-space:nowrap">${r.ngay}</td>
-        <td style="padding:.4rem .75rem;text-align:right;font-weight:600">${r.soHD}</td>
-        <td style="padding:.4rem .75rem;text-align:right;color:#15803d;font-weight:600">${fmt(r.tongTien)}</td>
-        <td style="padding:.4rem .75rem;color:#475569;font-size:.82em">${r.dichVu}</td>
-        <td style="padding:.4rem .75rem;font-weight:600;font-size:.82em">${r.maDiem}</td>
-        <td style="padding:.4rem .75rem;font-size:.82em">${r.maNCC}</td>
-        <td style="padding:.4rem .75rem;color:#64748b;font-size:.82em">${r.ghiChu}</td>
-        <td style="padding:.4rem .75rem;color:#0369a1;font-size:.82em">${r.dichVuThuHo}</td>
-      </tr>`).join('');
+      tbody.innerHTML = rows.map((r,i) => {
+        const maCT = _mttCtMap[r.maDiem] || '';
+        return `<tr style="background:${i%2?'#f8fafc':'#fff'}">
+          <td style="padding:.4rem .75rem;white-space:nowrap">${r.ngay}</td>
+          <td style="padding:.4rem .75rem;text-align:right;font-weight:600">${r.soHD}</td>
+          <td style="padding:.4rem .75rem;text-align:right;color:#15803d;font-weight:600">${fmt(r.tongTien)}</td>
+          <td style="padding:.4rem .75rem;color:#475569;font-size:.82em">${r.dichVu}</td>
+          <td style="padding:.4rem .75rem;font-size:.82em"><span style="font-weight:600">${r.maDiem}</span>${maCT?`<br><span style="color:#6366f1;font-size:.85em">↳ ${maCT}</span>`:''}</td>
+          <td style="padding:.4rem .75rem;font-size:.82em">${r.maNCC}</td>
+          <td style="padding:.4rem .75rem;color:#64748b;font-size:.82em">${r.ghiChu}</td>
+          <td style="padding:.4rem .75rem;color:#0369a1;font-size:.82em">${r.dichVuThuHo}</td>
+        </tr>`;
+      }).join('');
+    }
+
+    // ── MTT CT Map ──
+    function openMttCtMapModal() {
+      // Thu thập tất cả maDiem unique từ cả 2 sheet
+      const cuSet  = new Set(_mttCu.map(r => r.maDiem).filter(Boolean));
+      const moiSet = new Set(_mttMoi.map(r => r.maDiem).filter(Boolean));
+      const all = [...new Set([...cuSet, ...moiSet])].sort();
+      const tbody = document.getElementById('mttCtMapBody');
+      tbody.innerHTML = all.map((md, i) => {
+        const isCu  = cuSet.has(md);
+        const isMoi = moiSet.has(md);
+        const kh = isCu && isMoi ? 'Cả 2' : isCu ? '989' : '705';
+        const cur = _mttCtMap[md] || '';
+        const esc = md.replace(/'/g,"&#39;").replace(/"/g,'&quot;');
+        return `<tr style="background:${i%2?'#f8fafc':'#fff'}">
+          <td style="padding:.35rem .6rem;font-weight:600;font-size:.83em">${md}</td>
+          <td style="padding:.35rem .6rem;text-align:center;font-size:.78em;color:#64748b">${kh}</td>
+          <td style="padding:.35rem .6rem">
+            <div style="display:flex;gap:.4rem;align-items:center">
+              <input id="mttct_${i}" data-md="${esc}" value="${cur}"
+                style="width:100%;padding:.25rem .4rem;border:1px solid #cbd5e1;border-radius:4px;font-size:.82em"
+                onkeydown="if(event.key==='Enter')saveMttCtMapRow(this)">
+              <button onclick="saveMttCtMapRow(document.getElementById('mttct_${i}'))"
+                style="background:#6366f1;color:#fff;border:none;border-radius:4px;padding:.2rem .5rem;cursor:pointer;font-size:.78em;white-space:nowrap">Lưu</button>
+            </div>
+          </td>
+        </tr>`;
+      }).join('');
+      document.getElementById('mttCtMapModal').classList.add('open');
+    }
+
+    function closeMttCtMapModal() { document.getElementById('mttCtMapModal').classList.remove('open'); }
+
+    function saveMttCtMapRow(input) {
+      const md = input.dataset.md;
+      if (md) _mttCtMap[md] = input.value.trim();
+      try { localStorage.setItem(LS_MTT_CT_MAP, JSON.stringify(_mttCtMap)); } catch(e) {}
+      renderMttTable();
+    }
+
+    function saveMttCtMap(closeModal) {
+      document.querySelectorAll('#mttCtMapBody input[data-md]').forEach(inp => {
+        const md = inp.dataset.md; if (md) _mttCtMap[md] = inp.value.trim();
+      });
+      try { localStorage.setItem(LS_MTT_CT_MAP, JSON.stringify(_mttCtMap)); } catch(e) {}
+      renderMttTable();
+      if (closeModal) closeMttCtMapModal();
+    }
+
+    function exportMttCtMap() {
+      const cuSet  = new Set(_mttCu.map(r => r.maDiem).filter(Boolean));
+      const moiSet = new Set(_mttMoi.map(r => r.maDiem).filter(Boolean));
+      const all = [...new Set([...cuSet, ...moiSet])].sort();
+      const aoa = [['Mã điểm HT Misa', 'KH', 'Mã công trình']];
+      all.forEach(md => {
+        const kh = (cuSet.has(md) && moiSet.has(md)) ? 'Cả 2' : cuSet.has(md) ? '989' : '705';
+        aoa.push([md, kh, _mttCtMap[md] || '']);
+      });
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), 'MTT CT Map');
+      XLSX.writeFile(wb, 'MTT_CT_Map.xlsx');
+    }
+
+    function importMttCtMap(input) {
+      const file = input.files[0]; if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          const wb = XLSX.read(e.target.result, { type: 'array' });
+          const data = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header:1, defval:'' });
+          let updated = 0;
+          data.slice(1).forEach(row => {
+            const md = String(row[0]||'').trim();
+            const ct = String(row[2]||'').trim();
+            if (md && ct) { _mttCtMap[md] = ct; updated++; }
+          });
+          try { localStorage.setItem(LS_MTT_CT_MAP, JSON.stringify(_mttCtMap)); } catch(er) {}
+          alert(`✅ Đã nhập ${updated} mapping`);
+          openMttCtMapModal();
+          renderMttTable();
+        } catch(err) { alert('Lỗi: ' + err.message); }
+        input.value = '';
+      };
+      reader.readAsArrayBuffer(file);
     }
 
     function clearMttData() {
