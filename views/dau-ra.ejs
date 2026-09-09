@@ -1836,23 +1836,30 @@
           const wb = XLSX.read(new Uint8Array(e.target.result), {type:'array'});
           const ws = wb.Sheets[wb.SheetNames[0]];
           const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
-          // Tự động tìm dòng header (scan 10 dòng đầu)
-          const toNum = v => { if(typeof v==='number') return v; return parseFloat(String(v).replace(/[,. ]/g,'').replace(',','.')) || 0; };
+          // Tự động tìm dòng header: tìm dòng có cột đầu là 'STT' (ASCII, không bị lỗi encoding)
+          const toNum = v => { if(typeof v==='number') return v; return parseFloat(String(v).replace(/,/g,'')) || 0; };
           let hdrIdx = -1;
-          for(let i=0;i<Math.min(10,rows.length);i++){
+          for(let i=0;i<Math.min(15,rows.length);i++){
             const r = rows[i] || [];
-            if(r.some(c=>String(c).includes('Thời gian')||String(c).includes('Số tiền')||String(c).includes('Mã điểm'))){
-              hdrIdx = i; break;
-            }
+            const first = String(r[0]||'').trim();
+            if(first === 'STT' || first === 'Stt') { hdrIdx = i; break; }
           }
-          if(hdrIdx < 0){ alert('Không tìm thấy dòng header trong file BaoCaoPhi (tìm cột "Thời gian GD" / "Số tiền trước KM")'); return; }
+          // Fallback: thử row 2 luôn (biết trước từ cấu trúc file thực tế)
+          if(hdrIdx < 0) hdrIdx = 2;
+          console.log('[BaoCaoPhi] hdrIdx=', hdrIdx, 'hdr[0]=', rows[hdrIdx]?.[0], 'hdr[1]=', rows[hdrIdx]?.[1]);
           const hdr = rows[hdrIdx] || [];
-          const fc = k => hdr.findIndex(c=>String(c).trim()===k.trim());
-          const iTime=fc('Thời gian GD'), iMaDiem=fc('Mã điểm thu'), iDiem=fc('Điểm thu');
-          const iGross=fc('Số tiền trước KM'), iPhi=fc('Số tiền phí thu hộ');
+          const fp = k => { const i=hdr.findIndex(c=>String(c||'').includes(k)); return i>=0?i:-1; };
+          const fb = (candidates, def) => { for(const k of candidates){const i=fp(k);if(i>=0)return i;} return def; };
+          const iTime  = fb(['Gian GD','Thời gian','gian GD'], 1);
+          const iMaDiem= fb(['Mã điểm','diem thu','MaDiem'], 4);
+          const iDiem  = fb(['Điểm thu','Diểm thu'], 5);
+          const iGross = fb(['trước KM','Trước KM','truoc KM','Tiền GD'], 21);
+          const iPhi   = fb(['phí thu hộ','Phí thu hộ','phi thu ho'], 26);
+          console.log('[BaoCaoPhi] cols: time=',iTime,'gross=',iGross,'phi=',iPhi,'ghichu=',iGhiChu,'madon=',iMaDonZalo);
 
-          const iGhiChu = hdr.findIndex(c=>String(c).trim()==='Ghi chú');
-          const iMaDonZalo = hdr.findIndex(c=>String(c).trim()==='Mã đơn hàng');
+          console.log('[BaoCaoPhi] hdr cols:', hdr.slice(0,10).map((c,i)=>`${i}:${c}`));
+          const iGhiChu = hdr.findIndex(c=>String(c||'').includes('Ghi ch') || String(c||'').includes('ghi ch'));
+          const iMaDonZalo = hdr.findIndex(c=>String(c||'').includes('n hàng') && String(c||'').includes('đơn'));
 
           const newRows = rows.slice(hdrIdx+1)
             .filter(r => (r[iGross]!==''&&r[iGross]!=null))
