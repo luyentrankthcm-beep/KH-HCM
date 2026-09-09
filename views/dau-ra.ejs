@@ -1265,7 +1265,8 @@
       const colDV    = isCu ? fc('Nội dung xuất hóa đơn') : fc('Nội dung hóa đơn');
       const colMaDiem = isCu ? fc('Mã điểm trên misa thuế') : fc('Mã điểm ghi chú HT Misa');
       const colMaNCC  = isCu ? fc('Mã KH HT Misa') : fc('Mã NCC HT Misa');
-      const colGhiChu = fc('ghi chú');
+      const colGhiChu    = fc('ghi chú');
+      const colSoHopDong = fc('Số hợp đồng');
       const colThuHo  = isCu ? header.findIndex(c => String(c||'').includes('Dịch vụ thu hộ'))
                               : fc('Dịch vụ thu hộ');
       const rows = [];
@@ -1291,8 +1292,9 @@
           dichVu:   String(r[colDV]    ||''),
           maDiem:   String(r[colMaDiem]||''),
           maNCC:    String(r[colMaNCC] ||''),
-          ghiChu:   String(r[colGhiChu]||''),
-          dichVuThuHo: String(r[colThuHo]||''),
+          ghiChu:      String(r[colGhiChu]   ||''),
+          soHopDong:   String(r[colSoHopDong]||'').toLowerCase().trim(),
+          dichVuThuHo: String(r[colThuHo]    ||''),
         });
       }
       rows.sort((a,b) => (Number(a.soHD)||0) - (Number(b.soHD)||0));
@@ -1411,13 +1413,15 @@
       const tbody = document.getElementById('mttBody');
       if (!rows.length) { tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#94a3b8;padding:1.5rem">Không có dữ liệu</td></tr>'; return; }
       tbody.innerHTML = rows.map((r,i) => {
-        const maCT = (_mttCtMap[_mttActive] || {})[r.maDiem] || '';
-        return `<tr style="background:${i%2?'#f8fafc':'#fff'}">
+        const maCT  = (_mttCtMap[_mttActive] || {})[r.maDiem] || '';
+        const isCSE = r.soHopDong === 'cse';
+        const cseTag = isCSE ? `<span style="display:inline-block;margin-left:.3rem;background:#7c3aed;color:#fff;font-size:.72em;font-weight:700;padding:.05rem .35rem;border-radius:3px;vertical-align:middle">CS</span>` : '';
+        return `<tr style="background:${i%2?'#f8fafc':'#fff'}${isCSE?';border-left:3px solid #7c3aed':''}">
           <td style="padding:.4rem .75rem;white-space:nowrap">${r.ngay}</td>
           <td style="padding:.4rem .75rem;text-align:right;font-weight:600">${r.soHD}</td>
           <td style="padding:.4rem .75rem;text-align:right;color:#15803d;font-weight:600">${fmt(r.tongTien)}</td>
           <td style="padding:.4rem .75rem;color:#475569;font-size:.82em">${r.dichVu}</td>
-          <td style="padding:.4rem .75rem;font-size:.82em"><span style="font-weight:600">${r.maDiem}</span>${maCT?`<br><span style="color:#6366f1;font-size:.85em">↳ ${maCT}</span>`:''}</td>
+          <td style="padding:.4rem .75rem;font-size:.82em"><span style="font-weight:600">${r.maDiem}</span>${cseTag}${maCT?`<br><span style="color:#6366f1;font-size:.85em">↳ ${maCT}</span>`:''}</td>
           <td style="padding:.4rem .75rem;font-size:.82em">${r.maNCC}</td>
           <td style="padding:.4rem .75rem;color:#64748b;font-size:.82em">${r.ghiChu}</td>
           <td style="padding:.4rem .75rem;color:#0369a1;font-size:.82em">${r.dichVuThuHo}</td>
