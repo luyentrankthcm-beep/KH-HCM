@@ -1295,7 +1295,7 @@
     const LS_MTT_HIST   = `mtt_hist_${COMPANY}`;
     let _mttCu     = [];
     let _mttMoi    = [];
-    let _mttActive = 'cu';
+    let _mttActive = COMPANY === 'kh_cu' ? 'cu' : 'moi';
     let _mttCtMap  = { cu: {}, moi: {} }; // tách riêng KH Cũ / KH Mới
     let _mttHist   = []; // [{ fileName, uploadedAt, cuCount, moiCount }]
 
