@@ -529,37 +529,34 @@
         return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
       };
 
-      // Gians per momo date
-      const dateGians = {};
+      // Groups per momo date (group by maCT, same as byDate rendering)
+      const dateGroups = {};
       _rows.forEach(r => {
-        if (!dateGians[r.date]) dateGians[r.date] = new Set();
-        dateGians[r.date].add(r.gian);
+        if (!dateGroups[r.date]) dateGroups[r.date] = new Set();
+        const maCT = (_ctMap[r.gian] || {}).maCT || r.gian;
+        dateGroups[r.date].add(maCT); // groupKey = maCT || gian
       });
 
       let filled = 0, skipped = 0;
-      Object.entries(dateGians).forEach(([momoDate, gianSet]) => {
+      Object.entries(dateGroups).forEach(([momoDate, groupSet]) => {
         const invCandidates = [1,2,3,4].map(n => addDays(momoDate, n));
-        gianSet.forEach(g => {
-          const hdKey = `${momoDate}|${g}`;
-          if (_hdData[hdKey] && _hdData[hdKey].soHD) { skipped++; return; } // đã có rồi
-          // Ưu tiên: lấy maCT từ Momo CT map; fallback: dùng chính tên gian làm maCT
-          const maCT  = (_ctMap[g] || {}).maCT || g;
+        groupSet.forEach(groupKey => {
+          const hdKey = `${momoDate}|${groupKey}`;
+          if (_hdData[hdKey] && _hdData[hdKey].soHD) { skipped++; return; }
+          // groupKey là maCT (hoặc raw gian nếu chưa map)
+          const maCT   = groupKey;
           const maDiem = maCTtoDiem[maCT];
-          if (!maDiem) return;
-          // Tìm dòng MTT theo ngày invoice (thử cả maDiem từ CT map và maCT trực tiếp)
           let matched = null;
           for (const inv of invCandidates) {
             if (maDiem && mttByDateDiem[inv] && mttByDateDiem[inv][maDiem]) {
               matched = mttByDateDiem[inv][maDiem]; break;
             }
-            // Fallback: maDiem trong MTT chính là maCT (không qua CT map)
             if (maCT && mttByDateDiem[inv] && mttByDateDiem[inv][maCT]) {
               matched = mttByDateDiem[inv][maCT]; break;
             }
           }
           if (!matched) return;
           if (!_hdData[hdKey]) _hdData[hdKey] = {};
-          // Nếu nhiều dòng cùng gian: ghép số HĐ, cộng tổng tiền
           const soHDs = [...new Set(matched.map(r => String(r.soHD)))].join(', ');
           const tongTien = matched.reduce((s, r) => s + r.tongTien, 0);
           _hdData[hdKey].soHD     = soHDs;
@@ -971,14 +968,18 @@
         return;
       }
 
-      // Group: date → gian → {amount, fee}
+      // Group: date → groupKey(maCT||gian) → {amount, fee, maCT, gians[]}
+      // Các sub-gian cùng maCT được cộng dồn vào 1 bucket để hiện 1 dòng duy nhất
       const byDate = {};
       _rows.forEach(r => {
         if (!byDate[r.date]) byDate[r.date] = {};
-        if (!byDate[r.date][r.gian]) byDate[r.date][r.gian] = { amount: 0, fee: 0 };
+        const maCT = (_ctMap[r.gian] || {}).maCT;
+        const gKey = maCT || r.gian; // group by maCT if mapped, else raw gian
+        if (!byDate[r.date][gKey]) byDate[r.date][gKey] = { amount: 0, fee: 0, maCT: maCT || null, gians: [] };
         const rate = r.feeRate != null ? r.feeRate : (COMPANY === 'kh_cu' ? 0.011 : 0.01);
-        byDate[r.date][r.gian].amount += r.amount;
-        byDate[r.date][r.gian].fee    += r.amount * rate; // cộng dồn float, round 1 lần khi hiển thị
+        byDate[r.date][gKey].amount += r.amount;
+        byDate[r.date][gKey].fee    += r.amount * rate;
+        if (!byDate[r.date][gKey].gians.includes(r.gian)) byDate[r.date][gKey].gians.push(r.gian);
       });
 
       const fmtN = n => Math.round(n).toLocaleString('vi');
@@ -994,30 +995,18 @@
       // Tính net thực tế (sau server data + rounding) cho 1 ngày — dùng cho batch header
       const computeDayFinalNet = (date) => {
         const gianData = byDate[date] || {};
-        const gianList = Object.keys(gianData).sort();
-        if (!gianList.length) return 0;
-        const ctGrossTotal = {};
-        gianList.forEach(g => {
-          const maCT = (_ctMap[g] || {}).maCT;
-          if (maCT) ctGrossTotal[maCT] = (ctGrossTotal[maCT] || 0) + gianData[g].amount;
-        });
-        const nets = gianList.map(g => {
+        const gList = Object.keys(gianData).sort();
+        if (!gList.length) return 0;
+        const nets = gList.map(g => {
           const dg = gianData[g];
           const hd = _hdData[`${date}|${g}`] || {};
-          const ct = _ctMap[g] || {};
-          const serverKey = ct.maCT ? `${ddmmToISO(date)}|${ct.maCT}` : null;
+          const maCT = dg.maCT;
+          const serverKey = maCT ? `${ddmmToISO(date)}|${maCT}` : null;
           let serverNetVal = serverKey && _serverNet[serverKey] != null ? _serverNet[serverKey] : null;
-          let serverGrossVal = serverKey && _serverGross[serverKey] != null ? _serverGross[serverKey] : null;
-          if (serverNetVal != null && ct.maCT && ctGrossTotal[ct.maCT] > 0) {
-            const ratio = dg.amount / ctGrossTotal[ct.maCT];
-            serverNetVal = serverNetVal * ratio;
-            if (serverGrossVal != null) serverGrossVal = serverGrossVal * ratio;
-          }
           const net = (hd.netOvr != null && hd.netOvr !== '') ? (parseFloat(String(hd.netOvr).replace(/[^0-9.-]/g,''))||0)
                     : (serverNetVal != null ? serverNetVal : (dg.amount - Math.round(dg.fee)));
           return net;
         });
-        // Sub-gian rounding
         const dayNet = nets.reduce((s,n) => s+n, 0);
         let rounded = nets.map(n => Math.round(n));
         const sumR = rounded.reduce((s,n) => s+n, 0);
@@ -1026,8 +1015,7 @@
           const maxIdx = nets.reduce((mi, n, i) => n >= nets[mi] ? i : mi, 0);
           rounded[maxIdx] += adj;
         }
-        // NH ±1đ
-        const dayNH = gianList.reduce((s,g) => {
+        const dayNH = gList.reduce((s,g) => {
           const v = parseFloat(String((_hdData[`${date}|${g}`]||{}).tienNH||'').replace(/[^0-9.]/g,''))||0;
           return s + v;
         }, 0);
@@ -1037,33 +1025,21 @@
         return sumFinal;
       };
 
-      // Render các hàng cho 1 ngày (sub-rows theo gian) + bảng chỉnh sửa
+      // Render các hàng cho 1 ngày (sub-rows theo groupKey=maCT||gian) + bảng chỉnh sửa
       const renderDateRows = (date) => {
         const gianData = byDate[date] || {};
-        const gianList = Object.keys(gianData).sort();
+        const gianList = Object.keys(gianData).sort(); // groupKey list
         if (!gianList.length) return '';
-        // Pre-compute tổng gross của các gian có cùng maCT trong ngày này (để chia tỉ lệ)
-        const ctGrossTotal = {}; // maCT → tổng gross từ Transaction_report
-        gianList.forEach(g => {
-          const maCT = (_ctMap[g] || {}).maCT;
-          if (maCT) ctGrossTotal[maCT] = (ctGrossTotal[maCT] || 0) + gianData[g].amount;
-        });
 
         const getGianDisplay = (g) => {
           const dg = gianData[g];
           const feeR = Math.round(dg.fee);
           const hd = _hdData[`${date}|${g}`] || {};
-          const ct = _ctMap[g] || {};
-          // Ưu tiên: 1) override thủ công, 2) số thực từ Tổng Momo chia tỉ lệ, 3) ước lượng phí
-          const serverKey = ct.maCT ? `${ddmmToISO(date)}|${ct.maCT}` : null;
+          const maCT = dg.maCT; // đã lưu sẵn khi build byDate
+          const serverKey = maCT ? `${ddmmToISO(date)}|${maCT}` : null;
           let serverNetVal  = serverKey && _serverNet[serverKey]   != null ? _serverNet[serverKey]   : null;
           let serverGrossVal = serverKey && _serverGross[serverKey] != null ? _serverGross[serverKey] : null;
-          // Nếu nhiều sub-gian chung maCT → chia tỉ lệ theo gross của từng gian
-          if (serverNetVal != null && ct.maCT && ctGrossTotal[ct.maCT] > 0) {
-            const ratio = dg.amount / ctGrossTotal[ct.maCT];
-            serverNetVal   = serverNetVal   * ratio;
-            if (serverGrossVal != null) serverGrossVal = serverGrossVal * ratio;
-          }
+          // Không cần chia tỉ lệ nữa — dg.amount đã là tổng của cả nhóm maCT
           const dt  = (hd.dtOvr  != null && hd.dtOvr  !== '') ? (parseFloat(String(hd.dtOvr).replace(/[^0-9.-]/g,''))||0)
                      : (serverGrossVal != null ? serverGrossVal : dg.amount);
           const net = (hd.netOvr != null && hd.netOvr !== '') ? (parseFloat(String(hd.netOvr).replace(/[^0-9.-]/g,''))||0)
@@ -1078,30 +1054,25 @@
           return s + v;
         }, 0);
         const dateId = date.replace(/-/g,'_');
-        // Pre-compute tất cả gianDisp để kiểm tra chênh lệch làm tròn
         const _gDisps = {};
         gianList.forEach(g => { _gDisps[g] = getGianDisplay(g); });
-        // Bước 1: bù 1đ nếu tổng làm tròn các gian không khớp dayNet
         const _totalNetRounded = gianList.reduce((s,g) => s + Math.round(_gDisps[g].net), 0);
         const _dayNetRounded = Math.round(dayNet);
-        const _netAdj = _dayNetRounded - _totalNetRounded; // thường là 0, ±1
+        const _netAdj = _dayNetRounded - _totalNetRounded;
         if (_netAdj !== 0) {
           const largestG = gianList.reduce((a,b) => _gDisps[a].net >= _gDisps[b].net ? a : b);
           _gDisps[largestG] = { ..._gDisps[largestG], net: _gDisps[largestG].net + _netAdj };
         }
-        // Bước 2: nếu chênh với NH đúng ±1đ → bù thêm vào gian lớn nhất
         const _sumAfterAdj = gianList.reduce((s,g) => s + Math.round(_gDisps[g].net), 0);
         const _nhChenhRaw = dayNH > 0 ? (dayNH - _sumAfterAdj) : 0;
         if (_nhChenhRaw === 1 || _nhChenhRaw === -1) {
           const largestGN = gianList.reduce((a,b) => _gDisps[a].net >= _gDisps[b].net ? a : b);
           _gDisps[largestGN] = { ..._gDisps[largestGN], net: _gDisps[largestGN].net + _nhChenhRaw };
         }
-        // Bước 3: áp dụng batch-level chênh adjustment (nếu có)
         gianList.forEach(g => {
           const bAdj = _batchAdjMap[`${date}|${g}`];
           if (bAdj) _gDisps[g] = { ..._gDisps[g], net: _gDisps[g].net + bAdj };
         });
-        // Tổng final sau tất cả điều chỉnh
         const _finalNetSum = gianList.reduce((s,g) => s + Math.round(_gDisps[g].net), 0);
         const _finalPhi = dayDT - _finalNetSum;
         const _nhChenhFinal = dayNH > 0 ? (dayNH - _finalNetSum) : null;
@@ -1119,15 +1090,17 @@
         gianList.forEach(g => {
           const dg    = gianData[g];
           const gDisp = _gDisps[g];
-          const ct    = _ctMap[g] || {};
-          const ctLine = ct.maCT
-            ? `<span class="ct-badge">${ct.maCT}</span>${ct.isChiaSe ? '<span class="ct-chiase-badge">CS</span>' : ''}`
+          const isMapped = dg.maCT !== null;
+          // g IS maCT khi mapped, hoặc raw gian khi unmapped
+          const ctLine = isMapped
+            ? `<span class="ct-badge">${g}</span>`
             : '<span style="color:#94a3b8;font-size:.74em;font-style:italic">chưa map</span>';
+          const subGianLine = dg.gians && dg.gians.length > 0 ? dg.gians.join(' · ') : g;
           const hdKey = `${date}|${g}`;
           const hd    = _hdData[hdKey] || {};
           const hasOvr = (hd.dtOvr != null && hd.dtOvr !== '') || (hd.netOvr != null && hd.netOvr !== '');
           out += `<tr class="gian-row">
-            <td style="padding-left:2rem"><div>${ctLine}</div><div style="font-size:.82em;color:#475569;margin-top:1px">${g}</div></td>
+            <td style="padding-left:2rem"><div>${ctLine}</div><div style="font-size:.82em;color:#475569;margin-top:1px">${subGianLine}</div></td>
             <td style="text-align:right;color:#15803d;font-weight:600">${fmtN(gDisp.dt)}${hasOvr&&hd.dtOvr?'<sup style="color:#f59e0b;font-size:.7em">✏</sup>':''}</td>
             <td style="text-align:right;color:#dc2626">${fmtN(Math.round(gDisp.fee))}</td>
             <td class="col-net" style="text-align:right">${fmtN(Math.round(gDisp.net))}${hasOvr&&hd.netOvr?'<sup style="color:#f59e0b;font-size:.7em">✏</sup>':''}</td>
@@ -1148,13 +1121,14 @@
           <td colspan="6" style="padding:.75rem 1rem;background:#f8fafc;border-top:2px dashed #3b82f6">
             <div style="font-size:.82em;font-weight:700;color:#1e3a5f;margin-bottom:.5rem">✏️ Chỉnh sửa – ${date}</div>
             <div style="overflow-x:auto">
-            <table style="min-width:700px;border-collapse:collapse;font-size:.82em">
+            <table style="min-width:820px;border-collapse:collapse;font-size:.82em">
               <thead><tr style="background:#e0e7ff;color:#1e3a5f">
-                <th style="padding:.3rem .5rem;text-align:left;border:1px solid #c7d2fe">Gian</th>
+                <th style="padding:.3rem .5rem;text-align:left;border:1px solid #c7d2fe">Mã CT / Gian</th>
                 <th style="padding:.3rem .5rem;text-align:right;border:1px solid #c7d2fe">Doanh thu</th>
                 <th style="padding:.3rem .5rem;text-align:right;border:1px solid #c7d2fe">Net (sửa được)</th>
                 <th style="padding:.3rem .5rem;border:1px solid #c7d2fe">Số HĐ</th>
                 <th style="padding:.3rem .5rem;text-align:right;border:1px solid #c7d2fe">Tiền HĐ</th>
+                <th style="padding:.3rem .5rem;text-align:right;border:1px solid #c7d2fe">Tiền NH</th>
               </tr></thead>
               <tbody>
                 ${gianList.map(g => {
@@ -1165,23 +1139,29 @@
                   const hd = _hdData[hdKey] || {};
                   const netVal = hd.netOvr != null && hd.netOvr !== '' ? hd.netOvr : net;
                   const dtVal  = hd.dtOvr  != null && hd.dtOvr  !== '' ? hd.dtOvr  : dg.amount;
+                  const subGians = dg.gians && dg.gians.length > 0 ? dg.gians.join(', ') : g;
+                  const gKey = g.replace(/[^a-zA-Z0-9]/g,'_');
                   return `<tr>
-                    <td style="padding:.3rem .5rem;border:1px solid #e2e8f0;color:#374151">${g}</td>
+                    <td style="padding:.3rem .5rem;border:1px solid #e2e8f0;color:#374151;font-size:.8em">${g}<br><span style="color:#94a3b8;font-size:.9em">${subGians}</span></td>
                     <td style="padding:.3rem .5rem;border:1px solid #e2e8f0;text-align:right">
-                      <input id="edit_dtOvr_${dateId}_${g.replace(/[^a-zA-Z0-9]/g,'_')}" type="text" value="${dtVal}"
+                      <input id="edit_dtOvr_${dateId}_${gKey}" type="text" value="${dtVal}"
                         style="width:110px;border:1px solid #bbf7d0;border-radius:4px;padding:.2rem .35rem;text-align:right;background:#f0fdf4;color:#15803d;font-weight:600">
                     </td>
                     <td style="padding:.3rem .5rem;border:1px solid #e2e8f0;text-align:right">
-                      <input id="edit_netOvr_${dateId}_${g.replace(/[^a-zA-Z0-9]/g,'_')}" type="text" value="${netVal}"
+                      <input id="edit_netOvr_${dateId}_${gKey}" type="text" value="${netVal}"
                         style="width:110px;border:1px solid #bfdbfe;border-radius:4px;padding:.2rem .35rem;text-align:right;background:#eff6ff;color:#0d47a1;font-weight:700">
                     </td>
                     <td style="padding:.3rem .5rem;border:1px solid #e2e8f0">
-                      <input id="edit_soHD_${dateId}_${g.replace(/[^a-zA-Z0-9]/g,'_')}" type="text" value="${hd.soHD||''}" placeholder="0000123"
+                      <input id="edit_soHD_${dateId}_${gKey}" type="text" value="${hd.soHD||''}" placeholder="0000123"
                         style="width:120px;border:1px solid #cbd5e1;border-radius:4px;padding:.2rem .35rem">
                     </td>
                     <td style="padding:.3rem .5rem;border:1px solid #e2e8f0;text-align:right">
-                      <input id="edit_soTienHD_${dateId}_${g.replace(/[^a-zA-Z0-9]/g,'_')}" type="text" value="${hd.soTienHD||''}" placeholder="0"
+                      <input id="edit_soTienHD_${dateId}_${gKey}" type="text" value="${hd.soTienHD||''}" placeholder="0"
                         style="width:100px;border:1px solid #cbd5e1;border-radius:4px;padding:.2rem .35rem;text-align:right">
+                    </td>
+                    <td style="padding:.3rem .5rem;border:1px solid #e2e8f0;text-align:right">
+                      <input id="edit_tienNH_${dateId}_${gKey}" type="text" value="${hd.tienNH||''}" placeholder="0"
+                        style="width:100px;border:1px solid #fde68a;border-radius:4px;padding:.2rem .35rem;text-align:right;background:#fffbeb;color:#92400e;font-weight:600">
                     </td>
                   </tr>`;
                 }).join('')}
