@@ -1834,7 +1834,14 @@
       reader.onload = e => {
         try {
           const wb = XLSX.read(new Uint8Array(e.target.result), {type:'array'});
-          const ws = wb.Sheets[wb.SheetNames[0]];
+          // Tìm đúng sheet có data (không phải sheet CONFIG) — scan sheet nào có 'STT' ở cột đầu
+          let ws = null;
+          for(const sn of wb.SheetNames){
+            const s = wb.Sheets[sn];
+            const test = XLSX.utils.sheet_to_json(s,{header:1,defval:'',sheetRows:5,raw:true});
+            if(test.some(r=>String(r[0]||'').trim()==='STT')){ws=s;break;}
+          }
+          if(!ws) ws = wb.Sheets[wb.SheetNames[0]]; // fallback
           const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:'', raw:true});
           const toNum = v => { if(typeof v==='number') return v; return parseFloat(String(v||'').replace(/[^0-9.-]/g,'')) || 0; };
           // HARDCODE: cấu trúc file BaoCaoPhi cố định (đã xác minh):
