@@ -235,11 +235,39 @@
 
     <!-- ==================== ZVP TAB ==================== -->
     <div id="zvp" class="tab-panel">
-      <div class="channel-header">
-        <div class="acct-info">Zalo/VNPay/Payoo</div>
-        <button class="btn-nhap" style="background:#2563eb" disabled>📤 Nhập liệu đối soát</button>
+      <!-- Sub-tabs: Zalo / VNPay / Payoo -->
+      <div class="sub-tab-bar" style="margin-bottom:.75rem">
+        <button class="sub-tab-btn active" id="zvp_btn_zalo" onclick="switchZvpTab('zalo')">🔵 Zalo Pay</button>
+        <button class="sub-tab-btn" id="zvp_btn_vnpay" onclick="switchZvpTab('vnpay')">🟦 VNPay</button>
+        <button class="sub-tab-btn" id="zvp_btn_payoo" onclick="switchZvpTab('payoo')">🟪 Payoo</button>
       </div>
-      <div class="empty-state"><div class="big-icon">🔵</div><p>Chưa thiết lập – <%= activeCompany === 'kh_cu' ? 'KH Cũ' : 'KH Mới' %></p></div>
+
+      <!-- Zalo Pay -->
+      <div id="zvp_zalo" class="sub-panel active">
+        <div class="channel-header">
+          <div class="acct-info"><strong>Zalo Pay</strong></div>
+          <button class="btn-nhap" style="background:#0068ff" disabled>📤 Nhập liệu đối soát</button>
+        </div>
+        <div class="empty-state"><div class="big-icon">🔵</div><p>Chưa thiết lập – Zalo Pay<br><span style="font-size:.85em">Tính năng đang phát triển</span></p></div>
+      </div>
+
+      <!-- VNPay -->
+      <div id="zvp_vnpay" class="sub-panel">
+        <div class="channel-header">
+          <div class="acct-info"><strong>VNPay</strong></div>
+          <button class="btn-nhap" style="background:#e31837" disabled>📤 Nhập liệu đối soát</button>
+        </div>
+        <div class="empty-state"><div class="big-icon">🟦</div><p>Chưa thiết lập – VNPay<br><span style="font-size:.85em">Tính năng đang phát triển</span></p></div>
+      </div>
+
+      <!-- Payoo -->
+      <div id="zvp_payoo" class="sub-panel">
+        <div class="channel-header">
+          <div class="acct-info"><strong>Payoo</strong></div>
+          <button class="btn-nhap" style="background:#6d28d9" disabled>📤 Nhập liệu đối soát</button>
+        </div>
+        <div class="empty-state"><div class="big-icon">🟪</div><p>Chưa thiết lập – Payoo<br><span style="font-size:.85em">Tính năng đang phát triển</span></p></div>
+      </div>
     </div>
 
     <!-- ==================== VIET QR TAB ==================== -->
@@ -438,6 +466,12 @@
       document.querySelectorAll('.tab-bar .tab-btn').forEach(b => b.classList.remove('active'));
       document.getElementById(id).classList.add('active');
       btn.classList.add('active');
+    }
+    function switchZvpTab(sub) {
+      ['zalo','vnpay','payoo'].forEach(s => {
+        document.getElementById('zvp_' + s).classList.toggle('active', s === sub);
+        document.getElementById('zvp_btn_' + s).classList.toggle('active', s === sub);
+      });
     }
     function switchSub(tabId, subId, btn) {
       const panel = document.getElementById(tabId);
