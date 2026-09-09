@@ -840,6 +840,9 @@
         return d >= ddmmToISO(from) && d <= ddmmToISO(to);
       };
 
+      // Batch-level chênh adjustment: { "date|gian": số đ cần cộng/trừ }
+      let _batchAdjMap = {};
+
       // Tính net thực tế (sau server data + rounding) cho 1 ngày — dùng cho batch header
       const computeDayFinalNet = (date) => {
         const gianData = byDate[date] || {};
@@ -945,6 +948,11 @@
           const largestGN = gianList.reduce((a,b) => _gDisps[a].net >= _gDisps[b].net ? a : b);
           _gDisps[largestGN] = { ..._gDisps[largestGN], net: _gDisps[largestGN].net + _nhChenhRaw };
         }
+        // Bước 3: áp dụng batch-level chênh adjustment (nếu có)
+        gianList.forEach(g => {
+          const bAdj = _batchAdjMap[`${date}|${g}`];
+          if (bAdj) _gDisps[g] = { ..._gDisps[g], net: _gDisps[g].net + bAdj };
+        });
         // Tổng final sau tất cả điều chỉnh
         const _finalNetSum = gianList.reduce((s,g) => s + Math.round(_gDisps[g].net), 0);
         const _finalPhi = dayDT - _finalNetSum;
@@ -1061,11 +1069,22 @@
           // Hiển thị header đợt dù payDates rỗng (để biết NH đã trả nhưng Momo tháng này không có)
           const momoNet = payDates.reduce((s, d) => s + computeDayFinalNet(d), 0);
           const chenhNH = payDates.length > 0 ? (pay.amount - momoNet) : null;
+          // Nếu chênh ≤ 700đ: tự điều chỉnh vào gian có amount cao nhất trong payDates
+          if (chenhNH !== null && chenhNH !== 0 && Math.abs(chenhNH) <= 700) {
+            let maxAmt = -1, adjDate = null, adjGian = null;
+            payDates.forEach(d => {
+              Object.entries(byDate[d] || {}).forEach(([g, dg]) => {
+                if (dg.amount > maxAmt) { maxAmt = dg.amount; adjDate = d; adjGian = g; }
+              });
+            });
+            if (adjDate && adjGian) _batchAdjMap[`${adjDate}|${adjGian}`] = chenhNH;
+          }
+          const displayChenh = (chenhNH !== null && Math.abs(chenhNH) <= 700) ? 0 : chenhNH;
           const momoNetText = payDates.length > 0
             ? ` · Momo Net: <strong>${fmtN(momoNet)}đ</strong>`
             : '';
-          const chenhText = chenhNH !== null
-            ? ` &nbsp;·&nbsp; ${chenhNH !== 0 ? '⚠️' : '✅'} <span style="color:${chenhNH===0?'#4ade80':'#fca5a5'}">Chênh: <strong>${chenhNH>0?'+':''}${fmtN(chenhNH)}đ</strong></span>`
+          const chenhText = displayChenh !== null
+            ? ` &nbsp;·&nbsp; ${displayChenh !== 0 ? '⚠️' : '✅'} <span style="color:${displayChenh===0?'#4ade80':'#fca5a5'}">Chênh: <strong>${displayChenh>0?'+':''}${fmtN(displayChenh)}đ</strong></span>`
             : '';
 
           html += `<tr>
