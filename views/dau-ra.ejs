@@ -546,12 +546,15 @@
           const maCT  = (_ctMap[g] || {}).maCT || g;
           const maDiem = maCTtoDiem[maCT];
           if (!maDiem) return;
-          // Tìm dòng MTT theo ngày invoice
+          // Tìm dòng MTT theo ngày invoice (thử cả maDiem từ CT map và maCT trực tiếp)
           let matched = null;
           for (const inv of invCandidates) {
-            if (mttByDateDiem[inv] && mttByDateDiem[inv][maDiem]) {
-              matched = mttByDateDiem[inv][maDiem];
-              break;
+            if (maDiem && mttByDateDiem[inv] && mttByDateDiem[inv][maDiem]) {
+              matched = mttByDateDiem[inv][maDiem]; break;
+            }
+            // Fallback: maDiem trong MTT chính là maCT (không qua CT map)
+            if (maCT && mttByDateDiem[inv] && mttByDateDiem[inv][maCT]) {
+              matched = mttByDateDiem[inv][maCT]; break;
             }
           }
           if (!matched) return;
