@@ -1313,17 +1313,30 @@
           const shMoiName = wb.SheetNames.find(n => !n.includes('989') && n.toLowerCase().includes('kê'));
           const cuData  = shCuName  ? XLSX.utils.sheet_to_json(wb.Sheets[shCuName],  { header:1, defval:'' }) : [];
           const moiData = shMoiName ? XLSX.utils.sheet_to_json(wb.Sheets[shMoiName], { header:1, defval:'' }) : [];
-          _mttCu  = parseMttSheet(cuData,  true);
-          _mttMoi = parseMttSheet(moiData, false);
+          // Merge (không ghi đè) — bỏ qua dòng đã có cùng Số HĐ
+          const newCu  = parseMttSheet(cuData,  true);
+          const newMoi = parseMttSheet(moiData, false);
+          const exCuHD  = new Set(_mttCu.map(r => r.soHD));
+          const exMoiHD = new Set(_mttMoi.map(r => r.soHD));
+          const addCu   = newCu.filter(r => !exCuHD.has(r.soHD));
+          const addMoi  = newMoi.filter(r => !exMoiHD.has(r.soHD));
+          _mttCu  = [..._mttCu,  ...addCu];
+          _mttMoi = [..._mttMoi, ...addMoi];
+          // Sắp xếp lại theo soHD
+          _mttCu.sort((a,b) => String(a.soHD).localeCompare(String(b.soHD), undefined, { numeric: true }));
+          _mttMoi.sort((a,b) => String(a.soHD).localeCompare(String(b.soHD), undefined, { numeric: true }));
           try { localStorage.setItem(LS_MTT_CU,  JSON.stringify(_mttCu));  } catch(e) {}
           try { localStorage.setItem(LS_MTT_MOI, JSON.stringify(_mttMoi)); } catch(e) {}
           // Ghi lịch sử
-          const hist = { fileName: file.name, uploadedAt: new Date().toLocaleString('vi'), cuCount: _mttCu.length, moiCount: _mttMoi.length };
+          const hist = { fileName: file.name, uploadedAt: new Date().toLocaleString('vi'),
+            cuAdded: addCu.length, moiAdded: addMoi.length,
+            cuSkip: newCu.length - addCu.length, moiSkip: newMoi.length - addMoi.length };
           _mttHist.unshift(hist);
           if (_mttHist.length > 30) _mttHist.length = 30;
           try { localStorage.setItem(LS_MTT_HIST, JSON.stringify(_mttHist)); } catch(e) {}
+          const skipMsg = (hist.cuSkip + hist.moiSkip) > 0 ? ` (bỏ qua ${hist.cuSkip + hist.moiSkip} trùng)` : '';
           st.className = 'upload-status ok';
-          st.textContent = `✅ KH Cũ: ${_mttCu.length} dòng · KH Mới: ${_mttMoi.length} dòng`;
+          st.textContent = `✅ Thêm ${addCu.length} KH Cũ · ${addMoi.length} KH Mới${skipMsg} · Tổng: ${_mttCu.length}+${_mttMoi.length}`;
           closeMttModal();
           renderMttTable();
         } catch(err) {
@@ -1532,8 +1545,8 @@
         <div style="display:flex;align-items:center;gap:.75rem;padding:.45rem .75rem;background:${i%2?'#f8fafc':'#fff'};font-size:.83em;border-bottom:1px solid #f1f5f9">
           <span style="color:#64748b;white-space:nowrap">🕓 ${h.uploadedAt}</span>
           <span style="font-weight:600;flex:1;color:#1e293b">📄 ${h.fileName}</span>
-          <span style="color:#0369a1;white-space:nowrap">KH Cũ: <strong>${h.cuCount}</strong> HĐ</span>
-          <span style="color:#7c3aed;white-space:nowrap">KH Mới: <strong>${h.moiCount}</strong> HĐ</span>
+          <span style="color:#0369a1;white-space:nowrap">KH Cũ: <strong>+${h.cuAdded ?? h.cuCount ?? '?'}</strong>${h.cuSkip ? ` (bỏ ${h.cuSkip})` : ''}</span>
+          <span style="color:#7c3aed;white-space:nowrap">KH Mới: <strong>+${h.moiAdded ?? h.moiCount ?? '?'}</strong>${h.moiSkip ? ` (bỏ ${h.moiSkip})` : ''}</span>
         </div>`).join('');
     }
 
