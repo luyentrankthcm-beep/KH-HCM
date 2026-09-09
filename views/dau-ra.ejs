@@ -545,6 +545,7 @@
     let _ctCodes = []; // ['CT001', 'CT002', ...]
     let _hdData  = {}; // { [`${date}|${gian}`]: { soHD, soTienHD, tienNH } }
     let _bankMomoPayments = []; // [{ payDate:"DD-MM-YYYY", amount, fromDate, toDate }]
+    let _bankZaloPayments = []; // [{payDate, amount, fromDate, toDate}]
     let _serverNet   = {}; // { "YYYY-MM-DD|CT_CODE": netAmount } từ Tổng Momo thực
     let _serverGross = {}; // { "YYYY-MM-DD|CT_CODE": grossAmount } từ Tổng Momo thực
 
@@ -1807,7 +1808,7 @@
             const maOrder = String(r[iOrder]||'').trim().replace(/^#/,'');
             const tenSP   = String(r[iSP]||'').trim();
             if(!maOrder || _zaloOrders[maOrder] !== undefined) return;
-            _zaloOrders[maOrder] = getZaloMaCT(tenSP) || tenSP;
+            _zaloOrders[maOrder] = tenSP; // store tenSP; maCT resolved at render time
             if(tenSP && !_zaloSpMap[tenSP]) _zaloSpMap[tenSP]='';
             addedCount++;
           });
@@ -1897,6 +1898,7 @@
           localStorage.setItem(LS_ZALO_HIST, JSON.stringify(_zaloHist));
 
           renderZaloSummary(); renderZaloDoiSoat(); renderZaloHist();
+          fetchBankZalo();
           const s0 = newRows[0];
           alert(`✅ BaoCaoPhi: thêm ${addedFee.length} GD mới (bỏ qua ${newRows.length - addedFee.length} trùng)\nTổng tích lũy: ${_zaloFee.length} GD`);
         } catch(err) { alert('Lỗi đọc file BaoCaoPhi: ' + err.message); }
@@ -1954,9 +1956,9 @@
           const isFunzone = r.maDiem==='FUNZONE1' || (r.dienThu||'').toUpperCase().includes('FUNZONE');
           if(!isFunzone){ nOther++; return; }
           nFunzone++;
-          const maCT_lu = r.maFunzone ? _zaloOrders[String(r.maFunzone)] : undefined;
-          if(maCT_lu === undefined) nNoMatch++;
-          const maCT = maCT_lu || '_unknown_';
+          const tenSP_lu = r.maFunzone ? _zaloOrders[String(r.maFunzone)] : undefined;
+          if(tenSP_lu === undefined) nNoMatch++;
+          const maCT = tenSP_lu ? (getZaloMaCT(tenSP_lu)||tenSP_lu) : '_unknown_';
           if(!byDate[r.date]) byDate[r.date]={};
           if(!byDate[r.date][maCT]) byDate[r.date][maCT]={gross:0,phi:0,net:0,soDon:0};
           byDate[r.date][maCT].gross += r.gross;
@@ -1968,7 +1970,29 @@
         let totGross=0,totPhi=0,totNet=0,totN=0;
         dates.forEach(dt=>Object.values(byDate[dt]).forEach(d=>{totGross+=d.gross;totPhi+=d.phi;totNet+=d.net;totN+=d.soDon;}));
 
-        let html = '<div style="margin-bottom:.6rem;font-size:.82em;color:#64748b">';
+        // NH trả về ZaloPay header
+        let nhHtml = '';
+        if(_bankZaloPayments.length) {
+          const inRange = (d, f, t) => {
+            if(!f||!t) return false;
+            const iso = x => { const p=x.split('-'); return p[2]+'-'+p[1]+'-'+p[0]; };
+            return iso(d) >= iso(f) && iso(d) <= iso(t);
+          };
+          _bankZaloPayments.forEach(pay => {
+            const payDates = dates.filter(d => pay.fromDate && pay.toDate && inRange(d, pay.fromDate, pay.toDate));
+            const zaloNet = payDates.reduce((s,d) => s + Object.values(byDate[d]||{}).reduce((ss,g)=>ss+g.net,0), 0);
+            const chenh = pay.amount - zaloNet;
+            const chCol = Math.abs(chenh)<1000?'#16a34a':(chenh<0?'#ef4444':'#d97706');
+            nhHtml += '<div style="background:#0f2942;border-radius:6px;padding:.45rem .8rem;margin-bottom:.4rem;font-size:.83em;display:flex;align-items:center;gap:.8rem;flex-wrap:wrap">'
+              +'<span style="color:#38bdf8;font-weight:700">💳 NH trả về <strong>'+pay.payDate+'</strong>: '+Math.round(pay.amount).toLocaleString('vi')+'đ</span>'
+              +(pay.fromDate?'<span style="color:#94a3b8">ZaloPay '+pay.fromDate+(pay.toDate&&pay.toDate!==pay.fromDate?' → '+pay.toDate:'')+'</span>':'')
+              +(payDates.length?'<span style="color:#94a3b8">Net: '+Math.round(zaloNet).toLocaleString('vi')+'đ</span>':'')
+              +(payDates.length?'<span style="color:'+chCol+';font-weight:700">✔ Chênh: '+(chenh>=0?'+':'')+Math.round(chenh).toLocaleString('vi')+'đ</span>':'')
+              +'</div>';
+          });
+        }
+
+        let html = nhHtml + '<div style="margin-bottom:.6rem;font-size:.82em;color:#64748b">';
         html += '\u{1F4CA} FUNZONE: <strong>'+nFunzone+'</strong> GD · '+dates.length+' ngày';
         if(nNoMatch && Object.keys(_zaloOrders).length) html += ' · <span style="color:#f59e0b">Chưa khớp OrderDetails: '+nNoMatch+' (⇒ tải lại OrderDetails)</span>';
         if(!Object.keys(_zaloOrders).length) html += ' · <span style="color:#ef4444">Chưa tải OrderDetails!</span>';
@@ -2033,19 +2057,43 @@
           });
           html += '</tbody></table></div>';
         });
-        html += '<table style="width:100%;border-collapse:collapse;font-size:.85em"><tbody>'
+        // Per-gian totals across all dates
+        const byGian = {};
+        dates.forEach(dt => {
+          Object.entries(byDate[dt]).forEach(([maCT,d]) => {
+            if(!byGian[maCT]) byGian[maCT]={soDon:0,gross:0,phi:0,net:0};
+            byGian[maCT].soDon+=d.soDon; byGian[maCT].gross+=d.gross; byGian[maCT].phi+=d.phi; byGian[maCT].net+=d.net;
+          });
+        });
+        const gianKeys = Object.keys(byGian).filter(k=>k!=='_unknown_').sort();
+        if(byGian['_unknown_']) gianKeys.push('_unknown_');
+
+        html += '<table style="width:100%;border-collapse:collapse;font-size:.85em;margin-top:.5rem"><tbody>'
           +'<tr style="background:#1e3a5f;color:#fff;font-weight:700">'
           +'<td style="padding:.5rem .75rem">TỔNG CỘNG ('+dates.length+' ngày)</td>'
           +'<td style="text-align:right;padding:.5rem .5rem">'+totN+' GD</td>'
           +'<td style="text-align:right;padding:.5rem .5rem">'+fmtN(totGross)+'</td>'
           +'<td style="text-align:right;padding:.5rem .5rem">'+fmtN(totPhi)+'</td>'
           +'<td style="text-align:right;padding:.5rem .5rem">'+fmtN(totNet)+'</td>'
-          +'<td colspan="3"></td></tr></tbody></table>';
+          +'<td colspan="3"></td></tr>';
+        gianKeys.forEach((maCT,i) => {
+          const g = byGian[maCT];
+          const lbl = maCT==='_unknown_' ? '<span style="color:#94a3b8;font-style:italic">Chưa xác định</span>' : '<span class="ct-badge">'+maCT+'</span>';
+          html += '<tr style="background:'+(i%2===0?'#f0f4f8':'#e8f0f8')+'">'
+            +'<td style="padding:.3rem .75rem;padding-left:1.5rem">'+lbl+'</td>'
+            +'<td style="text-align:right;padding:.3rem .5rem;color:#64748b">'+g.soDon+'</td>'
+            +'<td style="text-align:right;padding:.3rem .5rem;color:#15803d;font-weight:600">'+fmtN(g.gross)+'</td>'
+            +'<td style="text-align:right;padding:.3rem .5rem;color:#ef4444">'+fmtN(g.phi)+'</td>'
+            +'<td style="text-align:right;padding:.3rem .5rem;color:#2563eb;font-weight:700">'+fmtN(g.net)+'</td>'
+            +'<td colspan="3"></td></tr>';
+        });
+        html += '</tbody></table>';
         el.innerHTML = html;
       } else {
         // ── FALLBACK: chỉ có OrderDetails, chưa có BaoCaoPhi ──
         const ctCount = {};
-        Object.entries(_zaloOrders).forEach(([maOrder, maCT]) => {
+        Object.entries(_zaloOrders).forEach(([maOrder, tenSP]) => {
+          const maCT = getZaloMaCT(tenSP) || tenSP;
           ctCount[maCT] = (ctCount[maCT]||0) + 1;
         });
         let html = '<div style="padding:1rem;color:#94a3b8;font-size:.88em">';
@@ -2141,10 +2189,49 @@
       document.getElementById('zaloOrderInput').click();
     }
 
+    // Fetch các đợt ZaloPay trả về từ ACB1268
+    async function fetchBankZalo() {
+      if(!_zaloFee.length) return;
+      const fzdates = _zaloFee
+        .filter(r => r.maDiem==='FUNZONE1' || (r.dienThu||'').toUpperCase().includes('FUNZONE'))
+        .map(r => r.date);
+      if(!fzdates.length) return;
+      const iso = d => { const p=d.split('-'); return p[2]+'-'+p[1]+'-'+p[0]; };
+      const sorted = [...fzdates].sort((a,b) => iso(a).localeCompare(iso(b)));
+      try {
+        const res  = await fetch('/api/dau-ra/bank-zalo?from='+iso(sorted[0])+'&to='+iso(sorted[sorted.length-1]));
+        const json = await res.json();
+        if(json.ok){ _bankZaloPayments = json.payments||[]; renderZaloDoiSoat(); }
+      } catch(e){}
+    }
+
     function saveZaloHD(maCT, field, val) {
       if(!_zaloHD[maCT]) _zaloHD[maCT] = {};
       _zaloHD[maCT][field] = val.trim();
       try { localStorage.setItem(LS_ZALO_HD, JSON.stringify(_zaloHD)); } catch(e){}
+    }
+
+    // Click-to-edit số HĐ / tiền HĐ (show inline input, save on blur/Enter)
+    function zHDEdit(spanEl, hdKey, field) {
+      const cur = _zaloHD[hdKey] ? (_zaloHD[hdKey][field]||'') : '';
+      const inp = document.createElement('input');
+      inp.value = cur;
+      inp.style.cssText = 'width:' + (field==='soHD'?'90px':'110px') + ';border:1px solid #2563eb;border-radius:4px;padding:.15rem .3rem;font-size:.8em;' + (field==='tienHD'?'text-align:right':'text-align:center');
+      inp.onblur = () => { saveZaloHD(hdKey, field, inp.value); renderZaloDoiSoat(); };
+      inp.onkeydown = e => { if(e.key==='Enter'||e.key==='Escape') inp.blur(); };
+      spanEl.replaceWith(inp);
+      inp.focus(); inp.select();
+    }
+
+    // Map "Chưa xác định gian" cho 1 ngày → maCT cụ thể
+    const LS_ZALO_UNK = `zalo_unk_${COMPANY}`; // {date: maCT}
+    let _zaloUnk = {};
+    try { const s=localStorage.getItem(LS_ZALO_UNK); if(s) _zaloUnk=JSON.parse(s); } catch(e){}
+    function saveZaloUnkCT(date, maCT) {
+      if(!maCT.trim()) return;
+      _zaloUnk[date] = maCT.trim().toUpperCase();
+      try { localStorage.setItem(LS_ZALO_UNK, JSON.stringify(_zaloUnk)); } catch(e){}
+      renderZaloDoiSoat();
     }
 
     function saveZaloSpMap(inp) {
@@ -2179,6 +2266,7 @@
 
     // Init Zalo Pay
     renderZaloSummary(); renderZaloDoiSoat(); renderZaloCtMap(); renderZaloHist();
+    fetchBankZalo();
 
   </script>
 </body>
