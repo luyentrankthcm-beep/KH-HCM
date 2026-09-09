@@ -461,17 +461,21 @@
     const LS_HD_DATA  = `momo_hd_${COMPANY}`;
 
     // ── Tab switching ──
+    const LS_ACTIVE_TAB     = `dauRaTab_${COMPANY}`;
+    const LS_ACTIVE_ZVP_SUB = `dauRaZvpSub_${COMPANY}`;
     function switchTab(id, btn) {
       document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
       document.querySelectorAll('.tab-bar .tab-btn').forEach(b => b.classList.remove('active'));
       document.getElementById(id).classList.add('active');
       btn.classList.add('active');
+      try { localStorage.setItem(LS_ACTIVE_TAB, id); } catch(e) {}
     }
     function switchZvpTab(sub) {
       ['zalo','vnpay','payoo'].forEach(s => {
         document.getElementById('zvp_' + s).classList.toggle('active', s === sub);
         document.getElementById('zvp_btn_' + s).classList.toggle('active', s === sub);
       });
+      try { localStorage.setItem(LS_ACTIVE_ZVP_SUB, sub); } catch(e) {}
     }
     function switchSub(tabId, subId, btn) {
       const panel = document.getElementById(tabId);
@@ -1693,6 +1697,18 @@
     loadStored();
     if (_rows.length) refreshUI();
     renderHistory();
+
+    // Restore active tab từ lần trước (F5 giữ nguyên tab)
+    try {
+      const savedTab = localStorage.getItem(LS_ACTIVE_TAB);
+      if (savedTab) {
+        const tabEl = document.getElementById(savedTab);
+        const btnEl = document.querySelector(`.tab-bar .tab-btn[onclick*="'${savedTab}'"]`);
+        if (tabEl && btnEl) switchTab(savedTab, btnEl);
+      }
+      const savedZvp = localStorage.getItem(LS_ACTIVE_ZVP_SUB);
+      if (savedZvp && ['zalo','vnpay','payoo'].includes(savedZvp)) switchZvpTab(savedZvp);
+    } catch(e) {}
   </script>
 </body>
 </html>
