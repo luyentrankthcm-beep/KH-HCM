@@ -847,15 +847,28 @@
         const gianData = byDate[date] || {};
         const gianList = Object.keys(gianData).sort();
         if (!gianList.length) return '';
+        // Pre-compute tổng gross của các gian có cùng maCT trong ngày này (để chia tỉ lệ)
+        const ctGrossTotal = {}; // maCT → tổng gross từ Transaction_report
+        gianList.forEach(g => {
+          const maCT = (_ctMap[g] || {}).maCT;
+          if (maCT) ctGrossTotal[maCT] = (ctGrossTotal[maCT] || 0) + gianData[g].amount;
+        });
+
         const getGianDisplay = (g) => {
           const dg = gianData[g];
           const feeR = Math.round(dg.fee);
           const hd = _hdData[`${date}|${g}`] || {};
           const ct = _ctMap[g] || {};
-          // Ưu tiên: 1) override thủ công, 2) số thực từ Tổng Momo, 3) ước lượng phí
+          // Ưu tiên: 1) override thủ công, 2) số thực từ Tổng Momo chia tỉ lệ, 3) ước lượng phí
           const serverKey = ct.maCT ? `${ddmmToISO(date)}|${ct.maCT}` : null;
-          const serverNetVal = serverKey && _serverNet[serverKey] != null ? _serverNet[serverKey] : null;
-          const serverGrossVal = serverKey && _serverGross[serverKey] != null ? _serverGross[serverKey] : null;
+          let serverNetVal  = serverKey && _serverNet[serverKey]   != null ? _serverNet[serverKey]   : null;
+          let serverGrossVal = serverKey && _serverGross[serverKey] != null ? _serverGross[serverKey] : null;
+          // Nếu nhiều sub-gian chung maCT → chia tỉ lệ theo gross của từng gian
+          if (serverNetVal != null && ct.maCT && ctGrossTotal[ct.maCT] > 0) {
+            const ratio = dg.amount / ctGrossTotal[ct.maCT];
+            serverNetVal   = serverNetVal   * ratio;
+            if (serverGrossVal != null) serverGrossVal = serverGrossVal * ratio;
+          }
           const dt  = (hd.dtOvr  != null && hd.dtOvr  !== '') ? (parseFloat(String(hd.dtOvr).replace(/[^0-9.-]/g,''))||0)
                      : (serverGrossVal != null ? serverGrossVal : dg.amount);
           const net = (hd.netOvr != null && hd.netOvr !== '') ? (parseFloat(String(hd.netOvr).replace(/[^0-9.-]/g,''))||0)
