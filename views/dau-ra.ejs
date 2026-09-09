@@ -245,10 +245,48 @@
       <!-- Zalo Pay -->
       <div id="zvp_zalo" class="sub-panel active">
         <div class="channel-header">
-          <div class="acct-info"><strong>Zalo Pay</strong></div>
-          <button class="btn-nhap" style="background:#0068ff" disabled>📤 Nhập liệu đối soát</button>
+          <div class="acct-info">
+            <strong>Zalo Pay</strong>
+            &nbsp;<span id="zalo_summary" style="font-size:.82em;color:#64748b"></span>
+          </div>
+          <div style="display:flex;gap:.5rem">
+            <button class="btn-nhap" style="background:#0068ff" onclick="document.getElementById('zaloOrderInput').click()">📥 OrderDetails</button>
+            <button class="btn-nhap" style="background:#0891b2" onclick="document.getElementById('zaloFeeInput').click()">📥 BaoCaoPhi</button>
+            <input type="file" id="zaloOrderInput" accept=".xls,.xlsx" style="display:none" onchange="handleZaloOrderFile(this)">
+            <input type="file" id="zaloFeeInput" accept=".xls,.xlsx" style="display:none" onchange="handleZaloFeeFile(this)">
+          </div>
         </div>
-        <div class="empty-state"><div class="big-icon">🔵</div><p>Chưa thiết lập – Zalo Pay<br><span style="font-size:.85em">Tính năng đang phát triển</span></p></div>
+
+        <!-- Sub-sub-tabs -->
+        <div class="sub-tab-bar" style="margin-top:.5rem">
+          <button class="sub-tab-btn active" id="zalo_btn_ds" onclick="switchZaloSub('ds')">📅 Đối soát ngày</button>
+          <button class="sub-tab-btn" id="zalo_btn_map" onclick="switchZaloSub('map')">🗺️ Map Tên SP → CT</button>
+          <button class="sub-tab-btn" id="zalo_btn_hist" onclick="switchZaloSub('hist')">⏱️ Lịch sử tải</button>
+        </div>
+
+        <!-- Đối soát ngày -->
+        <div id="zalo_sub_ds" class="sub-panel active" style="margin-top:.75rem">
+          <div id="zaloDoiSoatBody">
+            <div class="empty-state"><div class="big-icon">🔵</div><p>Tải OrderDetails để bắt đầu đối soát</p></div>
+          </div>
+        </div>
+
+        <!-- CT Map: Tên SP → Mã CT -->
+        <div id="zalo_sub_map" class="sub-panel" style="margin-top:.75rem">
+          <div style="font-size:.85em;color:#475569;margin-bottom:.75rem">
+            Map từng <strong>Tên sản phẩm</strong> từ OrderDetails sang <strong>Mã CT</strong> (gian). Nhiều tên SP có thể chung 1 mã CT.
+          </div>
+          <div id="zaloCtMapContent">
+            <div class="empty-state"><div class="big-icon">🗺️</div><p>Tải OrderDetails để thấy danh sách Tên SP</p></div>
+          </div>
+        </div>
+
+        <!-- Lịch sử tải -->
+        <div id="zalo_sub_hist" class="sub-panel" style="margin-top:.75rem">
+          <div id="zaloHistBody">
+            <div class="empty-state"><div class="big-icon">⏱️</div><p>Chưa có lịch sử tải</p></div>
+          </div>
+        </div>
       </div>
 
       <!-- VNPay -->
@@ -1709,6 +1747,286 @@
       const savedZvp = localStorage.getItem(LS_ACTIVE_ZVP_SUB);
       if (savedZvp && ['zalo','vnpay','payoo'].includes(savedZvp)) switchZvpTab(savedZvp);
     } catch(e) {}
+
+    // ══════════════════════════════════════════
+    // ZALO PAY
+    // ══════════════════════════════════════════
+    const LS_ZALO_ORDERS  = `zalo_orders_${COMPANY}`;
+    const LS_ZALO_FEE     = `zalo_fee_${COMPANY}`;
+    const LS_ZALO_SP_MAP  = `zalo_sp_map_${COMPANY}`;  // { [tenSP]: maCT }
+    const LS_ZALO_HIST    = `zalo_hist_${COMPANY}`;
+
+    let _zaloOrders = []; // [{date, tenSP, tongTien, maOrder}]
+    let _zaloFee    = []; // [{date, maDiem, tenDiem, gross, phi}]
+    let _zaloSpMap  = {}; // tenSP → maCT
+    let _zaloHist   = [];
+
+    try { const s=localStorage.getItem(LS_ZALO_ORDERS); if(s) _zaloOrders=JSON.parse(s); } catch(e){}
+    try { const s=localStorage.getItem(LS_ZALO_FEE);    if(s) _zaloFee=JSON.parse(s);    } catch(e){}
+    try { const s=localStorage.getItem(LS_ZALO_SP_MAP); if(s) _zaloSpMap=JSON.parse(s);  } catch(e){}
+    try { const s=localStorage.getItem(LS_ZALO_HIST);   if(s) _zaloHist=JSON.parse(s);   } catch(e){}
+
+    function switchZaloSub(sub) {
+      ['ds','map','hist'].forEach(s => {
+        const p = document.getElementById('zalo_sub_' + s);
+        const b = document.getElementById('zalo_btn_' + s);
+        if(p) p.classList.toggle('active', s===sub);
+        if(b) b.classList.toggle('active', s===sub);
+      });
+    }
+
+    function excelSerialToDateStr(serial) {
+      // Excel date serial → DD-MM-YYYY
+      const d = new Date(Math.round((serial - 25569) * 86400 * 1000));
+      return `${String(d.getUTCDate()).padStart(2,'0')}-${String(d.getUTCMonth()+1).padStart(2,'0')}-${d.getUTCFullYear()}`;
+    }
+
+    function handleZaloOrderFile(inp) {
+      if (!inp.files[0]) return;
+      const fname = inp.files[0].name;
+      const reader = new FileReader();
+      reader.onload = e => {
+        try {
+          const wb = XLSX.read(new Uint8Array(e.target.result), {type:'array'});
+          const ws = wb.Sheets[wb.SheetNames[0]];
+          const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+          const hdr = rows[0];
+          const fc = k => hdr.indexOf(k);
+          const iDate=fc('Ngày đặt hàng'), iStatus=fc('Trạng thái đơn hàng');
+          const iPay=fc('Trạng thái thanh toán'), iTotal=fc('Tổng tiền hàng');
+          const iSP=fc('Tên sản phẩm'), iOrder=fc('Mã đơn hàng');
+
+          const newRows = rows.slice(1)
+            .filter(r => r[iPay]==='Đã thanh toán' && r[iStatus]!=='Đã hủy' && r[iDate])
+            .map(r => ({
+              maOrder: String(r[iOrder]||'').trim(),
+              date: typeof r[iDate]==='number' ? excelSerialToDateStr(r[iDate])
+                    : String(r[iDate]).split(' ')[0].replace(/\//g,'-'), // fallback string
+              tenSP: String(r[iSP]||'').trim(),
+              tongTien: parseFloat(r[iTotal])||0,
+            }));
+
+          // Merge by maOrder dedup
+          const exKeys = new Set(_zaloOrders.map(r=>r.maOrder));
+          const added = newRows.filter(r=>!exKeys.has(r.maOrder));
+          _zaloOrders = [..._zaloOrders, ...added];
+          localStorage.setItem(LS_ZALO_ORDERS, JSON.stringify(_zaloOrders));
+
+          // Auto-add new tenSP to map (unmapped)
+          newRows.forEach(r => { if(r.tenSP && !(_zaloSpMap[r.tenSP])) _zaloSpMap[r.tenSP]=''; });
+          localStorage.setItem(LS_ZALO_SP_MAP, JSON.stringify(_zaloSpMap));
+
+          _zaloHist.unshift({type:'order', file:fname, at:new Date().toLocaleString('vi'), added:added.length, skip:newRows.length-added.length});
+          localStorage.setItem(LS_ZALO_HIST, JSON.stringify(_zaloHist));
+
+          renderZaloSummary(); renderZaloDoiSoat(); renderZaloCtMap(); renderZaloHist();
+          alert(`✅ OrderDetails: +${added.length} đơn mới · Bỏ qua ${newRows.length-added.length} trùng`);
+        } catch(err) { alert('Lỗi đọc file OrderDetails: ' + err.message); }
+      };
+      reader.readAsArrayBuffer(inp.files[0]);
+      inp.value='';
+    }
+
+    function handleZaloFeeFile(inp) {
+      if (!inp.files[0]) return;
+      const fname = inp.files[0].name;
+      const reader = new FileReader();
+      reader.onload = e => {
+        try {
+          const wb = XLSX.read(new Uint8Array(e.target.result), {type:'array'});
+          const ws = wb.Sheets[wb.SheetNames[0]];
+          const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+          // Header ở row index 2, data từ index 3
+          const hdr = rows[2] || [];
+          const fc = k => hdr.indexOf(k);
+          const iTime=fc('Thời gian GD'), iMaDiem=fc('Mã điểm thu'), iDiem=fc('Điểm thu');
+          const iGross=fc('Số tiền trước KM'), iPhi=fc('Số tiền phí thu hộ');
+
+          const newRows = rows.slice(3)
+            .filter(r => r[iMaDiem] && typeof r[iGross]==='number')
+            .map(r => {
+              const tg = String(r[iTime]||'').split(' ')[0]; // "07/09/2026"
+              const [dd,mm,yy] = tg.split('/');
+              return {
+                date: `${dd}-${mm}-${yy}`,
+                maDiem: String(r[iMaDiem]||'').trim(),
+                tenDiem: String(r[iDiem]||'').trim(),
+                gross: parseFloat(r[iGross])||0,
+                phi: parseFloat(r[iPhi])||0,
+              };
+            });
+
+          // REPLACE (mỗi lần tải là replace để luôn có dữ liệu mới nhất)
+          _zaloFee = newRows;
+          localStorage.setItem(LS_ZALO_FEE, JSON.stringify(_zaloFee));
+
+          _zaloHist.unshift({type:'fee', file:fname, at:new Date().toLocaleString('vi'), added:newRows.length, skip:0});
+          localStorage.setItem(LS_ZALO_HIST, JSON.stringify(_zaloHist));
+
+          renderZaloSummary(); renderZaloDoiSoat(); renderZaloHist();
+          alert(`✅ BaoCaoPhi: ${newRows.length} giao dịch`);
+        } catch(err) { alert('Lỗi đọc file BaoCaoPhi: ' + err.message); }
+      };
+      reader.readAsArrayBuffer(inp.files[0]);
+      inp.value='';
+    }
+
+    function renderZaloSummary() {
+      const el = document.getElementById('zalo_summary');
+      if(!el) return;
+      const dates = [...new Set(_zaloOrders.map(r=>r.date))];
+      el.textContent = _zaloOrders.length ? `${_zaloOrders.length} đơn · ${dates.length} ngày` : '';
+    }
+
+    function getZaloMaCT(tenSP) {
+      return (_zaloSpMap[tenSP]||'').trim() || null;
+    }
+
+    function renderZaloDoiSoat() {
+      const el = document.getElementById('zaloDoiSoatBody');
+      if(!el) return;
+      if(!_zaloOrders.length) {
+        el.innerHTML='<div class="empty-state"><div class="big-icon">🔵</div><p>Tải OrderDetails để bắt đầu đối soát</p></div>';
+        return;
+      }
+      const fmtN = n => Math.round(n).toLocaleString('vi');
+      // Group orders by date → maCT(||tenSP) → {tongTien, tenSPs[]}
+      const byDate = {};
+      _zaloOrders.forEach(r => {
+        const maCT = getZaloMaCT(r.tenSP) || r.tenSP;
+        if(!byDate[r.date]) byDate[r.date] = {};
+        if(!byDate[r.date][maCT]) byDate[r.date][maCT] = {amount:0, tenSPs:new Set()};
+        byDate[r.date][maCT].amount += r.tongTien;
+        byDate[r.date][maCT].tenSPs.add(r.tenSP);
+      });
+      // Group fee by date
+      const feeByDate = {};
+      _zaloFee.forEach(r => {
+        if(!feeByDate[r.date]) feeByDate[r.date] = {gross:0, phi:0};
+        feeByDate[r.date].gross += r.gross;
+        feeByDate[r.date].phi   += r.phi;
+      });
+
+      const dates = Object.keys(byDate).sort((a,b)=>{
+        const p=d=>{const[dd,mm,yy]=d.split('-');return`${yy}-${mm}-${dd}`;};
+        return p(a).localeCompare(p(b));
+      });
+
+      let html = '<table style="width:100%;border-collapse:collapse;font-size:.85em">';
+      html += '<thead><tr style="background:#1e3a5f;color:#fff"><th style="padding:.4rem .6rem;text-align:left">Ngày / Tên SP → CT</th><th style="text-align:right;padding:.4rem .6rem">Doanh thu</th><th style="text-align:right;padding:.4rem .6rem">Phí GW</th><th style="text-align:right;padding:.4rem .6rem">Net GW</th></tr></thead><tbody>';
+
+      dates.forEach(date => {
+        const ctData = byDate[date];
+        const fee = feeByDate[date] || {gross:0, phi:0};
+        const dayTotal = Object.values(ctData).reduce((s,v)=>s+v.amount,0);
+        html += `<tr style="background:#374151;color:#e5e7eb">
+          <td colspan="4" style="padding:.35rem .75rem .35rem 1rem;font-size:.87em">
+            📅 <strong>${date}</strong> &nbsp;·&nbsp; DT: ${fmtN(dayTotal)}đ
+            ${fee.phi ? `&nbsp;·&nbsp; Phí: <span style="color:#fca5a5">${fmtN(fee.phi)}đ</span> &nbsp;·&nbsp; Net GW: <strong style="color:#93c5fd">${fmtN(fee.gross-fee.phi)}đ</strong>` : ''}
+          </td></tr>`;
+        Object.entries(ctData).forEach(([maCT, d]) => {
+          const isMapped = !!getZaloMaCT([...d.tenSPs][0]);
+          const ctBadge = isMapped
+            ? `<span class="ct-badge">${maCT}</span>`
+            : `<span style="color:#94a3b8;font-size:.75em;font-style:italic">chưa map</span>`;
+          const subNames = [...d.tenSPs].join(' · ');
+          html += `<tr class="gian-row">
+            <td style="padding-left:2rem"><div>${ctBadge}</div><div style="font-size:.78em;color:#64748b;margin-top:1px">${subNames}</div></td>
+            <td style="text-align:right;color:#15803d;font-weight:600">${fmtN(d.amount)}</td>
+            <td style="text-align:right;color:#94a3b8">–</td>
+            <td style="text-align:right;color:#94a3b8">–</td>
+          </tr>`;
+        });
+      });
+      html += '</tbody></table>';
+      el.innerHTML = html;
+    }
+
+    function renderZaloCtMap() {
+      const el = document.getElementById('zaloCtMapContent');
+      if(!el) return;
+      const tenSPs = Object.keys(_zaloSpMap).sort();
+      if(!tenSPs.length) {
+        el.innerHTML='<div class="empty-state"><div class="big-icon">🗺️</div><p>Tải OrderDetails để thấy danh sách Tên SP</p></div>';
+        return;
+      }
+      const unmapped = tenSPs.filter(k=>!_zaloSpMap[k]);
+      const mapped   = tenSPs.filter(k=>!!_zaloSpMap[k]);
+      let html = '<table style="width:100%;border-collapse:collapse;font-size:.84em"><tbody>';
+      if(unmapped.length) {
+        html += `<tr style="background:#fef3c7"><td colspan="3" style="padding:.3rem .6rem;color:#92400e;font-weight:700">⏳ Chưa map (${unmapped.length})</td></tr>`;
+        unmapped.forEach((sp,i) => {
+          const bg = i%2?'#fff':'#f8fafc';
+          const esc = sp.replace(/'/g,"&#39;").replace(/"/g,'&quot;');
+          html += `<tr style="background:${bg}">
+            <td style="padding:.3rem .6rem;font-size:.8em;max-width:350px">${sp}</td>
+            <td style="padding:.3rem .4rem;width:160px">
+              <input id="zsp_${i}" data-sp="${esc}" value="" placeholder="Mã CT"
+                style="width:100%;border:1px solid #cbd5e1;border-radius:4px;padding:.2rem .35rem"
+                onkeydown="if(event.key==='Enter')saveZaloSpMap(this)">
+            </td>
+            <td style="padding:.3rem .4rem;width:60px">
+              <button onclick="saveZaloSpMap(document.getElementById('zsp_${i}'))" style="background:#2563eb;color:#fff;border:none;border-radius:4px;padding:.2rem .5rem;cursor:pointer;font-size:.8em">Lưu</button>
+            </td>
+          </tr>`;
+        });
+      }
+      if(mapped.length) {
+        html += `<tr style="background:#d1fae5"><td colspan="3" style="padding:.3rem .6rem;color:#065f46;font-weight:700">✅ Đã map (${mapped.length})</td></tr>`;
+        mapped.forEach((sp,i) => {
+          const bg = i%2?'#f0fdf4':'#dcfce7';
+          const esc = sp.replace(/'/g,"&#39;").replace(/"/g,'&quot;');
+          const idx = unmapped.length + i;
+          html += `<tr style="background:${bg}">
+            <td style="padding:.3rem .6rem;font-size:.8em;max-width:350px">${sp}</td>
+            <td style="padding:.3rem .4rem;width:160px">
+              <input id="zsp_${idx}" data-sp="${esc}" value="${_zaloSpMap[sp]||''}"
+                style="width:100%;border:1px solid #86efac;border-radius:4px;padding:.2rem .35rem;background:#f0fdf4"
+                onkeydown="if(event.key==='Enter')saveZaloSpMap(this)">
+            </td>
+            <td style="padding:.3rem .4rem;width:60px">
+              <button onclick="saveZaloSpMap(document.getElementById('zsp_${idx}'))" style="background:#16a34a;color:#fff;border:none;border-radius:4px;padding:.2rem .5rem;cursor:pointer;font-size:.8em">Lưu</button>
+            </td>
+          </tr>`;
+        });
+      }
+      html += '</tbody></table>';
+      el.innerHTML = html;
+    }
+
+    function saveZaloSpMap(inp) {
+      const sp = inp.dataset.sp;
+      const maCT = inp.value.trim();
+      _zaloSpMap[sp] = maCT;
+      localStorage.setItem(LS_ZALO_SP_MAP, JSON.stringify(_zaloSpMap));
+      renderZaloCtMap();
+      renderZaloDoiSoat();
+    }
+
+    function renderZaloHist() {
+      const el = document.getElementById('zaloHistBody');
+      if(!el) return;
+      if(!_zaloHist.length) {
+        el.innerHTML='<div class="empty-state"><div class="big-icon">⏱️</div><p>Chưa có lịch sử tải</p></div>';
+        return;
+      }
+      let html='<table style="width:100%;border-collapse:collapse;font-size:.84em"><thead><tr style="background:#e0e7ff;color:#1e3a5f"><th style="padding:.3rem .5rem;text-align:left">Loại</th><th style="padding:.3rem .5rem;text-align:left">File</th><th style="padding:.3rem .5rem">Thêm</th><th style="padding:.3rem .5rem">Bỏ qua</th><th style="padding:.3rem .5rem;text-align:left">Thời gian</th></tr></thead><tbody>';
+      _zaloHist.slice(0,20).forEach((h,i) => {
+        html+=`<tr style="background:${i%2?'#f8fafc':'#fff'}">
+          <td style="padding:.3rem .5rem">${h.type==='order'?'📥 Order':'💰 Fee'}</td>
+          <td style="padding:.3rem .5rem;font-size:.8em;color:#475569">${h.file}</td>
+          <td style="padding:.3rem .5rem;text-align:center;color:#16a34a;font-weight:700">+${h.added}</td>
+          <td style="padding:.3rem .5rem;text-align:center;color:#94a3b8">${h.skip}</td>
+          <td style="padding:.3rem .5rem;font-size:.8em;color:#64748b">${h.at}</td>
+        </tr>`;
+      });
+      html+='</tbody></table>';
+      el.innerHTML=html;
+    }
+
+    // Init Zalo Pay
+    renderZaloSummary(); renderZaloDoiSoat(); renderZaloCtMap(); renderZaloHist();
+
   </script>
 </body>
 </html>
