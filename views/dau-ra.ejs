@@ -1755,14 +1755,17 @@
     const LS_ZALO_FEE     = `zalo_fee_${COMPANY}`;
     const LS_ZALO_SP_MAP  = `zalo_sp_map_${COMPANY}`;  // { [tenSP]: maCT }
     const LS_ZALO_HIST    = `zalo_hist_${COMPANY}`;
+    const LS_ZALO_HD      = `zalo_hd_${COMPANY}`;   // { [maCT]: { soHD, tienHD } }
 
     let _zaloOrders = []; // [{date, tenSP, tongTien, maOrder}]
     let _zaloFee    = []; // [{date, maFunzone, maDonZalo, gross, phi, net}]
     let _zaloSpMap  = {}; // tenSP → maCT
     let _zaloHist   = [];
+    let _zaloHD     = {}; // maCT → { soHD, tienHD }
 
     try { const s=localStorage.getItem(LS_ZALO_ORDERS); if(s) _zaloOrders=JSON.parse(s); } catch(e){}
     try { const s=localStorage.getItem(LS_ZALO_FEE);    if(s) _zaloFee=JSON.parse(s);    } catch(e){}
+    try { const s=localStorage.getItem(LS_ZALO_HD);     if(s) _zaloHD=JSON.parse(s);     } catch(e){}
     try { const s=localStorage.getItem(LS_ZALO_SP_MAP); if(s) _zaloSpMap=JSON.parse(s);  } catch(e){}
     try { const s=localStorage.getItem(LS_ZALO_HIST);   if(s) _zaloHist=JSON.parse(s);   } catch(e){}
 
@@ -1946,121 +1949,100 @@
       _zaloOrders.forEach(o => { if(o.maOrder) orderLookup[String(o.maOrder)] = o; });
 
       if (_zaloFee.length) {
-        // ── PRIMARY: BaoCaoPhi → group by DATE → GIAN ──
-        const byDate = {};  // date → { maCT → {gross,phi,net,soDon} }
-        const byGianTot = {}; // maCT → {gross,phi,net,soDon}  (for summary footer)
-        let nUnmatched = 0;
+        // ── PRIMARY: BaoCaoPhi → chỉ lấy FUNZONE MINI APP → group by GIAN ──
+        const byGian = {}; // maCT → {gross,phi,net,soDon,tenSPs:Set}
+        let nFunzone = 0, nOther = 0, nNoMatch = 0;
+
         _zaloFee.forEach(r => {
+          // Chỉ lấy FUNZONE MINI APP (ZaloPay app) — bỏ GHOST, FARM... thuộc VNPay
+          const isFunzone = r.maDiem==='FUNZONE1' || (r.dienThu||'').toUpperCase().includes('FUNZONE');
+          if(!isFunzone) { nOther++; return; }
+          nFunzone++;
+
           const order = r.maFunzone ? orderLookup[String(r.maFunzone)] : null;
-          if (!order) nUnmatched++;
+          if(!order) { nNoMatch++; }
           const maCT = order
             ? (getZaloMaCT(order.tenSP) || order.tenSP)
-            : (r.dienThu ? (getZaloMaCT(r.dienThu) || r.dienThu) : '_unknown_');
-          if(!byDate[r.date]) byDate[r.date] = {};
-          if(!byDate[r.date][maCT]) byDate[r.date][maCT] = {gross:0,phi:0,net:0,soDon:0};
-          byDate[r.date][maCT].gross  += r.gross;
-          byDate[r.date][maCT].phi    += r.phi;
-          byDate[r.date][maCT].net    += r.net;
-          byDate[r.date][maCT].soDon  += 1;
-          if(!byGianTot[maCT]) byGianTot[maCT]={gross:0,phi:0,net:0,soDon:0};
-          byGianTot[maCT].gross += r.gross;
-          byGianTot[maCT].phi   += r.phi;
-          byGianTot[maCT].net   += r.net;
-          byGianTot[maCT].soDon += 1;
+            : (r.maFunzone ? `#${r.maFunzone}` : '_unknown_');
+
+          if(!byGian[maCT]) byGian[maCT] = {gross:0,phi:0,net:0,soDon:0,tenSPs:new Set()};
+          byGian[maCT].gross  += r.gross;
+          byGian[maCT].phi    += r.phi;
+          byGian[maCT].net    += r.net;
+          byGian[maCT].soDon  += 1;
+          if(order) byGian[maCT].tenSPs.add(order.tenSP);
         });
 
-        const totGross = _zaloFee.reduce((s,r)=>s+r.gross,0);
-        const totPhi   = _zaloFee.reduce((s,r)=>s+r.phi,0);
-        const totNet   = _zaloFee.reduce((s,r)=>s+r.net,0);
-        const nMatched = _zaloFee.length - nUnmatched;
-
-        const dates = Object.keys(byDate).sort(sortDate);
-        const gianAll = [...new Set(Object.values(byDate).flatMap(d=>Object.keys(d)))].sort((a,b)=>{
+        const gianList = Object.keys(byGian).sort((a,b)=>{
           if(a==='_unknown_') return 1; if(b==='_unknown_') return -1;
           return a.localeCompare(b);
         });
+        const totGross = Object.values(byGian).reduce((s,d)=>s+d.gross,0);
+        const totPhi   = Object.values(byGian).reduce((s,d)=>s+d.phi,0);
+        const totNet   = Object.values(byGian).reduce((s,d)=>s+d.net,0);
+        const totN     = Object.values(byGian).reduce((s,d)=>s+d.soDon,0);
 
-        let html = `<div style="margin-bottom:.75rem;font-size:.82em;color:#64748b">`;
-        html += `📊 <strong>${_zaloFee.length}</strong> giao dịch · ${dates.length} ngày`;
-        if(_zaloOrders.length) html += ` · Khớp OrderDetails: <strong style="color:#16a34a">${nMatched}</strong> / Chưa khớp: <span style="color:#f59e0b">${nUnmatched}</span>`;
-        else html += ` · <span style="color:#f59e0b">Chưa tải OrderDetails → gian lấy từ Điểm thu</span>`;
+        let html = `<div style="margin-bottom:.6rem;font-size:.82em;color:#64748b">`;
+        html += `📊 FUNZONE: <strong>${nFunzone}</strong> GD`;
+        if(nNoMatch) html += ` · <span style="color:#f59e0b">Chưa khớp OrderDetails: ${nNoMatch}</span>`;
+        if(nOther) html += ` · <span style="color:#94a3b8">VNPay khác (ẩn): ${nOther}</span>`;
+        if(!_zaloOrders.length) html += ` · <span style="color:#ef4444">Chưa tải OrderDetails!</span>`;
         html += `</div>`;
 
-        html += '<table style="width:100%;border-collapse:collapse;font-size:.84em">';
-        html += '<thead><tr style="background:#1e3a5f;color:#fff">'
-          + '<th style="padding:.45rem .75rem;text-align:left">Ngày / Gian</th>'
-          + '<th style="text-align:right;padding:.45rem .6rem">Số GD</th>'
-          + '<th style="text-align:right;padding:.45rem .6rem">DT trước KM</th>'
-          + '<th style="text-align:right;padding:.45rem .6rem">Phí GW</th>'
-          + '<th style="text-align:right;padding:.45rem .6rem">Net GW</th>'
-          + '</tr></thead><tbody>';
+        html += `<table style="width:100%;border-collapse:collapse;font-size:.85em">
+          <thead><tr style="background:#1e3a5f;color:#fff">
+            <th style="padding:.5rem .75rem;text-align:left">Mã CT (Gian)</th>
+            <th style="text-align:right;padding:.5rem .5rem">Số GD</th>
+            <th style="text-align:right;padding:.5rem .5rem">DT trước KM</th>
+            <th style="text-align:right;padding:.5rem .5rem">Phí GW</th>
+            <th style="text-align:right;padding:.5rem .5rem">Net GW</th>
+            <th style="padding:.5rem .5rem;text-align:center">Số HĐ</th>
+            <th style="text-align:right;padding:.5rem .5rem">Tiền HĐ</th>
+            <th style="text-align:right;padding:.5rem .5rem">Chênh lệch</th>
+          </tr></thead><tbody>`;
 
-        dates.forEach(date => {
-          const ctData = byDate[date];
-          const dayGross = Object.values(ctData).reduce((s,v)=>s+v.gross,0);
-          const dayPhi   = Object.values(ctData).reduce((s,v)=>s+v.phi,0);
-          const dayNet   = Object.values(ctData).reduce((s,v)=>s+v.net,0);
-          const dayN     = Object.values(ctData).reduce((s,v)=>s+v.soDon,0);
-          // Date header row (click to collapse)
-          html += `<tr style="background:#2d4a6e;color:#e2e8f0;cursor:pointer" onclick="
-            var tb=this.nextElementSibling;
-            tb.style.display=tb.style.display==='none'?'':'none';
-            this.querySelector('.tog').textContent=tb.style.display===''?'▾':'▸';
-          ">
-            <td style="padding:.4rem .75rem;font-weight:600">
-              <span class="tog">▾</span> 📅 ${date}
+        gianList.forEach((maCT,idx) => {
+          const d = byGian[maCT];
+          const isUnknown = maCT==='_unknown_' || maCT.startsWith('#');
+          const ctLabel = isUnknown
+            ? `<span style="color:#94a3b8;font-style:italic">${maCT==='_unknown_'?'Chưa xác định':maCT}</span>`
+            : `<span class="ct-badge">${maCT}</span>`;
+          const hd = _zaloHD[maCT] || {};
+          const tienHD = parseFloat((hd.tienHD||'0').toString().replace(/[^0-9.-]/g,''))||0;
+          const chenh = tienHD ? (d.net - tienHD) : null;
+          const chenhColor = chenh===null ? '#94a3b8' : (Math.abs(chenh)<1000 ? '#16a34a' : (chenh<0?'#ef4444':'#d97706'));
+          const bg = idx%2===0 ? '#f8fafc' : '#fff';
+          const esc = maCT.replace(/'/g,"\\'");
+          html += `<tr style="background:${bg}">
+            <td style="padding:.4rem .75rem">${ctLabel}</td>
+            <td style="text-align:right;padding:.4rem .5rem;color:#64748b">${d.soDon}</td>
+            <td style="text-align:right;padding:.4rem .5rem;color:#15803d;font-weight:600">${fmtN(d.gross)}</td>
+            <td style="text-align:right;padding:.4rem .5rem;color:#ef4444">${fmtN(d.phi)}</td>
+            <td style="text-align:right;padding:.4rem .5rem;color:#2563eb;font-weight:700">${fmtN(d.net)}</td>
+            <td style="padding:.4rem .3rem;text-align:center">
+              <input placeholder="Số HĐ" value="${hd.soHD||''}"
+                style="width:90px;border:1px solid #cbd5e1;border-radius:4px;padding:.15rem .3rem;font-size:.8em;text-align:center"
+                onchange="saveZaloHD('${esc}','soHD',this.value)">
             </td>
-            <td style="text-align:right;padding:.4rem .6rem">${dayN}</td>
-            <td style="text-align:right;padding:.4rem .6rem;font-weight:700">${fmtN(dayGross)}</td>
-            <td style="text-align:right;padding:.4rem .6rem;color:#fca5a5">${fmtN(dayPhi)}</td>
-            <td style="text-align:right;padding:.4rem .6rem;font-weight:700;color:#93c5fd">${fmtN(dayNet)}</td>
+            <td style="padding:.4rem .3rem">
+              <input placeholder="Tiền HĐ" value="${hd.tienHD||''}"
+                style="width:110px;border:1px solid #cbd5e1;border-radius:4px;padding:.15rem .3rem;font-size:.8em;text-align:right"
+                onchange="saveZaloHD('${esc}','tienHD',this.value);renderZaloDoiSoat()">
+            </td>
+            <td style="text-align:right;padding:.4rem .5rem;font-weight:700;color:${chenhColor}">
+              ${chenh===null ? '—' : (chenh>0?'+':'')+fmtN(chenh)}
+            </td>
           </tr>`;
-          // Gian sub-rows (visible by default)
-          html += `<tbody>`;
-          const ctKeys = Object.keys(ctData).sort((a,b)=>{
-            if(a==='_unknown_') return 1; if(b==='_unknown_') return -1;
-            return a.localeCompare(b);
-          });
-          ctKeys.forEach((maCT,i) => {
-            const d = ctData[maCT];
-            const isUnknown = maCT==='_unknown_';
-            const ctLabel = isUnknown
-              ? `<span style="color:#94a3b8;font-style:italic">Chưa xác định</span>`
-              : `<span class="ct-badge">${maCT}</span>`;
-            const bg = i%2===0 ? '#f8fafc' : '#fff';
-            html += `<tr style="background:${bg}">
-              <td style="padding:.35rem .75rem .35rem 2rem">${ctLabel}</td>
-              <td style="text-align:right;padding:.35rem .6rem;color:#64748b">${d.soDon}</td>
-              <td style="text-align:right;padding:.35rem .6rem;color:#15803d;font-weight:600">${fmtN(d.gross)}</td>
-              <td style="text-align:right;padding:.35rem .6rem;color:#ef4444">${fmtN(d.phi)}</td>
-              <td style="text-align:right;padding:.35rem .6rem;color:#2563eb;font-weight:600">${fmtN(d.net)}</td>
-            </tr>`;
-          });
-          html += `</tbody>`;
         });
 
-        // Tổng cộng theo gian
         html += `<tr style="background:#1e3a5f;color:#fff;font-weight:700">
           <td style="padding:.5rem .75rem">TỔNG CỘNG</td>
-          <td style="text-align:right;padding:.5rem .6rem">${_zaloFee.length}</td>
-          <td style="text-align:right;padding:.5rem .6rem">${fmtN(totGross)}</td>
-          <td style="text-align:right;padding:.5rem .6rem">${fmtN(totPhi)}</td>
-          <td style="text-align:right;padding:.5rem .6rem">${fmtN(totNet)}</td>
+          <td style="text-align:right;padding:.5rem .5rem">${totN}</td>
+          <td style="text-align:right;padding:.5rem .5rem">${fmtN(totGross)}</td>
+          <td style="text-align:right;padding:.5rem .5rem">${fmtN(totPhi)}</td>
+          <td style="text-align:right;padding:.5rem .5rem">${fmtN(totNet)}</td>
+          <td colspan="3"></td>
         </tr>`;
-        // Per-gian total sub-rows
-        gianAll.forEach(maCT => {
-          const d = byGianTot[maCT];
-          if(!d) return;
-          const isUnknown = maCT==='_unknown_';
-          const ctLabel = isUnknown ? 'Chưa xác định' : maCT;
-          html += `<tr style="background:#273549;color:#cbd5e1;font-size:.82em">
-            <td style="padding:.3rem .75rem .3rem 2rem">↳ ${ctLabel}</td>
-            <td style="text-align:right;padding:.3rem .6rem">${d.soDon}</td>
-            <td style="text-align:right;padding:.3rem .6rem;color:#86efac">${fmtN(d.gross)}</td>
-            <td style="text-align:right;padding:.3rem .6rem;color:#fca5a5">${fmtN(d.phi)}</td>
-            <td style="text-align:right;padding:.3rem .6rem;color:#93c5fd">${fmtN(d.net)}</td>
-          </tr>`;
-        });
         html += '</tbody></table>';
         el.innerHTML = html;
       } else {
@@ -2166,6 +2148,12 @@
       });
       html += '</tbody></table>';
       el.innerHTML = html;
+    }
+
+    function saveZaloHD(maCT, field, val) {
+      if(!_zaloHD[maCT]) _zaloHD[maCT] = {};
+      _zaloHD[maCT][field] = val.trim();
+      try { localStorage.setItem(LS_ZALO_HD, JSON.stringify(_zaloHD)); } catch(e){}
     }
 
     function saveZaloSpMap(inp) {
