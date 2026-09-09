@@ -202,7 +202,7 @@
 
       <!-- Sub: Đối soát ngày -->
       <div id="momo-doisoat" class="sub-panel">
-        <div class="filter-bar" style="margin-bottom:.5rem;align-items:center">
+        <div class="filter-bar" style="margin-bottom:.25rem;align-items:center">
           <label style="font-size:.82em;font-weight:600;color:#1e3a5f">Tháng:</label>
           <select id="filterMonth" onchange="renderDoiSoatNgay()" style="padding:.3rem .6rem;border:1px solid #cbd5e1;border-radius:6px;font-size:.85em;font-weight:600;background:#fff;cursor:pointer"></select>
           <span style="font-size:.78em;color:#94a3b8">· Nhóm theo đợt NH trả · Nhập số HĐ để lưu</span>
@@ -1130,9 +1130,12 @@
       const hasBankPayments = _bankMomoPayments.length > 0;
       if (hasBankPayments) {
         _bankMomoPayments.forEach(pay => {
-          // Lấy tất cả ngày Momo trong khoảng trả (kể cả qua tháng, để tránh chênh lớn)
+          // Tất cả ngày Momo trong khoảng trả (dùng cho tính chênh — không lọc tháng)
           const payDates = _dates.filter(d => inRange(d, pay.fromDate, pay.toDate));
-          // Hiển thị header đợt dù payDates rỗng (để biết NH đã trả nhưng Momo tháng này không có)
+          // Chỉ render ngày thuộc tháng đang chọn
+          const renderDates = selMonth ? payDates.filter(d => filteredDates.includes(d)) : payDates;
+          // Ẩn hoàn toàn đợt này nếu không có ngày nào trong tháng đang chọn
+          if (selMonth && renderDates.length === 0) { payDates.forEach(d => coveredDates.add(d)); return; }
           const momoNet = payDates.reduce((s, d) => s + computeDayFinalNet(d), 0);
           const chenhNH = payDates.length > 0 ? (pay.amount - momoNet) : null;
           // Nếu chênh ≤ 700đ: tự điều chỉnh vào gian có amount cao nhất trong payDates
@@ -1161,10 +1164,8 @@
             </td>
           </tr>`;
 
-          payDates.forEach(d => {
-            coveredDates.add(d);
-            html += renderDateRows(d);
-          });
+          payDates.forEach(d => coveredDates.add(d));
+          renderDates.forEach(d => { html += renderDateRows(d); });
         });
       }
 
