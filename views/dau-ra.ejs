@@ -892,10 +892,22 @@
             ${dayNH ? `&nbsp;·&nbsp; NH: <strong style="color:#fbbf24">${fmtN(dayNH)}đ</strong>` : ''}
             <span style="float:right;font-size:.8em;opacity:.7">✏️ Sửa</span>
           </td></tr>`;
+        // Pre-compute tất cả gianDisp để kiểm tra chênh lệch làm tròn
+        const _gDisps = {};
+        gianList.forEach(g => { _gDisps[g] = getGianDisplay(g); });
+        // Nếu tổng các net đã làm tròn không bằng dayNet → bù 1đ vào gian có net lớn nhất
+        const _totalNetRounded = gianList.reduce((s,g) => s + Math.round(_gDisps[g].net), 0);
+        const _dayNetRounded = Math.round(dayNet);
+        const _netAdj = _dayNetRounded - _totalNetRounded; // thường là 0, ±1
+        if (_netAdj !== 0) {
+          const largestG = gianList.reduce((a,b) => _gDisps[a].net >= _gDisps[b].net ? a : b);
+          _gDisps[largestG] = { ..._gDisps[largestG], net: _gDisps[largestG].net + _netAdj };
+        }
+
         gianList.forEach(g => {
-          const dg  = gianData[g];
-          const gDisp = getGianDisplay(g);
-          const ct  = _ctMap[g] || {};
+          const dg    = gianData[g];
+          const gDisp = _gDisps[g];
+          const ct    = _ctMap[g] || {};
           const ctLine = ct.maCT
             ? `<span class="ct-badge">${ct.maCT}</span>${ct.isChiaSe ? '<span class="ct-chiase-badge">CS</span>' : ''}`
             : '<span style="color:#94a3b8;font-size:.74em;font-style:italic">chưa map</span>';
