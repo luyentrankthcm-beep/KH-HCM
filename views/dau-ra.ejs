@@ -1421,24 +1421,38 @@
       document.getElementById('mttCtMapTitle').textContent = `🗺️ Map Mã Điểm → Mã CT · ${label}`;
       const khMap = _mttCtMap[khKey] || {};
       const all = [...new Set(srcRows.map(r => r.maDiem).filter(Boolean))].sort();
-      const tbody = document.getElementById('mttCtMapBody');
-      tbody.innerHTML = all.map((md, i) => {
+      const unmapped = all.filter(md => !khMap[md]);
+      const mapped   = all.filter(md =>  khMap[md]);
+      const khLabel  = label.split(' ')[1];
+      const mkRow = (md, i, isMapped) => {
         const cur = khMap[md] || '';
         const esc = md.replace(/'/g,"&#39;").replace(/"/g,'&quot;');
-        return `<tr style="background:${i%2?'#f8fafc':'#fff'}">
+        const bg  = isMapped ? (i%2?'#f0fdf4':'#dcfce7') : (i%2?'#f8fafc':'#fff');
+        return `<tr style="background:${bg}">
           <td style="padding:.35rem .6rem;font-weight:600;font-size:.83em">${md}</td>
-          <td style="padding:.35rem .6rem;text-align:center;font-size:.78em;color:#64748b">${label.split(' ')[1]}</td>
+          <td style="padding:.35rem .6rem;text-align:center;font-size:.78em;color:#64748b">${khLabel}</td>
           <td style="padding:.35rem .6rem">
             <div style="display:flex;gap:.4rem;align-items:center">
               <input id="mttct_${i}" data-md="${esc}" data-kh="${khKey}" value="${cur}"
-                style="width:100%;padding:.25rem .4rem;border:1px solid #cbd5e1;border-radius:4px;font-size:.82em"
+                style="width:100%;padding:.25rem .4rem;border:1px solid ${isMapped?'#86efac':'#cbd5e1'};border-radius:4px;font-size:.82em;background:${isMapped?'#f0fdf4':'#fff'}"
                 onkeydown="if(event.key==='Enter')saveMttCtMapRow(this)">
               <button onclick="saveMttCtMapRow(document.getElementById('mttct_${i}'))"
                 style="background:#6366f1;color:#fff;border:none;border-radius:4px;padding:.2rem .5rem;cursor:pointer;font-size:.78em;white-space:nowrap">Lưu</button>
             </div>
           </td>
         </tr>`;
-      }).join('');
+      };
+      const tbody = document.getElementById('mttCtMapBody');
+      let html = '';
+      if (unmapped.length) {
+        html += `<tr style="background:#fef3c7"><td colspan="3" style="padding:.3rem .6rem;font-size:.78em;font-weight:700;color:#92400e">⏳ Chưa map (${unmapped.length})</td></tr>`;
+        html += unmapped.map((md, i) => mkRow(md, i, false)).join('');
+      }
+      if (mapped.length) {
+        html += `<tr style="background:#d1fae5"><td colspan="3" style="padding:.3rem .6rem;font-size:.78em;font-weight:700;color:#065f46">✅ Đã map (${mapped.length})</td></tr>`;
+        html += mapped.map((md, i) => mkRow(md, unmapped.length + i, true)).join('');
+      }
+      tbody.innerHTML = html;
       document.getElementById('mttCtMapModal').classList.add('open');
     }
 
