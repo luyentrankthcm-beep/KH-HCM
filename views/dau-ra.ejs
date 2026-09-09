@@ -128,7 +128,7 @@
       <button class="tab-btn active" onclick="switchTab('momo', this)">🟣 Momo</button>
       <button class="tab-btn" onclick="switchTab('zvp', this)">🔵 Zalo/VNPay/Payoo</button>
       <button class="tab-btn" onclick="switchTab('vietqr', this)">🟢 Viet QR</button>
-      <button class="tab-btn" onclick="switchTab('mtt', this)">🔶 MTT / Hoàn tiền</button>
+      <button class="tab-btn" onclick="switchTab('mtt', this)">🔶 MTT / Hóa đơn</button>
     </div>
 
     <!-- ==================== MOMO TAB ==================== -->
@@ -254,14 +254,20 @@
     <div id="mtt" class="tab-panel">
       <div class="channel-header">
         <div class="acct-info">
-          MTT / Hoàn tiền &nbsp;<span style="font-size:.78em;color:#64748b">· File đối soát hoàn tiền từ các kênh thanh toán</span>
+          MTT / Hóa đơn &nbsp;<span style="font-size:.78em;color:#64748b">· Kê danh sách xuất hóa đơn MTT (989 & 705)</span>
         </div>
         <button class="btn-nhap" style="background:#d97706" onclick="openMttModal()">📤 Nhập file MTT</button>
       </div>
 
+      <!-- Sub-tabs KH Cũ / KH Mới -->
+      <div id="mttSubTabs" style="display:none;margin:.4rem 0 0;border-bottom:2px solid #e2e8f0">
+        <button id="mttTabCu"  class="sub-tab-btn active" onclick="switchMttTab('cu')">📋 KH Cũ (989)</button>
+        <button id="mttTabMoi" class="sub-tab-btn"        onclick="switchMttTab('moi')">📋 KH Mới (705)</button>
+      </div>
+
       <div id="mttEmpty" class="empty-state">
         <div class="big-icon">🔶</div>
-        <p>Chưa có dữ liệu MTT<br>Nhấn <strong>Nhập file MTT</strong> để tải lên · Hệ thống tự nhận dạng KH Cũ / KH Mới</p>
+        <p>Chưa có dữ liệu MTT<br>Nhấn <strong>Nhập file MTT</strong> để tải lên · Hệ thống tự đọc 2 sheet KH Cũ / KH Mới</p>
       </div>
 
       <div id="mttResults" style="display:none">
@@ -273,7 +279,18 @@
         </div>
         <div style="overflow-x:auto;border:1px solid #e2e8f0;border-radius:8px;max-height:65vh;overflow-y:auto">
           <table style="width:100%;border-collapse:collapse;font-size:.83em">
-            <thead><tr id="mttHead" style="background:#92400e;color:#fff;position:sticky;top:0"></tr></thead>
+            <thead>
+              <tr style="background:#92400e;color:#fff;position:sticky;top:0">
+                <th style="padding:.5rem .75rem;text-align:left;white-space:nowrap">Ngày HĐ</th>
+                <th style="padding:.5rem .75rem;text-align:right;white-space:nowrap">Số HĐ</th>
+                <th style="padding:.5rem .75rem;text-align:right;white-space:nowrap">Tổng tiền</th>
+                <th style="padding:.5rem .75rem;text-align:left">Dịch vụ</th>
+                <th style="padding:.5rem .75rem;text-align:left;white-space:nowrap">Mã điểm HT Misa</th>
+                <th style="padding:.5rem .75rem;text-align:left;white-space:nowrap">Mã NCC HT Misa</th>
+                <th style="padding:.5rem .75rem;text-align:left">Ghi chú</th>
+                <th style="padding:.5rem .75rem;text-align:left;white-space:nowrap">Dịch vụ thu hộ</th>
+              </tr>
+            </thead>
             <tbody id="mttBody"></tbody>
           </table>
         </div>
@@ -331,8 +348,8 @@
   <!-- ==================== MTT MODAL ==================== -->
   <div id="mttModal" class="modal-overlay" onclick="if(event.target===this)closeMttModal()">
     <div class="modal-box">
-      <h3>📤 Nhập file MTT – Hoàn tiền</h3>
-      <p class="modal-sub">Tải file đối soát MTT (Excel/CSV). Hệ thống đọc cấu trúc để Claude thiết lập parser.</p>
+      <h3>📤 Nhập file MTT – Hóa đơn</h3>
+      <p class="modal-sub">Tải file MTT Excel. Hệ thống tự đọc sheet <strong>"kê ds xuất HĐ MTT 989"</strong> (KH Cũ) và <strong>"kê ds xuất HĐ MTT"</strong> (KH Mới).</p>
       <div class="upload-area" onclick="document.getElementById('mttFileInput').click()">
         <span class="big-icon">📂</span>
         <div>Nhấn để chọn file <strong>.xlsx / .csv</strong></div>
@@ -340,8 +357,8 @@
         <input type="file" id="mttFileInput" accept=".xlsx,.xls,.csv" style="display:none" onchange="handleMttFile(this.files[0])">
       </div>
       <div id="mttUploadStatus" class="upload-status"></div>
-      <div style="margin-top:.75rem;padding:.6rem .75rem;background:#fef9c3;border-radius:6px;font-size:.8em;color:#854d0e">
-        ⚠️ Format file MTT chưa cấu hình. Tải lên → Claude xem cấu trúc → thiết lập parser.
+      <div style="margin-top:.75rem;padding:.6rem .75rem;background:#f0fdf4;border-radius:6px;font-size:.8em;color:#166534">
+        ✅ Upload 1 file chứa cả 2 sheet → hệ thống tự phân loại KH Cũ / KH Mới.
       </div>
       <div class="modal-actions">
         <button class="btn-cancel" onclick="closeMttModal()">Đóng</button>
@@ -1144,12 +1161,75 @@
       XLSX.writeFile(wb, 'Momo_pivot.xlsx');
     }
 
-    // ── MTT / Hoàn tiền ──
-    const LS_MTT = `mtt_rows_${COMPANY}`;
-    let _mttRows = [];
+    // ── MTT / Hóa đơn ──
+    const LS_MTT_CU  = `mtt_cu_${COMPANY}`;
+    const LS_MTT_MOI = `mtt_moi_${COMPANY}`;
+    let _mttCu  = [];
+    let _mttMoi = [];
+    let _mttActive = 'cu'; // 'cu' hoặc 'moi'
+
+    try { const s = localStorage.getItem(LS_MTT_CU);  if (s) _mttCu  = JSON.parse(s); } catch(e) {}
+    try { const s = localStorage.getItem(LS_MTT_MOI); if (s) _mttMoi = JSON.parse(s); } catch(e) {}
+    if (_mttCu.length || _mttMoi.length) { renderMttTable(); }
 
     function openMttModal()  { document.getElementById('mttModal').classList.add('open'); }
     function closeMttModal() { document.getElementById('mttModal').classList.remove('open'); }
+
+    function switchMttTab(tab) {
+      _mttActive = tab;
+      document.getElementById('mttTabCu').classList.toggle('active', tab === 'cu');
+      document.getElementById('mttTabMoi').classList.toggle('active', tab === 'moi');
+      renderMttTable();
+    }
+
+    function parseMttSheet(data, isCu) {
+      // Tìm dòng header (có 'Số HĐ')
+      let headerIdx = -1;
+      for (let i = 0; i < data.length; i++) {
+        if (data[i].some(c => String(c||'').trim() === 'Số HĐ')) { headerIdx = i; break; }
+      }
+      if (headerIdx < 0) return [];
+      const header = data[headerIdx];
+      const fc = name => header.findIndex(c => String(c||'').trim() === name);
+      const colNgay  = fc('Ngày HĐ');
+      const colSoHD  = fc('Số HĐ');
+      const colTong  = fc('Tổng TT HĐ htoan Misa');
+      const colDV    = isCu ? fc('Nội dung xuất hóa đơn') : fc('Nội dung hóa đơn');
+      const colMaDiem = isCu ? fc('Mã điểm trên misa thuế') : fc('Mã điểm ghi chú HT Misa');
+      const colMaNCC  = isCu ? fc('Mã KH HT Misa') : fc('Mã NCC HT Misa');
+      const colGhiChu = fc('ghi chú');
+      const colThuHo  = isCu ? header.findIndex(c => String(c||'').includes('Dịch vụ thu hộ'))
+                              : fc('Dịch vụ thu hộ');
+      const rows = [];
+      for (let i = headerIdx + 1; i < data.length; i++) {
+        const r = data[i];
+        const soHD = r[colSoHD];
+        const tong = r[colTong];
+        if (!soHD && !tong) continue;
+        // Format ngày
+        let ngay = '';
+        const rawD = r[colNgay];
+        if (typeof rawD === 'number') {
+          // Excel serial → JS Date via XLSX
+          const d = XLSX.SSF.parse_date_code(rawD);
+          ngay = `${String(d.d).padStart(2,'0')}/${String(d.m).padStart(2,'0')}/${d.y}`;
+        } else if (rawD instanceof Date) {
+          ngay = `${String(rawD.getDate()).padStart(2,'0')}/${String(rawD.getMonth()+1).padStart(2,'0')}/${rawD.getFullYear()}`;
+        } else if (rawD) { ngay = String(rawD); }
+        rows.push({
+          ngay,
+          soHD: soHD || '',
+          tongTien: typeof tong === 'number' ? tong : (parseFloat(String(tong).replace(/[^0-9.-]/g,''))||0),
+          dichVu:   String(r[colDV]    ||''),
+          maDiem:   String(r[colMaDiem]||''),
+          maNCC:    String(r[colMaNCC] ||''),
+          ghiChu:   String(r[colGhiChu]||''),
+          dichVuThuHo: String(r[colThuHo]||''),
+        });
+      }
+      rows.sort((a,b) => (Number(a.soHD)||0) - (Number(b.soHD)||0));
+      return rows;
+    }
 
     function handleMttFile(file) {
       if (!file) return;
@@ -1159,30 +1239,68 @@
       const reader = new FileReader();
       reader.onload = function(e) {
         try {
-          const wb   = XLSX.read(e.target.result, { type: 'array', cellDates: false });
-          const ws   = wb.Sheets[wb.SheetNames[0]];
-          const data = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
-          const preview = data.slice(0, 10).map(r => r.map(c => String(c).substring(0,30)).join(' | ')).join('\n');
+          const wb = XLSX.read(e.target.result, { type: 'array', cellDates: false });
+          // Tìm sheet KH Cũ (989)
+          const shCuName  = wb.SheetNames.find(n => n.includes('989') && n.toLowerCase().includes('kê'));
+          // Tìm sheet KH Mới (705 hoặc "kê ds xuất HĐ MTT" không có 989)
+          const shMoiName = wb.SheetNames.find(n => !n.includes('989') && n.toLowerCase().includes('kê'));
+          const cuData  = shCuName  ? XLSX.utils.sheet_to_json(wb.Sheets[shCuName],  { header:1, defval:'' }) : [];
+          const moiData = shMoiName ? XLSX.utils.sheet_to_json(wb.Sheets[shMoiName], { header:1, defval:'' }) : [];
+          _mttCu  = parseMttSheet(cuData,  true);
+          _mttMoi = parseMttSheet(moiData, false);
+          try { localStorage.setItem(LS_MTT_CU,  JSON.stringify(_mttCu));  } catch(e) {}
+          try { localStorage.setItem(LS_MTT_MOI, JSON.stringify(_mttMoi)); } catch(e) {}
           st.className = 'upload-status ok';
-          st.innerHTML = `✅ Đọc được ${data.length} dòng · ${wb.SheetNames.length} sheet · Sheet đầu: <em>${wb.SheetNames[0]}</em><br>
-            <details open style="margin-top:.4rem;font-size:.78em">
-              <summary>Cấu trúc 10 dòng đầu (gửi cho Claude để thiết lập parser)</summary>
-              <pre style="background:#f1f5f9;border-radius:4px;padding:.5rem;overflow-x:auto;margin:.4rem 0;font-size:.73em;max-height:200px;white-space:pre-wrap">${preview}</pre>
-            </details>`;
+          st.textContent = `✅ KH Cũ: ${_mttCu.length} dòng · KH Mới: ${_mttMoi.length} dòng`;
+          closeMttModal();
+          renderMttTable();
         } catch(err) {
           st.className = 'upload-status err';
-          st.textContent = '❌ Lỗi đọc file: ' + err.message;
+          st.textContent = '❌ Lỗi: ' + err.message;
         }
       };
       reader.readAsArrayBuffer(file);
     }
 
+    function renderMttTable() {
+      const rows = _mttActive === 'cu' ? _mttCu : _mttMoi;
+      const label = _mttActive === 'cu' ? 'KH Cũ (989)' : 'KH Mới (705)';
+      const hasCu  = _mttCu.length > 0;
+      const hasMoi = _mttMoi.length > 0;
+      if (!hasCu && !hasMoi) {
+        document.getElementById('mttEmpty').style.display = 'block';
+        document.getElementById('mttResults').style.display = 'none';
+        document.getElementById('mttSubTabs').style.display = 'none';
+        return;
+      }
+      document.getElementById('mttEmpty').style.display = 'none';
+      document.getElementById('mttResults').style.display = 'block';
+      document.getElementById('mttSubTabs').style.display = 'block';
+      const fmt = n => Math.round(n).toLocaleString('vi');
+      const tongAll = rows.reduce((s,r) => s + r.tongTien, 0);
+      document.getElementById('mttMeta').textContent = `${label} · ${rows.length} hóa đơn · Tổng: ${fmt(tongAll)}đ`;
+      const tbody = document.getElementById('mttBody');
+      if (!rows.length) { tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#94a3b8;padding:1.5rem">Không có dữ liệu</td></tr>'; return; }
+      tbody.innerHTML = rows.map((r,i) => `<tr style="background:${i%2?'#f8fafc':'#fff'}">
+        <td style="padding:.4rem .75rem;white-space:nowrap">${r.ngay}</td>
+        <td style="padding:.4rem .75rem;text-align:right;font-weight:600">${r.soHD}</td>
+        <td style="padding:.4rem .75rem;text-align:right;color:#15803d;font-weight:600">${fmt(r.tongTien)}</td>
+        <td style="padding:.4rem .75rem;color:#475569;font-size:.82em">${r.dichVu}</td>
+        <td style="padding:.4rem .75rem;font-weight:600;font-size:.82em">${r.maDiem}</td>
+        <td style="padding:.4rem .75rem;font-size:.82em">${r.maNCC}</td>
+        <td style="padding:.4rem .75rem;color:#64748b;font-size:.82em">${r.ghiChu}</td>
+        <td style="padding:.4rem .75rem;color:#0369a1;font-size:.82em">${r.dichVuThuHo}</td>
+      </tr>`).join('');
+    }
+
     function clearMttData() {
       if (!confirm('Xóa toàn bộ dữ liệu MTT?')) return;
-      _mttRows = [];
-      try { localStorage.removeItem(LS_MTT); } catch(e) {}
+      _mttCu = []; _mttMoi = [];
+      try { localStorage.removeItem(LS_MTT_CU);  } catch(e) {}
+      try { localStorage.removeItem(LS_MTT_MOI); } catch(e) {}
       document.getElementById('mttEmpty').style.display = 'block';
       document.getElementById('mttResults').style.display = 'none';
+      document.getElementById('mttSubTabs').style.display = 'none';
     }
 
     // ── Fetch các đợt NH trả Momo về cho Đối soát ngày ──
