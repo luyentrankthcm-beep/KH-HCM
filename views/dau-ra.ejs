@@ -498,7 +498,7 @@
         return (ya + ma).localeCompare(yb + mb);
       });
       const curVal = sel.value;
-      sel.innerHTML = months.map(m => `<option value="${m}">${m}</option>`).join('');
+      sel.innerHTML = `<option value="">Tất cả</option>` + months.map(m => `<option value="${m}">${m}</option>`).join('');
       const today = new Date();
       const curMonth = String(today.getMonth()+1).padStart(2,'0') + '/' + today.getFullYear();
       sel.value = months.includes(curVal) ? curVal
@@ -1051,8 +1051,13 @@
       const hasBankPayments = _bankMomoPayments.length > 0;
       if (hasBankPayments) {
         _bankMomoPayments.forEach(pay => {
-          // Lấy tất cả ngày Momo đã upload nằm trong khoảng trả của đợt này (kể cả qua tháng)
-          const payDates = _dates.filter(d => inRange(d, pay.fromDate, pay.toDate));
+          // Lấy ngày Momo nằm trong khoảng trả; nếu chọn tháng cụ thể thì ẩn tháng khác
+          const payDates = _dates.filter(d => {
+            if (!inRange(d, pay.fromDate, pay.toDate)) return false;
+            if (!selMonth) return true; // Tất cả: hiện mọi tháng
+            const [dd, mm, yy] = d.split('-');
+            return `${mm}/${yy}` === selMonth;
+          });
           // Hiển thị header đợt dù payDates rỗng (để biết NH đã trả nhưng Momo tháng này không có)
           const momoNet = payDates.reduce((s, d) => s + computeDayFinalNet(d), 0);
           const chenhNH = payDates.length > 0 ? (pay.amount - momoNet) : null;
