@@ -215,7 +215,6 @@
                 <th style="padding:.5rem .75rem;text-align:right;min-width:120px">Doanh thu</th>
                 <th style="padding:.5rem .75rem;text-align:right;min-width:100px">Phí Momo</th>
                 <th class="col-net" style="padding:.5rem .75rem;text-align:right;min-width:130px">💙 Tiền Net</th>
-                <th style="padding:.5rem .75rem;text-align:right;min-width:130px;background:#1e4a6f">Tiền NH về</th>
                 <th style="padding:.5rem .75rem;min-width:140px">Số hóa đơn</th>
                 <th style="padding:.5rem .75rem;text-align:right;min-width:120px">Tiền HĐ</th>
               </tr>
@@ -739,7 +738,7 @@
           <td style="font-size:.78em;color:#64748b">${r.maDon}</td>
         </tr>`;
       });
-      document.getElementById('detailBody').innerHTML = html || '<tr><td colspan="7" style="text-align:center;color:#94a3b8;padding:1rem">Không có dữ liệu</td></tr>';
+      document.getElementById('detailBody').innerHTML = html || '<tr><td colspan="6" style="text-align:center;color:#94a3b8;padding:1rem">Không có dữ liệu</td></tr>';
     }
 
     // ── Render history ──
@@ -808,7 +807,7 @@
     function renderDoiSoatNgay() {
       const el = document.getElementById('doiSoatBody');
       if (!el || !_rows.length) {
-        if (el) el.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#94a3b8;padding:1.5rem">Chưa có dữ liệu</td></tr>';
+        if (el) el.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#94a3b8;padding:1.5rem">Chưa có dữ liệu</td></tr>';
         return;
       }
 
@@ -820,7 +819,7 @@
         return `${mm}/${yy}` === selMonth;
       });
       if (!filteredDates.length) {
-        el.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#94a3b8;padding:1.5rem">Không có dữ liệu cho tháng đã chọn</td></tr>';
+        el.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#94a3b8;padding:1.5rem">Không có dữ liệu cho tháng đã chọn</td></tr>';
         return;
       }
 
@@ -884,7 +883,7 @@
         }, 0);
         const dateId = date.replace(/-/g,'_');
         let out = `<tr style="background:#374151;color:#e5e7eb;cursor:pointer" onclick="toggleEditPanel('${dateId}')">
-          <td colspan="7" style="padding:.38rem .75rem .38rem 1.25rem;font-size:.87em">
+          <td colspan="6" style="padding:.38rem .75rem .38rem 1.25rem;font-size:.87em">
             📅 <strong>${date}</strong>
             &nbsp;·&nbsp; DT: ${fmtN(dayDT)}đ
             &nbsp;·&nbsp; Phí: ${fmtN(dayPhi)}đ
@@ -919,7 +918,6 @@
             <td style="text-align:right;color:#15803d;font-weight:600">${fmtN(gDisp.dt)}${hasOvr&&hd.dtOvr?'<sup style="color:#f59e0b;font-size:.7em">✏</sup>':''}</td>
             <td style="text-align:right;color:#dc2626">${fmtN(Math.round(gDisp.fee))}</td>
             <td class="col-net" style="text-align:right">${fmtN(Math.round(gDisp.net))}${hasOvr&&hd.netOvr?'<sup style="color:#f59e0b;font-size:.7em">✏</sup>':''}</td>
-            <td>${hd.tienNH ? `<span style="font-size:.82em;color:#0369a1;font-weight:600">${fmtN(parseFloat(String(hd.tienNH).replace(/[^0-9.]/g,''))||0)}đ</span>` : '<span style="color:#cbd5e1;font-size:.78em">–</span>'}</td>
             <td>${hd.soHD ? `<span style="font-size:.82em;font-weight:600">${hd.soHD}</span>` : '<span style="color:#cbd5e1;font-size:.78em">–</span>'}</td>
             <td>${hd.soTienHD ? `<span style="font-size:.82em;font-weight:600">${fmtN(parseFloat(String(hd.soTienHD).replace(/[^0-9.]/g,''))||0)}đ</span>` : '<span style="color:#cbd5e1;font-size:.78em">–</span>'}</td>
           </tr>`;
@@ -930,11 +928,11 @@
           <td style="text-align:right;color:#15803d;font-weight:700">${fmtN(dayDT)}</td>
           <td style="text-align:right;color:#dc2626;font-weight:700">${fmtN(Math.round(dayPhi))}</td>
           <td class="col-net" style="text-align:right;font-weight:800">${fmtN(Math.round(dayNet))}</td>
-          <td colspan="3"></td>
+          <td colspan="2"></td>
         </tr>`;
         // Bảng chỉnh sửa (ẩn mặc định, toggle khi click header ngày)
         out += `<tr id="edit_${dateId}" style="display:none">
-          <td colspan="7" style="padding:.75rem 1rem;background:#f8fafc;border-top:2px dashed #3b82f6">
+          <td colspan="6" style="padding:.75rem 1rem;background:#f8fafc;border-top:2px dashed #3b82f6">
             <div style="font-size:.82em;font-weight:700;color:#1e3a5f;margin-bottom:.5rem">✏️ Chỉnh sửa – ${date}</div>
             <div style="overflow-x:auto">
             <table style="min-width:700px;border-collapse:collapse;font-size:.82em">
@@ -942,7 +940,6 @@
                 <th style="padding:.3rem .5rem;text-align:left;border:1px solid #c7d2fe">Gian</th>
                 <th style="padding:.3rem .5rem;text-align:right;border:1px solid #c7d2fe">Doanh thu</th>
                 <th style="padding:.3rem .5rem;text-align:right;border:1px solid #c7d2fe">Net (sửa được)</th>
-                <th style="padding:.3rem .5rem;text-align:right;border:1px solid #c7d2fe">Tiền NH</th>
                 <th style="padding:.3rem .5rem;border:1px solid #c7d2fe">Số HĐ</th>
                 <th style="padding:.3rem .5rem;text-align:right;border:1px solid #c7d2fe">Tiền HĐ</th>
               </tr></thead>
@@ -964,10 +961,6 @@
                     <td style="padding:.3rem .5rem;border:1px solid #e2e8f0;text-align:right">
                       <input id="edit_netOvr_${dateId}_${g.replace(/[^a-zA-Z0-9]/g,'_')}" type="text" value="${netVal}"
                         style="width:110px;border:1px solid #bfdbfe;border-radius:4px;padding:.2rem .35rem;text-align:right;background:#eff6ff;color:#0d47a1;font-weight:700">
-                    </td>
-                    <td style="padding:.3rem .5rem;border:1px solid #e2e8f0;text-align:right">
-                      <input id="edit_tienNH_${dateId}_${g.replace(/[^a-zA-Z0-9]/g,'_')}" type="text" value="${hd.tienNH||''}" placeholder="0"
-                        style="width:100px;border:1px solid #bae6fd;border-radius:4px;padding:.2rem .35rem;text-align:right;background:#f0f9ff">
                     </td>
                     <td style="padding:.3rem .5rem;border:1px solid #e2e8f0">
                       <input id="edit_soHD_${dateId}_${g.replace(/[^a-zA-Z0-9]/g,'_')}" type="text" value="${hd.soHD||''}" placeholder="0000123"
@@ -1007,17 +1000,12 @@
           const momoNet = payDates.reduce((s, d) => {
             return s + Object.values(byDate[d] || {}).reduce((s2, v) => s2 + v.amount - Math.round(v.fee), 0);
           }, 0);
-          const diff = pay.amount - momoNet;
-          const matchIcon = payDates.length === 0 ? '' : (Math.abs(diff) < 1000 ? '✅' : '⚠️');
-          const diffText = payDates.length > 0 && Math.abs(diff) >= 1000
-            ? ` · Chênh: <span style="color:#fbbf24">${diff > 0 ? '+' : ''}${fmtN(diff)}đ</span>`
-            : '';
           const momoNetText = payDates.length > 0
-            ? ` · Momo Net: <strong>${fmtN(momoNet)}đ</strong> ${matchIcon}${diffText}`
+            ? ` · Momo Net: <strong>${fmtN(momoNet)}đ</strong>`
             : '';
 
           html += `<tr>
-            <td colspan="7" style="background:#1e4a6f;color:#e0f2fe;padding:.6rem .75rem;font-weight:700;font-size:.9em;border-top:2px solid #0ea5e9">
+            <td colspan="6" style="background:#1e4a6f;color:#e0f2fe;padding:.6rem .75rem;font-weight:700;font-size:.9em;border-top:2px solid #0ea5e9">
               📦 NH trả về <strong>${pay.payDate}</strong>:
               <span style="font-size:1.12em;font-weight:900;color:#fff;background:#0369a1;padding:.05rem .55rem;border-radius:6px;margin:0 2px">${fmtN(pay.amount)}đ</span>
               &nbsp;·&nbsp; Momo ngày <span style="color:#bae6fd">${pay.fromDate}</span> → <span style="color:#bae6fd">${pay.toDate}</span>${momoNetText}
@@ -1039,7 +1027,7 @@
           const unpaidNet = unpaidDates.reduce((s, d) =>
             s + Object.values(byDate[d] || {}).reduce((s2, v) => s2 + v.amount - Math.round(v.fee), 0), 0);
           html += `<tr>
-            <td colspan="7" style="background:#78350f;color:#fef3c7;padding:.6rem .75rem;font-weight:700;font-size:.9em;border-top:2px solid #d97706">
+            <td colspan="6" style="background:#78350f;color:#fef3c7;padding:.6rem .75rem;font-weight:700;font-size:.9em;border-top:2px solid #d97706">
               ⏳ Chưa có NH trả về &nbsp;·&nbsp; Tổng Net: ${fmtN(unpaidNet)}đ
             </td>
           </tr>`;
@@ -1047,7 +1035,7 @@
         unpaidDates.forEach(d => { html += renderDateRows(d); });
       }
 
-      el.innerHTML = html || '<tr><td colspan="7" style="text-align:center;color:#94a3b8;padding:1.5rem">Chưa có dữ liệu</td></tr>';
+      el.innerHTML = html || '<tr><td colspan="6" style="text-align:center;color:#94a3b8;padding:1.5rem">Chưa có dữ liệu</td></tr>';
     }
 
     // ── Export pivot ──
