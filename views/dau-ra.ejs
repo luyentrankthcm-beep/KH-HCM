@@ -882,19 +882,10 @@
           return s + v;
         }, 0);
         const dateId = date.replace(/-/g,'_');
-        let out = `<tr style="background:#374151;color:#e5e7eb;cursor:pointer" onclick="toggleEditPanel('${dateId}')">
-          <td colspan="6" style="padding:.38rem .75rem .38rem 1.25rem;font-size:.87em">
-            📅 <strong>${date}</strong>
-            &nbsp;·&nbsp; DT: ${fmtN(dayDT)}đ
-            &nbsp;·&nbsp; Phí: ${fmtN(dayPhi)}đ
-            &nbsp;·&nbsp; Net: <strong style="color:#93c5fd">${fmtN(dayNet)}đ</strong>
-            ${dayNH ? `&nbsp;·&nbsp; NH: <strong style="color:#fbbf24">${fmtN(dayNH)}đ</strong>` : ''}
-            <span style="float:right;font-size:.8em;opacity:.7">✏️ Sửa</span>
-          </td></tr>`;
         // Pre-compute tất cả gianDisp để kiểm tra chênh lệch làm tròn
         const _gDisps = {};
         gianList.forEach(g => { _gDisps[g] = getGianDisplay(g); });
-        // Nếu tổng các net đã làm tròn không bằng dayNet → bù 1đ vào gian có net lớn nhất
+        // Bước 1: bù 1đ nếu tổng làm tròn các gian không khớp dayNet
         const _totalNetRounded = gianList.reduce((s,g) => s + Math.round(_gDisps[g].net), 0);
         const _dayNetRounded = Math.round(dayNet);
         const _netAdj = _dayNetRounded - _totalNetRounded; // thường là 0, ±1
@@ -902,6 +893,27 @@
           const largestG = gianList.reduce((a,b) => _gDisps[a].net >= _gDisps[b].net ? a : b);
           _gDisps[largestG] = { ..._gDisps[largestG], net: _gDisps[largestG].net + _netAdj };
         }
+        // Bước 2: nếu chênh với NH đúng ±1đ → bù thêm vào gian lớn nhất
+        const _sumAfterAdj = gianList.reduce((s,g) => s + Math.round(_gDisps[g].net), 0);
+        const _nhChenhRaw = dayNH > 0 ? (dayNH - _sumAfterAdj) : 0;
+        if (_nhChenhRaw === 1 || _nhChenhRaw === -1) {
+          const largestGN = gianList.reduce((a,b) => _gDisps[a].net >= _gDisps[b].net ? a : b);
+          _gDisps[largestGN] = { ..._gDisps[largestGN], net: _gDisps[largestGN].net + _nhChenhRaw };
+        }
+        // Tổng final sau tất cả điều chỉnh
+        const _finalNetSum = gianList.reduce((s,g) => s + Math.round(_gDisps[g].net), 0);
+        const _finalPhi = dayDT - _finalNetSum;
+        const _nhChenhFinal = dayNH > 0 ? (dayNH - _finalNetSum) : null;
+        let out = `<tr style="background:#374151;color:#e5e7eb;cursor:pointer" onclick="toggleEditPanel('${dateId}')">
+          <td colspan="6" style="padding:.38rem .75rem .38rem 1.25rem;font-size:.87em">
+            📅 <strong>${date}</strong>
+            &nbsp;·&nbsp; DT: ${fmtN(dayDT)}đ
+            &nbsp;·&nbsp; Phí: ${fmtN(_finalPhi)}đ
+            &nbsp;·&nbsp; Net: <strong style="color:#93c5fd">${fmtN(_finalNetSum)}đ</strong>
+            ${dayNH ? `&nbsp;·&nbsp; NH: <strong style="color:#fbbf24">${fmtN(dayNH)}đ</strong>` : ''}
+            ${_nhChenhFinal !== null ? `&nbsp;·&nbsp; ${_nhChenhFinal !== 0 ? '⚠️' : '✅'} Chênh: <strong style="color:${_nhChenhFinal===0?'#4ade80':'#fca5a5'}">${_nhChenhFinal>0?'+':''}${fmtN(_nhChenhFinal)}đ</strong>` : ''}
+            <span style="float:right;font-size:.8em;opacity:.7">✏️ Sửa</span>
+          </td></tr>`;
 
         gianList.forEach(g => {
           const dg    = gianData[g];
@@ -926,8 +938,8 @@
         out += `<tr class="gian-total">
           <td style="padding-left:2rem;font-weight:700;color:#0369a1">Tổng cộng</td>
           <td style="text-align:right;color:#15803d;font-weight:700">${fmtN(dayDT)}</td>
-          <td style="text-align:right;color:#dc2626;font-weight:700">${fmtN(Math.round(dayPhi))}</td>
-          <td class="col-net" style="text-align:right;font-weight:800">${fmtN(Math.round(dayNet))}</td>
+          <td style="text-align:right;color:#dc2626;font-weight:700">${fmtN(_finalPhi)}</td>
+          <td class="col-net" style="text-align:right;font-weight:800">${fmtN(_finalNetSum)}</td>
           <td colspan="2"></td>
         </tr>`;
         // Bảng chỉnh sửa (ẩn mặc định, toggle khi click header ngày)
@@ -1000,15 +1012,19 @@
           const momoNet = payDates.reduce((s, d) => {
             return s + Object.values(byDate[d] || {}).reduce((s2, v) => s2 + v.amount - Math.round(v.fee), 0);
           }, 0);
+          const chenhNH = payDates.length > 0 ? (pay.amount - momoNet) : null;
           const momoNetText = payDates.length > 0
             ? ` · Momo Net: <strong>${fmtN(momoNet)}đ</strong>`
+            : '';
+          const chenhText = chenhNH !== null
+            ? ` &nbsp;·&nbsp; ${chenhNH !== 0 ? '⚠️' : '✅'} <span style="color:${chenhNH===0?'#4ade80':'#fca5a5'}">Chênh: <strong>${chenhNH>0?'+':''}${fmtN(chenhNH)}đ</strong></span>`
             : '';
 
           html += `<tr>
             <td colspan="6" style="background:#1e4a6f;color:#e0f2fe;padding:.6rem .75rem;font-weight:700;font-size:.9em;border-top:2px solid #0ea5e9">
               📦 NH trả về <strong>${pay.payDate}</strong>:
               <span style="font-size:1.12em;font-weight:900;color:#fff;background:#0369a1;padding:.05rem .55rem;border-radius:6px;margin:0 2px">${fmtN(pay.amount)}đ</span>
-              &nbsp;·&nbsp; Momo ngày <span style="color:#bae6fd">${pay.fromDate}</span> → <span style="color:#bae6fd">${pay.toDate}</span>${momoNetText}
+              &nbsp;·&nbsp; Momo ngày <span style="color:#bae6fd">${pay.fromDate}</span> → <span style="color:#bae6fd">${pay.toDate}</span>${momoNetText}${chenhText}
             </td>
           </tr>`;
 
