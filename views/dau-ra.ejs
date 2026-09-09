@@ -912,6 +912,14 @@
             <td>${hd.soTienHD ? `<span style="font-size:.82em;font-weight:600">${fmtN(parseFloat(String(hd.soTienHD).replace(/[^0-9.]/g,''))||0)}đ</span>` : '<span style="color:#cbd5e1;font-size:.78em">–</span>'}</td>
           </tr>`;
         });
+        // Dòng tổng cuối ngày
+        out += `<tr class="gian-total">
+          <td style="padding-left:2rem;font-weight:700;color:#0369a1">Tổng cộng</td>
+          <td style="text-align:right;color:#15803d;font-weight:700">${fmtN(dayDT)}</td>
+          <td style="text-align:right;color:#dc2626;font-weight:700">${fmtN(Math.round(dayPhi))}</td>
+          <td class="col-net" style="text-align:right;font-weight:800">${fmtN(Math.round(dayNet))}</td>
+          <td colspan="3"></td>
+        </tr>`;
         // Bảng chỉnh sửa (ẩn mặc định, toggle khi click header ngày)
         out += `<tr id="edit_${dateId}" style="display:none">
           <td colspan="7" style="padding:.75rem 1rem;background:#f8fafc;border-top:2px dashed #3b82f6">
