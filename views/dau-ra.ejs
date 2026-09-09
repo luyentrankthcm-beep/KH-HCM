@@ -1751,13 +1751,13 @@
     // ══════════════════════════════════════════
     // ZALO PAY
     // ══════════════════════════════════════════
-    const LS_ZALO_ORDERS  = `zalo_orders_${COMPANY}`;
+    const LS_ZALO_ORDERS  = `zalo_order_map_${COMPANY}`; // compact {maOrder:maCT}
     const LS_ZALO_FEE     = `zalo_fee_${COMPANY}`;
     const LS_ZALO_SP_MAP  = `zalo_sp_map_${COMPANY}`;  // { [tenSP]: maCT }
     const LS_ZALO_HIST    = `zalo_hist_${COMPANY}`;
     const LS_ZALO_HD      = `zalo_hd_${COMPANY}`;   // { [maCT]: { soHD, tienHD } }
 
-    let _zaloOrders = []; // [{date, tenSP, tongTien, maOrder}]
+    let _zaloOrders = {}; // {maOrder: maCT} compact map (~4x smaller than array)
     let _zaloFee    = []; // [{date, maFunzone, maDonZalo, gross, phi, net}]
     let _zaloSpMap  = {}; // tenSP → maCT
     let _zaloHist   = [];
@@ -1799,29 +1799,28 @@
           const iPay=fc('Trạng thái thanh toán');
           const iSP=fc('Tên sản phẩm'), iOrder=fc('Mã đơn hàng');
 
-          // Chỉ lưu maOrder + tenSP (đủ để match, tiết kiệm localStorage)
-          const newRows = rows.slice(1)
-            .filter(r => r[iPay]==='Đã thanh toán' && r[iStatus]!=='Đã hủy' && r[iDate])
-            .map(r => ({
-              maOrder: String(r[iOrder]||'').trim().replace(/^#/,''),
-              tenSP: String(r[iSP]||'').trim(),
-            }));
-
-          // Merge by maOrder dedup
-          const exKeys = new Set(_zaloOrders.map(r=>r.maOrder));
-          const added = newRows.filter(r=>!exKeys.has(r.maOrder));
-          _zaloOrders = [..._zaloOrders, ...added];
-          localStorage.setItem(LS_ZALO_ORDERS, JSON.stringify(_zaloOrders));
-
-          // Auto-add new tenSP to map (unmapped)
-          newRows.forEach(r => { if(r.tenSP && !(_zaloSpMap[r.tenSP])) _zaloSpMap[r.tenSP]=''; });
+          // Lưu compact {maOrder: maCT} — ~4x nhỏ hơn array, tránh quota exceeded
+          let addedCount=0, totalInFile=0;
+          rows.slice(1).forEach(r => {
+            if(r[iPay]!=='Đã thanh toán' || r[iStatus]==='Đã hủy' || !r[iDate]) return;
+            totalInFile++;
+            const maOrder = String(r[iOrder]||'').trim().replace(/^#/,'');
+            const tenSP   = String(r[iSP]||'').trim();
+            if(!maOrder || _zaloOrders[maOrder] !== undefined) return;
+            _zaloOrders[maOrder] = getZaloMaCT(tenSP) || tenSP;
+            if(tenSP && !_zaloSpMap[tenSP]) _zaloSpMap[tenSP]='';
+            addedCount++;
+          });
+          try { localStorage.setItem(LS_ZALO_ORDERS, JSON.stringify(_zaloOrders)); } catch(e) {
+            console.warn('Quota exceeded khi lưu OrderMap');
+          }
           localStorage.setItem(LS_ZALO_SP_MAP, JSON.stringify(_zaloSpMap));
 
-          _zaloHist.unshift({type:'order', file:fname, at:new Date().toLocaleString('vi'), added:added.length, skip:newRows.length-added.length});
+          _zaloHist.unshift({type:'order', file:fname, at:new Date().toLocaleString('vi'), added:addedCount, skip:totalInFile-addedCount, total:Object.keys(_zaloOrders).length});
           localStorage.setItem(LS_ZALO_HIST, JSON.stringify(_zaloHist));
 
           renderZaloSummary(); renderZaloDoiSoat(); renderZaloCtMap(); renderZaloHist();
-          alert(`✅ OrderDetails: +${added.length} đơn mới · Bỏ qua ${newRows.length-added.length} trùng`);
+          alert(`✅ OrderDetails: +${addedCount} đơn mới · Bỏ qua ${totalInFile-addedCount} trùng\nTổng tích lũy: ${Object.keys(_zaloOrders).length} đơn`);
         } catch(err) { alert('Lỗi đọc file OrderDetails: ' + err.message); }
       };
       reader.readAsArrayBuffer(inp.files[0]);
@@ -1909,7 +1908,7 @@
     function renderZaloSummary() {
       const el = document.getElementById('zalo_summary');
       if(!el) return;
-      el.textContent = _zaloOrders.length ? `${_zaloOrders.length} đơn` : '';
+      el.textContent = Object.keys(_zaloOrders).length ? `${Object.keys(_zaloOrders).length} đơn` : '';
     }
 
     function getZaloMaCT(tenSP) {
@@ -1937,7 +1936,7 @@
     function renderZaloDoiSoat() {
       const el = document.getElementById('zaloDoiSoatBody');
       if(!el) return;
-      if(!_zaloOrders.length && !_zaloFee.length) {
+      if(!Object.keys(_zaloOrders).length && !_zaloFee.length) {
         el.innerHTML='<div class="empty-state"><div class="big-icon">🔵</div><p>Tải OrderDetails + BaoCaoPhi để bắt đầu đối soát</p></div>';
         return;
       }
@@ -1947,10 +1946,6 @@
         return p(a).localeCompare(p(b));
       };
 
-      // Lookup: maOrder (Funzone ID) → order info
-      const orderLookup = {};
-      _zaloOrders.forEach(o => { if(o.maOrder) orderLookup[String(o.maOrder)] = o; });
-
       if (_zaloFee.length) {
         // PRIMARY: BaoCaoPhi -> chi FUNZONE MINI APP -> group by DATE -> GIAN
         const byDate = {};
@@ -1959,9 +1954,9 @@
           const isFunzone = r.maDiem==='FUNZONE1' || (r.dienThu||'').toUpperCase().includes('FUNZONE');
           if(!isFunzone){ nOther++; return; }
           nFunzone++;
-          const order = r.maFunzone ? orderLookup[String(r.maFunzone)] : null;
-          if(!order) nNoMatch++;
-          const maCT = order ? (getZaloMaCT(order.tenSP)||order.tenSP) : '_unknown_';
+          const maCT_lu = r.maFunzone ? _zaloOrders[String(r.maFunzone)] : undefined;
+          if(maCT_lu === undefined) nNoMatch++;
+          const maCT = maCT_lu || '_unknown_';
           if(!byDate[r.date]) byDate[r.date]={};
           if(!byDate[r.date][maCT]) byDate[r.date][maCT]={gross:0,phi:0,net:0,soDon:0};
           byDate[r.date][maCT].gross += r.gross;
@@ -1975,8 +1970,8 @@
 
         let html = '<div style="margin-bottom:.6rem;font-size:.82em;color:#64748b">';
         html += '\u{1F4CA} FUNZONE: <strong>'+nFunzone+'</strong> GD · '+dates.length+' ngày';
-        if(nNoMatch && _zaloOrders.length) html += ' · <span style="color:#f59e0b">Chưa khớp OrderDetails: '+nNoMatch+' (⇒ tải lại OrderDetails)</span>';
-        if(!_zaloOrders.length) html += ' · <span style="color:#ef4444">Chưa tải OrderDetails!</span>';
+        if(nNoMatch && Object.keys(_zaloOrders).length) html += ' · <span style="color:#f59e0b">Chưa khớp OrderDetails: '+nNoMatch+' (⇒ tải lại OrderDetails)</span>';
+        if(!Object.keys(_zaloOrders).length) html += ' · <span style="color:#ef4444">Chưa tải OrderDetails!</span>';
         if(nOther) html += ' · <span style="color:#94a3b8">VNPay khác ẩn: '+nOther+'</span>';
         html += '</div>';
 
@@ -2049,31 +2044,17 @@
         el.innerHTML = html;
       } else {
         // ── FALLBACK: chỉ có OrderDetails, chưa có BaoCaoPhi ──
-        const byDate = {};
-        _zaloOrders.forEach(r => {
-          const maCT = getZaloMaCT(r.tenSP) || r.tenSP;
-          if(!byDate['(OrderDetails)']) byDate['(OrderDetails)'] = {};
-          if(!byDate['(OrderDetails)'][maCT]) byDate['(OrderDetails)'][maCT] = {amount:0, tenSPs:new Set()};
-          byDate['(OrderDetails)'][maCT].amount += 0;
-          byDate['(OrderDetails)'][maCT].tenSPs.add(r.tenSP);
+        const ctCount = {};
+        Object.entries(_zaloOrders).forEach(([maOrder, maCT]) => {
+          ctCount[maCT] = (ctCount[maCT]||0) + 1;
         });
-        const dates = Object.keys(byDate).sort(sortDate);
-        let html = '<table style="width:100%;border-collapse:collapse;font-size:.85em">';
-        html += '<thead><tr style="background:#1e3a5f;color:#fff"><th style="padding:.4rem .6rem;text-align:left">Ngày / CT</th><th style="text-align:right;padding:.4rem .6rem">Doanh thu</th><th style="text-align:right;padding:.4rem .6rem">Phí GW</th><th style="text-align:right;padding:.4rem .6rem">Net GW</th></tr></thead><tbody>';
-        dates.forEach(date => {
-          const ctData = byDate[date];
-          const dayTotal = Object.values(ctData).reduce((s,v)=>s+v.amount,0);
-          html += `<tr style="background:#374151;color:#e5e7eb"><td colspan="4" style="padding:.35rem .75rem .35rem 1rem;font-size:.87em">📅 <strong>${date}</strong> &nbsp;·&nbsp; DT: ${fmtN(dayTotal)}đ &nbsp;<span style="color:#fbbf24;font-size:.82em">(chưa có BaoCaoPhi)</span></td></tr>`;
-          Object.entries(ctData).forEach(([maCT, d]) => {
-            const isMapped = !!getZaloMaCT([...d.tenSPs][0]);
-            const ctBadge = isMapped ? `<span class="ct-badge">${maCT}</span>` : `<span style="color:#94a3b8;font-size:.75em;font-style:italic">chưa map</span>`;
-            html += `<tr class="gian-row"><td style="padding-left:2rem"><div>${ctBadge}</div><div style="font-size:.78em;color:#64748b">${[...d.tenSPs].join(' · ')}</div></td>
-              <td style="text-align:right;color:#15803d;font-weight:600">${fmtN(d.amount)}</td>
-              <td style="text-align:right;color:#94a3b8">–</td>
-              <td style="text-align:right;color:#94a3b8">–</td></tr>`;
-          });
+        let html = '<div style="padding:1rem;color:#94a3b8;font-size:.88em">';
+        html += `<p>Đã tải <strong>${Object.keys(_zaloOrders).length}</strong> đơn hàng. Tải thêm BaoCaoPhi để đối soát.</p>`;
+        html += '<table style="border-collapse:collapse;font-size:.9em"><tr><th style="text-align:left;padding:.25rem .75rem;color:#94a3b8">Gian</th><th style="padding:.25rem .75rem;color:#94a3b8">Số đơn</th></tr>';
+        Object.entries(ctCount).sort((a,b)=>b[1]-a[1]).forEach(([maCT,n])=>{
+          html += `<tr><td style="padding:.2rem .75rem"><span class="ct-badge">${maCT}</span></td><td style="padding:.2rem .75rem;color:#e5e7eb">${n}</td></tr>`;
         });
-        html += '</tbody></table>';
+        html += '</table></div>';
         el.innerHTML = html;
       }
     }
@@ -2154,7 +2135,7 @@
 
     function clearZaloOrders() {
       // Xóa cache OrderDetails cũ rồi mở file picker
-      _zaloOrders = [];
+      _zaloOrders = {};
       try { localStorage.removeItem(LS_ZALO_ORDERS); } catch(e){}
       renderZaloSummary(); renderZaloDoiSoat();
       document.getElementById('zaloOrderInput').click();
