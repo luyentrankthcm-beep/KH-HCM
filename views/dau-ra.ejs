@@ -1849,7 +1849,7 @@
           //   Row index 2 = header, data từ row index 3
           //   Col B(1)=Thời gian GD, I(8)=Mã đơn hàng ZaloPay, V(21)=Số tiền trước KM
           //   AA(26)=Số tiền phí thu hộ, AS(44)=Ghi chú
-          const HDR=2, iTime=1, iMaDiem=4, iDienThu=5, iMaDonZalo=8, iGross=21, iPhi=26, iGhiChu=44;
+          const HDR=2, iTime=1, iMaDiem=4, iDienThu=5, iMaDonZalo=8, iGross=21, iPhi=26, iGhiChu=44, iTrangThai=42;
           // Validate: nếu cột 21 của row đầu tiên không phải số → báo lỗi debug
           const sample = rows[HDR+1];
           console.log('[BaoCaoPhi] row0=',rows[0]?.[0],'hdr2=',rows[HDR]?.[0],rows[HDR]?.[1],'sampleGross=',sample?.[iGross],'sampleTime=',sample?.[iTime]);
@@ -1857,7 +1857,8 @@
             console.warn('[BaoCaoPhi] WARN: gross col',iGross,'=',sample[iGross],'(not number!) — hdr:',rows[HDR]?.slice(20,28));
 
           const newRows = rows.slice(HDR+1)
-            .filter(r => typeof r[iGross]==='number' && r[iGross]>0)
+            .filter(r => typeof r[iGross]==='number' && r[iGross]>0
+              && String(r[iTrangThai]||'').trim()==='Thành công')
             .map(r => {
               const tg = String(r[iTime]||'').split(' ')[0]; // "07/09/2026"
               const parts = tg.split('/');
