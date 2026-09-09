@@ -542,8 +542,8 @@
         gianSet.forEach(g => {
           const hdKey = `${momoDate}|${g}`;
           if (_hdData[hdKey] && _hdData[hdKey].soHD) { skipped++; return; } // đã có rồi
-          const maCT  = (_ctMap[g] || {}).maCT;
-          if (!maCT) return;
+          // Ưu tiên: lấy maCT từ Momo CT map; fallback: dùng chính tên gian làm maCT
+          const maCT  = (_ctMap[g] || {}).maCT || g;
           const maDiem = maCTtoDiem[maCT];
           if (!maDiem) return;
           // Tìm dòng MTT theo ngày invoice
