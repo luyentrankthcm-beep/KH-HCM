@@ -261,8 +261,9 @@
 
       <!-- Sub-tabs KH Cũ / KH Mới + filter -->
       <div id="mttSubTabs" style="display:none;margin:.4rem 0 0;border-bottom:2px solid #e2e8f0;display:none;align-items:center">
-        <button id="mttTabCu"  class="sub-tab-btn active" onclick="switchMttTab('cu')">📋 KH Cũ (989)</button>
-        <button id="mttTabMoi" class="sub-tab-btn"        onclick="switchMttTab('moi')">📋 KH Mới (705)</button>
+        <button id="mttTabCu"   class="sub-tab-btn active" onclick="switchMttTab('cu')">📋 KH Cũ (989)</button>
+        <button id="mttTabMoi"  class="sub-tab-btn"       onclick="switchMttTab('moi')">📋 KH Mới (705)</button>
+        <button id="mttTabHist" class="sub-tab-btn"       onclick="switchMttTab('hist')">🕓 Lịch sử tải</button>
         <div style="margin-left:auto;display:flex;gap:.5rem;align-items:center;padding:.2rem .5rem">
           <label style="font-size:.82em;font-weight:600;color:#1e3a5f">Tháng:</label>
           <select id="mttMonthFilter" onchange="renderMttTable()" style="padding:.25rem .5rem;border:1px solid #cbd5e1;border-radius:6px;font-size:.82em;font-weight:600;background:#fff;cursor:pointer"></select>
@@ -302,6 +303,15 @@
             <tbody id="mttBody"></tbody>
           </table>
         </div>
+      </div>
+
+      <!-- Lịch sử tải MTT -->
+      <div id="mttHistPanel" style="display:none;padding:.5rem .75rem">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem">
+          <span style="font-size:.85em;font-weight:700;color:#1e3a5f">Lịch sử tải file MTT</span>
+          <button onclick="clearMttHistory()" style="background:#ef4444;color:#fff;border:none;border-radius:5px;padding:.25rem .6rem;cursor:pointer;font-size:.78em">🗑️ Xóa lịch sử</button>
+        </div>
+        <div id="mttHistBody" style="border:1px solid #e2e8f0;border-radius:8px;overflow:hidden"></div>
       </div>
     </div>
 
@@ -1120,13 +1130,8 @@
       const hasBankPayments = _bankMomoPayments.length > 0;
       if (hasBankPayments) {
         _bankMomoPayments.forEach(pay => {
-          // Lấy ngày Momo nằm trong khoảng trả; nếu chọn tháng cụ thể thì ẩn tháng khác
-          const payDates = _dates.filter(d => {
-            if (!inRange(d, pay.fromDate, pay.toDate)) return false;
-            if (!selMonth) return true; // Tất cả: hiện mọi tháng
-            const [dd, mm, yy] = d.split('-');
-            return `${mm}/${yy}` === selMonth;
-          });
+          // Lấy tất cả ngày Momo trong khoảng trả (kể cả qua tháng, để tránh chênh lớn)
+          const payDates = _dates.filter(d => inRange(d, pay.fromDate, pay.toDate));
           // Hiển thị header đợt dù payDates rỗng (để biết NH đã trả nhưng Momo tháng này không có)
           const momoNet = payDates.reduce((s, d) => s + computeDayFinalNet(d), 0);
           const chenhNH = payDates.length > 0 ? (pay.amount - momoNet) : null;
@@ -1209,14 +1214,17 @@
     const LS_MTT_CU     = `mtt_cu_${COMPANY}`;
     const LS_MTT_MOI    = `mtt_moi_${COMPANY}`;
     const LS_MTT_CT_MAP = `mtt_ct_map_${COMPANY}`;
+    const LS_MTT_HIST   = `mtt_hist_${COMPANY}`;
     let _mttCu     = [];
     let _mttMoi    = [];
     let _mttActive = 'cu';
-    let _mttCtMap  = {}; // { maDiem: maCT }
+    let _mttCtMap  = {};
+    let _mttHist   = []; // [{ fileName, uploadedAt, cuCount, moiCount }]
 
     try { const s = localStorage.getItem(LS_MTT_CU);     if (s) _mttCu     = JSON.parse(s); } catch(e) {}
     try { const s = localStorage.getItem(LS_MTT_MOI);    if (s) _mttMoi    = JSON.parse(s); } catch(e) {}
     try { const s = localStorage.getItem(LS_MTT_CT_MAP); if (s) _mttCtMap  = JSON.parse(s); } catch(e) {}
+    try { const s = localStorage.getItem(LS_MTT_HIST);   if (s) _mttHist   = JSON.parse(s); } catch(e) {}
     if (_mttCu.length || _mttMoi.length) { renderMttTable(); }
 
     function openMttModal()  { document.getElementById('mttModal').classList.add('open'); }
@@ -1226,7 +1234,12 @@
       _mttActive = tab;
       document.getElementById('mttTabCu').classList.toggle('active', tab === 'cu');
       document.getElementById('mttTabMoi').classList.toggle('active', tab === 'moi');
-      renderMttTable();
+      document.getElementById('mttTabHist').classList.toggle('active', tab === 'hist');
+      document.getElementById('mttResults').style.display = tab === 'hist' ? 'none' : 'block';
+      document.getElementById('mttSummary').style.display = tab === 'hist' ? 'none' : 'flex';
+      document.getElementById('mttHistPanel').style.display = tab === 'hist' ? 'block' : 'none';
+      if (tab === 'hist') renderMttHistory();
+      else renderMttTable();
     }
 
     function parseMttSheet(data, isCu) {
@@ -1297,6 +1310,11 @@
           _mttMoi = parseMttSheet(moiData, false);
           try { localStorage.setItem(LS_MTT_CU,  JSON.stringify(_mttCu));  } catch(e) {}
           try { localStorage.setItem(LS_MTT_MOI, JSON.stringify(_mttMoi)); } catch(e) {}
+          // Ghi lịch sử
+          const hist = { fileName: file.name, uploadedAt: new Date().toLocaleString('vi'), cuCount: _mttCu.length, moiCount: _mttMoi.length };
+          _mttHist.unshift(hist);
+          if (_mttHist.length > 30) _mttHist.length = 30;
+          try { localStorage.setItem(LS_MTT_HIST, JSON.stringify(_mttHist)); } catch(e) {}
           st.className = 'upload-status ok';
           st.textContent = `✅ KH Cũ: ${_mttCu.length} dòng · KH Mới: ${_mttMoi.length} dòng`;
           closeMttModal();
@@ -1478,7 +1496,27 @@
       try { localStorage.removeItem(LS_MTT_MOI); } catch(e) {}
       document.getElementById('mttEmpty').style.display = 'block';
       document.getElementById('mttResults').style.display = 'none';
+      document.getElementById('mttSummary').style.display = 'none';
       document.getElementById('mttSubTabs').style.display = 'none';
+    }
+
+    function renderMttHistory() {
+      const el = document.getElementById('mttHistBody');
+      if (!_mttHist.length) { el.innerHTML = '<div style="padding:1rem;text-align:center;color:#94a3b8;font-size:.85em">Chưa có lịch sử tải</div>'; return; }
+      el.innerHTML = _mttHist.map((h, i) => `
+        <div style="display:flex;align-items:center;gap:.75rem;padding:.45rem .75rem;background:${i%2?'#f8fafc':'#fff'};font-size:.83em;border-bottom:1px solid #f1f5f9">
+          <span style="color:#64748b;white-space:nowrap">🕓 ${h.uploadedAt}</span>
+          <span style="font-weight:600;flex:1;color:#1e293b">📄 ${h.fileName}</span>
+          <span style="color:#0369a1;white-space:nowrap">KH Cũ: <strong>${h.cuCount}</strong> HĐ</span>
+          <span style="color:#7c3aed;white-space:nowrap">KH Mới: <strong>${h.moiCount}</strong> HĐ</span>
+        </div>`).join('');
+    }
+
+    function clearMttHistory() {
+      if (!confirm('Xóa lịch sử tải MTT?')) return;
+      _mttHist = [];
+      try { localStorage.removeItem(LS_MTT_HIST); } catch(e) {}
+      renderMttHistory();
     }
 
     // ── Fetch các đợt NH trả Momo về cho Đối soát ngày ──
