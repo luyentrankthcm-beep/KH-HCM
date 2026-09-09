@@ -1835,47 +1835,28 @@
         try {
           const wb = XLSX.read(new Uint8Array(e.target.result), {type:'array'});
           const ws = wb.Sheets[wb.SheetNames[0]];
-          // Dùng {raw:true} để lấy giá trị gốc (number/string không qua format)
           const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:'', raw:true});
-          // Hardcode column index dựa trên cấu trúc file BaoCaoPhi thực tế (đã kiểm tra):
-          // Row 2 (index 2) = header; data từ index 3
-          // Col 1=Thời gian GD, 8=Mã đơn hàng(ZaloPay), 21=Số tiền trước KM, 26=Phí thu hộ, 44=Ghi chú
           const toNum = v => { if(typeof v==='number') return v; return parseFloat(String(v||'').replace(/[^0-9.-]/g,'')) || 0; };
-          // Tìm header row bằng cách duyệt: tìm row đầu tiên có nhiều hơn 5 cột không rỗng (row data thực)
-          let hdrIdx = 2; // default biết trước
-          for(let i=0;i<Math.min(10,rows.length);i++){
-            const r = rows[i] || [];
-            if(r.filter(c=>c!=='').length > 5 && (String(r[0]||'').includes('STT') || i===2)) { hdrIdx=i; break; }
-          }
-          const hdr = rows[hdrIdx] || [];
-          // Scan toàn bộ header để tìm đúng cột theo từng keyword (không nhạy cảm unicode)
-          const findCol = (keywords, fallback) => {
-            for(const kw of keywords) {
-              const idx = hdr.findIndex(c => {
-                const s = String(c||'').toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g,'');
-                const k = kw.toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g,'');
-                return s.includes(k);
-              });
-              if(idx >= 0) return idx;
-            }
-            return fallback;
-          };
-          const iTime     = findCol(['thoi gian gd','time','thoi gian'], 1);
-          const iGross    = findCol(['tien truoc km','truoc km','so tien truoc'], 21);
-          const iPhi      = findCol(['phi thu ho','tien phi thu'], 26);
-          const iGhiChu   = findCol(['ghi chu','note'], 44);
-          const iMaDonZalo= findCol(['ma don hang','ma don'], 8);
-          console.log('[BaoCaoPhi] hdrIdx=',hdrIdx,'cols: time=',iTime,'gross=',iGross,'phi=',iPhi,'ghichu=',iGhiChu,'sample gross=',rows[hdrIdx+1]?.[iGross]);
+          // HARDCODE: cấu trúc file BaoCaoPhi cố định (đã xác minh):
+          //   Row index 2 = header, data từ row index 3
+          //   Col B(1)=Thời gian GD, I(8)=Mã đơn hàng ZaloPay, V(21)=Số tiền trước KM
+          //   AA(26)=Số tiền phí thu hộ, AS(44)=Ghi chú
+          const HDR=2, iTime=1, iMaDonZalo=8, iGross=21, iPhi=26, iGhiChu=44;
+          // Validate: nếu cột 21 của row đầu tiên không phải số → báo lỗi debug
+          const sample = rows[HDR+1];
+          console.log('[BaoCaoPhi] row0=',rows[0]?.[0],'hdr2=',rows[HDR]?.[0],rows[HDR]?.[1],'sampleGross=',sample?.[iGross],'sampleTime=',sample?.[iTime]);
+          if(sample && typeof sample[iGross] !== 'number')
+            console.warn('[BaoCaoPhi] WARN: gross col',iGross,'=',sample[iGross],'(not number!) — hdr:',rows[HDR]?.slice(20,28));
 
-          const newRows = rows.slice(hdrIdx+1)
-            .filter(r => r.length > 5 && (typeof r[iGross]==='number' || (typeof r[iGross]==='string' && r[iGross]!=='')))
+          const newRows = rows.slice(HDR+1)
+            .filter(r => typeof r[iGross]==='number' && r[iGross]>0)
             .map(r => {
               const tg = String(r[iTime]||'').split(' ')[0]; // "07/09/2026"
               const parts = tg.split('/');
               const date = parts.length===3 ? `${parts[0]}-${parts[1]}-${parts[2]}` : tg;
               const gc = String(r[iGhiChu]||'');
-              const mFunzone = gc.match(/(?:don hang|donhang|order)\s+(\d+)/i);
-              const gross = toNum(r[iGross]);
+              const mFunzone = gc.match(/don hang\s+(\d+)/i);
+              const gross = r[iGross];
               const phi   = toNum(r[iPhi]);
               return {
                 date,
@@ -1885,7 +1866,7 @@
                 phi,
                 net: gross - phi,
               };
-            }).filter(r=>r.gross>0);
+            });
 
           // REPLACE (mỗi lần tải là replace để luôn có dữ liệu mới nhất)
           _zaloFee = newRows;
@@ -1895,7 +1876,8 @@
           localStorage.setItem(LS_ZALO_HIST, JSON.stringify(_zaloHist));
 
           renderZaloSummary(); renderZaloDoiSoat(); renderZaloHist();
-          alert(`✅ BaoCaoPhi: ${newRows.length} giao dịch`);
+          const s0 = newRows[0];
+          alert(`✅ BaoCaoPhi: ${newRows.length} giao dịch\nMẫu GD đầu: ngày=${s0?.date} | gross=${s0?.gross} | maFunzone=${s0?.maFunzone}`);
         } catch(err) { alert('Lỗi đọc file BaoCaoPhi: ' + err.message); }
       };
       reader.readAsArrayBuffer(inp.files[0]);
