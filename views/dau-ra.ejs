@@ -841,6 +841,52 @@
         return d >= ddmmToISO(from) && d <= ddmmToISO(to);
       };
 
+      // Tính net thực tế (sau server data + rounding) cho 1 ngày — dùng cho batch header
+      const computeDayFinalNet = (date) => {
+        const gianData = byDate[date] || {};
+        const gianList = Object.keys(gianData).sort();
+        if (!gianList.length) return 0;
+        const ctGrossTotal = {};
+        gianList.forEach(g => {
+          const maCT = (_ctMap[g] || {}).maCT;
+          if (maCT) ctGrossTotal[maCT] = (ctGrossTotal[maCT] || 0) + gianData[g].amount;
+        });
+        const nets = gianList.map(g => {
+          const dg = gianData[g];
+          const hd = _hdData[`${date}|${g}`] || {};
+          const ct = _ctMap[g] || {};
+          const serverKey = ct.maCT ? `${ddmmToISO(date)}|${ct.maCT}` : null;
+          let serverNetVal = serverKey && _serverNet[serverKey] != null ? _serverNet[serverKey] : null;
+          let serverGrossVal = serverKey && _serverGross[serverKey] != null ? _serverGross[serverKey] : null;
+          if (serverNetVal != null && ct.maCT && ctGrossTotal[ct.maCT] > 0) {
+            const ratio = dg.amount / ctGrossTotal[ct.maCT];
+            serverNetVal = serverNetVal * ratio;
+            if (serverGrossVal != null) serverGrossVal = serverGrossVal * ratio;
+          }
+          const net = (hd.netOvr != null && hd.netOvr !== '') ? (parseFloat(String(hd.netOvr).replace(/[^0-9.-]/g,''))||0)
+                    : (serverNetVal != null ? serverNetVal : (dg.amount - Math.round(dg.fee)));
+          return net;
+        });
+        // Sub-gian rounding
+        const dayNet = nets.reduce((s,n) => s+n, 0);
+        let rounded = nets.map(n => Math.round(n));
+        const sumR = rounded.reduce((s,n) => s+n, 0);
+        const adj = Math.round(dayNet) - sumR;
+        if (adj !== 0) {
+          const maxIdx = nets.reduce((mi, n, i) => n >= nets[mi] ? i : mi, 0);
+          rounded[maxIdx] += adj;
+        }
+        // NH ±1đ
+        const dayNH = gianList.reduce((s,g) => {
+          const v = parseFloat(String((_hdData[`${date}|${g}`]||{}).tienNH||'').replace(/[^0-9.]/g,''))||0;
+          return s + v;
+        }, 0);
+        const sumFinal = rounded.reduce((s,n) => s+n, 0);
+        const nhChenh = dayNH > 0 ? (dayNH - sumFinal) : 0;
+        if (nhChenh === 1 || nhChenh === -1) return sumFinal + nhChenh;
+        return sumFinal;
+      };
+
       // Render các hàng cho 1 ngày (sub-rows theo gian) + bảng chỉnh sửa
       const renderDateRows = (date) => {
         const gianData = byDate[date] || {};
@@ -1009,9 +1055,7 @@
           // Chỉ lấy ngày Momo trong tháng đang lọc & nằm trong khoảng trả của đợt này
           const payDates = filteredDates.filter(d => inRange(d, pay.fromDate, pay.toDate));
           // Hiển thị header đợt dù payDates rỗng (để biết NH đã trả nhưng Momo tháng này không có)
-          const momoNet = payDates.reduce((s, d) => {
-            return s + Object.values(byDate[d] || {}).reduce((s2, v) => s2 + v.amount - Math.round(v.fee), 0);
-          }, 0);
+          const momoNet = payDates.reduce((s, d) => s + computeDayFinalNet(d), 0);
           const chenhNH = payDates.length > 0 ? (pay.amount - momoNet) : null;
           const momoNetText = payDates.length > 0
             ? ` · Momo Net: <strong>${fmtN(momoNet)}đ</strong>`
