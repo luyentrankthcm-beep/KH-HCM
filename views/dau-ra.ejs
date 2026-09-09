@@ -1796,17 +1796,15 @@
           const hdr = rows[0];
           const fc = k => hdr.indexOf(k);
           const iDate=fc('Ngày đặt hàng'), iStatus=fc('Trạng thái đơn hàng');
-          const iPay=fc('Trạng thái thanh toán'), iTotal=fc('Tổng tiền hàng');
+          const iPay=fc('Trạng thái thanh toán');
           const iSP=fc('Tên sản phẩm'), iOrder=fc('Mã đơn hàng');
 
+          // Chỉ lưu maOrder + tenSP (đủ để match, tiết kiệm localStorage)
           const newRows = rows.slice(1)
             .filter(r => r[iPay]==='Đã thanh toán' && r[iStatus]!=='Đã hủy' && r[iDate])
             .map(r => ({
               maOrder: String(r[iOrder]||'').trim().replace(/^#/,''),
-              date: typeof r[iDate]==='number' ? excelSerialToDateStr(r[iDate])
-                    : String(r[iDate]).split(' ')[0].replace(/\//g,'-'), // fallback string
               tenSP: String(r[iSP]||'').trim(),
-              tongTien: parseFloat(r[iTotal])||0,
             }));
 
           // Merge by maOrder dedup
@@ -1905,8 +1903,7 @@
     function renderZaloSummary() {
       const el = document.getElementById('zalo_summary');
       if(!el) return;
-      const dates = [...new Set(_zaloOrders.map(r=>r.date))];
-      el.textContent = _zaloOrders.length ? `${_zaloOrders.length} đơn · ${dates.length} ngày` : '';
+      el.textContent = _zaloOrders.length ? `${_zaloOrders.length} đơn` : '';
     }
 
     function getZaloMaCT(tenSP) {
@@ -2049,10 +2046,10 @@
         const byDate = {};
         _zaloOrders.forEach(r => {
           const maCT = getZaloMaCT(r.tenSP) || r.tenSP;
-          if(!byDate[r.date]) byDate[r.date] = {};
-          if(!byDate[r.date][maCT]) byDate[r.date][maCT] = {amount:0, tenSPs:new Set()};
-          byDate[r.date][maCT].amount += r.tongTien;
-          byDate[r.date][maCT].tenSPs.add(r.tenSP);
+          if(!byDate['(OrderDetails)']) byDate['(OrderDetails)'] = {};
+          if(!byDate['(OrderDetails)'][maCT]) byDate['(OrderDetails)'][maCT] = {amount:0, tenSPs:new Set()};
+          byDate['(OrderDetails)'][maCT].amount += 0;
+          byDate['(OrderDetails)'][maCT].tenSPs.add(r.tenSP);
         });
         const dates = Object.keys(byDate).sort(sortDate);
         let html = '<table style="width:100%;border-collapse:collapse;font-size:.85em">';
