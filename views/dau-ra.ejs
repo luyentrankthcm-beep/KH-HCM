@@ -206,6 +206,7 @@
           <label style="font-size:.82em;font-weight:600;color:#1e3a5f">Tháng:</label>
           <select id="filterMonth" onchange="renderDoiSoatNgay()" style="padding:.3rem .6rem;border:1px solid #cbd5e1;border-radius:6px;font-size:.85em;font-weight:600;background:#fff;cursor:pointer"></select>
           <span style="font-size:.78em;color:#94a3b8">· Nhóm theo đợt NH trả · Nhập số HĐ để lưu</span>
+          <button onclick="autoMapMttMomo()" style="margin-left:auto;background:#7c3aed;color:#fff;border:none;border-radius:5px;padding:.28rem .7rem;cursor:pointer;font-size:.8em;font-weight:600">🧾 Map MTT → Momo</button>
         </div>
         <div style="overflow-x:auto;max-height:70vh;overflow-y:auto;border:1px solid #e2e8f0;border-radius:8px;">
           <table class="doisoat-table">
@@ -494,6 +495,79 @@
       if (!_hdData[key]) _hdData[key] = {};
       _hdData[key][field] = val;
       saveHdData();
+    }
+
+    // ── Auto map MTT → Momo Đối soát ──
+    function autoMapMttMomo() {
+      const khKey   = COMPANY === 'kh_cu' ? 'cu' : 'moi';
+      const mttRows = khKey === 'cu' ? _mttCu : _mttMoi;
+      if (!mttRows.length) { alert('Chưa có dữ liệu MTT. Vui lòng tải file MTT trước.'); return; }
+
+      // Chỉ lấy dòng có dichVuThuHo chứa "momo"
+      const momoMtt = mttRows.filter(r => (r.dichVuThuHo||'').toLowerCase().includes('momo'));
+      if (!momoMtt.length) { alert('Không tìm thấy hóa đơn MTT nào có dịch vụ thu hộ = momo.'); return; }
+
+      // Build MTT lookup: ngay(DD/MM/YYYY) → maDiem → [rows]
+      const mttByDateDiem = {};
+      momoMtt.forEach(r => {
+        if (!mttByDateDiem[r.ngay]) mttByDateDiem[r.ngay] = {};
+        if (!mttByDateDiem[r.ngay][r.maDiem]) mttByDateDiem[r.ngay][r.maDiem] = [];
+        mttByDateDiem[r.ngay][r.maDiem].push(r);
+      });
+
+      // maDiem → maCT (MTT ct map cho KH đang xem)
+      const maDiemToMaCT = _mttCtMap[khKey] || {};
+      // Reverse: maCT → maDiem
+      const maCTtoDiem = {};
+      Object.entries(maDiemToMaCT).forEach(([md, mc]) => { if (mc) maCTtoDiem[mc] = md; });
+
+      // Helper: momo date DD-MM-YYYY → invoice date DD/MM/YYYY after N days
+      const addDays = (ddmmyyyy, n) => {
+        const [dd,mm,yy] = ddmmyyyy.split('-');
+        const d = new Date(Number(yy), Number(mm)-1, Number(dd));
+        d.setDate(d.getDate() + n);
+        return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
+      };
+
+      // Gians per momo date
+      const dateGians = {};
+      _rows.forEach(r => {
+        if (!dateGians[r.date]) dateGians[r.date] = new Set();
+        dateGians[r.date].add(r.gian);
+      });
+
+      let filled = 0, skipped = 0;
+      Object.entries(dateGians).forEach(([momoDate, gianSet]) => {
+        const invCandidates = [1,2,3,4].map(n => addDays(momoDate, n));
+        gianSet.forEach(g => {
+          const hdKey = `${momoDate}|${g}`;
+          if (_hdData[hdKey] && _hdData[hdKey].soHD) { skipped++; return; } // đã có rồi
+          const maCT  = (_ctMap[g] || {}).maCT;
+          if (!maCT) return;
+          const maDiem = maCTtoDiem[maCT];
+          if (!maDiem) return;
+          // Tìm dòng MTT theo ngày invoice
+          let matched = null;
+          for (const inv of invCandidates) {
+            if (mttByDateDiem[inv] && mttByDateDiem[inv][maDiem]) {
+              matched = mttByDateDiem[inv][maDiem];
+              break;
+            }
+          }
+          if (!matched) return;
+          if (!_hdData[hdKey]) _hdData[hdKey] = {};
+          // Nếu nhiều dòng cùng gian: ghép số HĐ, cộng tổng tiền
+          const soHDs = [...new Set(matched.map(r => String(r.soHD)))].join(', ');
+          const tongTien = matched.reduce((s, r) => s + r.tongTien, 0);
+          _hdData[hdKey].soHD     = soHDs;
+          _hdData[hdKey].soTienHD = String(Math.round(tongTien));
+          filled++;
+        });
+      });
+
+      saveHdData();
+      renderDoiSoatNgay();
+      alert(`✅ Map xong: ${filled} ô hóa đơn · Bỏ qua ${skipped} ô đã có`);
     }
     function toggleEditPanel(dateId) {
       const row = document.getElementById('edit_' + dateId);
