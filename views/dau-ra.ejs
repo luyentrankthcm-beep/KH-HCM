@@ -1835,38 +1835,46 @@
         try {
           const wb = XLSX.read(new Uint8Array(e.target.result), {type:'array'});
           const ws = wb.Sheets[wb.SheetNames[0]];
-          const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
-          // Tự động tìm dòng header: tìm dòng có cột đầu là 'STT' (ASCII, không bị lỗi encoding)
-          const toNum = v => { if(typeof v==='number') return v; return parseFloat(String(v).replace(/,/g,'')) || 0; };
-          let hdrIdx = -1;
-          for(let i=0;i<Math.min(15,rows.length);i++){
+          // Dùng {raw:true} để lấy giá trị gốc (number/string không qua format)
+          const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:'', raw:true});
+          // Hardcode column index dựa trên cấu trúc file BaoCaoPhi thực tế (đã kiểm tra):
+          // Row 2 (index 2) = header; data từ index 3
+          // Col 1=Thời gian GD, 8=Mã đơn hàng(ZaloPay), 21=Số tiền trước KM, 26=Phí thu hộ, 44=Ghi chú
+          const toNum = v => { if(typeof v==='number') return v; return parseFloat(String(v||'').replace(/[^0-9.-]/g,'')) || 0; };
+          // Tìm header row bằng cách duyệt: tìm row đầu tiên có nhiều hơn 5 cột không rỗng (row data thực)
+          let hdrIdx = 2; // default biết trước
+          for(let i=0;i<Math.min(10,rows.length);i++){
             const r = rows[i] || [];
-            const first = String(r[0]||'').trim();
-            if(first === 'STT' || first === 'Stt') { hdrIdx = i; break; }
+            if(r.filter(c=>c!=='').length > 5 && (String(r[0]||'').includes('STT') || i===2)) { hdrIdx=i; break; }
           }
-          // Fallback: thử row 2 luôn (biết trước từ cấu trúc file thực tế)
-          if(hdrIdx < 0) hdrIdx = 2;
-          console.log('[BaoCaoPhi] hdrIdx=', hdrIdx, 'hdr[0]=', rows[hdrIdx]?.[0], 'hdr[1]=', rows[hdrIdx]?.[1]);
           const hdr = rows[hdrIdx] || [];
-          const fp = k => { const i=hdr.findIndex(c=>String(c||'').includes(k)); return i>=0?i:-1; };
-          const fb = (candidates, def) => { for(const k of candidates){const i=fp(k);if(i>=0)return i;} return def; };
-          const iTime  = fb(['Gian GD','Thời gian','gian GD'], 1);
-          const iMaDiem= fb(['Mã điểm','diem thu','MaDiem'], 4);
-          const iDiem  = fb(['Điểm thu','Diểm thu'], 5);
-          const iGross    = fb(['trước KM','Trước KM','truoc KM','Tiền GD'], 21);
-          const iPhi      = fb(['phí thu hộ','Phí thu hộ','phi thu ho'], 26);
-          const iGhiChu   = fb(['Ghi ch','ghi ch'], 44);
-          const iMaDonZalo= fp('n hàng')>=0 ? fp('n hàng') : 8;
-          console.log('[BaoCaoPhi] hdrIdx=',hdrIdx,'time=',iTime,'gross=',iGross,'phi=',iPhi,'ghichu=',iGhiChu,'madon=',iMaDonZalo,'hdr[0]=',hdr[0]);
+          // Scan toàn bộ header để tìm đúng cột theo từng keyword (không nhạy cảm unicode)
+          const findCol = (keywords, fallback) => {
+            for(const kw of keywords) {
+              const idx = hdr.findIndex(c => {
+                const s = String(c||'').toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g,'');
+                const k = kw.toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g,'');
+                return s.includes(k);
+              });
+              if(idx >= 0) return idx;
+            }
+            return fallback;
+          };
+          const iTime     = findCol(['thoi gian gd','time','thoi gian'], 1);
+          const iGross    = findCol(['tien truoc km','truoc km','so tien truoc'], 21);
+          const iPhi      = findCol(['phi thu ho','tien phi thu'], 26);
+          const iGhiChu   = findCol(['ghi chu','note'], 44);
+          const iMaDonZalo= findCol(['ma don hang','ma don'], 8);
+          console.log('[BaoCaoPhi] hdrIdx=',hdrIdx,'cols: time=',iTime,'gross=',iGross,'phi=',iPhi,'ghichu=',iGhiChu,'sample gross=',rows[hdrIdx+1]?.[iGross]);
 
           const newRows = rows.slice(hdrIdx+1)
-            .filter(r => (r[iGross]!==''&&r[iGross]!=null))
+            .filter(r => r.length > 5 && (typeof r[iGross]==='number' || (typeof r[iGross]==='string' && r[iGross]!=='')))
             .map(r => {
               const tg = String(r[iTime]||'').split(' ')[0]; // "07/09/2026"
               const parts = tg.split('/');
               const date = parts.length===3 ? `${parts[0]}-${parts[1]}-${parts[2]}` : tg;
               const gc = String(r[iGhiChu]||'');
-              const mFunzone = gc.match(/don hang\s+(\d+)/i);
+              const mFunzone = gc.match(/(?:don hang|donhang|order)\s+(\d+)/i);
               const gross = toNum(r[iGross]);
               const phi   = toNum(r[iPhi]);
               return {
