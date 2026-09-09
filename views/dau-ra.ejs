@@ -1878,9 +1878,15 @@
               };
             });
 
-          // REPLACE (mỗi lần tải là replace để luôn có dữ liệu mới nhất)
-          _zaloFee = newRows;
-          localStorage.setItem(LS_ZALO_FEE, JSON.stringify(_zaloFee));
+          // MERGE + DEDUP theo maDonZalo (cộng dồn, không replace)
+          const exFeeKeys = new Set(_zaloFee.map(r=>r.maDonZalo));
+          const addedFee = newRows.filter(r=>r.maDonZalo && !exFeeKeys.has(r.maDonZalo));
+          _zaloFee = [..._zaloFee, ...addedFee];
+          try { localStorage.setItem(LS_ZALO_FEE, JSON.stringify(_zaloFee)); } catch(e) {
+            // Nếu đầy localStorage, lưu 3000 GD gần nhất
+            _zaloFee = _zaloFee.slice(-3000);
+            try { localStorage.setItem(LS_ZALO_FEE, JSON.stringify(_zaloFee)); } catch(e2){}
+          }
 
           // Auto-add Điểm thu vào SpMap để user có thể map mã CT
           newRows.forEach(r => {
@@ -1893,7 +1899,7 @@
 
           renderZaloSummary(); renderZaloDoiSoat(); renderZaloHist();
           const s0 = newRows[0];
-          alert(`✅ BaoCaoPhi: ${newRows.length} giao dịch\nMẫu GD đầu: ngày=${s0?.date} | gross=${s0?.gross} | maFunzone=${s0?.maFunzone}`);
+          alert(`✅ BaoCaoPhi: thêm ${addedFee.length} GD mới (bỏ qua ${newRows.length - addedFee.length} trùng)\nTổng tích lũy: ${_zaloFee.length} GD`);
         } catch(err) { alert('Lỗi đọc file BaoCaoPhi: ' + err.message); }
       };
       reader.readAsArrayBuffer(inp.files[0]);
