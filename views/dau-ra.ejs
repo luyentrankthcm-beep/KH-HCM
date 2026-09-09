@@ -1799,7 +1799,7 @@
           const newRows = rows.slice(1)
             .filter(r => r[iPay]==='Đã thanh toán' && r[iStatus]!=='Đã hủy' && r[iDate])
             .map(r => ({
-              maOrder: String(r[iOrder]||'').trim(),
+              maOrder: String(r[iOrder]||'').trim().replace(/^#/,''),
               date: typeof r[iDate]==='number' ? excelSerialToDateStr(r[iDate])
                     : String(r[iDate]).split(' ')[0].replace(/\//g,'-'), // fallback string
               tenSP: String(r[iSP]||'').trim(),
