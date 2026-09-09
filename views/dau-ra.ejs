@@ -1848,7 +1848,7 @@
           //   Row index 2 = header, data từ row index 3
           //   Col B(1)=Thời gian GD, I(8)=Mã đơn hàng ZaloPay, V(21)=Số tiền trước KM
           //   AA(26)=Số tiền phí thu hộ, AS(44)=Ghi chú
-          const HDR=2, iTime=1, iMaDonZalo=8, iGross=21, iPhi=26, iGhiChu=44;
+          const HDR=2, iTime=1, iMaDiem=4, iDienThu=5, iMaDonZalo=8, iGross=21, iPhi=26, iGhiChu=44;
           // Validate: nếu cột 21 của row đầu tiên không phải số → báo lỗi debug
           const sample = rows[HDR+1];
           console.log('[BaoCaoPhi] row0=',rows[0]?.[0],'hdr2=',rows[HDR]?.[0],rows[HDR]?.[1],'sampleGross=',sample?.[iGross],'sampleTime=',sample?.[iTime]);
@@ -1869,6 +1869,8 @@
                 date,
                 maFunzone: mFunzone ? mFunzone[1] : '',
                 maDonZalo: String(r[iMaDonZalo]||'').trim(),
+                maDiem: String(r[iMaDiem]||'').trim(),
+                dienThu: String(r[iDienThu]||'').trim(),
                 gross,
                 phi,
                 net: gross - phi,
@@ -1899,7 +1901,25 @@
     }
 
     function getZaloMaCT(tenSP) {
-      return (_zaloSpMap[tenSP]||'').trim() || null;
+      // 1. Exact map (user-configured)
+      const exact = (_zaloSpMap[tenSP]||'').trim();
+      if(exact) return exact;
+      // 2. Partial match in user map (key is substring of tenSP)
+      for(const [k,v] of Object.entries(_zaloSpMap)){
+        if(k && v && tenSP.toUpperCase().includes(k.toUpperCase())) return v.trim();
+      }
+      // 3. Keyword fallback for Điểm thu values from BaoCaoPhi
+      const up = tenSP.toUpperCase();
+      const KW = [
+        ['GHOST','GHOST'],['SNOW','SNOW'],['TUTU','TUTU'],
+        ['FARM AEON','FARM AEON HUE'],['FARM MEGA','FARM MEGA DN'],
+        ['FARM','FARM'],['FUNZONE','FUNZONE'],
+        ['LOTTE','LOTTE'],['AEON','AEON'],['GO!','GO'],
+        ['BIG C','BIGC'],['COOPMART','COOP'],['MM MEGA','MM'],
+        ['VINCOM','VINCOM'],['SENSE','SENSE'],
+      ];
+      for(const [kw,ct] of KW){ if(up.includes(kw)) return ct; }
+      return null;
     }
 
     function renderZaloDoiSoat() {
@@ -1926,7 +1946,10 @@
         _zaloFee.forEach(r => {
           const order = r.maFunzone ? orderLookup[String(r.maFunzone)] : null;
           if (!order) nUnmatched++;
-          const maCT = order ? (getZaloMaCT(order.tenSP) || order.tenSP) : '_unknown_';
+          // Nếu khớp OrderDetails → map từ tenSP; nếu không → dùng Điểm thu từ BaoCaoPhi
+          const maCT = order
+            ? (getZaloMaCT(order.tenSP) || order.tenSP)
+            : (r.dienThu ? (getZaloMaCT(r.dienThu) || r.dienThu) : '_unknown_');
           if(!byGian[maCT]) byGian[maCT] = {gross:0,phi:0,net:0,soDon:0,byDate:{}};
           byGian[maCT].gross  += r.gross;
           byGian[maCT].phi    += r.phi;
