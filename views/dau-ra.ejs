@@ -1940,26 +1940,27 @@
       _zaloOrders.forEach(o => { if(o.maOrder) orderLookup[String(o.maOrder)] = o; });
 
       if (_zaloFee.length) {
-        // ── PRIMARY: BaoCaoPhi → group by GIAN (maCT) across all dates ──
-        const byGian = {};  // maCT → {gross, phi, net, soDon, byDate:{}}
+        // ── PRIMARY: BaoCaoPhi → group by DATE → GIAN ──
+        const byDate = {};  // date → { maCT → {gross,phi,net,soDon} }
+        const byGianTot = {}; // maCT → {gross,phi,net,soDon}  (for summary footer)
         let nUnmatched = 0;
         _zaloFee.forEach(r => {
           const order = r.maFunzone ? orderLookup[String(r.maFunzone)] : null;
           if (!order) nUnmatched++;
-          // Nếu khớp OrderDetails → map từ tenSP; nếu không → dùng Điểm thu từ BaoCaoPhi
           const maCT = order
             ? (getZaloMaCT(order.tenSP) || order.tenSP)
             : (r.dienThu ? (getZaloMaCT(r.dienThu) || r.dienThu) : '_unknown_');
-          if(!byGian[maCT]) byGian[maCT] = {gross:0,phi:0,net:0,soDon:0,byDate:{}};
-          byGian[maCT].gross  += r.gross;
-          byGian[maCT].phi    += r.phi;
-          byGian[maCT].net    += r.net;
-          byGian[maCT].soDon  += 1;
-          if(!byGian[maCT].byDate[r.date]) byGian[maCT].byDate[r.date]={gross:0,phi:0,net:0,soDon:0};
-          byGian[maCT].byDate[r.date].gross += r.gross;
-          byGian[maCT].byDate[r.date].phi   += r.phi;
-          byGian[maCT].byDate[r.date].net   += r.net;
-          byGian[maCT].byDate[r.date].soDon += 1;
+          if(!byDate[r.date]) byDate[r.date] = {};
+          if(!byDate[r.date][maCT]) byDate[r.date][maCT] = {gross:0,phi:0,net:0,soDon:0};
+          byDate[r.date][maCT].gross  += r.gross;
+          byDate[r.date][maCT].phi    += r.phi;
+          byDate[r.date][maCT].net    += r.net;
+          byDate[r.date][maCT].soDon  += 1;
+          if(!byGianTot[maCT]) byGianTot[maCT]={gross:0,phi:0,net:0,soDon:0};
+          byGianTot[maCT].gross += r.gross;
+          byGianTot[maCT].phi   += r.phi;
+          byGianTot[maCT].net   += r.net;
+          byGianTot[maCT].soDon += 1;
         });
 
         const totGross = _zaloFee.reduce((s,r)=>s+r.gross,0);
@@ -1967,56 +1968,72 @@
         const totNet   = _zaloFee.reduce((s,r)=>s+r.net,0);
         const nMatched = _zaloFee.length - nUnmatched;
 
-        // Sort: mapped gians first, then unknown
-        const gianList = Object.keys(byGian).sort((a,b)=>{
+        const dates = Object.keys(byDate).sort(sortDate);
+        const gianAll = [...new Set(Object.values(byDate).flatMap(d=>Object.keys(d)))].sort((a,b)=>{
           if(a==='_unknown_') return 1; if(b==='_unknown_') return -1;
           return a.localeCompare(b);
         });
 
         let html = `<div style="margin-bottom:.75rem;font-size:.82em;color:#64748b">`;
-        html += `📊 <strong>${_zaloFee.length}</strong> giao dịch`;
+        html += `📊 <strong>${_zaloFee.length}</strong> giao dịch · ${dates.length} ngày`;
         if(_zaloOrders.length) html += ` · Khớp OrderDetails: <strong style="color:#16a34a">${nMatched}</strong> / Chưa khớp: <span style="color:#f59e0b">${nUnmatched}</span>`;
-        else html += ` · <span style="color:#f59e0b">Chưa tải OrderDetails → không biết gian</span>`;
+        else html += ` · <span style="color:#f59e0b">Chưa tải OrderDetails → gian lấy từ Điểm thu</span>`;
         html += `</div>`;
 
-        html += '<table style="width:100%;border-collapse:collapse;font-size:.85em">';
+        html += '<table style="width:100%;border-collapse:collapse;font-size:.84em">';
         html += '<thead><tr style="background:#1e3a5f;color:#fff">'
-          + '<th style="padding:.5rem .75rem;text-align:left">Gian (Mã CT)</th>'
-          + '<th style="text-align:right;padding:.5rem .6rem">Số GD</th>'
-          + '<th style="text-align:right;padding:.5rem .6rem">DT trước KM</th>'
-          + '<th style="text-align:right;padding:.5rem .6rem">Phí GW</th>'
-          + '<th style="text-align:right;padding:.5rem .6rem">Net GW</th>'
+          + '<th style="padding:.45rem .75rem;text-align:left">Ngày / Gian</th>'
+          + '<th style="text-align:right;padding:.45rem .6rem">Số GD</th>'
+          + '<th style="text-align:right;padding:.45rem .6rem">DT trước KM</th>'
+          + '<th style="text-align:right;padding:.45rem .6rem">Phí GW</th>'
+          + '<th style="text-align:right;padding:.45rem .6rem">Net GW</th>'
           + '</tr></thead><tbody>';
 
-        gianList.forEach((maCT,idx) => {
-          const d = byGian[maCT];
-          const isUnknown = maCT === '_unknown_';
-          const ctLabel = isUnknown
-            ? `<span style="color:#94a3b8;font-style:italic">Chưa xác định gian</span>`
-            : `<span class="ct-badge">${maCT}</span>`;
-          const bg = idx%2===0 ? '#f8fafc' : '#fff';
-          html += `<tr style="background:${bg};cursor:pointer" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'table-row-group':'none'">
-            <td style="padding:.45rem .75rem">${ctLabel}</td>
-            <td style="text-align:right;padding:.45rem .6rem;color:#64748b">${d.soDon}</td>
-            <td style="text-align:right;padding:.45rem .6rem;color:#15803d;font-weight:600">${fmtN(d.gross)}</td>
-            <td style="text-align:right;padding:.45rem .6rem;color:#ef4444">${fmtN(d.phi)}</td>
-            <td style="text-align:right;padding:.45rem .6rem;color:#2563eb;font-weight:600">${fmtN(d.net)}</td>
+        dates.forEach(date => {
+          const ctData = byDate[date];
+          const dayGross = Object.values(ctData).reduce((s,v)=>s+v.gross,0);
+          const dayPhi   = Object.values(ctData).reduce((s,v)=>s+v.phi,0);
+          const dayNet   = Object.values(ctData).reduce((s,v)=>s+v.net,0);
+          const dayN     = Object.values(ctData).reduce((s,v)=>s+v.soDon,0);
+          // Date header row (click to collapse)
+          html += `<tr style="background:#2d4a6e;color:#e2e8f0;cursor:pointer" onclick="
+            var tb=this.nextElementSibling;
+            tb.style.display=tb.style.display==='none'?'':'none';
+            this.querySelector('.tog').textContent=tb.style.display===''?'▾':'▸';
+          ">
+            <td style="padding:.4rem .75rem;font-weight:600">
+              <span class="tog">▾</span> 📅 ${date}
+            </td>
+            <td style="text-align:right;padding:.4rem .6rem">${dayN}</td>
+            <td style="text-align:right;padding:.4rem .6rem;font-weight:700">${fmtN(dayGross)}</td>
+            <td style="text-align:right;padding:.4rem .6rem;color:#fca5a5">${fmtN(dayPhi)}</td>
+            <td style="text-align:right;padding:.4rem .6rem;font-weight:700;color:#93c5fd">${fmtN(dayNet)}</td>
           </tr>`;
-          // Per-date breakdown (hidden by default, click to expand)
-          html += `<tbody style="display:none">`;
-          Object.entries(d.byDate).sort((a,b)=>sortDate(a[0],b[0])).forEach(([dt,dd])=>{
-            html += `<tr style="background:#f0f9ff">
-              <td style="padding:.3rem .75rem .3rem 2.5rem;font-size:.8em;color:#64748b">📅 ${dt}</td>
-              <td style="text-align:right;font-size:.8em;color:#64748b">${dd.soDon}</td>
-              <td style="text-align:right;font-size:.8em;color:#15803d">${fmtN(dd.gross)}</td>
-              <td style="text-align:right;font-size:.8em;color:#ef4444">${fmtN(dd.phi)}</td>
-              <td style="text-align:right;font-size:.8em;color:#2563eb">${fmtN(dd.net)}</td>
+          // Gian sub-rows (visible by default)
+          html += `<tbody>`;
+          const ctKeys = Object.keys(ctData).sort((a,b)=>{
+            if(a==='_unknown_') return 1; if(b==='_unknown_') return -1;
+            return a.localeCompare(b);
+          });
+          ctKeys.forEach((maCT,i) => {
+            const d = ctData[maCT];
+            const isUnknown = maCT==='_unknown_';
+            const ctLabel = isUnknown
+              ? `<span style="color:#94a3b8;font-style:italic">Chưa xác định</span>`
+              : `<span class="ct-badge">${maCT}</span>`;
+            const bg = i%2===0 ? '#f8fafc' : '#fff';
+            html += `<tr style="background:${bg}">
+              <td style="padding:.35rem .75rem .35rem 2rem">${ctLabel}</td>
+              <td style="text-align:right;padding:.35rem .6rem;color:#64748b">${d.soDon}</td>
+              <td style="text-align:right;padding:.35rem .6rem;color:#15803d;font-weight:600">${fmtN(d.gross)}</td>
+              <td style="text-align:right;padding:.35rem .6rem;color:#ef4444">${fmtN(d.phi)}</td>
+              <td style="text-align:right;padding:.35rem .6rem;color:#2563eb;font-weight:600">${fmtN(d.net)}</td>
             </tr>`;
           });
           html += `</tbody>`;
         });
 
-        // Tổng cộng
+        // Tổng cộng theo gian
         html += `<tr style="background:#1e3a5f;color:#fff;font-weight:700">
           <td style="padding:.5rem .75rem">TỔNG CỘNG</td>
           <td style="text-align:right;padding:.5rem .6rem">${_zaloFee.length}</td>
@@ -2024,6 +2041,20 @@
           <td style="text-align:right;padding:.5rem .6rem">${fmtN(totPhi)}</td>
           <td style="text-align:right;padding:.5rem .6rem">${fmtN(totNet)}</td>
         </tr>`;
+        // Per-gian total sub-rows
+        gianAll.forEach(maCT => {
+          const d = byGianTot[maCT];
+          if(!d) return;
+          const isUnknown = maCT==='_unknown_';
+          const ctLabel = isUnknown ? 'Chưa xác định' : maCT;
+          html += `<tr style="background:#273549;color:#cbd5e1;font-size:.82em">
+            <td style="padding:.3rem .75rem .3rem 2rem">↳ ${ctLabel}</td>
+            <td style="text-align:right;padding:.3rem .6rem">${d.soDon}</td>
+            <td style="text-align:right;padding:.3rem .6rem;color:#86efac">${fmtN(d.gross)}</td>
+            <td style="text-align:right;padding:.3rem .6rem;color:#fca5a5">${fmtN(d.phi)}</td>
+            <td style="text-align:right;padding:.3rem .6rem;color:#93c5fd">${fmtN(d.net)}</td>
+          </tr>`;
+        });
         html += '</tbody></table>';
         el.innerHTML = html;
       } else {
