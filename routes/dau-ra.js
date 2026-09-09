@@ -135,7 +135,8 @@ router.get("/api/dau-ra/bank-zalo", (req, res) => {
     for (const t of store.transactions) {
       if (t.bank_id !== bank.id) continue;
       if (t.type !== "thu") continue;
-      if (!/829168/i.test(t.description || "")) continue;
+      // Chỉ lấy đúng mẫu ZaloPay mini app: "VNPAY TT 829168 GIAIT...989 DV CTT NGAY"
+      if (!/VNPAY\s+TT\s+829168.*GIAIT.*989.*DV\s+CTT\s+NGAY/i.test(t.description || "")) continue;
       if (/OFFLINE/i.test(t.description || "")) continue;
       if (from && t.date < from) continue;
       if (to   && t.date > to)   continue;
