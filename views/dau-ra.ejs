@@ -1881,6 +1881,12 @@
           _zaloFee = newRows;
           localStorage.setItem(LS_ZALO_FEE, JSON.stringify(_zaloFee));
 
+          // Auto-add Điểm thu vào SpMap để user có thể map mã CT
+          newRows.forEach(r => {
+            if(r.dienThu && !(_zaloSpMap[r.dienThu])) _zaloSpMap[r.dienThu]='';
+          });
+          localStorage.setItem(LS_ZALO_SP_MAP, JSON.stringify(_zaloSpMap));
+
           _zaloHist.unshift({type:'fee', file:fname, at:new Date().toLocaleString('vi'), added:newRows.length, skip:0});
           localStorage.setItem(LS_ZALO_HIST, JSON.stringify(_zaloHist));
 
