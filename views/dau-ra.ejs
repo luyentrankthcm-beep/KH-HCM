@@ -250,7 +250,7 @@
             &nbsp;<span id="zalo_summary" style="font-size:.82em;color:#64748b"></span>
           </div>
           <div style="display:flex;gap:.5rem">
-            <button class="btn-nhap" style="background:#0068ff" onclick="document.getElementById('zaloOrderInput').click()">📥 OrderDetails</button>
+            <button class="btn-nhap" style="background:#0068ff" onclick="clearZaloOrders()">📥 OrderDetails</button>
             <button class="btn-nhap" style="background:#0891b2" onclick="document.getElementById('zaloFeeInput').click()">📥 BaoCaoPhi</button>
             <input type="file" id="zaloOrderInput" accept=".xls,.xlsx" style="display:none" onchange="handleZaloOrderFile(this)">
             <input type="file" id="zaloFeeInput" accept=".xls,.xlsx" style="display:none" onchange="handleZaloFeeFile(this)">
@@ -2147,6 +2147,14 @@
       });
       html += '</tbody></table>';
       el.innerHTML = html;
+    }
+
+    function clearZaloOrders() {
+      // Xóa cache OrderDetails cũ rồi mở file picker
+      _zaloOrders = [];
+      try { localStorage.removeItem(LS_ZALO_ORDERS); } catch(e){}
+      renderZaloSummary(); renderZaloDoiSoat();
+      document.getElementById('zaloOrderInput').click();
     }
 
     function saveZaloHD(maCT, field, val) {
