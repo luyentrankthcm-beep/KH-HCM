@@ -266,6 +266,12 @@
 
         <!-- Đối soát ngày -->
         <div id="zalo_sub_ds" class="sub-panel active" style="margin-top:.75rem">
+          <div style="margin-bottom:.5rem;display:flex;gap:.6rem;align-items:center">
+            <label style="font-size:.83em;color:#64748b">Lọc tháng:</label>
+            <select id="zaloFilterMonth" onchange="renderZaloDoiSoat()" style="font-size:.83em;padding:.2rem .5rem;border:1px solid #cbd5e1;border-radius:5px">
+              <option value="">-- Tất cả --</option>
+            </select>
+          </div>
           <div id="zaloDoiSoatBody">
             <div class="empty-state"><div class="big-icon">🔵</div><p>Tải OrderDetails để bắt đầu đối soát</p></div>
           </div>
@@ -1936,6 +1942,18 @@
       return null;
     }
 
+    function populateZaloMonthFilter() {
+      const sel = document.getElementById('zaloFilterMonth');
+      if(!sel) return;
+      const months = [...new Set(_zaloFee.map(r => {
+        const p = r.date ? r.date.split('-') : [];
+        return p.length===3 ? p[1]+'/'+p[2] : '';
+      }).filter(Boolean))].sort().reverse();
+      const cur = sel.value;
+      sel.innerHTML = '<option value="">-- Tất cả --</option>'
+        + months.map(m=>`<option value="${m}"${m===cur?' selected':''}>${m}</option>`).join('');
+    }
+
     function renderZaloDoiSoat() {
       const el = document.getElementById('zaloDoiSoatBody');
       if(!el) return;
@@ -1944,13 +1962,15 @@
         return;
       }
       const fmtN = n => Math.round(n).toLocaleString('vi');
-      const sortDate = (a,b) => {
-        const p=d=>{const[dd,mm,yy]=d.split('-');return`${yy}-${mm}-${dd}`;};
-        return p(a).localeCompare(p(b));
-      };
+      const iso  = d => { const p=d.split('-'); return p[2]+'-'+p[1]+'-'+p[0]; };
+      const sortDate = (a,b) => iso(a).localeCompare(iso(b));
+      const inRange = (d,f,t) => !f||!t ? false : iso(d)>=iso(f) && iso(d)<=iso(t);
 
       if (_zaloFee.length) {
-        // PRIMARY: BaoCaoPhi -> chi FUNZONE MINI APP -> group by DATE -> GIAN
+        populateZaloMonthFilter();
+        const selMonth = (document.getElementById('zaloFilterMonth')||{}).value || '';
+
+        // Build byDate from BaoCaoPhi (FUNZONE only)
         const byDate = {};
         let nFunzone=0, nOther=0, nNoMatch=0;
         _zaloFee.forEach(r => {
@@ -1959,7 +1979,7 @@
           nFunzone++;
           const tenSP_lu = r.maFunzone ? _zaloOrders[String(r.maFunzone)] : undefined;
           if(tenSP_lu === undefined) nNoMatch++;
-          const maCT = tenSP_lu ? (getZaloMaCT(tenSP_lu)||tenSP_lu) : '_unknown_';
+          const maCT = tenSP_lu ? (getZaloMaCT(tenSP_lu)||tenSP_lu) : (_zaloUnk[r.date] || '_unknown_');
           if(!byDate[r.date]) byDate[r.date]={};
           if(!byDate[r.date][maCT]) byDate[r.date][maCT]={gross:0,phi:0,net:0,soDon:0};
           byDate[r.date][maCT].gross += r.gross;
@@ -1967,68 +1987,50 @@
           byDate[r.date][maCT].net   += r.net;
           byDate[r.date][maCT].soDon += 1;
         });
-        const dates = Object.keys(byDate).sort(sortDate);
+        const allDates = Object.keys(byDate).sort(sortDate);
+        const filteredDates = selMonth
+          ? allDates.filter(d => { const p=d.split('-'); return p[1]+'/'+p[2]===selMonth; })
+          : allDates;
+
         let totGross=0,totPhi=0,totNet=0,totN=0;
-        dates.forEach(dt=>Object.values(byDate[dt]).forEach(d=>{totGross+=d.gross;totPhi+=d.phi;totNet+=d.net;totN+=d.soDon;}));
+        filteredDates.forEach(dt=>Object.values(byDate[dt]).forEach(d=>{totGross+=d.gross;totPhi+=d.phi;totNet+=d.net;totN+=d.soDon;}));
 
-        // NH trả về ZaloPay header
-        let nhHtml = '';
-        if(_bankZaloPayments.length) {
-          const inRange = (d, f, t) => {
-            if(!f||!t) return false;
-            const iso = x => { const p=x.split('-'); return p[2]+'-'+p[1]+'-'+p[0]; };
-            return iso(d) >= iso(f) && iso(d) <= iso(t);
-          };
-          _bankZaloPayments.forEach(pay => {
-            const payDates = dates.filter(d => pay.fromDate && pay.toDate && inRange(d, pay.fromDate, pay.toDate));
-            const zaloNet = payDates.reduce((s,d) => s + Object.values(byDate[d]||{}).reduce((ss,g)=>ss+g.net,0), 0);
-            const chenh = pay.amount - zaloNet;
-            const chCol = Math.abs(chenh)<1000?'#16a34a':(chenh<0?'#ef4444':'#d97706');
-            nhHtml += '<div style="background:#0f2942;border-radius:6px;padding:.45rem .8rem;margin-bottom:.4rem;font-size:.83em;display:flex;align-items:center;gap:.8rem;flex-wrap:wrap">'
-              +'<span style="color:#38bdf8;font-weight:700">💳 NH trả về <strong>'+pay.payDate+'</strong>: '+Math.round(pay.amount).toLocaleString('vi')+'đ</span>'
-              +(pay.fromDate?'<span style="color:#94a3b8">ZaloPay '+pay.fromDate+(pay.toDate&&pay.toDate!==pay.fromDate?' → '+pay.toDate:'')+'</span>':'')
-              +(payDates.length?'<span style="color:#94a3b8">Net: '+Math.round(zaloNet).toLocaleString('vi')+'đ</span>':'')
-              +(payDates.length?'<span style="color:'+chCol+';font-weight:700">✔ Chênh: '+(chenh>=0?'+':'')+Math.round(chenh).toLocaleString('vi')+'đ</span>':'')
-              +'</div>';
-          });
-        }
-
-        let html = nhHtml + '<div style="margin-bottom:.6rem;font-size:.82em;color:#64748b">';
-        html += '\u{1F4CA} FUNZONE: <strong>'+nFunzone+'</strong> GD · '+dates.length+' ngày';
-        if(nNoMatch && Object.keys(_zaloOrders).length) html += ' · <span style="color:#f59e0b">Chưa khớp OrderDetails: '+nNoMatch+' (⇒ tải lại OrderDetails)</span>';
+        let html = '<div style="margin-bottom:.5rem;font-size:.82em;color:#64748b">';
+        html += '\u{1F4CA} FUNZONE: <strong>'+nFunzone+'</strong> GD · '+filteredDates.length+' ngày';
+        if(nNoMatch && Object.keys(_zaloOrders).length) html += ' · <span style="color:#f59e0b">Chưa khớp: '+nNoMatch+'</span>';
         if(!Object.keys(_zaloOrders).length) html += ' · <span style="color:#ef4444">Chưa tải OrderDetails!</span>';
-        if(nOther) html += ' · <span style="color:#94a3b8">VNPay khác ẩn: '+nOther+'</span>';
+        if(nOther) html += ' · <span style="color:#94a3b8">VNPay khác: '+nOther+'</span>';
         html += '</div>';
 
-        dates.forEach(date => {
+        // Helper: render one date block
+        const renderDateBlock = date => {
           const ctData = byDate[date];
+          if(!ctData) return '';
           const ctKeys = Object.keys(ctData).sort((a,b)=>{if(a==='_unknown_')return 1;if(b==='_unknown_')return -1;return a.localeCompare(b);});
           const dayGross=Object.values(ctData).reduce((s,d)=>s+d.gross,0);
           const dayNet=Object.values(ctData).reduce((s,d)=>s+d.net,0);
           const dayN=Object.values(ctData).reduce((s,d)=>s+d.soDon,0);
           const [dd,mm,yyyy]=date.split('-');
-          html += '<div style="margin-bottom:1rem">'
-            +'<div style="background:#1e3a5f;color:#fff;padding:.45rem .75rem;font-weight:700;font-size:.88em;border-radius:6px 6px 0 0;display:flex;justify-content:space-between">'
+          let out = '<div style="margin-bottom:.8rem">'
+            +'<div style="background:#1e3a5f;color:#fff;padding:.4rem .75rem;font-weight:700;font-size:.87em;display:flex;justify-content:space-between">'
             +'<span>\u{1F4C5} '+dd+'/'+mm+'/'+yyyy+'</span>'
-            +'<span style="font-size:.82em;font-weight:400;color:#93c5fd">'+dayN+' GD · DT: '+fmtN(dayGross)+'đ · Net: '+fmtN(dayNet)+'đ</span>'
+            +'<span style="font-size:.81em;font-weight:400;color:#93c5fd">'+dayN+' GD · DT: '+fmtN(dayGross)+'đ · Net: '+fmtN(dayNet)+'đ</span>'
             +'</div>'
             +'<table style="width:100%;border-collapse:collapse;font-size:.84em">'
             +'<thead><tr style="background:#2d4a6e;color:#e2e8f0">'
-            +'<th style="padding:.35rem .6rem;text-align:left">Mã CT (Gian)</th>'
-            +'<th style="text-align:right;padding:.35rem .4rem">Số GD</th>'
-            +'<th style="text-align:right;padding:.35rem .4rem">DT trước KM</th>'
-            +'<th style="text-align:right;padding:.35rem .4rem">Phí GW</th>'
-            +'<th style="text-align:right;padding:.35rem .4rem">Net GW</th>'
-            +'<th style="text-align:center;padding:.35rem .4rem">Số HĐ</th>'
-            +'<th style="text-align:right;padding:.35rem .4rem">Tiền HĐ</th>'
-            +'<th style="text-align:right;padding:.35rem .4rem">Chênh lệch</th>'
+            +'<th style="padding:.3rem .6rem;text-align:left">Mã CT (Gian)</th>'
+            +'<th style="text-align:right;padding:.3rem .4rem">Số GD</th>'
+            +'<th style="text-align:right;padding:.3rem .4rem">DT trước KM</th>'
+            +'<th style="text-align:right;padding:.3rem .4rem">Phí GW</th>'
+            +'<th style="text-align:right;padding:.3rem .4rem">Net GW</th>'
+            +'<th style="text-align:center;padding:.3rem .4rem">Số HĐ</th>'
+            +'<th style="text-align:right;padding:.3rem .4rem">Tiền HĐ</th>'
+            +'<th style="text-align:right;padding:.3rem .4rem">Chênh</th>'
             +'</tr></thead><tbody>';
           ctKeys.forEach((maCT,i) => {
             const d = ctData[maCT];
             const isUnknown = maCT==='_unknown_';
-            const ctLabel = isUnknown
-              ? '<span style="color:#94a3b8;font-style:italic">Chưa xác định gian</span>'
-              : '<span class="ct-badge">'+maCT+'</span>';
+            const ctLabel = isUnknown ? '<span style="color:#94a3b8;font-style:italic">Chưa xác định gian</span>' : '<span class="ct-badge">'+maCT+'</span>';
             const hdKey = date+'|'+maCT;
             const hd = _zaloHD[hdKey] || {};
             const tienHD = parseFloat((hd.tienHD||'0').toString().replace(/[^0-9.-]/g,''))||0;
@@ -2037,30 +2039,72 @@
             const chenhTxt = chenh===null?'—':((chenh>0?'+':'')+fmtN(chenh));
             const bg = i%2===0?'#f8fafc':'#fff';
             const escKey = hdKey.replace(/'/g,"\\'");
-            html += '<tr style="background:'+bg+'">'
-              +'<td style="padding:.35rem .6rem">'+ctLabel+'</td>'
-              +'<td style="text-align:right;padding:.35rem .4rem;color:#64748b">'+d.soDon+'</td>'
-              +'<td style="text-align:right;padding:.35rem .4rem;color:#15803d;font-weight:600">'+fmtN(d.gross)+'</td>'
-              +'<td style="text-align:right;padding:.35rem .4rem;color:#ef4444">'+fmtN(d.phi)+'</td>'
-              +'<td style="text-align:right;padding:.35rem .4rem;color:#2563eb;font-weight:700">'+fmtN(d.net)+'</td>'
-              +'<td style="padding:.35rem .3rem;text-align:center">'
-              +'<input placeholder="Số HĐ" value="'+(hd.soHD||'')+'"'
-              +' style="width:85px;border:1px solid #cbd5e1;border-radius:4px;padding:.15rem .3rem;font-size:.78em;text-align:center"'
-              +' onchange="saveZaloHD(\''+escKey+'\',\'soHD\',this.value)">'
-              +'</td>'
-              +'<td style="padding:.35rem .3rem">'
-              +'<input placeholder="Tiền HĐ" value="'+(hd.tienHD||'')+'"'
-              +' style="width:105px;border:1px solid #cbd5e1;border-radius:4px;padding:.15rem .3rem;font-size:.78em;text-align:right"'
-              +' onchange="saveZaloHD(\''+escKey+'\',\'tienHD\',this.value);renderZaloDoiSoat()">'
-              +'</td>'
-              +'<td style="text-align:right;padding:.35rem .4rem;font-weight:700;color:'+chenhColor+'">'+chenhTxt+'</td>'
+            const soHDDisplay = hd.soHD
+              ? '<span style="font-size:.8em;cursor:pointer" onclick="zHDEdit(this,\''+escKey+'\',\'soHD\')">'+hd.soHD+' ✏️</span>'
+              : '<span style="color:#94a3b8;font-size:.75em;cursor:pointer" onclick="zHDEdit(this,\''+escKey+'\',\'soHD\')">…</span>';
+            const tienHDDisplay = hd.tienHD
+              ? '<span style="font-size:.8em;cursor:pointer;color:#15803d" onclick="zHDEdit(this,\''+escKey+'\',\'tienHD\')">'+hd.tienHD+' ✏️</span>'
+              : '<span style="color:#94a3b8;font-size:.75em;cursor:pointer" onclick="zHDEdit(this,\''+escKey+'\',\'tienHD\')">…</span>';
+            const unkInput = isUnknown
+              ? '<div style="margin-top:.2rem"><input placeholder="Mã CT..." id="unkCT_'+date.replace(/-/g,'')+'"'
+                +' style="width:110px;border:1px solid #f59e0b;border-radius:4px;padding:.12rem .3rem;font-size:.74em"'
+                +' onkeydown="if(event.key===\'Enter\'){saveZaloUnkCT(\''+date+'\',this.value)}"'
+                +'>&nbsp;<button style="font-size:.71em;padding:.1rem .3rem;background:#f59e0b;color:#fff;border:none;border-radius:3px;cursor:pointer"'
+                +' onclick="saveZaloUnkCT(\''+date+'\',document.getElementById(\'unkCT_'+date.replace(/-/g,'')+'\').value)">Map</button></div>'
+              : '';
+            out += '<tr style="background:'+bg+'">'
+              +'<td style="padding:.3rem .6rem">'+ctLabel+unkInput+'</td>'
+              +'<td style="text-align:right;padding:.3rem .4rem;color:#64748b">'+d.soDon+'</td>'
+              +'<td style="text-align:right;padding:.3rem .4rem;color:#15803d;font-weight:600">'+fmtN(d.gross)+'</td>'
+              +'<td style="text-align:right;padding:.3rem .4rem;color:#ef4444">'+fmtN(d.phi)+'</td>'
+              +'<td style="text-align:right;padding:.3rem .4rem;color:#2563eb;font-weight:700">'+fmtN(d.net)+'</td>'
+              +'<td style="padding:.3rem .3rem;text-align:center">'+soHDDisplay+'</td>'
+              +'<td style="padding:.3rem .3rem;text-align:right">'+tienHDDisplay+'</td>'
+              +'<td style="text-align:right;padding:.3rem .4rem;font-weight:700;color:'+chenhColor+'">'+chenhTxt+'</td>'
               +'</tr>';
           });
-          html += '</tbody></table></div>';
-        });
-        // Per-gian totals across all dates
+          out += '</tbody></table></div>';
+          return out;
+        };
+
+        // GROUP BY NH PAYMENT (Momo style)
+        const coveredDates = new Set();
+        if(_bankZaloPayments.length) {
+          _bankZaloPayments.forEach(pay => {
+            const payAllDates = allDates.filter(d => inRange(d, pay.fromDate, pay.toDate));
+            const payRenderDates = filteredDates.filter(d => inRange(d, pay.fromDate, pay.toDate));
+            if(selMonth && payRenderDates.length===0){ payAllDates.forEach(d=>coveredDates.add(d)); return; }
+            const zaloNet = payAllDates.reduce((s,d)=>s+Object.values(byDate[d]||{}).reduce((ss,g)=>ss+g.net,0),0);
+            const chenh = pay.amount - zaloNet;
+            const chCol = Math.abs(chenh)<1000?'#86efac':(chenh<0?'#fca5a5':'#fcd34d');
+            const chTxt = (chenh>=0?'+':'')+fmtN(chenh);
+            html += '<div style="background:#1e4a6f;color:#e0f2fe;padding:.5rem .8rem;font-weight:700;font-size:.87em;border-top:2px solid #0ea5e9;border-radius:4px;margin-top:.5rem;display:flex;flex-wrap:wrap;gap:.6rem;align-items:center">'
+              +'<span>💳 NH trả về <strong>'+pay.payDate+'</strong>:'
+              +'<span style="background:#0369a1;padding:.05rem .45rem;border-radius:5px;margin-left:.4rem">'+fmtN(pay.amount)+'đ</span></span>'
+              +(pay.fromDate?'<span style="font-weight:400;color:#bae6fd;font-size:.84em">ZaloPay '
+                +pay.fromDate+(pay.toDate&&pay.toDate!==pay.fromDate?' → '+pay.toDate:'')+'</span>':'')
+              +(payAllDates.length?'<span style="font-weight:400;color:#bae6fd;font-size:.84em">Net: '+fmtN(zaloNet)+'đ</span>':'')
+              +(payAllDates.length?'<span style="color:'+chCol+';font-weight:900">'+(Math.abs(chenh)<1000?'✅':'⚠️')+' Chênh: '+chTxt+'đ</span>':'')
+              +'</div>';
+            payAllDates.forEach(d=>coveredDates.add(d));
+            payRenderDates.forEach(d=>{ html += renderDateBlock(d); });
+          });
+        }
+
+        // Dates not covered by any NH payment
+        const unpaidDates = filteredDates.filter(d=>!coveredDates.has(d));
+        if(unpaidDates.length) {
+          if(_bankZaloPayments.length) {
+            const unpaidNet = unpaidDates.reduce((s,d)=>s+Object.values(byDate[d]||{}).reduce((ss,g)=>ss+g.net,0),0);
+            html += '<div style="background:#78350f;color:#fef3c7;padding:.5rem .8rem;font-weight:700;font-size:.86em;border-top:2px solid #d97706;border-radius:4px;margin-top:.5rem">'
+              +'⏳ Chưa có NH trả về &nbsp;·&nbsp; Tổng Net: '+fmtN(unpaidNet)+'đ</div>';
+          }
+          unpaidDates.forEach(d=>{ html += renderDateBlock(d); });
+        }
+
+        // Per-gian totals (across filteredDates)
         const byGian = {};
-        dates.forEach(dt => {
+        filteredDates.forEach(dt => {
           Object.entries(byDate[dt]).forEach(([maCT,d]) => {
             if(!byGian[maCT]) byGian[maCT]={soDon:0,gross:0,phi:0,net:0};
             byGian[maCT].soDon+=d.soDon; byGian[maCT].gross+=d.gross; byGian[maCT].phi+=d.phi; byGian[maCT].net+=d.net;
@@ -2068,10 +2112,9 @@
         });
         const gianKeys = Object.keys(byGian).filter(k=>k!=='_unknown_').sort();
         if(byGian['_unknown_']) gianKeys.push('_unknown_');
-
-        html += '<table style="width:100%;border-collapse:collapse;font-size:.85em;margin-top:.5rem"><tbody>'
+        html += '<table style="width:100%;border-collapse:collapse;font-size:.85em;margin-top:.6rem"><tbody>'
           +'<tr style="background:#1e3a5f;color:#fff;font-weight:700">'
-          +'<td style="padding:.5rem .75rem">TỔNG CỘNG ('+dates.length+' ngày)</td>'
+          +'<td style="padding:.5rem .75rem">TỔNG CỘNG ('+filteredDates.length+' ngày)</td>'
           +'<td style="text-align:right;padding:.5rem .5rem">'+totN+' GD</td>'
           +'<td style="text-align:right;padding:.5rem .5rem">'+fmtN(totGross)+'</td>'
           +'<td style="text-align:right;padding:.5rem .5rem">'+fmtN(totPhi)+'</td>'
