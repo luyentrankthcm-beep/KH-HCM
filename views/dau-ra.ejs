@@ -430,7 +430,8 @@
       if (!row) return;
       row.style.display = row.style.display === 'none' ? '' : 'none';
     }
-    function saveEditPanel(dateId, date, gianList) {
+    function saveEditPanel(dateId, date, btnEl) {
+      const gianList = btnEl && btnEl.dataset && btnEl.dataset.gians ? JSON.parse(btnEl.dataset.gians) : [];
       gianList.forEach(g => {
         const gKey = g.replace(/[^a-zA-Z0-9]/g,'_');
         const hdKey = `${date}|${g}`;
@@ -949,7 +950,8 @@
             </table>
             </div>
             <div style="margin-top:.6rem;display:flex;gap:.5rem">
-              <button onclick="saveEditPanel('${dateId}','${date}',${JSON.stringify(gianList)})"
+              <button onclick="saveEditPanel('${dateId}','${date}',this)"
+                data-gians='${JSON.stringify(gianList).replace(/'/g,"&#39;")}'
                 style="background:#16a34a;color:#fff;border:none;border-radius:6px;padding:.35rem .9rem;font-weight:700;font-size:.82em;cursor:pointer">💾 Lưu</button>
               <button onclick="toggleEditPanel('${dateId}')"
                 style="background:#6b7280;color:#fff;border:none;border-radius:6px;padding:.35rem .9rem;font-weight:600;font-size:.82em;cursor:pointer">✕ Đóng</button>
