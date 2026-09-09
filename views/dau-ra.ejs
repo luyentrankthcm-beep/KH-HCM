@@ -826,7 +826,6 @@
       // Group: date → gian → {amount, fee}
       const byDate = {};
       _rows.forEach(r => {
-        if (!filteredDates.includes(r.date)) return;
         if (!byDate[r.date]) byDate[r.date] = {};
         if (!byDate[r.date][r.gian]) byDate[r.date][r.gian] = { amount: 0, fee: 0 };
         const rate = r.feeRate != null ? r.feeRate : (COMPANY === 'kh_cu' ? 0.011 : 0.01);
@@ -1052,8 +1051,8 @@
       const hasBankPayments = _bankMomoPayments.length > 0;
       if (hasBankPayments) {
         _bankMomoPayments.forEach(pay => {
-          // Chỉ lấy ngày Momo trong tháng đang lọc & nằm trong khoảng trả của đợt này
-          const payDates = filteredDates.filter(d => inRange(d, pay.fromDate, pay.toDate));
+          // Lấy tất cả ngày Momo đã upload nằm trong khoảng trả của đợt này (kể cả qua tháng)
+          const payDates = _dates.filter(d => inRange(d, pay.fromDate, pay.toDate));
           // Hiển thị header đợt dù payDates rỗng (để biết NH đã trả nhưng Momo tháng này không có)
           const momoNet = payDates.reduce((s, d) => s + computeDayFinalNet(d), 0);
           const chenhNH = payDates.length > 0 ? (pay.amount - momoNet) : null;
