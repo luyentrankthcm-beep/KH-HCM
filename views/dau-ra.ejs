@@ -448,11 +448,7 @@
       });
       saveHdData();
       renderDoiSoatNgay();
-      // Mở lại panel sau khi re-render
-      setTimeout(() => {
-        const row = document.getElementById('edit_' + dateId);
-        if (row) row.style.display = '';
-      }, 50);
+      // Panel tự đóng sau khi lưu (đã cập nhật số trên bảng)
     }
 
     // ── Recompute derived arrays & refresh UI ──
