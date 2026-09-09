@@ -1757,7 +1757,7 @@
     const LS_ZALO_HIST    = `zalo_hist_${COMPANY}`;
 
     let _zaloOrders = []; // [{date, tenSP, tongTien, maOrder}]
-    let _zaloFee    = []; // [{date, maDiem, tenDiem, gross, phi}]
+    let _zaloFee    = []; // [{date, maFunzone, maDonZalo, gross, phi, net}]
     let _zaloSpMap  = {}; // tenSP → maCT
     let _zaloHist   = [];
 
@@ -1851,18 +1851,26 @@
           const iTime=fc('Thời gian GD'), iMaDiem=fc('Mã điểm thu'), iDiem=fc('Điểm thu');
           const iGross=fc('Số tiền trước KM'), iPhi=fc('Số tiền phí thu hộ');
 
+          const iGhiChu = hdr.findIndex(c=>String(c).trim()==='Ghi chú');
+          const iMaDonZalo = hdr.findIndex(c=>String(c).trim()==='Mã đơn hàng');
+
           const newRows = rows.slice(hdrIdx+1)
-            .filter(r => r[iMaDiem] && (r[iGross]!==''&&r[iGross]!=null))
+            .filter(r => (r[iGross]!==''&&r[iGross]!=null))
             .map(r => {
               const tg = String(r[iTime]||'').split(' ')[0]; // "07/09/2026"
               const parts = tg.split('/');
               const date = parts.length===3 ? `${parts[0]}-${parts[1]}-${parts[2]}` : tg;
+              const gc = String(r[iGhiChu]||'');
+              const mFunzone = gc.match(/don hang\s+(\d+)/i);
+              const gross = toNum(r[iGross]);
+              const phi   = toNum(r[iPhi]);
               return {
                 date,
-                maDiem: String(r[iMaDiem]||'').trim(),
-                tenDiem: String(r[iDiem]||'').trim(),
-                gross: toNum(r[iGross]),
-                phi: toNum(r[iPhi]),
+                maFunzone: mFunzone ? mFunzone[1] : '',
+                maDonZalo: String(r[iMaDonZalo]||'').trim(),
+                gross,
+                phi,
+                net: gross - phi,
               };
             }).filter(r=>r.gross>0);
 
@@ -1895,61 +1903,105 @@
     function renderZaloDoiSoat() {
       const el = document.getElementById('zaloDoiSoatBody');
       if(!el) return;
-      if(!_zaloOrders.length) {
-        el.innerHTML='<div class="empty-state"><div class="big-icon">🔵</div><p>Tải OrderDetails để bắt đầu đối soát</p></div>';
+      if(!_zaloOrders.length && !_zaloFee.length) {
+        el.innerHTML='<div class="empty-state"><div class="big-icon">🔵</div><p>Tải OrderDetails + BaoCaoPhi để bắt đầu đối soát</p></div>';
         return;
       }
       const fmtN = n => Math.round(n).toLocaleString('vi');
-      // Group orders by date → maCT(||tenSP) → {tongTien, tenSPs[]}
-      const byDate = {};
-      _zaloOrders.forEach(r => {
-        const maCT = getZaloMaCT(r.tenSP) || r.tenSP;
-        if(!byDate[r.date]) byDate[r.date] = {};
-        if(!byDate[r.date][maCT]) byDate[r.date][maCT] = {amount:0, tenSPs:new Set()};
-        byDate[r.date][maCT].amount += r.tongTien;
-        byDate[r.date][maCT].tenSPs.add(r.tenSP);
-      });
-      // Group fee by date
-      const feeByDate = {};
-      _zaloFee.forEach(r => {
-        if(!feeByDate[r.date]) feeByDate[r.date] = {gross:0, phi:0};
-        feeByDate[r.date].gross += r.gross;
-        feeByDate[r.date].phi   += r.phi;
-      });
-
-      const dates = Object.keys(byDate).sort((a,b)=>{
+      const sortDate = (a,b) => {
         const p=d=>{const[dd,mm,yy]=d.split('-');return`${yy}-${mm}-${dd}`;};
         return p(a).localeCompare(p(b));
-      });
+      };
 
-      let html = '<table style="width:100%;border-collapse:collapse;font-size:.85em">';
-      html += '<thead><tr style="background:#1e3a5f;color:#fff"><th style="padding:.4rem .6rem;text-align:left">Ngày / Tên SP → CT</th><th style="text-align:right;padding:.4rem .6rem">Doanh thu</th><th style="text-align:right;padding:.4rem .6rem">Phí GW</th><th style="text-align:right;padding:.4rem .6rem">Net GW</th></tr></thead><tbody>';
+      // Lookup: maOrder (Funzone ID) → order info
+      const orderLookup = {};
+      _zaloOrders.forEach(o => { if(o.maOrder) orderLookup[String(o.maOrder)] = o; });
 
-      dates.forEach(date => {
-        const ctData = byDate[date];
-        const fee = feeByDate[date] || {gross:0, phi:0};
-        const dayTotal = Object.values(ctData).reduce((s,v)=>s+v.amount,0);
-        html += `<tr style="background:#374151;color:#e5e7eb">
-          <td colspan="4" style="padding:.35rem .75rem .35rem 1rem;font-size:.87em">
-            📅 <strong>${date}</strong> &nbsp;·&nbsp; DT: ${fmtN(dayTotal)}đ
-            ${fee.phi ? `&nbsp;·&nbsp; Phí: <span style="color:#fca5a5">${fmtN(fee.phi)}đ</span> &nbsp;·&nbsp; Net GW: <strong style="color:#93c5fd">${fmtN(fee.gross-fee.phi)}đ</strong>` : ''}
-          </td></tr>`;
-        Object.entries(ctData).forEach(([maCT, d]) => {
-          const isMapped = !!getZaloMaCT([...d.tenSPs][0]);
-          const ctBadge = isMapped
-            ? `<span class="ct-badge">${maCT}</span>`
-            : `<span style="color:#94a3b8;font-size:.75em;font-style:italic">chưa map</span>`;
-          const subNames = [...d.tenSPs].join(' · ');
-          html += `<tr class="gian-row">
-            <td style="padding-left:2rem"><div>${ctBadge}</div><div style="font-size:.78em;color:#64748b;margin-top:1px">${subNames}</div></td>
-            <td style="text-align:right;color:#15803d;font-weight:600">${fmtN(d.amount)}</td>
-            <td style="text-align:right;color:#94a3b8">–</td>
-            <td style="text-align:right;color:#94a3b8">–</td>
-          </tr>`;
+      if (_zaloFee.length) {
+        // ── PRIMARY: BaoCaoPhi (tiền VNPay xác nhận) cross-ref với OrderDetails để biết gian ──
+        const byDate = {};
+        let nUnmatched = 0;
+        _zaloFee.forEach(r => {
+          const order = r.maFunzone ? orderLookup[String(r.maFunzone)] : null;
+          if (!order) { nUnmatched++; }
+          const maCT  = order ? (getZaloMaCT(order.tenSP) || order.tenSP) : '?';
+          const label = order ? order.tenSP : `đơn #${r.maFunzone||r.maDonZalo.slice(-8)}`;
+          if(!byDate[r.date]) byDate[r.date] = {};
+          if(!byDate[r.date][maCT]) byDate[r.date][maCT] = {gross:0,phi:0,net:0,labels:new Set()};
+          byDate[r.date][maCT].gross += r.gross;
+          byDate[r.date][maCT].phi   += r.phi;
+          byDate[r.date][maCT].net   += r.net;
+          byDate[r.date][maCT].labels.add(label);
         });
-      });
-      html += '</tbody></table>';
-      el.innerHTML = html;
+
+        const dates = Object.keys(byDate).sort(sortDate);
+        let html = '<table style="width:100%;border-collapse:collapse;font-size:.85em">';
+        html += '<thead><tr style="background:#1e3a5f;color:#fff">'
+          + '<th style="padding:.4rem .6rem;text-align:left">Ngày / CT</th>'
+          + '<th style="text-align:right;padding:.4rem .6rem">DT trước KM</th>'
+          + '<th style="text-align:right;padding:.4rem .6rem">Phí GW</th>'
+          + '<th style="text-align:right;padding:.4rem .6rem">Net GW</th>'
+          + '</tr></thead><tbody>';
+
+        dates.forEach(date => {
+          const ctData = byDate[date];
+          const dayGross = Object.values(ctData).reduce((s,v)=>s+v.gross,0);
+          const dayPhi   = Object.values(ctData).reduce((s,v)=>s+v.phi,0);
+          const dayNet   = Object.values(ctData).reduce((s,v)=>s+v.net,0);
+          html += `<tr style="background:#374151;color:#e5e7eb">
+            <td colspan="4" style="padding:.35rem .75rem .35rem 1rem;font-size:.87em">
+              📅 <strong>${date}</strong>
+              &nbsp;·&nbsp; DT: ${fmtN(dayGross)}đ
+              &nbsp;·&nbsp; Phí: <span style="color:#fca5a5">${fmtN(dayPhi)}đ</span>
+              &nbsp;·&nbsp; Net: <strong style="color:#93c5fd">${fmtN(dayNet)}đ</strong>
+            </td></tr>`;
+          Object.entries(ctData).forEach(([maCT, d]) => {
+            const isMapped = maCT !== '?';
+            const ctBadge = isMapped
+              ? `<span class="ct-badge">${maCT}</span>`
+              : `<span style="color:#94a3b8;font-size:.75em;font-style:italic">chưa map</span>`;
+            const subNames = [...d.labels].join(' · ');
+            html += `<tr class="gian-row">
+              <td style="padding-left:2rem"><div>${ctBadge}</div>
+                <div style="font-size:.75em;color:#64748b;margin-top:1px">${subNames}</div></td>
+              <td style="text-align:right;color:#15803d;font-weight:600">${fmtN(d.gross)}</td>
+              <td style="text-align:right;color:#fca5a5">${fmtN(d.phi)}</td>
+              <td style="text-align:right;color:#93c5fd;font-weight:600">${fmtN(d.net)}</td>
+            </tr>`;
+          });
+        });
+        html += '</tbody></table>';
+        if(nUnmatched>0 && _zaloOrders.length) html += `<div style="margin-top:.5rem;font-size:.78em;color:#f59e0b">⚠️ ${nUnmatched} GD không khớp đơn trong OrderDetails (chưa tải OrderDetails hoặc đơn chưa thanh toán)</div>`;
+        el.innerHTML = html;
+      } else {
+        // ── FALLBACK: chỉ có OrderDetails, chưa có BaoCaoPhi ──
+        const byDate = {};
+        _zaloOrders.forEach(r => {
+          const maCT = getZaloMaCT(r.tenSP) || r.tenSP;
+          if(!byDate[r.date]) byDate[r.date] = {};
+          if(!byDate[r.date][maCT]) byDate[r.date][maCT] = {amount:0, tenSPs:new Set()};
+          byDate[r.date][maCT].amount += r.tongTien;
+          byDate[r.date][maCT].tenSPs.add(r.tenSP);
+        });
+        const dates = Object.keys(byDate).sort(sortDate);
+        let html = '<table style="width:100%;border-collapse:collapse;font-size:.85em">';
+        html += '<thead><tr style="background:#1e3a5f;color:#fff"><th style="padding:.4rem .6rem;text-align:left">Ngày / CT</th><th style="text-align:right;padding:.4rem .6rem">Doanh thu</th><th style="text-align:right;padding:.4rem .6rem">Phí GW</th><th style="text-align:right;padding:.4rem .6rem">Net GW</th></tr></thead><tbody>';
+        dates.forEach(date => {
+          const ctData = byDate[date];
+          const dayTotal = Object.values(ctData).reduce((s,v)=>s+v.amount,0);
+          html += `<tr style="background:#374151;color:#e5e7eb"><td colspan="4" style="padding:.35rem .75rem .35rem 1rem;font-size:.87em">📅 <strong>${date}</strong> &nbsp;·&nbsp; DT: ${fmtN(dayTotal)}đ &nbsp;<span style="color:#fbbf24;font-size:.82em">(chưa có BaoCaoPhi)</span></td></tr>`;
+          Object.entries(ctData).forEach(([maCT, d]) => {
+            const isMapped = !!getZaloMaCT([...d.tenSPs][0]);
+            const ctBadge = isMapped ? `<span class="ct-badge">${maCT}</span>` : `<span style="color:#94a3b8;font-size:.75em;font-style:italic">chưa map</span>`;
+            html += `<tr class="gian-row"><td style="padding-left:2rem"><div>${ctBadge}</div><div style="font-size:.78em;color:#64748b">${[...d.tenSPs].join(' · ')}</div></td>
+              <td style="text-align:right;color:#15803d;font-weight:600">${fmtN(d.amount)}</td>
+              <td style="text-align:right;color:#94a3b8">–</td>
+              <td style="text-align:right;color:#94a3b8">–</td></tr>`;
+          });
+        });
+        html += '</tbody></table>';
+        el.innerHTML = html;
+      }
     }
 
     function autoMapZaloSP() {
