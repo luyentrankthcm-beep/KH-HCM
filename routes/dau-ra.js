@@ -237,4 +237,65 @@ router.get("/api/dau-ra/bank-zalo", (req, res) => {
   } catch(err) { res.json({ ok: false, error: err.message }); }
 });
 
+// GET /api/dau-ra/bank-vnpay?from=2026-08-15&to=2026-09-08
+// Trả về các đợt VNPay (QR Offline, khác Zalo Mini App) trả về ACB1268 --
+// cùng tài khoản, cùng tiền tố diễn giải với Zalo Pay nhưng có chữ "OFFLINE"
+// (vd "...VNPAY TT 829168 GIAITTRIKH989 DV QR OFFLINE NGAY 14-16.08.26...")
+router.get("/api/dau-ra/bank-vnpay", (req, res) => {
+  try {
+    const { from, to } = req.query;
+    const store   = load();
+    const company = getCompany(req);
+    const bank = store.banks.find(b =>
+      (b.company || "kh_cu") === company &&
+      String(b.account_number || b.accountNumber || "").endsWith("1268")
+    );
+    if (!bank) return res.json({ ok: false, error: "Không tìm thấy TK *1268" });
+
+    const payments = [];
+    for (const t of store.transactions) {
+      if (t.bank_id !== bank.id) continue;
+      if (t.type !== "thu") continue;
+      // Chỉ lấy đúng mẫu VNPay QR Offline: "VNPAY TT 829168 GIAIT...989 DV QR OFFLINE NGAY"
+      if (!/VNPAY\s+TT\s+829168.*GIAIT.*989/i.test(t.description || "")) continue;
+      if (!/OFFLINE/i.test(t.description || "")) continue;
+      if (from && t.date < from) continue;
+      if (to   && t.date > to)   continue;
+
+      let fromDate = null, toDate = null;
+      const desc = t.description || "";
+      const mCross  = /NGAY\s+(\d{1,2})\.(\d{1,2})-(\d{1,2})\.(\d{1,2})\.(\d{2,4})/i.exec(desc);
+      const mSame   = !mCross && /NGAY\s+(\d{1,2})-(\d{1,2})\.(\d{1,2})\.(\d{2,4})/i.exec(desc);
+      const mSingle = !mCross && !mSame && /NGAY\s+(\d{1,2})\.(\d{1,2})\.(\d{2,4})/i.exec(desc);
+      if (mCross) {
+        const [, d1, mo1, d2, mo2, y] = mCross;
+        const yr = y.length === 2 ? "20" + y : y;
+        fromDate = d1.padStart(2, "0") + "-" + mo1.padStart(2, "0") + "-" + yr;
+        toDate   = d2.padStart(2, "0") + "-" + mo2.padStart(2, "0") + "-" + yr;
+      } else if (mSame) {
+        const [, d1, d2, mo, y] = mSame;
+        const yr = y.length === 2 ? "20" + y : y;
+        fromDate = d1.padStart(2, "0") + "-" + mo.padStart(2, "0") + "-" + yr;
+        toDate   = d2.padStart(2, "0") + "-" + mo.padStart(2, "0") + "-" + yr;
+      } else if (mSingle) {
+        const [, d, mo, y] = mSingle;
+        const yr = y.length === 2 ? "20" + y : y;
+        fromDate = d.padStart(2, "0") + "-" + mo.padStart(2, "0") + "-" + yr;
+        toDate   = fromDate;
+      }
+      let payDate = t.date;
+      if (/^\d{4}-\d{2}-\d{2}$/.test(t.date)) {
+        const p = t.date.split("-");
+        payDate = p[2] + "-" + p[1] + "-" + p[0];
+      }
+      payments.push({ payDate, amount: Number(t.amount || 0), fromDate, toDate, desc: (t.description||"").substring(0,100) });
+    }
+    payments.sort((a, b) => {
+      const iso = d => { if (!d) return ""; const p = d.split("-"); return p[2]+"-"+p[1]+"-"+p[0]; };
+      return iso(a.payDate).localeCompare(iso(b.payDate));
+    });
+    res.json({ ok: true, payments });
+  } catch(err) { res.json({ ok: false, error: err.message }); }
+});
+
 module.exports = router;
