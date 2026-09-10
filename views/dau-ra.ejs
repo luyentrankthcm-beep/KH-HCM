@@ -2268,7 +2268,12 @@
             const hdKey = date+'|'+maCT;
             const hd = _zaloHD[hdKey] || {};
             const tienHD = parseFloat((hd.tienHD||'0').toString().replace(/[^0-9.-]/g,''))||0;
-            const chenh = tienHD ? (gDisp.net - tienHD) : null;
+            // Luyen, 2026-09-10: "hóa đơn check với gian là check tiền
+            // trước khuyến mãi" -- hóa đơn xuất theo DT TRƯỚC KM (gDisp.dt),
+            // không phải Net GW (đã trừ phí GW) -- so sánh với Net trước đây
+            // khiến MỌI dòng đều lệch đúng bằng đúng số phí GW, tưởng là
+            // chênh thật nhưng không phải.
+            const chenh = tienHD ? (gDisp.dt - tienHD) : null;
             const chenhColor = chenh===null?'#94a3b8':(Math.abs(chenh)<1000?'#16a34a':(chenh<0?'#ef4444':'#d97706'));
             const chenhTxt = chenh===null?'—':((chenh>0?'+':'')+fmtN(chenh));
             const bg = i%2===0?'#f8fafc':'#fff';
