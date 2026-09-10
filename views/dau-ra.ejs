@@ -785,8 +785,9 @@
       _zaloFee.forEach(r => {
         const isFunzone = r.maDiem==='FUNZONE1' || (r.dienThu||'').toUpperCase().includes('FUNZONE');
         if(!isFunzone) return;
-        const tenSP_lu = r.maFunzone ? _zaloOrders[String(r.maFunzone)] : undefined;
-        const maCT = tenSP_lu ? (getZaloMaCT(tenSP_lu)||tenSP_lu) : (_zaloUnk[r.date] || '_unknown_');
+        const ordVal = r.maFunzone ? _zaloOrders[String(r.maFunzone)] : undefined;
+        const { tenSP: tenSP_lu, sku: skuLu } = unpackZaloOrder(ordVal);
+        const maCT = ordVal !== undefined ? (getZaloMaCT(tenSP_lu, skuLu)||tenSP_lu||ordVal) : (_zaloUnk[r.date] || '_unknown_');
         const key = r.date+'|'+maCT;
         grossByDateCT[key] = (grossByDateCT[key]||0) + r.gross;
       });
@@ -1944,11 +1945,24 @@
     const LS_ZALO_HIST    = `zalo_hist_${COMPANY}`;
     const LS_ZALO_HD      = `zalo_hd_${COMPANY}`;   // { [maCT]: { soHD, tienHD } }
 
-    let _zaloOrders = {}; // {maOrder: maCT} compact map (~4x smaller than array)
+    let _zaloOrders = {}; // {maOrder: "tenSP" hoặc "tenSPsku"} compact map (~4x smaller than array)
     let _zaloFee    = []; // [{date, maFunzone, maDonZalo, gross, phi, net}]
-    let _zaloSpMap  = {}; // tenSP → maCT
+    let _zaloSpMap  = {}; // tenSP hoặc Sku → maCT (2 loại key dùng chung 1 bảng)
     let _zaloHist   = [];
     let _zaloHD     = {}; // maCT → { soHD, tienHD }
+
+    // Luyen, 2026-09-10: file OrderDetails ZaloPay có cột "Sku" (mã sản phẩm)
+    // ổn định hơn "Tên sản phẩm" (tên đổi theo khuyến mãi). Đóng gói chung
+    // vào 1 string "tenSPsku" trong _zaloOrders để KHÔNG phải thêm 1
+    // object song song (tránh tăng gấp đôi dung lượng localStorage như
+    // comment cũ đã né). Vd Luyen xác nhận: Sku "AMTP" = gian "AM TP KVCM".
+    const SKU_CT_DEFAULTS = { 'AMTP': 'AM TP KVCM' };
+    function packZaloOrder(tenSP, sku) { return sku ? (tenSP + '' + sku) : tenSP; }
+    function unpackZaloOrder(val) {
+      if (val == null) return { tenSP: '', sku: '' };
+      const i = val.indexOf('');
+      return i === -1 ? { tenSP: val, sku: '' } : { tenSP: val.slice(0,i), sku: val.slice(i+1) };
+    }
 
     // Dọn key cũ (array format) để giải phóng quota
     try { lsRemove('zalo_orders_kh_cu'); lsRemove('zalo_orders_kh_moi'); } catch(e){}
@@ -2007,6 +2021,7 @@
           const iDate=fc('Ngày đặt hàng'), iStatus=fc('Trạng thái đơn hàng');
           const iPay=fc('Trạng thái thanh toán');
           const iSP=fc('Tên sản phẩm'), iOrder=fc('Mã đơn hàng');
+          const iSku=fc('Sku');
 
           // Lưu compact {maOrder: maCT} — ~4x nhỏ hơn array, tránh quota exceeded
           let addedCount=0, totalInFile=0;
@@ -2021,9 +2036,14 @@
             totalInFile++;
             const maOrder = String(r[iOrder]||'').trim().replace(/^#/,'');
             const tenSP   = String(r[iSP]||'').trim();
+            const sku     = iSku>-1 ? String(r[iSku]||'').trim() : '';
             if(!maOrder || _zaloOrders[maOrder] !== undefined) return;
-            _zaloOrders[maOrder] = tenSP; // store tenSP; maCT resolved at render time
+            _zaloOrders[maOrder] = packZaloOrder(tenSP, sku); // tenSP (+sku); maCT resolved at render time
             if(tenSP && !_zaloSpMap[tenSP]) _zaloSpMap[tenSP]='';
+            // Luyen, 2026-09-10: Sku ổn định hơn tên SP (tên đổi theo khuyến
+            // mãi, vd "SNOWFUN TÂN PHÚ" vs Sku cố định "AMTP") -- thêm Sku
+            // làm key map riêng, seed sẵn vài mã Luyen đã xác nhận.
+            if(sku && _zaloSpMap[sku]===undefined) _zaloSpMap[sku] = SKU_CT_DEFAULTS[sku] || '';
             addedCount++;
           });
           // Lưu OrderMap vào localStorage, thử giảm size nếu bị quota
@@ -2164,7 +2184,10 @@
       el.innerHTML = `${n} đơn <span style="font-size:.75em;color:${saved?'#86efac':'#fca5a5'}" title="${saved?'Đã lưu vào bộ nhớ trình duyệt':'⚠️ Chưa lưu được — F5 sẽ mất dữ liệu!'}">${saved?'💾':'⚠️ chưa lưu'}</span>`;
     }
 
-    function getZaloMaCT(tenSP) {
+    function getZaloMaCT(tenSP, sku) {
+      // 0. Exact map theo Sku (mã sản phẩm cố định, không đổi theo khuyến mãi
+      // như tên sản phẩm) -- ưu tiên cao nhất nếu có.
+      if(sku){ const bySku = (_zaloSpMap[sku]||'').trim(); if(bySku) return bySku; }
       // 1. Exact map (user-configured)
       const exact = (_zaloSpMap[tenSP]||'').trim();
       if(exact) return exact;
@@ -2237,9 +2260,10 @@
           const isFunzone = r.maDiem==='FUNZONE1' || (r.dienThu||'').toUpperCase().includes('FUNZONE');
           if(!isFunzone){ nOther++; return; }
           nFunzone++;
-          const tenSP_lu = r.maFunzone ? _zaloOrders[String(r.maFunzone)] : undefined;
-          if(tenSP_lu === undefined) nNoMatch++;
-          const maCT = tenSP_lu ? (getZaloMaCT(tenSP_lu)||tenSP_lu) : (_zaloUnk[r.date] || '_unknown_');
+          const ordVal = r.maFunzone ? _zaloOrders[String(r.maFunzone)] : undefined;
+          if(ordVal === undefined) nNoMatch++;
+          const { tenSP: tenSP_lu, sku: skuLu } = unpackZaloOrder(ordVal);
+          const maCT = ordVal !== undefined ? (getZaloMaCT(tenSP_lu, skuLu)||tenSP_lu||ordVal) : (_zaloUnk[r.date] || '_unknown_');
           if(!byDate[r.date]) byDate[r.date]={};
           if(!byDate[r.date][maCT]) byDate[r.date][maCT]={gross:0,phi:0,net:0,soDon:0};
           byDate[r.date][maCT].gross += r.gross;
@@ -2261,6 +2285,21 @@
         if(!Object.keys(_zaloOrders).length) html += ' · <span style="color:#ef4444">Chưa tải OrderDetails!</span>';
         if(nOther) html += ' · <span style="color:#94a3b8">VNPay khác: '+nOther+'</span>';
         html += '</div>';
+
+        // Luyen, 2026-09-10: "cái nào tải lên có sản phẩm mới á bạn hiện bên
+        // kia nhá tôi sẽ map với hiện lên chính giữa cái đối soát theo ngày
+        // luôn cho tôi cảnh báo có tên sản phẩm mới" -- ten SP/diem thu MOI
+        // da duoc handleZaloOrderFile/handleZaloFeeFile tu dong them vao
+        // _zaloSpMap (gia tri rong) de hien san trong man "Map Tên SP → CT",
+        // o day them banner canh bao NOI BAT ngay dau Doi soat ngay, bam vao
+        // nhay thang sang man Map.
+        const unmappedSp = Object.entries(_zaloSpMap).filter(([k,v]) => !v);
+        if (unmappedSp.length) {
+          html += '<div style="background:#fef3c7;border:1px solid #f59e0b;border-radius:8px;padding:.6rem 1rem;margin-bottom:.6rem;font-size:.87em;color:#92400e;display:flex;justify-content:space-between;align-items:center;gap:.6rem;flex-wrap:wrap">'
+            +'<span>⚠️ Có <strong>'+unmappedSp.length+'</strong> tên sản phẩm / điểm thu <strong>MỚI</strong> chưa map mã CT (vd: '+unmappedSp.slice(0,3).map(([k])=>k).join(', ')+(unmappedSp.length>3?'...':'')+') — các giao dịch này sẽ hiện tên gốc thay vì đúng gian cho tới khi map.</span>'
+            +'<button onclick="switchZaloSub(\'map\')" style="background:#f59e0b;color:#fff;border:none;border-radius:6px;padding:.3rem .8rem;font-weight:700;cursor:pointer;white-space:nowrap">🗺️ Map ngay</button>'
+            +'</div>';
+        }
 
         // Helper: render one date block
         const renderDateBlock = date => {
@@ -2448,8 +2487,9 @@
       } else {
         // ── FALLBACK: chỉ có OrderDetails, chưa có BaoCaoPhi ──
         const ctCount = {};
-        Object.entries(_zaloOrders).forEach(([maOrder, tenSP]) => {
-          const maCT = getZaloMaCT(tenSP) || tenSP;
+        Object.entries(_zaloOrders).forEach(([maOrder, ordVal]) => {
+          const { tenSP, sku } = unpackZaloOrder(ordVal);
+          const maCT = getZaloMaCT(tenSP, sku) || tenSP;
           ctCount[maCT] = (ctCount[maCT]||0) + 1;
         });
         let html = '<div style="padding:1rem;color:#94a3b8;font-size:.88em">';
