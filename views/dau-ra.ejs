@@ -2709,8 +2709,15 @@
             // không tròn số.
             const soHDNow = (hd.soHD||'').trim();
             const grp = soHDNow ? invoiceGroups[maCT+'|'+soHDNow] : null;
-            const grpBalanced = grp && grp.dates.length > 1 && Math.abs(grp.dt - grp.tienHD) < 1000;
-            const chenh = grpBalanced ? 0 : (tienHD ? (gDisp.dt - tienHD) : null);
+            // Luyen, 2026-09-10: hóa đơn gộp nhiều ngày (vd "3271, 3272" cùng
+            // 1 tổng tiền ghi trên MỌI ngày nó che phủ) -- chia đều phần tiền
+            // hóa đơn theo TỶ LỆ DT từng ngày trong nhóm rồi mới so, thay vì
+            // so mỗi ngày với TOÀN BỘ số tiền hóa đơn (tính trùng, ra số vô
+            // nghĩa dương/âm ngược nhau). Tự động cấn về ~0 khi tổng khớp,
+            // và hiện đúng phần lệch thật (chia đều) khi tổng KHÔNG khớp.
+            const chenh = (grp && grp.dates.length > 1 && grp.tienHD)
+              ? (gDisp.dt - grp.tienHD * (grp.dt > 0 ? (gDisp.dt / grp.dt) : (1 / grp.dates.length)))
+              : (tienHD ? (gDisp.dt - tienHD) : null);
             const chenhColor = chenh===null?'#94a3b8':(Math.abs(chenh)<1000?'#16a34a':(chenh<0?'#ef4444':'#d97706'));
             const chenhTxt = chenh===null?'—':((chenh>0?'+':'')+fmtN(chenh));
             const bg = i%2===0?'#f8fafc':'#fff';
@@ -3354,8 +3361,9 @@
           const tienHD = parseFloat((hd.tienHD||'0').toString().replace(/[^0-9.-]/g,''))||0;
           const soHDNow = (hd.soHD||'').trim();
           const grp = soHDNow ? invoiceGroups[maCT+'|'+soHDNow] : null;
-          const grpBalanced = grp && grp.dates.length > 1 && Math.abs(grp.dt - grp.tienHD) < 1000;
-          const chenh = grpBalanced ? 0 : (tienHD ? (gDisp.dt - tienHD) : null);
+          const chenh = (grp && grp.dates.length > 1 && grp.tienHD)
+            ? (gDisp.dt - grp.tienHD * (grp.dt > 0 ? (gDisp.dt / grp.dt) : (1 / grp.dates.length)))
+            : (tienHD ? (gDisp.dt - tienHD) : null);
           const chenhColor = chenh===null?'#94a3b8':(Math.abs(chenh)<1000?'#16a34a':(chenh<0?'#ef4444':'#d97706'));
           const chenhTxt = chenh===null?'—':((chenh>0?'+':'')+fmtN(chenh));
           const bg = i%2===0?'#f8fafc':'#fff';
@@ -3878,8 +3886,9 @@
           const tienHD = parseFloat((hd.tienHD||'0').toString().replace(/[^0-9.-]/g,''))||0;
           const soHDNow = (hd.soHD||'').trim();
           const grp = soHDNow ? invoiceGroups[maCT+'|'+soHDNow] : null;
-          const grpBalanced = grp && grp.dates.length > 1 && Math.abs(grp.dt - grp.tienHD) < 1000;
-          const chenh = grpBalanced ? 0 : (tienHD ? (gDisp.dt - tienHD) : null);
+          const chenh = (grp && grp.dates.length > 1 && grp.tienHD)
+            ? (gDisp.dt - grp.tienHD * (grp.dt > 0 ? (gDisp.dt / grp.dt) : (1 / grp.dates.length)))
+            : (tienHD ? (gDisp.dt - tienHD) : null);
           const chenhColor = chenh===null?'#94a3b8':(Math.abs(chenh)<1000?'#16a34a':(chenh<0?'#ef4444':'#d97706'));
           const chenhTxt = chenh===null?'—':((chenh>0?'+':'')+fmtN(chenh));
           const bg = i%2===0?'#f8fafc':'#fff';
