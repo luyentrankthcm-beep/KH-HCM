@@ -2030,9 +2030,17 @@
             // lot qua giao dich chua thanh cong -- trim() ky lai 2 cot trang
             // thai (phong khi Excel co khoang trang thua/an) truoc khi so
             // sanh, thay vi so sanh truc tiep r[iPay]/r[iStatus] nhu cu.
+            //
+            // Luyen, 2026-09-10 (sau): phat hien don #134119/#134108 THUC SU
+            // co trong file OrderDetails (Da thanh toan) nhung bi loai vi
+            // "Trang thai don hang" = "Da huy" -- trong khi BaoCaoPhi (nguon
+            // xac nhan tien THAT SU ve) van ghi nhan GD do la "Thanh cong".
+            // Tuc la don bi huy tren he thong quan ly don SAU KHI da thu tien
+            // that (khong hoan tien), nen van phai tinh doanh thu. Bo dieu
+            // kien loai theo "Da huy" -- chi con dua vao Trang thai thanh
+            // toan (da co BaoCaoPhi tu loc "Thanh cong" o buoc khac roi).
             const payStatus   = String(r[iPay]||'').trim();
-            const orderStatus = String(r[iStatus]||'').trim();
-            if(payStatus!=='Đã thanh toán' || orderStatus==='Đã hủy' || !r[iDate]) return;
+            if(payStatus!=='Đã thanh toán' || !r[iDate]) return;
             totalInFile++;
             const maOrder = String(r[iOrder]||'').trim().replace(/^#/,'');
             const tenSP   = String(r[iSP]||'').trim();
@@ -2785,7 +2793,7 @@
       rows.forEach(r => {
         const reason = !r.maFunzone
           ? 'Không đọc được mã đơn hàng từ ghi chú BaoCaoPhi'
-          : 'Mã đơn <b>'+r.maFunzone+'</b> không có trong file OrderDetails đã tải — do chưa tải file chứa đơn này, hoặc đơn đó không ở trạng thái "Đã thanh toán" / bị hủy nên khi tải OrderDetails đã bị lọc bỏ';
+          : 'Mã đơn <b>'+r.maFunzone+'</b> không có trong file OrderDetails đã tải — do chưa tải file chứa đơn này, hoặc đơn đó không ở trạng thái "Đã thanh toán" nên khi tải OrderDetails đã bị lọc bỏ';
         html += '<tr style="border-bottom:1px solid #fde68a">'
           +'<td style="padding:.2rem .4rem">'+(r.maDonZalo||'—')+'</td>'
           +'<td style="padding:.2rem .4rem">'+(r.maFunzone||'—')+'</td>'
