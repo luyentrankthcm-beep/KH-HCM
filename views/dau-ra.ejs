@@ -2273,6 +2273,31 @@
       XLSX.writeFile(wb,'ZaloPay_MapSP_CT.xlsx');
     }
 
+    // Nhập lại file Excel đã xuất (hoặc chỉnh sửa) ở trên -- cột A = Tên sản
+    // phẩm, cột B = Mã CT. Ghi đè mapping hiện có theo đúng tên sản phẩm.
+    function importZaloSpMap(input) {
+      const file = input.files[0]; if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          const wb = XLSX.read(e.target.result, { type: 'array' });
+          const data = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header:1, defval:'' });
+          let updated = 0;
+          data.slice(1).forEach(row => {
+            const sp = String(row[0]||'').trim();
+            const ct = String(row[1]||'').trim();
+            if (sp && ct) { _zaloSpMap[sp] = ct; updated++; }
+          });
+          lsSet(LS_ZALO_SP_MAP, JSON.stringify(_zaloSpMap));
+          alert(`✅ Đã nhập ${updated} mapping`);
+          renderZaloCtMap();
+          renderZaloDoiSoat();
+        } catch(err) { alert('Lỗi: ' + err.message); }
+        input.value = '';
+      };
+      reader.readAsArrayBuffer(file);
+    }
+
     function renderZaloCtMap() {
       const el = document.getElementById('zaloCtMapContent');
       if(!el) return;
@@ -2287,6 +2312,9 @@
         <span style="font-size:.83em;color:#64748b">${tenSPs.length} sản phẩm · <span style="color:${unmappedCount?'#d97706':'#16a34a'}">${unmappedCount} chưa map</span></span>
         <button onclick="autoMapZaloSP()" style="background:#7c3aed;color:#fff;border:none;border-radius:5px;padding:.25rem .7rem;cursor:pointer;font-size:.8em;font-weight:700">⚡ Auto Map</button>
         <button onclick="exportZaloSpMap()" style="background:#0891b2;color:#fff;border:none;border-radius:5px;padding:.25rem .7rem;cursor:pointer;font-size:.8em">⬇️ Xuất Excel</button>
+        <label style="background:#059669;color:#fff;border:none;border-radius:5px;padding:.25rem .7rem;cursor:pointer;font-size:.8em;display:inline-flex;align-items:center;gap:.3rem">
+          📤 Nhập từ Excel <input type="file" accept=".xlsx,.xls" style="display:none" onchange="importZaloSpMap(this)">
+        </label>
       </div>`;
       // 1 bảng duy nhất — unmapped trước (nền vàng nhạt), mapped sau (nền xanh nhạt)
       html += '<table style="width:100%;border-collapse:collapse;font-size:.84em"><thead><tr style="background:#e0e7ff;color:#1e3a5f"><th style="padding:.3rem .6rem;text-align:left">Tên sản phẩm</th><th style="padding:.3rem .4rem;width:180px">Mã CT</th><th style="padding:.3rem .4rem;width:56px"></th></tr></thead><tbody>';
