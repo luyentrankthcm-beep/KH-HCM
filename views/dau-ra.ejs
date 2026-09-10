@@ -2641,11 +2641,23 @@
             const gDisp0 = getGianDisp(dt, maCT, ctData0[maCT]);
             const tienHD0 = parseFloat((hd.tienHD||'0').toString().replace(/[^0-9.-]/g,''))||0;
             const key = maCT+'|'+soHD;
-            if(!invoiceGroups[key]) invoiceGroups[key] = {dt:0, tienHD:0, dates:[]};
+            if(!invoiceGroups[key]) invoiceGroups[key] = {dt:0, tienHDs:[], dates:[]};
             invoiceGroups[key].dt += gDisp0.dt;
-            invoiceGroups[key].tienHD += tienHD0;
+            invoiceGroups[key].tienHDs.push(tienHD0);
             invoiceGroups[key].dates.push(dt);
           });
+        });
+        // Luyen, 2026-09-10: "nếu xuất hóa đơn này cộng trừ cấn trừ qua lại
+        // đi cho nó hết [lệch]" -- Luyen thường nhập NGUYÊN số tiền hóa đơn
+        // gộp trên MỌI ngày nó che phủ (không tự chia), nên CỘNG DỒN tienHD
+        // qua các ngày (như code cũ) sẽ tính ra gấp đôi/gấp ba số thật, khiến
+        // "cấn trừ" không bao giờ khớp. Nếu mọi ngày trong nhóm ghi CÙNG 1 số
+        // tiền (không tự chia) thì tổng = đúng số đó (không cộng dồn); chỉ
+        // cộng dồn khi các ngày có số tiền KHÁC nhau (đã tự chia theo tỷ lệ,
+        // như nút "Map MTT" tự làm).
+        Object.values(invoiceGroups).forEach(g => {
+          const uniq = [...new Set(g.tienHDs.filter(v=>v>0))];
+          g.tienHD = uniq.length <= 1 ? (uniq[0]||0) : g.tienHDs.reduce((s,v)=>s+v,0);
         });
 
         // Helper: render one date block
@@ -3293,11 +3305,17 @@
           const gDisp0 = getVnpayGianDisp(dt, maCT, ctData0[maCT]);
           const tienHD0 = parseFloat((hd.tienHD||'0').toString().replace(/[^0-9.-]/g,''))||0;
           const key = maCT+'|'+soHD;
-          if(!invoiceGroups[key]) invoiceGroups[key] = {dt:0, tienHD:0, dates:[]};
+          if(!invoiceGroups[key]) invoiceGroups[key] = {dt:0, tienHDs:[], dates:[]};
           invoiceGroups[key].dt += gDisp0.dt;
-          invoiceGroups[key].tienHD += tienHD0;
+          invoiceGroups[key].tienHDs.push(tienHD0);
           invoiceGroups[key].dates.push(dt);
         });
+      });
+      // Xem ghi chú tương ứng ở renderZaloDoiSoat: nếu mọi ngày trong nhóm
+      // ghi CÙNG 1 số tiền hóa đơn (không tự chia) thì không cộng dồn nhân đôi.
+      Object.values(invoiceGroups).forEach(g => {
+        const uniq = [...new Set(g.tienHDs.filter(v=>v>0))];
+        g.tienHD = uniq.length <= 1 ? (uniq[0]||0) : g.tienHDs.reduce((s,v)=>s+v,0);
       });
 
       const renderDateBlock = date => {
@@ -3810,11 +3828,17 @@
           const gDisp0 = getPayooGianDisp(dt, maCT, ctData0[maCT]);
           const tienHD0 = parseFloat((hd.tienHD||'0').toString().replace(/[^0-9.-]/g,''))||0;
           const key = maCT+'|'+soHD;
-          if(!invoiceGroups[key]) invoiceGroups[key] = {dt:0, tienHD:0, dates:[]};
+          if(!invoiceGroups[key]) invoiceGroups[key] = {dt:0, tienHDs:[], dates:[]};
           invoiceGroups[key].dt += gDisp0.dt;
-          invoiceGroups[key].tienHD += tienHD0;
+          invoiceGroups[key].tienHDs.push(tienHD0);
           invoiceGroups[key].dates.push(dt);
         });
+      });
+      // Xem ghi chú tương ứng ở renderZaloDoiSoat: nếu mọi ngày trong nhóm
+      // ghi CÙNG 1 số tiền hóa đơn (không tự chia) thì không cộng dồn nhân đôi.
+      Object.values(invoiceGroups).forEach(g => {
+        const uniq = [...new Set(g.tienHDs.filter(v=>v>0))];
+        g.tienHD = uniq.length <= 1 ? (uniq[0]||0) : g.tienHDs.reduce((s,v)=>s+v,0);
       });
 
       const renderDateBlock = date => {
