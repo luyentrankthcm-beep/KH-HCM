@@ -2039,17 +2039,17 @@
             // that (khong hoan tien), nen van phai tinh doanh thu. Bo dieu
             // kien loai theo "Da huy" -- chi con dua vao Trang thai thanh
             // toan (da co BaoCaoPhi tu loc "Thanh cong" o buoc khac roi).
-            // Luyen, 2026-09-10 (thêm nữa): đơn #137373 CÓ trong file, "Trạng
-            // thái thanh toán" nhìn = "Đã thanh toán" nhưng vẫn bị bỏ qua --
-            // nghi do khác kiểu chuẩn hoá Unicode (dấu tiếng Việt tổ hợp NFD
-            // vs sẵn NFC) khiến so sánh === lệch dù mắt nhìn giống hệt. Chuẩn
-            // hoá NFC cả 2 vế trước khi so sánh cho chắc, đồng thời đếm số
-            // dòng bị loại do trạng thái để báo cho Luyen thấy (thay vì mất
-            // tăm không dấu vết như trước).
-            const norm = s => { try { return s.normalize('NFC'); } catch(e){ return s; } };
-            const payStatus = norm(String(r[iPay]||'').trim());
-            const isPaid = payStatus === norm('Đã thanh toán');
-            if(!isPaid || !r[iDate]) { if(payStatus) excludedByStatus++; return; }
+            // Luyen, 2026-09-10 (thêm nữa): đơn #139605/#139809/#139738... đã
+            // kiểm tra tận nơi -- KHÔNG phải lỗi Unicode, mà "Trạng thái
+            // thanh toán" của các đơn này trong OrderDetails THẬT SỰ là
+            // "Chờ xử lý" (chưa cập nhật thành Đã thanh toán trên hệ thống
+            // quản lý đơn), dù BaoCaoPhi (nguồn xác nhận tiền thật đã về, đã
+            // lọc "Thành công") thì đã ghi nhận GD thành công rồi. Tương tự
+            // case "Đã hủy" ở trên -- OrderDetails chỉ dùng để LẤY TÊN SẢN
+            // PHẨM/SKU (xác định gian), không dùng để xác nhận có thu tiền
+            // hay không (việc đó BaoCaoPhi đã làm rồi) -- nên bỏ luôn điều
+            // kiện lọc theo Trạng thái thanh toán, chỉ cần có Mã đơn + Ngày.
+            if(!r[iDate]) { excludedByStatus++; return; }
             totalInFile++;
             const maOrder = String(r[iOrder]||'').trim().replace(/^#/,'');
             const tenSP   = String(r[iSP]||'').trim();
@@ -2082,7 +2082,7 @@
           lsSet(LS_ZALO_HIST, JSON.stringify(_zaloHist));
 
           renderZaloSummary(); renderZaloDoiSoat(); renderZaloCtMap(); renderZaloHist();
-          alert(`✅ OrderDetails: +${addedCount} đơn mới · Bỏ qua ${totalInFile-addedCount} trùng${excludedByStatus?' · Bỏ qua '+excludedByStatus+' do trạng thái thanh toán ≠ "Đã thanh toán"':''}\nTổng tích lũy: ${Object.keys(_zaloOrders).length} đơn`);
+          alert(`✅ OrderDetails: +${addedCount} đơn mới · Bỏ qua ${totalInFile-addedCount} trùng${excludedByStatus?' · Bỏ qua '+excludedByStatus+' dòng thiếu Ngày đặt hàng':''}\nTổng tích lũy: ${Object.keys(_zaloOrders).length} đơn`);
         } catch(err) { alert('Lỗi đọc file OrderDetails: ' + err.message); }
       };
       reader.readAsArrayBuffer(inp.files[0]);
