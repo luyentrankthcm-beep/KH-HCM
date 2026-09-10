@@ -3876,10 +3876,12 @@
         return out;
       };
 
-      // Nhóm các đợt NH trả về theo ĐÚNG khoảng ngày (fromDate|toDate) --
-      // Payoo luôn trả 2 giao dịch/ngày (QR + Thẻ) cùng 1 khoảng ngày, hiện
-      // 2 dòng "NH trả về" (mỗi loại 1 dòng, so khớp riêng) rồi hiện bảng
-      // chi tiết ngày DUY NHẤT 1 lần bên dưới (không lặp lại 2 lần).
+      // Luyen, 2026-09-10: "đối soát chung ngày á rồi sổ ra thôi đừng phân ra
+      // thẻ với lại qr riêng" -- gộp CHUNG 2 giao dịch NH (QR+Thẻ) của cùng 1
+      // khoảng ngày thành 1 tổng DUY NHẤT, so với tổng Net CHUNG (mọi gian,
+      // không phân loại) -- đơn giản, giống hệt cách Zalo/VNPay đang làm.
+      // (Bảng chi tiết từng gian vẫn tách QR/Thẻ riêng như cũ, chỉ có dòng
+      // "NH trả về" tổng là gộp lại.)
       const paymentGroups = {};
       _bankPayooPayments.forEach(pay => {
         const key = (pay.fromDate||'')+'|'+(pay.toDate||'');
@@ -3892,22 +3894,19 @@
         const payAllDates = allDates.filter(d => inRange(d, pay0.fromDate, pay0.toDate));
         const payRenderDates = filteredDates.filter(d => inRange(d, pay0.fromDate, pay0.toDate));
         if(selMonth && payRenderDates.length===0){ payAllDates.forEach(d=>coveredDates.add(d)); return; }
-        group.sort((a,b)=> (a.loai||'').localeCompare(b.loai||''));
-        group.forEach(pay => {
-          const typeNet = payAllDates.reduce((s,d)=>s+computePayooDayNetByType(d,pay.loai,byDate),0);
-          const chenh = pay.amount - typeNet;
-          const chCol = Math.abs(chenh)<1000?'#86efac':(chenh<0?'#fca5a5':'#fcd34d');
-          const chTxt = (chenh>=0?'+':'')+fmtN(chenh);
-          const loaiLbl = pay.loai==='THE' ? '💳 Thẻ' : '📱 QR';
-          html += '<div style="background:#4c1d95;color:#e9d5ff;padding:.5rem .8rem;font-weight:700;font-size:.87em;border-top:2px solid #7c3aed;border-radius:4px;margin-top:.5rem;display:flex;flex-wrap:wrap;gap:.6rem;align-items:center">'
-            +'<span>'+loaiLbl+' NH trả về <strong>'+pay.payDate+'</strong>:'
-            +'<span style="background:#5b21b6;padding:.05rem .45rem;border-radius:5px;margin-left:.4rem">'+fmtN(pay.amount)+'đ</span></span>'
-            +(pay.fromDate?'<span style="font-weight:400;color:#d8b4fe;font-size:.84em">Payoo '
-              +pay.fromDate+(pay.toDate&&pay.toDate!==pay.fromDate?' → '+pay.toDate:'')+'</span>':'')
-            +(payAllDates.length?'<span style="font-weight:400;color:#d8b4fe;font-size:.84em">Net ('+loaiLbl+'): '+fmtN(typeNet)+'đ</span>':'')
-            +(payAllDates.length?'<span style="color:'+chCol+';font-weight:900">'+(Math.abs(chenh)<1000?'✅':'⚠️')+' Chênh: '+chTxt+'đ</span>':'')
-            +'</div>';
-        });
+        const totalAmount = group.reduce((s,p)=>s+p.amount,0);
+        const payooNet = payAllDates.reduce((s,d)=>s+computePayooDayNet(d,byDate),0);
+        const chenh = totalAmount - payooNet;
+        const chCol = Math.abs(chenh)<1000?'#86efac':(chenh<0?'#fca5a5':'#fcd34d');
+        const chTxt = (chenh>=0?'+':'')+fmtN(chenh);
+        html += '<div style="background:#4c1d95;color:#e9d5ff;padding:.5rem .8rem;font-weight:700;font-size:.87em;border-top:2px solid #7c3aed;border-radius:4px;margin-top:.5rem;display:flex;flex-wrap:wrap;gap:.6rem;align-items:center">'
+          +'<span>💜 NH trả về <strong>'+pay0.payDate+'</strong>:'
+          +'<span style="background:#5b21b6;padding:.05rem .45rem;border-radius:5px;margin-left:.4rem">'+fmtN(totalAmount)+'đ</span></span>'
+          +(pay0.fromDate?'<span style="font-weight:400;color:#d8b4fe;font-size:.84em">Payoo '
+            +pay0.fromDate+(pay0.toDate&&pay0.toDate!==pay0.fromDate?' → '+pay0.toDate:'')+'</span>':'')
+          +(payAllDates.length?'<span style="font-weight:400;color:#d8b4fe;font-size:.84em">Net: '+fmtN(payooNet)+'đ</span>':'')
+          +(payAllDates.length?'<span style="color:'+chCol+';font-weight:900">'+(Math.abs(chenh)<1000?'✅':'⚠️')+' Chênh: '+chTxt+'đ</span>':'')
+          +'</div>';
         payAllDates.forEach(d=>coveredDates.add(d));
         payRenderDates.forEach(d=>{ html += renderDateBlock(d); });
       });
