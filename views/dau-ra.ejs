@@ -410,9 +410,10 @@
             </select>
             <button onclick="fetchBankPayooRefresh()" style="font-size:.78em;padding:.2rem .65rem;background:#6d28d9;color:#fff;border:none;border-radius:5px;cursor:pointer">🔄 Làm mới NH</button>
             <button onclick="toggleBankPayooDetail()" style="font-size:.78em;padding:.2rem .65rem;background:#374151;color:#e5e7eb;border:none;border-radius:5px;cursor:pointer">🏦 Xem raw NH</button>
+            <button onclick="autoMapMttPayoo()" style="font-size:.78em;padding:.2rem .65rem;background:#7c3aed;color:#fff;border:none;border-radius:5px;cursor:pointer;font-weight:600">🧾 Map MTT → Payoo</button>
             <span id="bankPayooStatus" style="font-size:.78em;color:#64748b"></span>
           </div>
-          <div style="font-size:.76em;color:#94a3b8;margin-bottom:.5rem">Mỗi Cửa hàng tách riêng theo 2 <b>Hình thức thanh toán</b> (QR / Thẻ) — ngân hàng cũng trả về 2 giao dịch riêng mỗi ngày (1 QR + 1 Thẻ), đối soát khớp đúng theo từng loại.</div>
+          <div style="font-size:.76em;color:#94a3b8;margin-bottom:.5rem">Mỗi Cửa hàng tách riêng theo 2 <b>Hình thức thanh toán</b> (QR / Thẻ) — ngân hàng trả về gộp chung 2 giao dịch (1 QR + 1 Thẻ) mỗi ngày thành 1 dòng đối soát tổng.</div>
           <div id="bankPayooDetailPanel" style="display:none;background:#0f172a;border:1px solid #4c1d95;border-radius:6px;padding:.6rem .8rem;margin-bottom:.6rem;font-size:.8em;overflow-x:auto">
             <div style="color:#94a3b8;margin-bottom:.4rem;font-weight:700">Raw transactions khớp regex Payoo (ACB1268):</div>
             <table style="border-collapse:collapse;width:100%;min-width:600px" id="bankPayooRawTable">
@@ -4024,6 +4025,80 @@
         if(p) p.classList.toggle('active', s===sub);
         if(b) b.classList.toggle('active', s===sub);
       });
+    }
+
+    // ── Auto map MTT → Payoo Đối soát ── (Luyen, 2026-09-10: "cho 1 chỗ map
+    // với hóa đơn nữa nè chỗ dịch vụ thu hộ á để payoo" -- y hệt
+    // autoMapMttVnpay, chỉ đổi lọc dịch vụ thu hộ sang "payoo" và tính DT
+    // theo _payooFee (getPayooMaCT). "Dịch vụ thu hộ" MTT của Payoo không
+    // phân biệt QR/Thẻ (vd "PAYOO 5,6") -- không sao vì maDiem trong MTT map
+    // sang ĐÚNG 1 Mã CT, và Mã CT đó trong _payooFee vốn đã CỘNG GỘP cả QR
+    // lẫn Thẻ nếu Luyen map cả 2 hình thức của 1 cửa hàng về cùng 1 Mã CT
+    // (giống cách đối soát ngân hàng cũng đã gộp chung).
+    function autoMapMttPayoo() {
+      const khKey   = COMPANY === 'kh_cu' ? 'cu' : 'moi';
+      const mttRows = khKey === 'cu' ? _mttCu : _mttMoi;
+      if (!mttRows.length) { alert('Chưa có dữ liệu MTT. Vui lòng tải file MTT trước.'); return; }
+
+      const payooMtt = mttRows.filter(r => (r.dichVuThuHo||'').toLowerCase().includes('payoo'));
+      if (!payooMtt.length) { alert('Không tìm thấy hóa đơn MTT nào có dịch vụ thu hộ = PAYOO.'); return; }
+
+      const maDiemToMaCT = _mttCtMap[khKey] || {};
+
+      const parseDays = s => {
+        const m = /(\d+(?:\s*,\s*\d+)*)\s*$/.exec(s||'');
+        if (!m) return [];
+        return m[1].split(',').map(x=>parseInt(x.trim(),10)).filter(n=>!isNaN(n));
+      };
+      const resolveDate = (ngayHD, dayNum) => {
+        const p = String(ngayHD||'').split('/');
+        if (p.length !== 3) return null;
+        const dd = +p[0], mm = +p[1], yy = +p[2];
+        let month = mm, year = yy;
+        if (dayNum > dd) { month -= 1; if (month < 1) { month = 12; year -= 1; } }
+        return String(dayNum).padStart(2,'0')+'-'+String(month).padStart(2,'0')+'-'+year;
+      };
+
+      const grossByDateCT = {};
+      _payooFee.forEach(r => {
+        const maCT = getPayooMaCT(r.gian);
+        const key = r.date+'|'+maCT;
+        grossByDateCT[key] = (grossByDateCT[key]||0) + r.gross;
+      });
+
+      Object.keys(_payooHD).forEach(k => {
+        if (_payooHD[k] && !_payooHD[k]._manual) {
+          delete _payooHD[k].soHD; delete _payooHD[k].tienHD;
+        }
+      });
+
+      let filled = 0, skipped = 0;
+      payooMtt.forEach(r => {
+        const days = parseDays(r.dichVuThuHo);
+        if (!days.length || !r.ngay) return;
+        const maCT = maDiemToMaCT[r.maDiem] || r.maDiem;
+        const dates = days.map(d => resolveDate(r.ngay, d)).filter(Boolean);
+        if (!dates.length) return;
+        const grosses = dates.map(dt => grossByDateCT[dt+'|'+maCT] || 0);
+        const totalGross = grosses.reduce((s,g)=>s+g,0);
+        dates.forEach((dt, i) => {
+          const hdKey = dt+'|'+maCT;
+          const existing = _payooHD[hdKey];
+          if (existing && existing._manual) { skipped++; return; }
+          const share = totalGross>0 ? (grosses[i]/totalGross) : (1/dates.length);
+          const portion = Math.round(r.tongTien * share);
+          if (!_payooHD[hdKey]) _payooHD[hdKey] = {};
+          const prevHD = String(_payooHD[hdKey].soHD||'').split(',').map(s=>s.trim()).filter(Boolean);
+          if (!prevHD.includes(String(r.soHD))) prevHD.push(String(r.soHD));
+          _payooHD[hdKey].soHD   = prevHD.join(', ');
+          _payooHD[hdKey].tienHD = String((parseFloat(_payooHD[hdKey].tienHD)||0) + portion);
+          filled++;
+        });
+      });
+
+      try { lsSet(LS_PAYOO_HD, JSON.stringify(_payooHD)); } catch(e){}
+      renderPayooDoiSoat();
+      alert(`✅ Map xong: ${filled} ô hóa đơn (tự chia tỷ lệ / cộng dồn nếu gộp nhiều ngày) · Bỏ qua ${skipped} ô đã tự nhập tay`);
     }
 
     function savePayooHD(hdKey, field, val) {
