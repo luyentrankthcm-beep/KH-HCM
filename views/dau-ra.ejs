@@ -319,7 +319,11 @@
             <strong>VNPay</strong>
             &nbsp;<span id="vnpay_summary" style="font-size:.82em;color:#64748b"></span>
           </div>
-          <div style="font-size:.78em;color:#94a3b8;max-width:280px;text-align:right">Dữ liệu lấy từ file <b>BaoCaoPhi</b> tải ở tab Zalo Pay (mọi Điểm thu khác FUNZONE MINI APP)</div>
+          <div style="display:flex;align-items:center;gap:.6rem">
+            <div style="font-size:.75em;color:#94a3b8;max-width:220px;text-align:right">Cùng 1 file <b>BaoCaoPhi</b> với Zalo Pay — tải ở đây hoặc bên tab Zalo Pay đều được, hệ thống tự tách gian</div>
+            <button class="btn-nhap" style="background:#9a3412" onclick="document.getElementById('vnpayFeeInput').click()">📥 BaoCaoPhi</button>
+            <input type="file" id="vnpayFeeInput" accept=".xls,.xlsx" style="display:none" onchange="handleZaloFeeFile(this)">
+          </div>
         </div>
 
         <!-- Sub-sub-tabs -->
