@@ -273,6 +273,7 @@
             </select>
             <button onclick="fetchBankZaloRefresh()" style="font-size:.78em;padding:.2rem .65rem;background:#0369a1;color:#fff;border:none;border-radius:5px;cursor:pointer">🔄 Làm mới NH</button>
             <button onclick="toggleBankZaloDetail()" style="font-size:.78em;padding:.2rem .65rem;background:#374151;color:#e5e7eb;border:none;border-radius:5px;cursor:pointer">🏦 Xem raw NH</button>
+            <button onclick="autoMapMttZalo()" style="font-size:.78em;padding:.2rem .65rem;background:#7c3aed;color:#fff;border:none;border-radius:5px;cursor:pointer;font-weight:600">🧾 Map MTT → Zalo</button>
             <span id="bankZaloStatus" style="font-size:.78em;color:#64748b"></span>
           </div>
           <div id="bankZaloDetailPanel" style="display:none;background:#0f172a;border:1px solid #1e3a5f;border-radius:6px;padding:.6rem .8rem;margin-bottom:.6rem;font-size:.8em;overflow-x:auto">
@@ -544,24 +545,32 @@
         }
       } catch(e) { console.error('Không đồng bộ được dữ liệu từ server:', e); }
     })();
-    // Đẩy dữ liệu lên server (song song với localStorage) mỗi khi có thay đổi.
+    // Đẩy dữ liệu lên server mỗi khi có thay đổi.
+    // Chi Nhan, 2026-09-10: Luyen bao "tôi tải lên xong nhấn F5 mất hết dữ
+    // liệu" -- truoc day dung fetch() bat-dong-bo kieu "fire-and-forget",
+    // neu Luyen F5/dong tab NGAY sau khi tai file (nhat la file lon nhu Momo
+    // ~12 nghin dong) thi request POST len server co the CHUA kip xong da bi
+    // huy giua chung -> lan sau load lai, server tra ve du lieu CU (hoac
+    // rong), ghi de mat du lieu vua tai. Doi sang XMLHttpRequest DONG BO
+    // (giong cach hydrateFromServer dang doc), de ham lsSet/lsRemove CHI
+    // return sau khi server da luu xong -- dam bao F5 ngay sau khi tai file
+    // van an toan, khong mat du lieu (danh doi: khung UI dung khoang 1 giay
+    // trong luc luu, chap nhan duoc de tranh mat du lieu).
     function kvPush(key, value) {
       try {
-        fetch('/api/dau-ra/kv', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ key, value }),
-        }).catch(()=>{});
-      } catch(e) {}
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', '/api/dau-ra/kv', false); // false = đồng bộ, đợi lưu xong
+        xhr.setRequestHeader('Content-Type', 'application/json');
+        xhr.send(JSON.stringify({ key, value }));
+      } catch(e) { console.error('Lưu server thất bại (kvPush):', e); }
     }
     function kvRemove(key) {
       try {
-        fetch('/api/dau-ra/kv-delete', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ key }),
-        }).catch(()=>{});
-      } catch(e) {}
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', '/api/dau-ra/kv-delete', false);
+        xhr.setRequestHeader('Content-Type', 'application/json');
+        xhr.send(JSON.stringify({ key }));
+      } catch(e) { console.error('Xoá server thất bại (kvRemove):', e); }
     }
     // Thay cho localStorage.setItem/removeItem trực tiếp: vẫn ghi local như
     // cũ (đọc lại tức thì) + đồng thời đẩy lên server ở nền.
@@ -721,6 +730,78 @@
       renderDoiSoatNgay();
       alert(`✅ Map xong: ${filled} ô hóa đơn · Bỏ qua ${skipped} ô đã có`);
     }
+
+    // ── Auto map MTT → Zalo Đối soát ── (Luyen, 2026-09-10: "thêm cho tôi
+    // cái map với hóa đơn... chỗ hóa đơn dịch vụ thu hộ là ZALO MINI APP" --
+    // giống hệt nút Map MTT → Momo, chỉ đổi lọc dichVuThuHo sang "zalo" và
+    // ghi vào _zaloHD thay vì _hdData.)
+    function autoMapMttZalo() {
+      const khKey   = COMPANY === 'kh_cu' ? 'cu' : 'moi';
+      const mttRows = khKey === 'cu' ? _mttCu : _mttMoi;
+      if (!mttRows.length) { alert('Chưa có dữ liệu MTT. Vui lòng tải file MTT trước.'); return; }
+
+      // Chỉ lấy dòng có dịch vụ thu hộ = ZALO MINI APP (chứa "zalo")
+      const zaloMtt = mttRows.filter(r => (r.dichVuThuHo||'').toLowerCase().includes('zalo'));
+      if (!zaloMtt.length) { alert('Không tìm thấy hóa đơn MTT nào có dịch vụ thu hộ = ZALO MINI APP.'); return; }
+
+      // Build MTT lookup: ngay(DD/MM/YYYY) → maDiem → [rows]
+      const mttByDateDiem = {};
+      zaloMtt.forEach(r => {
+        if (!mttByDateDiem[r.ngay]) mttByDateDiem[r.ngay] = {};
+        if (!mttByDateDiem[r.ngay][r.maDiem]) mttByDateDiem[r.ngay][r.maDiem] = [];
+        mttByDateDiem[r.ngay][r.maDiem].push(r);
+      });
+
+      // maDiem → maCT (dùng chung bảng Map Mã Điểm → Mã Công Trình MTT với bên Momo)
+      const maDiemToMaCT = _mttCtMap[khKey] || {};
+      const maCTtoDiem = {};
+      Object.entries(maDiemToMaCT).forEach(([md, mc]) => { if (mc) maCTtoDiem[mc] = md; });
+
+      const addDays = (ddmmyyyy, n) => {
+        const [dd,mm,yy] = ddmmyyyy.split('-');
+        const d = new Date(Number(yy), Number(mm)-1, Number(dd));
+        d.setDate(d.getDate() + n);
+        return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
+      };
+
+      // Build nhóm ngày|maCT từ dữ liệu Zalo FUNZONE (giống byDate trong renderZaloDoiSoat)
+      const dateGroups = {};
+      _zaloFee.forEach(r => {
+        const isFunzone = r.maDiem==='FUNZONE1' || (r.dienThu||'').toUpperCase().includes('FUNZONE');
+        if(!isFunzone) return;
+        const tenSP_lu = r.maFunzone ? _zaloOrders[String(r.maFunzone)] : undefined;
+        const maCT = tenSP_lu ? (getZaloMaCT(tenSP_lu)||tenSP_lu) : (_zaloUnk[r.date] || '_unknown_');
+        if (!dateGroups[r.date]) dateGroups[r.date] = new Set();
+        dateGroups[r.date].add(maCT);
+      });
+
+      let filled = 0, skipped = 0;
+      Object.entries(dateGroups).forEach(([zaloDate, groupSet]) => {
+        const invCandidates = [1,2,3,4].map(n => addDays(zaloDate, n));
+        groupSet.forEach(maCT => {
+          const hdKey = `${zaloDate}|${maCT}`;
+          if (_zaloHD[hdKey] && _zaloHD[hdKey].soHD) { skipped++; return; }
+          const maDiem = maCTtoDiem[maCT];
+          let matched = null;
+          for (const inv of invCandidates) {
+            if (maDiem && mttByDateDiem[inv] && mttByDateDiem[inv][maDiem]) { matched = mttByDateDiem[inv][maDiem]; break; }
+            if (maCT && mttByDateDiem[inv] && mttByDateDiem[inv][maCT]) { matched = mttByDateDiem[inv][maCT]; break; }
+          }
+          if (!matched) return;
+          if (!_zaloHD[hdKey]) _zaloHD[hdKey] = {};
+          const soHDs = [...new Set(matched.map(r => String(r.soHD)))].join(', ');
+          const tongTien = matched.reduce((s, r) => s + r.tongTien, 0);
+          _zaloHD[hdKey].soHD   = soHDs;
+          _zaloHD[hdKey].tienHD = String(Math.round(tongTien));
+          filled++;
+        });
+      });
+
+      try { lsSet(LS_ZALO_HD, JSON.stringify(_zaloHD)); } catch(e){}
+      renderZaloDoiSoat();
+      alert(`✅ Map xong: ${filled} ô hóa đơn · Bỏ qua ${skipped} ô đã có`);
+    }
+
     function toggleEditPanel(dateId) {
       const row = document.getElementById('edit_' + dateId);
       if (!row) return;
