@@ -650,7 +650,27 @@
     // thẳng localStorage.setItem/removeItem) để tránh gọi đệ quy vô hạn.
     const _rawLsSet    = localStorage.setItem.bind(localStorage);
     const _rawLsRemove = localStorage.removeItem.bind(localStorage);
+    const _rawLsGet    = localStorage.getItem.bind(localStorage);
 
+    // Chi Nhan, 2026-09-10: Luyen báo "tải Payoo lên xong, F5 lại thì mất hết
+    // chỉ còn 1 ngày" -- ĐIỀU TRA: server vẫn lưu ĐỦ 6256 dòng (kiểm tra qua
+    // /api/dau-ra/kv-all), nhưng localStorage của trình duyệt CHỈ có 46 dòng.
+    // Nguyên nhân thật: trình duyệt giới hạn localStorage ~5MB/site — cộng dồn
+    // Momo+MTT+Zalo+VNPay+Payoo đã gần chạm mức này (đo được 4.7MB), nên khi
+    // hydrateFromServer() ghi đè localStorage bằng dữ liệu server cho TỪNG
+    // key, key Payoo (~1MB, ghi sau các key khác) bị trình duyệt TỪ CHỐI ghi
+    // (lỗi "exceeded the quota") — code cũ "try{...}catch(e){}" NUỐT LỖI ÂM
+    // THẦM nên không ai biết, để lại giá trị CŨ/NHỎ hơn trong localStorage từ
+    // lần lưu trước đó, khiến trang đọc nhầm dữ liệu cũ dù server có đủ.
+    // Fix TẬN GỐC (áp dụng chung cho MỌI key hiện tại lẫn sau này, không cần
+    // sửa từng chỗ đọc localStorage rải rác khắp file): giữ 1 bản sao dữ liệu
+    // server NGAY TRONG BỘ NHỚ (_serverKv) và THAY THẾ luôn localStorage.getItem
+    // để ưu tiên đọc từ bản sao này khi có — dù ghi thật xuống đĩa localStorage
+    // có thất bại do đầy quota, mọi đoạn code đọc lại NGAY SAU ĐÓ trong phiên
+    // này vẫn thấy đúng dữ liệu server mới nhất (localStorage lúc này chỉ còn
+    // là lớp cache "cố gắng tốt nhất", không còn là nguồn có thể làm mất dữ
+    // liệu nữa).
+    let _serverKv = {};
     (function hydrateFromServer() {
       try {
         const xhr = new XMLHttpRequest();
@@ -659,13 +679,18 @@
         if (xhr.status === 200) {
           const res = JSON.parse(xhr.responseText);
           if (res && res.ok && res.data) {
+            _serverKv = res.data;
             Object.keys(res.data).forEach(k => {
-              try { _rawLsSet(k, res.data[k]); } catch(e) {}
+              try { _rawLsSet(k, res.data[k]); } catch(e) { console.warn('[hydrate] localStorage đầy quota, giữ tạm trong bộ nhớ cho key:', k, e.message); }
             });
           }
         }
       } catch(e) { console.error('Không đồng bộ được dữ liệu từ server:', e); }
     })();
+    localStorage.getItem = function(key) {
+      if (Object.prototype.hasOwnProperty.call(_serverKv, key)) return _serverKv[key];
+      return _rawLsGet(key);
+    };
     // Đẩy dữ liệu lên server mỗi khi có thay đổi.
     // Chi Nhan, 2026-09-10: Luyen bao "tôi tải lên xong nhấn F5 mất hết dữ
     // liệu" -- truoc day dung fetch() bat-dong-bo kieu "fire-and-forget",
@@ -694,9 +719,20 @@
       } catch(e) { console.error('Xoá server thất bại (kvRemove):', e); }
     }
     // Thay cho localStorage.setItem/removeItem trực tiếp: vẫn ghi local như
-    // cũ (đọc lại tức thì) + đồng thời đẩy lên server ở nền.
-    function lsSet(key, val) { try { _rawLsSet(key, val); } catch(e) {} kvPush(key, val); }
-    function lsRemove(key) { try { _rawLsRemove(key); } catch(e) {} kvRemove(key); }
+    // cũ (đọc lại tức thì) + đồng thời đẩy lên server ở nền. Cập nhật
+    // _serverKv NGAY (đồng bộ) trước khi thử ghi localStorage thật -- đề
+    // phòng ghi localStorage thật bị đầy quota (xem ghi chú hydrateFromServer
+    // ở trên), các lần đọc SAU trong cùng phiên vẫn thấy đúng giá trị mới.
+    function lsSet(key, val) {
+      _serverKv[key] = val;
+      try { _rawLsSet(key, val); } catch(e) { console.warn('[lsSet] localStorage đầy quota, chỉ giữ trong bộ nhớ + server:', key, e.message); }
+      kvPush(key, val);
+    }
+    function lsRemove(key) {
+      delete _serverKv[key];
+      try { _rawLsRemove(key); } catch(e) {}
+      kvRemove(key);
+    }
     const LS_ROWS    = `momo_rows_${COMPANY}`;
     const LS_HISTORY = `momo_history_${COMPANY}`;
     const LS_CT_MAP   = `momo_ct_map_${COMPANY}`;
