@@ -2768,6 +2768,7 @@
     // trong file OrderDetails đã tải / đơn đó chưa "Đã thanh toán"/bị hủy nên
     // bị lọc khi tải OrderDetails).
     function renderZaloUnkDetail(date) {
+      const fmtN = n => Math.round(n).toLocaleString('vi');
       const isFunzone = r => r.maDiem==='FUNZONE1' || (r.dienThu||'').toUpperCase().includes('FUNZONE');
       const isUnmatched = r => !r.maFunzone || _zaloOrders[String(r.maFunzone)] === undefined;
       const rows = _zaloFee.filter(r => r.date===date && isFunzone(r) && isUnmatched(r));
