@@ -1847,6 +1847,26 @@
     try { const s=localStorage.getItem(LS_ZALO_SP_MAP); if(s) _zaloSpMap=JSON.parse(s);  } catch(e){}
     try { const s=localStorage.getItem(LS_ZALO_HIST);   if(s) _zaloHist=JSON.parse(s);   } catch(e){}
 
+    // Chi Nhan, 2026-09-10: tu sua cac dong _zaloFee da bi luu sai "date" tu
+    // truoc (chuoi so serial Excel tho nhu "46235.00011574074" thay vi
+    // "DD-MM-YYYY") do bug da fix o handleZaloFeeFile -- xem ghi chu tren.
+    // Chay 1 lan luc tai trang, khong can Luyen tai lai file nao ca.
+    (function repairZaloFeeDates() {
+      let fixed = 0;
+      _zaloFee.forEach(r => {
+        if (!/^\d{1,2}-\d{1,2}-\d{4}$/.test(r.date || '')) {
+          const num = parseFloat(r.date);
+          if (!isNaN(num) && num > 20000 && num < 90000) {
+            try { r.date = excelSerialToDateStr(num); fixed++; } catch(e) {}
+          }
+        }
+      });
+      if (fixed) {
+        try { lsSet(LS_ZALO_FEE, JSON.stringify(_zaloFee)); } catch(e) {}
+        console.log('[ZaloPay] Da tu sua ' + fixed + ' dong bi loi ngay (serial Excel).');
+      }
+    })();
+
     function switchZaloSub(sub) {
       ['ds','map','hist'].forEach(s => {
         const p = document.getElementById('zalo_sub_' + s);
@@ -1947,9 +1967,23 @@
             .filter(r => typeof r[iGross]==='number' && r[iGross]>0
               && String(r[iTrangThai]||'').trim()==='Thành công')
             .map(r => {
-              const tg = String(r[iTime]||'').split(' ')[0]; // "07/09/2026"
-              const parts = tg.split('/');
-              const date = parts.length===3 ? `${parts[0]}-${parts[1]}-${parts[2]}` : tg;
+              // Chi Nhan, 2026-09-10: cot "Thoi gian GD" (iTime) thuong la
+              // chuoi "07/09/2026 10:23:00" nhung 1 so dong (tuy file/tuy
+              // dinh dang cell Excel) lai bi doc thanh SO SERIAL THO cua Excel
+              // (vd 46235.00011574074) thay vi chuoi da format -- neu khong
+              // xu ly rieng, .split('/') tren so nay se KHONG ra du 3 phan,
+              // khien "date" giu nguyen chuoi so do va bang doi soat hien
+              // dong "46235.00011574074/undefined/undefined" (Luyen bao loi
+              // nay). Fix: neu r[iTime] la number thi doi qua DD-MM-YYYY
+              // bang excelSerialToDateStr() truoc, khong dua qua split('/').
+              let date;
+              if (typeof r[iTime] === 'number') {
+                date = excelSerialToDateStr(r[iTime]);
+              } else {
+                const tg = String(r[iTime]||'').split(' ')[0]; // "07/09/2026"
+                const parts = tg.split('/');
+                date = parts.length===3 ? `${parts[0]}-${parts[1]}-${parts[2]}` : tg;
+              }
               const gc = String(r[iGhiChu]||'');
               const mFunzone = gc.match(/don hang\s+(\d+)/i);
               const gross = r[iGross];
