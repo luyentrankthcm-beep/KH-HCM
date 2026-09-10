@@ -2110,7 +2110,7 @@
           //   Row index 2 = header, data từ row index 3
           //   Col B(1)=Thời gian GD, I(8)=Mã đơn hàng ZaloPay, V(21)=Số tiền trước KM
           //   AA(26)=Số tiền phí thu hộ, AS(44)=Ghi chú
-          const HDR=2, iTime=1, iMaDiem=4, iDienThu=5, iMaDonZalo=8, iGross=21, iPhi=26, iGhiChu=44, iTrangThai=42;
+          const HDR=2, iTime=1, iMaGD=2, iMaDiem=4, iDienThu=5, iMaDonZalo=8, iGross=21, iPhi=26, iGhiChu=44, iTrangThai=42;
           // Validate: nếu cột 21 của row đầu tiên không phải số → báo lỗi debug
           const sample = rows[HDR+1];
           console.log('[BaoCaoPhi] row0=',rows[0]?.[0],'hdr2=',rows[HDR]?.[0],rows[HDR]?.[1],'sampleGross=',sample?.[iGross],'sampleTime=',sample?.[iTime]);
@@ -2152,6 +2152,14 @@
                 date,
                 maFunzone: mFunzone ? mFunzone[1] : '',
                 maDonZalo: String(r[iMaDonZalo]||'').trim(),
+                // Chi Nhan, 2026-09-10: cac gian moi (Ghost/Farm Mega DN, Farm
+                // Aeon Hue...) khong dung Zalo Mini App nen cot "Ma don hang"
+                // (I) luon RONG -> truoc day dedup chi dua vao maDonZalo nen
+                // cac dong nay KHONG THE dedup, moi lan up lai file la cong
+                // don lap. Fix: dung them "Ma giao dich" (C, iMaGD=2) — cot
+                // nay do he thong thanh toan sinh ra, LUON DUY NHAT cho MOI
+                // dong bat ke gian nao — lam key du phong khi maDonZalo rong.
+                maGD: String(r[iMaGD]||'').trim(),
                 maDiem: String(r[iMaDiem]||'').trim(),
                 dienThu: String(r[iDienThu]||'').trim(),
                 gross,
@@ -2160,9 +2168,11 @@
               };
             });
 
-          // MERGE + DEDUP theo maDonZalo (cộng dồn, không replace)
-          const exFeeKeys = new Set(_zaloFee.map(r=>r.maDonZalo));
-          const addedFee = newRows.filter(r=>r.maDonZalo && !exFeeKeys.has(r.maDonZalo));
+          // MERGE + DEDUP theo maDonZalo, fallback sang maGD nếu maDonZalo rỗng
+          // (gian không có app Zalo Mini App) — cộng dồn, không replace.
+          const dedupKey = r => r.maDonZalo || r.maGD;
+          const exFeeKeys = new Set(_zaloFee.map(r=>dedupKey(r)).filter(Boolean));
+          const addedFee = newRows.filter(r=>dedupKey(r) && !exFeeKeys.has(dedupKey(r)));
           _zaloFee = [..._zaloFee, ...addedFee];
           try { lsSet(LS_ZALO_FEE, JSON.stringify(_zaloFee)); } catch(e) {
             // Nếu đầy localStorage, lưu 3000 GD gần nhất
