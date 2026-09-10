@@ -1900,7 +1900,13 @@
           // Lưu compact {maOrder: maCT} — ~4x nhỏ hơn array, tránh quota exceeded
           let addedCount=0, totalInFile=0;
           rows.slice(1).forEach(r => {
-            if(r[iPay]!=='Đã thanh toán' || r[iStatus]==='Đã hủy' || !r[iDate]) return;
+            // Chi Nhan, 2026-09-10: Luyen nghi "chua xac dinh gian" co the do
+            // lot qua giao dich chua thanh cong -- trim() ky lai 2 cot trang
+            // thai (phong khi Excel co khoang trang thua/an) truoc khi so
+            // sanh, thay vi so sanh truc tiep r[iPay]/r[iStatus] nhu cu.
+            const payStatus   = String(r[iPay]||'').trim();
+            const orderStatus = String(r[iStatus]||'').trim();
+            if(payStatus!=='Đã thanh toán' || orderStatus==='Đã hủy' || !r[iDate]) return;
             totalInFile++;
             const maOrder = String(r[iOrder]||'').trim().replace(/^#/,'');
             const tenSP   = String(r[iSP]||'').trim();
@@ -1963,9 +1969,15 @@
           if(sample && typeof sample[iGross] !== 'number')
             console.warn('[BaoCaoPhi] WARN: gross col',iGross,'=',sample[iGross],'(not number!) — hdr:',rows[HDR]?.slice(20,28));
 
-          const newRows = rows.slice(HDR+1)
-            .filter(r => typeof r[iGross]==='number' && r[iGross]>0
-              && String(r[iTrangThai]||'').trim()==='Thành công')
+          // Chi Nhan, 2026-09-10: Luyen nghi cac dong "chua xac dinh gian"
+          // co the do lot giao dich CHUA THANH CONG (vd "Het han thanh toan",
+          // "Khong thanh cong") -- cot Trang thai (AQ, iTrangThai=42) da duoc
+          // loc dung == 'Thanh cong' tu truoc, chi them log de de kiem tra.
+          const rawDataRows = rows.slice(HDR+1).filter(r => typeof r[iGross]==='number' && r[iGross]>0);
+          const excludedByStatus = rawDataRows.filter(r => String(r[iTrangThai]||'').trim()!=='Thành công').length;
+          if (excludedByStatus) console.log('[BaoCaoPhi] Bo qua', excludedByStatus, 'dong khac "Thành công" (vd Het han/Khong thanh cong).');
+          const newRows = rawDataRows
+            .filter(r => String(r[iTrangThai]||'').trim()==='Thành công')
             .map(r => {
               // Chi Nhan, 2026-09-10: cot "Thoi gian GD" (iTime) thuong la
               // chuoi "07/09/2026 10:23:00" nhung 1 so dong (tuy file/tuy
@@ -2087,6 +2099,22 @@
       const sortDate = (a,b) => iso(a).localeCompare(iso(b));
       const inRange = (d,f,t) => !f||!t ? false : iso(d)>=iso(f) && iso(d)<=iso(t);
 
+      // Chi Nhan, 2026-09-10: cho phep Luyen "Sửa" tay Doanh thu/Net của 1
+      // gian trong 1 ngày (giống bên Momo) khi số tự động lệch/sai -- lưu
+      // đè vào _zaloHD[date+'|'+maCT].dtOvr / .netOvr, dùng hàm này ở MỌI
+      // chỗ tính DT/Net (bảng ngày, tổng NH trả về, tổng theo gian) để nhất
+      // quán, không chỉ hiện ở 1 chỗ.
+      const getGianDisp = (date, maCT, d) => {
+        const hd = _zaloHD[date+'|'+maCT] || {};
+        const dt  = (hd.dtOvr  != null && hd.dtOvr  !== '') ? (parseFloat(String(hd.dtOvr).replace(/[^0-9.-]/g,''))||0)  : d.gross;
+        const net = (hd.netOvr != null && hd.netOvr !== '') ? (parseFloat(String(hd.netOvr).replace(/[^0-9.-]/g,''))||0) : d.net;
+        return { dt, net, phi: dt - net, hasDtOvr: hd.dtOvr!=null && hd.dtOvr!=='', hasNetOvr: hd.netOvr!=null && hd.netOvr!=='' };
+      };
+      const computeZaloDayNet = (date, byDateRef) => {
+        const ctData = byDateRef[date]; if(!ctData) return 0;
+        return Object.entries(ctData).reduce((s,[maCT,d]) => s + getGianDisp(date,maCT,d).net, 0);
+      };
+
       if (_zaloFee.length) {
         populateZaloMonthFilter();
         const selMonth = (document.getElementById('zaloFilterMonth')||{}).value || '';
@@ -2114,7 +2142,7 @@
           : allDates;
 
         let totGross=0,totPhi=0,totNet=0,totN=0;
-        filteredDates.forEach(dt=>Object.values(byDate[dt]).forEach(d=>{totGross+=d.gross;totPhi+=d.phi;totNet+=d.net;totN+=d.soDon;}));
+        filteredDates.forEach(dt=>Object.entries(byDate[dt]).forEach(([maCT,d])=>{const gDisp=getGianDisp(dt,maCT,d);totGross+=gDisp.dt;totPhi+=gDisp.phi;totNet+=gDisp.net;totN+=d.soDon;}));
 
         let html = '<div style="margin-bottom:.5rem;font-size:.82em;color:#64748b">';
         html += '\u{1F4CA} FUNZONE: <strong>'+nFunzone+'</strong> GD · '+filteredDates.length+' ngày';
@@ -2128,14 +2156,17 @@
           const ctData = byDate[date];
           if(!ctData) return '';
           const ctKeys = Object.keys(ctData).sort((a,b)=>{if(a==='_unknown_')return 1;if(b==='_unknown_')return -1;return a.localeCompare(b);});
-          const dayGross=Object.values(ctData).reduce((s,d)=>s+d.gross,0);
-          const dayNet=Object.values(ctData).reduce((s,d)=>s+d.net,0);
+          const disps = {}; // maCT -> {dt,net,phi,hasDtOvr,hasNetOvr}
+          ctKeys.forEach(maCT => { disps[maCT] = getGianDisp(date, maCT, ctData[maCT]); });
+          const dayGross=ctKeys.reduce((s,g)=>s+disps[g].dt,0);
+          const dayNet=ctKeys.reduce((s,g)=>s+disps[g].net,0);
           const dayN=Object.values(ctData).reduce((s,d)=>s+d.soDon,0);
           const [dd,mm,yyyy]=date.split('-');
+          const dateId = date.replace(/-/g,'_');
           let out = '<div style="margin-bottom:.8rem">'
-            +'<div style="background:#1e3a5f;color:#fff;padding:.4rem .75rem;font-weight:700;font-size:.87em;display:flex;justify-content:space-between">'
+            +'<div style="background:#1e3a5f;color:#fff;padding:.4rem .75rem;font-weight:700;font-size:.87em;display:flex;justify-content:space-between;cursor:pointer" onclick="toggleZaloEditPanel(\''+dateId+'\')">'
             +'<span>\u{1F4C5} '+dd+'/'+mm+'/'+yyyy+'</span>'
-            +'<span style="font-size:.81em;font-weight:400;color:#93c5fd">'+dayN+' GD · DT: '+fmtN(dayGross)+'đ · Net: '+fmtN(dayNet)+'đ</span>'
+            +'<span style="font-size:.81em;font-weight:400;color:#93c5fd">'+dayN+' GD · DT: '+fmtN(dayGross)+'đ · Net: '+fmtN(dayNet)+'đ &nbsp;<span style="opacity:.8">✏️ Sửa</span></span>'
             +'</div>'
             +'<table style="width:100%;border-collapse:collapse;font-size:.84em">'
             +'<thead><tr style="background:#2d4a6e;color:#e2e8f0">'
@@ -2150,12 +2181,13 @@
             +'</tr></thead><tbody>';
           ctKeys.forEach((maCT,i) => {
             const d = ctData[maCT];
+            const gDisp = disps[maCT];
             const isUnknown = maCT==='_unknown_';
             const ctLabel = isUnknown ? '<span style="color:#94a3b8;font-style:italic">Chưa xác định gian</span>' : '<span class="ct-badge">'+maCT+'</span>';
             const hdKey = date+'|'+maCT;
             const hd = _zaloHD[hdKey] || {};
             const tienHD = parseFloat((hd.tienHD||'0').toString().replace(/[^0-9.-]/g,''))||0;
-            const chenh = tienHD ? (d.net - tienHD) : null;
+            const chenh = tienHD ? (gDisp.net - tienHD) : null;
             const chenhColor = chenh===null?'#94a3b8':(Math.abs(chenh)<1000?'#16a34a':(chenh<0?'#ef4444':'#d97706'));
             const chenhTxt = chenh===null?'—':((chenh>0?'+':'')+fmtN(chenh));
             const bg = i%2===0?'#f8fafc':'#fff';
@@ -2176,15 +2208,49 @@
             out += '<tr style="background:'+bg+'">'
               +'<td style="padding:.3rem .6rem">'+ctLabel+unkInput+'</td>'
               +'<td style="text-align:right;padding:.3rem .4rem;color:#64748b">'+d.soDon+'</td>'
-              +'<td style="text-align:right;padding:.3rem .4rem;color:#15803d;font-weight:600">'+fmtN(d.gross)+'</td>'
-              +'<td style="text-align:right;padding:.3rem .4rem;color:#ef4444">'+fmtN(d.phi)+'</td>'
-              +'<td style="text-align:right;padding:.3rem .4rem;color:#2563eb;font-weight:700">'+fmtN(d.net)+'</td>'
+              +'<td style="text-align:right;padding:.3rem .4rem;color:#15803d;font-weight:600">'+fmtN(gDisp.dt)+(gDisp.hasDtOvr?'<sup style="color:#f59e0b;font-size:.7em">✏</sup>':'')+'</td>'
+              +'<td style="text-align:right;padding:.3rem .4rem;color:#ef4444">'+fmtN(gDisp.phi)+'</td>'
+              +'<td style="text-align:right;padding:.3rem .4rem;color:#2563eb;font-weight:700">'+fmtN(gDisp.net)+(gDisp.hasNetOvr?'<sup style="color:#f59e0b;font-size:.7em">✏</sup>':'')+'</td>'
               +'<td style="padding:.3rem .3rem;text-align:center">'+soHDDisplay+'</td>'
               +'<td style="padding:.3rem .3rem;text-align:right">'+tienHDDisplay+'</td>'
               +'<td style="text-align:right;padding:.3rem .4rem;font-weight:700;color:'+chenhColor+'">'+chenhTxt+'</td>'
               +'</tr>';
           });
-          out += '</tbody></table></div>';
+          out += '</tbody></table>';
+          // Bảng chỉnh sửa (ẩn mặc định, toggle khi bấm vào tiêu đề ngày) --
+          // giống panel "✏️ Sửa" bên Momo: cho sửa Doanh thu / Net trực tiếp.
+          out += '<div id="edit_zalo_'+dateId+'" style="display:none;padding:.6rem .75rem;background:#f8fafc;border:1px dashed #3b82f6;border-top:none">'
+            +'<div style="font-size:.8em;font-weight:700;color:#1e3a5f;margin-bottom:.4rem">✏️ Chỉnh sửa – '+dd+'/'+mm+'/'+yyyy+'</div>'
+            +'<div style="overflow-x:auto"><table style="min-width:640px;border-collapse:collapse;font-size:.8em">'
+            +'<thead><tr style="background:#e0e7ff;color:#1e3a5f">'
+            +'<th style="padding:.25rem .5rem;text-align:left;border:1px solid #c7d2fe">Mã CT / Gian</th>'
+            +'<th style="padding:.25rem .5rem;text-align:right;border:1px solid #c7d2fe">DT (sửa được)</th>'
+            +'<th style="padding:.25rem .5rem;text-align:right;border:1px solid #c7d2fe">Net (sửa được)</th>'
+            +'<th style="padding:.25rem .5rem;border:1px solid #c7d2fe">Số HĐ</th>'
+            +'<th style="padding:.25rem .5rem;text-align:right;border:1px solid #c7d2fe">Tiền HĐ</th>'
+            +'</tr></thead><tbody>'
+            +ctKeys.map(maCT => {
+              const d = ctData[maCT];
+              const gDisp = disps[maCT];
+              const hd = _zaloHD[date+'|'+maCT] || {};
+              const gKey = maCT.replace(/[^a-zA-Z0-9]/g,'_');
+              return '<tr>'
+                +'<td style="padding:.25rem .5rem;border:1px solid #e2e8f0;font-size:.9em">'+(maCT==='_unknown_'?'<i>Chưa xác định</i>':maCT)+'</td>'
+                +'<td style="padding:.25rem .5rem;border:1px solid #e2e8f0;text-align:right">'
+                  +'<input id="zedit_dt_'+dateId+'_'+gKey+'" type="text" value="'+gDisp.dt+'" style="width:105px;border:1px solid #bbf7d0;border-radius:4px;padding:.15rem .3rem;text-align:right;background:#f0fdf4;color:#15803d;font-weight:600"></td>'
+                +'<td style="padding:.25rem .5rem;border:1px solid #e2e8f0;text-align:right">'
+                  +'<input id="zedit_net_'+dateId+'_'+gKey+'" type="text" value="'+gDisp.net+'" style="width:105px;border:1px solid #bfdbfe;border-radius:4px;padding:.15rem .3rem;text-align:right;background:#eff6ff;color:#0d47a1;font-weight:700"></td>'
+                +'<td style="padding:.25rem .5rem;border:1px solid #e2e8f0">'
+                  +'<input id="zedit_soHD_'+dateId+'_'+gKey+'" type="text" value="'+(hd.soHD||'')+'" placeholder="0000123" style="width:100px;border:1px solid #cbd5e1;border-radius:4px;padding:.15rem .3rem"></td>'
+                +'<td style="padding:.25rem .5rem;border:1px solid #e2e8f0;text-align:right">'
+                  +'<input id="zedit_tienHD_'+dateId+'_'+gKey+'" type="text" value="'+(hd.tienHD||'')+'" placeholder="0" style="width:100px;border:1px solid #cbd5e1;border-radius:4px;padding:.15rem .3rem;text-align:right"></td>'
+                +'</tr>';
+            }).join('')
+            +'</tbody></table></div>'
+            +'<div style="margin-top:.5rem;display:flex;gap:.5rem">'
+            +'<button onclick="saveZaloEditPanel(\''+dateId+'\',\''+date+'\',this)" data-gians=\''+JSON.stringify(ctKeys).replace(/'/g,'&#39;')+'\' style="background:#16a34a;color:#fff;border:none;border-radius:6px;padding:.3rem .8rem;font-weight:700;font-size:.8em;cursor:pointer">💾 Lưu</button>'
+            +'<button onclick="toggleZaloEditPanel(\''+dateId+'\')" style="background:#6b7280;color:#fff;border:none;border-radius:6px;padding:.3rem .8rem;font-weight:600;font-size:.8em;cursor:pointer">✕ Đóng</button>'
+            +'</div></div></div>';
           return out;
         };
 
@@ -2195,7 +2261,7 @@
             const payAllDates = allDates.filter(d => inRange(d, pay.fromDate, pay.toDate));
             const payRenderDates = filteredDates.filter(d => inRange(d, pay.fromDate, pay.toDate));
             if(selMonth && payRenderDates.length===0){ payAllDates.forEach(d=>coveredDates.add(d)); return; }
-            const zaloNet = payAllDates.reduce((s,d)=>s+Object.values(byDate[d]||{}).reduce((ss,g)=>ss+g.net,0),0);
+            const zaloNet = payAllDates.reduce((s,d)=>s+computeZaloDayNet(d,byDate),0);
             const chenh = pay.amount - zaloNet;
             const chCol = Math.abs(chenh)<1000?'#86efac':(chenh<0?'#fca5a5':'#fcd34d');
             const chTxt = (chenh>=0?'+':'')+fmtN(chenh);
@@ -2216,7 +2282,7 @@
         const unpaidDates = filteredDates.filter(d=>!coveredDates.has(d));
         if(unpaidDates.length) {
           if(_bankZaloPayments.length) {
-            const unpaidNet = unpaidDates.reduce((s,d)=>s+Object.values(byDate[d]||{}).reduce((ss,g)=>ss+g.net,0),0);
+            const unpaidNet = unpaidDates.reduce((s,d)=>s+computeZaloDayNet(d,byDate),0);
             html += '<div style="background:#78350f;color:#fef3c7;padding:.5rem .8rem;font-weight:700;font-size:.86em;border-top:2px solid #d97706;border-radius:4px;margin-top:.5rem">'
               +'⏳ Chưa có NH trả về &nbsp;·&nbsp; Tổng Net: '+fmtN(unpaidNet)+'đ</div>';
           }
@@ -2227,8 +2293,9 @@
         const byGian = {};
         filteredDates.forEach(dt => {
           Object.entries(byDate[dt]).forEach(([maCT,d]) => {
+            const gDisp = getGianDisp(dt, maCT, d);
             if(!byGian[maCT]) byGian[maCT]={soDon:0,gross:0,phi:0,net:0};
-            byGian[maCT].soDon+=d.soDon; byGian[maCT].gross+=d.gross; byGian[maCT].phi+=d.phi; byGian[maCT].net+=d.net;
+            byGian[maCT].soDon+=d.soDon; byGian[maCT].gross+=gDisp.dt; byGian[maCT].phi+=gDisp.phi; byGian[maCT].net+=gDisp.net;
           });
         });
         const gianKeys = Object.keys(byGian).filter(k=>k!=='_unknown_').sort();
@@ -2457,6 +2524,32 @@
       inp.onkeydown = e => { if(e.key==='Enter'||e.key==='Escape') inp.blur(); };
       spanEl.replaceWith(inp);
       inp.focus(); inp.select();
+    }
+
+    // Toggle bảng "✏️ Sửa" (giống Momo) cho 1 ngày trong Zalo Đối soát ngày
+    function toggleZaloEditPanel(dateId) {
+      const row = document.getElementById('edit_zalo_' + dateId);
+      if (!row) return;
+      row.style.display = row.style.display === 'none' ? '' : 'none';
+    }
+    // Lưu Doanh thu/Net (override) + Số HĐ/Tiền HĐ sửa tay cho từng gian trong ngày
+    function saveZaloEditPanel(dateId, date, btnEl) {
+      const gianList = btnEl && btnEl.dataset && btnEl.dataset.gians ? JSON.parse(btnEl.dataset.gians) : [];
+      gianList.forEach(maCT => {
+        const gKey = maCT.replace(/[^a-zA-Z0-9]/g,'_');
+        const hdKey = `${date}|${maCT}`;
+        if (!_zaloHD[hdKey]) _zaloHD[hdKey] = {};
+        const dtOvr    = (document.getElementById(`zedit_dt_${dateId}_${gKey}`)    || {}).value;
+        const netOvr   = (document.getElementById(`zedit_net_${dateId}_${gKey}`)   || {}).value;
+        const soHD     = (document.getElementById(`zedit_soHD_${dateId}_${gKey}`)   || {}).value || '';
+        const tienHD   = (document.getElementById(`zedit_tienHD_${dateId}_${gKey}`) || {}).value || '';
+        _zaloHD[hdKey].dtOvr  = dtOvr  != null ? dtOvr  : '';
+        _zaloHD[hdKey].netOvr = netOvr != null ? netOvr : '';
+        _zaloHD[hdKey].soHD   = soHD.trim();
+        _zaloHD[hdKey].tienHD = tienHD.trim();
+      });
+      try { lsSet(LS_ZALO_HD, JSON.stringify(_zaloHD)); } catch(e){}
+      renderZaloDoiSoat();
     }
 
     // Map "Chưa xác định gian" cho 1 ngày → maCT cụ thể
