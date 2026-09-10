@@ -2359,6 +2359,11 @@
             // nếu trùng mã CT (nhóm theo đúng string key), thêm nút Xóa để
             // bỏ hẳn các GD "chưa xác định gian" của ngày này khi không map
             // được (vd giao dịch rác/lỗi).
+            // Luyen, 2026-09-10: "cho tôi nhấn vô 1 cái khung coi ngày chưa
+            // xác định là đơn nào, trạng thái/tiền phí mà chưa có á" -- thêm
+            // nút "Xem chi tiết" mở khung liệt kê từng GD chưa xác định gian
+            // của ngày này (mã đơn Zalo, mã đơn Funzone, điểm thu, DT, phí,
+            // và LÝ DO cụ thể vì sao chưa xác định được).
             const unkInput = isUnknown
               ? '<div style="margin-top:.2rem"><input placeholder="Mã CT..." id="unkCT_'+date.replace(/-/g,'')+'"'
                 +' style="width:110px;border:1px solid #f59e0b;border-radius:4px;padding:.12rem .3rem;font-size:.74em"'
@@ -2366,7 +2371,10 @@
                 +'>&nbsp;<button style="font-size:.71em;padding:.1rem .3rem;background:#f59e0b;color:#fff;border:none;border-radius:3px;cursor:pointer"'
                 +' onclick="saveZaloUnkCT(\''+date+'\',document.getElementById(\'unkCT_'+date.replace(/-/g,'')+'\').value)">Map</button>'
                 +'&nbsp;<button style="font-size:.71em;padding:.1rem .3rem;background:#dc2626;color:#fff;border:none;border-radius:3px;cursor:pointer"'
-                +' onclick="deleteZaloUnkGroup(\''+date+'\')">🗑 Xóa</button></div>'
+                +' onclick="deleteZaloUnkGroup(\''+date+'\')">🗑 Xóa</button>'
+                +'&nbsp;<button style="font-size:.71em;padding:.1rem .3rem;background:#0891b2;color:#fff;border:none;border-radius:3px;cursor:pointer"'
+                +' onclick="toggleZaloUnkDetail(\''+date+'\')">👁 Xem chi tiết</button>'
+                +'<div id="unkDetail_'+date.replace(/-/g,'')+'" style="display:none"></div></div>'
               : '';
             out += '<tr style="background:'+bg+'">'
               +'<td style="padding:.3rem .6rem">'+ctLabel+unkInput+'</td>'
@@ -2752,6 +2760,49 @@
       lsSet(LS_ZALO_FEE, JSON.stringify(_zaloFee));
       renderZaloDoiSoat();
       alert(`✅ Đã xóa ${toRemove.length} GD (tổng ${total.toLocaleString('vi')}đ).`);
+    }
+
+    // Luyen, 2026-09-10: khung xem chi tiết từng GD "chưa xác định gian" của
+    // 1 ngày -- liệt kê mã đơn Zalo, mã đơn Funzone, điểm thu, DT/phí và LÝ DO
+    // cụ thể (không đọc được mã đơn từ ghi chú, hay có mã đơn nhưng không có
+    // trong file OrderDetails đã tải / đơn đó chưa "Đã thanh toán"/bị hủy nên
+    // bị lọc khi tải OrderDetails).
+    function renderZaloUnkDetail(date) {
+      const isFunzone = r => r.maDiem==='FUNZONE1' || (r.dienThu||'').toUpperCase().includes('FUNZONE');
+      const isUnmatched = r => !r.maFunzone || _zaloOrders[String(r.maFunzone)] === undefined;
+      const rows = _zaloFee.filter(r => r.date===date && isFunzone(r) && isUnmatched(r));
+      if(!rows.length) return '<div style="padding:.3rem .5rem;color:#94a3b8;font-size:.78em">Không có giao dịch nào.</div>';
+      let html = '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:.74em;margin-top:.25rem;background:#fffbeb">'
+        +'<thead><tr style="background:#fde68a;color:#78350f">'
+        +'<th style="padding:.2rem .4rem;text-align:left">Mã đơn Zalo</th>'
+        +'<th style="padding:.2rem .4rem;text-align:left">Mã đơn (Funzone)</th>'
+        +'<th style="padding:.2rem .4rem;text-align:left">Điểm thu</th>'
+        +'<th style="padding:.2rem .4rem;text-align:right">DT trước KM</th>'
+        +'<th style="padding:.2rem .4rem;text-align:right">Phí</th>'
+        +'<th style="padding:.2rem .4rem;text-align:left">Lý do chưa xác định</th>'
+        +'</tr></thead><tbody>';
+      rows.forEach(r => {
+        const reason = !r.maFunzone
+          ? 'Không đọc được mã đơn hàng từ ghi chú BaoCaoPhi'
+          : 'Mã đơn <b>'+r.maFunzone+'</b> không có trong file OrderDetails đã tải — do chưa tải file chứa đơn này, hoặc đơn đó không ở trạng thái "Đã thanh toán" / bị hủy nên khi tải OrderDetails đã bị lọc bỏ';
+        html += '<tr style="border-bottom:1px solid #fde68a">'
+          +'<td style="padding:.2rem .4rem">'+(r.maDonZalo||'—')+'</td>'
+          +'<td style="padding:.2rem .4rem">'+(r.maFunzone||'—')+'</td>'
+          +'<td style="padding:.2rem .4rem">'+(r.dienThu||'—')+'</td>'
+          +'<td style="padding:.2rem .4rem;text-align:right;color:#15803d">'+fmtN(r.gross)+'</td>'
+          +'<td style="padding:.2rem .4rem;text-align:right;color:#ef4444">'+fmtN(r.phi)+'</td>'
+          +'<td style="padding:.2rem .4rem;color:#92400e">'+reason+'</td>'
+          +'</tr>';
+      });
+      html += '</tbody></table></div>';
+      return html;
+    }
+
+    function toggleZaloUnkDetail(date) {
+      const el = document.getElementById('unkDetail_'+date.replace(/-/g,''));
+      if(!el) return;
+      if(el.style.display==='none'){ el.innerHTML = renderZaloUnkDetail(date); el.style.display=''; }
+      else { el.style.display='none'; el.innerHTML=''; }
     }
 
     function saveZaloSpMap(inp) {
