@@ -735,6 +735,18 @@
     // cái map với hóa đơn... chỗ hóa đơn dịch vụ thu hộ là ZALO MINI APP" --
     // giống hệt nút Map MTT → Momo, chỉ đổi lọc dichVuThuHo sang "zalo" và
     // ghi vào _zaloHD thay vì _hdData.)
+    //
+    // Luyen, 2026-09-10 (bản 2): phát hiện cột "Dịch vụ thu hộ" của MTT thực
+    // ra ghi kèm NGÀY (trong tháng) mà hóa đơn đó thu hộ ngay trong tên, vd
+    // "ZALO MINI APP 29,30,31" nghĩa là hóa đơn này GỘP CHUNG doanh thu 3
+    // ngày 29-30-31 (của tháng TRƯỚC ngày hóa đơn, vì 29>ngày HĐ) làm MỘT
+    // hóa đơn duy nhất cho 1 gian. Bản cũ đoán mù ngày hóa đơn (+1..+4 ngày
+    // sau ngày đối soát) nên có lúc gán TRÙNG 1 hóa đơn cho nhiều ngày (VD
+    // 30/08 và 31/08 cùng bị gán hóa đơn 3235/3238/3239/3264 -> Chênh sai vì
+    // đếm 2 lần), có lúc lại BỎ SÓT ngày (vd thiếu hẳn ngày 29/08). Sửa: đọc
+    // ĐÚNG (các) ngày ghi trong cột thu hộ thay vì đoán, và khi 1 hóa đơn gộp
+    // nhiều ngày thì CHIA tiền hóa đơn theo đúng tỷ lệ DT trước KM thực tế
+    // của từng ngày (không copy nguyên số tiền vào mỗi ngày).
     function autoMapMttZalo() {
       const khKey   = COMPANY === 'kh_cu' ? 'cu' : 'moi';
       const mttRows = khKey === 'cu' ? _mttCu : _mttMoi;
@@ -744,62 +756,80 @@
       const zaloMtt = mttRows.filter(r => (r.dichVuThuHo||'').toLowerCase().includes('zalo'));
       if (!zaloMtt.length) { alert('Không tìm thấy hóa đơn MTT nào có dịch vụ thu hộ = ZALO MINI APP.'); return; }
 
-      // Build MTT lookup: ngay(DD/MM/YYYY) → maDiem → [rows]
-      const mttByDateDiem = {};
-      zaloMtt.forEach(r => {
-        if (!mttByDateDiem[r.ngay]) mttByDateDiem[r.ngay] = {};
-        if (!mttByDateDiem[r.ngay][r.maDiem]) mttByDateDiem[r.ngay][r.maDiem] = [];
-        mttByDateDiem[r.ngay][r.maDiem].push(r);
-      });
-
       // maDiem → maCT (dùng chung bảng Map Mã Điểm → Mã Công Trình MTT với bên Momo)
       const maDiemToMaCT = _mttCtMap[khKey] || {};
-      const maCTtoDiem = {};
-      Object.entries(maDiemToMaCT).forEach(([md, mc]) => { if (mc) maCTtoDiem[mc] = md; });
 
-      const addDays = (ddmmyyyy, n) => {
-        const [dd,mm,yy] = ddmmyyyy.split('-');
-        const d = new Date(Number(yy), Number(mm)-1, Number(dd));
-        d.setDate(d.getDate() + n);
-        return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
+      // Tách các ngày-trong-tháng ghi ở cuối "Dịch vụ thu hộ", vd
+      // "ZALO MINI APP 29,30,31" -> [29,30,31]; "ZALO MINI APP 4" -> [4]
+      const parseDays = s => {
+        const m = /(\d+(?:\s*,\s*\d+)*)\s*$/.exec(s||'');
+        if (!m) return [];
+        return m[1].split(',').map(x=>parseInt(x.trim(),10)).filter(n=>!isNaN(n));
+      };
+      // Quy ra ngày thật DD-MM-YYYY (định dạng Zalo dùng): so ngày trong cột
+      // thu hộ với ngày hóa đơn (ngayHD "DD/MM/YYYY") -- nếu lớn hơn thì
+      // thuộc THÁNG TRƯỚC (vd HĐ 03/09 ghi ngày 29,30,31 -> tháng 08).
+      const resolveDate = (ngayHD, dayNum) => {
+        const p = String(ngayHD||'').split('/');
+        if (p.length !== 3) return null;
+        const dd = +p[0], mm = +p[1], yy = +p[2];
+        let month = mm, year = yy;
+        if (dayNum > dd) { month -= 1; if (month < 1) { month = 12; year -= 1; } }
+        return String(dayNum).padStart(2,'0')+'-'+String(month).padStart(2,'0')+'-'+year;
       };
 
-      // Build nhóm ngày|maCT từ dữ liệu Zalo FUNZONE (giống byDate trong renderZaloDoiSoat)
-      const dateGroups = {};
+      // DT trước KM thực tế từng ngày|maCT (từ dữ liệu Zalo FUNZONE, giống
+      // byDate trong renderZaloDoiSoat) -- dùng để chia tỷ lệ khi 1 hóa đơn
+      // gộp nhiều ngày.
+      const grossByDateCT = {};
       _zaloFee.forEach(r => {
         const isFunzone = r.maDiem==='FUNZONE1' || (r.dienThu||'').toUpperCase().includes('FUNZONE');
         if(!isFunzone) return;
         const tenSP_lu = r.maFunzone ? _zaloOrders[String(r.maFunzone)] : undefined;
         const maCT = tenSP_lu ? (getZaloMaCT(tenSP_lu)||tenSP_lu) : (_zaloUnk[r.date] || '_unknown_');
-        if (!dateGroups[r.date]) dateGroups[r.date] = new Set();
-        dateGroups[r.date].add(maCT);
+        const key = r.date+'|'+maCT;
+        grossByDateCT[key] = (grossByDateCT[key]||0) + r.gross;
+      });
+
+      // Xóa các ô KHÔNG PHẢI do Luyen tự tay sửa (không có _manual) để tính
+      // lại từ đầu mỗi lần bấm nút -- tránh cộng dồn nhiều lần khi bấm lặp
+      // lại, và tự động SỬA LUÔN các ô bị gán sai từ lần chạy phiên bản cũ
+      // (trước khi có logic chia tỷ lệ này). Ô nào Luyen đã tự sửa tay
+      // (_manual=true, đánh dấu trong zHDEdit/saveZaloEditPanel) thì giữ
+      // nguyên, không đụng vào.
+      Object.keys(_zaloHD).forEach(k => {
+        if (_zaloHD[k] && !_zaloHD[k]._manual) {
+          delete _zaloHD[k].soHD; delete _zaloHD[k].tienHD;
+        }
       });
 
       let filled = 0, skipped = 0;
-      Object.entries(dateGroups).forEach(([zaloDate, groupSet]) => {
-        const invCandidates = [1,2,3,4].map(n => addDays(zaloDate, n));
-        groupSet.forEach(maCT => {
-          const hdKey = `${zaloDate}|${maCT}`;
-          if (_zaloHD[hdKey] && _zaloHD[hdKey].soHD) { skipped++; return; }
-          const maDiem = maCTtoDiem[maCT];
-          let matched = null;
-          for (const inv of invCandidates) {
-            if (maDiem && mttByDateDiem[inv] && mttByDateDiem[inv][maDiem]) { matched = mttByDateDiem[inv][maDiem]; break; }
-            if (maCT && mttByDateDiem[inv] && mttByDateDiem[inv][maCT]) { matched = mttByDateDiem[inv][maCT]; break; }
-          }
-          if (!matched) return;
+      zaloMtt.forEach(r => {
+        const days = parseDays(r.dichVuThuHo);
+        if (!days.length || !r.ngay) return;
+        const maCT = maDiemToMaCT[r.maDiem] || r.maDiem;
+        const dates = days.map(d => resolveDate(r.ngay, d)).filter(Boolean);
+        if (!dates.length) return;
+        const grosses = dates.map(dt => grossByDateCT[dt+'|'+maCT] || 0);
+        const totalGross = grosses.reduce((s,g)=>s+g,0);
+        dates.forEach((dt, i) => {
+          const hdKey = dt+'|'+maCT;
+          const existing = _zaloHD[hdKey];
+          if (existing && existing._manual) { skipped++; return; } // Luyen đã tự nhập tay
+          const share = totalGross>0 ? (grosses[i]/totalGross) : (1/dates.length);
+          const portion = Math.round(r.tongTien * share);
           if (!_zaloHD[hdKey]) _zaloHD[hdKey] = {};
-          const soHDs = [...new Set(matched.map(r => String(r.soHD)))].join(', ');
-          const tongTien = matched.reduce((s, r) => s + r.tongTien, 0);
-          _zaloHD[hdKey].soHD   = soHDs;
-          _zaloHD[hdKey].tienHD = String(Math.round(tongTien));
+          const prevHD = String(_zaloHD[hdKey].soHD||'').split(',').map(s=>s.trim()).filter(Boolean);
+          if (!prevHD.includes(String(r.soHD))) prevHD.push(String(r.soHD));
+          _zaloHD[hdKey].soHD    = prevHD.join(', ');
+          _zaloHD[hdKey].tienHD  = String((parseFloat(_zaloHD[hdKey].tienHD)||0) + portion);
           filled++;
         });
       });
 
       try { lsSet(LS_ZALO_HD, JSON.stringify(_zaloHD)); } catch(e){}
       renderZaloDoiSoat();
-      alert(`✅ Map xong: ${filled} ô hóa đơn · Bỏ qua ${skipped} ô đã có`);
+      alert(`✅ Map xong: ${filled} ô hóa đơn (tự chia tỷ lệ nếu hóa đơn gộp nhiều ngày) · Bỏ qua ${skipped} ô đã tự nhập tay`);
     }
 
     function toggleEditPanel(dateId) {
@@ -2284,12 +2314,20 @@
             const tienHDDisplay = hd.tienHD
               ? '<span style="font-size:.8em;cursor:pointer;color:#15803d" onclick="zHDEdit(this,\''+escKey+'\',\'tienHD\')">'+hd.tienHD+' ✏️</span>'
               : '<span style="color:#94a3b8;font-size:.75em;cursor:pointer" onclick="zHDEdit(this,\''+escKey+'\',\'tienHD\')">…</span>';
+            // Luyen, 2026-09-10: "chưa xác định thêm có thể xóa với nếu tôi
+            // thêm mã công trình thì map vào công trình đó luôn nếu có ở
+            // trên còn không thì hiện dưới" -- Map đã tự gộp vào gian có sẵn
+            // nếu trùng mã CT (nhóm theo đúng string key), thêm nút Xóa để
+            // bỏ hẳn các GD "chưa xác định gian" của ngày này khi không map
+            // được (vd giao dịch rác/lỗi).
             const unkInput = isUnknown
               ? '<div style="margin-top:.2rem"><input placeholder="Mã CT..." id="unkCT_'+date.replace(/-/g,'')+'"'
                 +' style="width:110px;border:1px solid #f59e0b;border-radius:4px;padding:.12rem .3rem;font-size:.74em"'
                 +' onkeydown="if(event.key===\'Enter\'){saveZaloUnkCT(\''+date+'\',this.value)}"'
                 +'>&nbsp;<button style="font-size:.71em;padding:.1rem .3rem;background:#f59e0b;color:#fff;border:none;border-radius:3px;cursor:pointer"'
-                +' onclick="saveZaloUnkCT(\''+date+'\',document.getElementById(\'unkCT_'+date.replace(/-/g,'')+'\').value)">Map</button></div>'
+                +' onclick="saveZaloUnkCT(\''+date+'\',document.getElementById(\'unkCT_'+date.replace(/-/g,'')+'\').value)">Map</button>'
+                +'&nbsp;<button style="font-size:.71em;padding:.1rem .3rem;background:#dc2626;color:#fff;border:none;border-radius:3px;cursor:pointer"'
+                +' onclick="deleteZaloUnkGroup(\''+date+'\')">🗑 Xóa</button></div>'
               : '';
             out += '<tr style="background:'+bg+'">'
               +'<td style="padding:.3rem .6rem">'+ctLabel+unkInput+'</td>'
@@ -2597,6 +2635,9 @@
     function saveZaloHD(maCT, field, val) {
       if(!_zaloHD[maCT]) _zaloHD[maCT] = {};
       _zaloHD[maCT][field] = val.trim();
+      // Luyen tự tay sửa -- đánh dấu để nút "Map MTT → Zalo" không ghi đè
+      // lại ô này ở lần chạy sau.
+      if (field === 'soHD' || field === 'tienHD') _zaloHD[maCT]._manual = true;
       try { lsSet(LS_ZALO_HD, JSON.stringify(_zaloHD)); } catch(e){}
     }
 
@@ -2633,6 +2674,9 @@
         _zaloHD[hdKey].netOvr = netOvr != null ? netOvr : '';
         _zaloHD[hdKey].soHD   = soHD.trim();
         _zaloHD[hdKey].tienHD = tienHD.trim();
+        // Chỉ đánh dấu "tự tay sửa" khi Luyen thực sự nhập Số HĐ/Tiền HĐ --
+        // để trống thì vẫn để nút "Map MTT → Zalo" tự điền sau này.
+        if (soHD.trim() || tienHD.trim()) _zaloHD[hdKey]._manual = true;
       });
       try { lsSet(LS_ZALO_HD, JSON.stringify(_zaloHD)); } catch(e){}
       renderZaloDoiSoat();
@@ -2647,6 +2691,21 @@
       _zaloUnk[date] = maCT.trim().toUpperCase();
       try { lsSet(LS_ZALO_UNK, JSON.stringify(_zaloUnk)); } catch(e){}
       renderZaloDoiSoat();
+    }
+
+    // Xóa hẳn các GD FUNZONE "chưa xác định gian" của 1 ngày (không map được
+    // vào gian nào, vd giao dịch rác/lỗi thay vì phải Map ép vào 1 mã CT).
+    function deleteZaloUnkGroup(date) {
+      const isFunzone = r => r.maDiem==='FUNZONE1' || (r.dienThu||'').toUpperCase().includes('FUNZONE');
+      const isUnmatched = r => !r.maFunzone || _zaloOrders[String(r.maFunzone)] === undefined;
+      const toRemove = _zaloFee.filter(r => r.date===date && isFunzone(r) && isUnmatched(r));
+      if (!toRemove.length) { alert('Không có giao dịch "chưa xác định gian" nào ở ngày ' + date + '.'); return; }
+      const total = toRemove.reduce((s,r)=>s+r.gross,0);
+      if (!confirm(`Xóa ${toRemove.length} GD "chưa xác định gian" ngày ${date} (tổng ${total.toLocaleString('vi')}đ)?\nKhông hoàn tác được.`)) return;
+      _zaloFee = _zaloFee.filter(r => !(r.date===date && isFunzone(r) && isUnmatched(r)));
+      lsSet(LS_ZALO_FEE, JSON.stringify(_zaloFee));
+      renderZaloDoiSoat();
+      alert(`✅ Đã xóa ${toRemove.length} GD (tổng ${total.toLocaleString('vi')}đ).`);
     }
 
     function saveZaloSpMap(inp) {
