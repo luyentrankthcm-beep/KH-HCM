@@ -2024,7 +2024,7 @@
           const iSku=fc('Sku');
 
           // Lưu compact {maOrder: maCT} — ~4x nhỏ hơn array, tránh quota exceeded
-          let addedCount=0, totalInFile=0;
+          let addedCount=0, totalInFile=0, excludedByStatus=0;
           rows.slice(1).forEach(r => {
             // Chi Nhan, 2026-09-10: Luyen nghi "chua xac dinh gian" co the do
             // lot qua giao dich chua thanh cong -- trim() ky lai 2 cot trang
@@ -2039,8 +2039,17 @@
             // that (khong hoan tien), nen van phai tinh doanh thu. Bo dieu
             // kien loai theo "Da huy" -- chi con dua vao Trang thai thanh
             // toan (da co BaoCaoPhi tu loc "Thanh cong" o buoc khac roi).
-            const payStatus   = String(r[iPay]||'').trim();
-            if(payStatus!=='Đã thanh toán' || !r[iDate]) return;
+            // Luyen, 2026-09-10 (thêm nữa): đơn #137373 CÓ trong file, "Trạng
+            // thái thanh toán" nhìn = "Đã thanh toán" nhưng vẫn bị bỏ qua --
+            // nghi do khác kiểu chuẩn hoá Unicode (dấu tiếng Việt tổ hợp NFD
+            // vs sẵn NFC) khiến so sánh === lệch dù mắt nhìn giống hệt. Chuẩn
+            // hoá NFC cả 2 vế trước khi so sánh cho chắc, đồng thời đếm số
+            // dòng bị loại do trạng thái để báo cho Luyen thấy (thay vì mất
+            // tăm không dấu vết như trước).
+            const norm = s => { try { return s.normalize('NFC'); } catch(e){ return s; } };
+            const payStatus = norm(String(r[iPay]||'').trim());
+            const isPaid = payStatus === norm('Đã thanh toán');
+            if(!isPaid || !r[iDate]) { if(payStatus) excludedByStatus++; return; }
             totalInFile++;
             const maOrder = String(r[iOrder]||'').trim().replace(/^#/,'');
             const tenSP   = String(r[iSP]||'').trim();
@@ -2073,7 +2082,7 @@
           lsSet(LS_ZALO_HIST, JSON.stringify(_zaloHist));
 
           renderZaloSummary(); renderZaloDoiSoat(); renderZaloCtMap(); renderZaloHist();
-          alert(`✅ OrderDetails: +${addedCount} đơn mới · Bỏ qua ${totalInFile-addedCount} trùng\nTổng tích lũy: ${Object.keys(_zaloOrders).length} đơn`);
+          alert(`✅ OrderDetails: +${addedCount} đơn mới · Bỏ qua ${totalInFile-addedCount} trùng${excludedByStatus?' · Bỏ qua '+excludedByStatus+' do trạng thái thanh toán ≠ "Đã thanh toán"':''}\nTổng tích lũy: ${Object.keys(_zaloOrders).length} đơn`);
         } catch(err) { alert('Lỗi đọc file OrderDetails: ' + err.message); }
       };
       reader.readAsArrayBuffer(inp.files[0]);
