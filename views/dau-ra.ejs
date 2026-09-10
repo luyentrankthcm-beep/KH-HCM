@@ -2582,14 +2582,20 @@
         </label>
       </div>`;
       // 1 bảng duy nhất — unmapped trước (nền vàng nhạt), mapped sau (nền xanh nhạt)
-      html += '<table style="width:100%;border-collapse:collapse;font-size:.84em"><thead><tr style="background:#e0e7ff;color:#1e3a5f"><th style="padding:.3rem .6rem;text-align:left">Tên sản phẩm</th><th style="padding:.3rem .4rem;width:180px">Mã CT</th><th style="padding:.3rem .4rem;width:56px"></th></tr></thead><tbody>';
+      html += '<table style="width:100%;border-collapse:collapse;font-size:.84em"><thead><tr style="background:#e0e7ff;color:#1e3a5f"><th style="padding:.3rem .6rem;text-align:left">Tên sản phẩm / Mã Sku</th><th style="padding:.3rem .4rem;width:180px">Mã CT</th><th style="padding:.3rem .4rem;width:56px"></th></tr></thead><tbody>';
+      // Luyen, 2026-09-10: "tên sản phẩm kì" -- từ khi thêm map theo Sku, bảng
+      // này lẫn cả tên sản phẩm (dài, có dấu, nhiều khoảng trắng) VÀ mã Sku
+      // (ngắn, không dấu, không khoảng trắng, vd "AMTP", "farmPT-CT") khiến
+      // Luyen thấy lạ. Đánh dấu rõ dòng nào là Sku bằng nhãn xanh để phân biệt.
+      const looksLikeSku = s => !/\s/.test(s) && s.length <= 24;
       tenSPs.forEach((sp, i) => {
         const isMapped = !!_zaloSpMap[sp];
         const bg = isMapped ? (i%2?'#f0fdf4':'#dcfce7') : (i%2?'#fff':'#fffbeb');
         const borderCol = isMapped ? '#86efac' : '#cbd5e1';
         const esc = sp.replace(/'/g,"&#39;").replace(/"/g,'&quot;');
+        const skuTag = looksLikeSku(sp) ? ' <span style="background:#dbeafe;color:#1d4ed8;font-size:.72em;font-weight:700;padding:.05rem .35rem;border-radius:4px;vertical-align:middle">Sku</span>' : '';
         html += `<tr style="background:${bg}">
-          <td style="padding:.3rem .6rem;font-size:.79em">${isMapped?'':' ⏳ '}${sp}</td>
+          <td style="padding:.3rem .6rem;font-size:.79em">${isMapped?'':' ⏳ '}${sp}${skuTag}</td>
           <td style="padding:.3rem .4rem">
             <input id="zsp_${i}" data-sp="${esc}" value="${(_zaloSpMap[sp]||'').replace(/"/g,'&quot;')}" placeholder="Mã CT"
               style="width:100%;border:1px solid ${borderCol};border-radius:4px;padding:.2rem .35rem;background:${isMapped?'#f0fdf4':'#fff'}"
