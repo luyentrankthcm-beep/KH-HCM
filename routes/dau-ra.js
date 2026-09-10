@@ -259,6 +259,19 @@ router.get("/api/dau-ra/bank-vnpay", (req, res) => {
       // Chỉ lấy đúng mẫu VNPay QR Offline: "VNPAY TT 829168 GIAIT...989 DV QR OFFLINE NGAY"
       if (!/VNPAY\s+TT\s+829168.*GIAIT.*989/i.test(t.description || "")) continue;
       if (!/OFFLINE/i.test(t.description || "")) continue;
+      // Luyen, 2026-09-10: "mấy tỷ giữ vậy" -- tài khoản ACB1268 này còn nhận
+      // NHIỀU giao dịch KHÁC của cùng đơn vị trung gian thanh toán "CT CP
+      // GIAI PHAP THANH TOAN VIET NAM" (VNPay) dùng ĐÚNG mẫu diễn giải y hệt
+      // "VNPAY TT 829168 GIAITRIKH989 DV QR OFFLINE NGAY..." (không phân
+      // biệt được bằng text) nhưng KHÔNG liên quan tới 3-4 gian QR Offline
+      // đang đối soát ở đây -- đã xác nhận bằng cách so khớp với tổng Net từ
+      // BaoCaoPhi: vd 03/08 thực tế chỉ có 19.320.752đ (khớp tuyệt đối với
+      // BaoCaoPhi) nhưng cùng ngày còn có 1 dòng khác 3.070.166.115đ (số dư
+      // NH tăng thật, không phải lỗi đọc file) -- rõ ràng không phải doanh
+      // thu của các gian QR Offline nhỏ này. Cả tháng 08/2026 tổng Net cao
+      // nhất 1 ngày chỉ ~64 triệu, cả tháng cộng lại ~650 triệu -- nên loại
+      // hẳn các dòng > 300 triệu vì chắc chắn không phải của các gian này.
+      if (Number(t.amount || 0) > 300000000) continue;
       if (from && t.date < from) continue;
       if (to   && t.date > to)   continue;
 
