@@ -194,15 +194,33 @@ router.get("/api/dau-ra/bank-zalo", (req, res) => {
       if (from && t.date < from) continue;
       if (to   && t.date > to)   continue;
 
-      // Parse "NGAY 14-16.08.26" hoặc "NGAY 03.09.26"
-      const m = /NGAY\s+(\d{1,2})(?:-(\d{1,2}))?\.(\d{1,2})\.(\d{2,4})/i.exec(t.description || "");
+      // Parse "NGAY 28.08-02.09.26" (khac thang), "NGAY 14-16.08.26" (cung
+      // thang), hoặc "NGAY 03.09.26" (1 ngày). Chi Nhan, 2026-09-10: Luyen
+      // bao dot NH tra 03-09-2026 (83.671.918đ, dien giai "...NGAY
+      // 28.08-02.09.26") hien "ZaloPay từ→đến: —" vi regex cu chi ho tro
+      // dang "D1(-D2)?.MM.YY" (mot thang duy nhat cho ca 2 dau) -- khoang
+      // ngay bang qua 2 thang khac nhau (28/8 -> 2/9) khong khop duoc.
+      // Them 1 dang regex rieng (mCross) thu truoc, uu tien hon 2 dang cu.
       let fromDate = null, toDate = null;
-      if (m) {
-        const d1 = m[1].padStart(2,"0"), d2 = (m[2]||m[1]).padStart(2,"0");
-        const mo = m[3].padStart(2,"0");
-        const yr = m[4].length === 2 ? "20" + m[4] : m[4];
-        fromDate = d1 + "-" + mo + "-" + yr;
-        toDate   = d2 + "-" + mo + "-" + yr;
+      const desc = t.description || "";
+      const mCross  = /NGAY\s+(\d{1,2})\.(\d{1,2})-(\d{1,2})\.(\d{1,2})\.(\d{2,4})/i.exec(desc);
+      const mSame   = !mCross && /NGAY\s+(\d{1,2})-(\d{1,2})\.(\d{1,2})\.(\d{2,4})/i.exec(desc);
+      const mSingle = !mCross && !mSame && /NGAY\s+(\d{1,2})\.(\d{1,2})\.(\d{2,4})/i.exec(desc);
+      if (mCross) {
+        const [, d1, mo1, d2, mo2, y] = mCross;
+        const yr = y.length === 2 ? "20" + y : y;
+        fromDate = d1.padStart(2, "0") + "-" + mo1.padStart(2, "0") + "-" + yr;
+        toDate   = d2.padStart(2, "0") + "-" + mo2.padStart(2, "0") + "-" + yr;
+      } else if (mSame) {
+        const [, d1, d2, mo, y] = mSame;
+        const yr = y.length === 2 ? "20" + y : y;
+        fromDate = d1.padStart(2, "0") + "-" + mo.padStart(2, "0") + "-" + yr;
+        toDate   = d2.padStart(2, "0") + "-" + mo.padStart(2, "0") + "-" + yr;
+      } else if (mSingle) {
+        const [, d, mo, y] = mSingle;
+        const yr = y.length === 2 ? "20" + y : y;
+        fromDate = d.padStart(2, "0") + "-" + mo.padStart(2, "0") + "-" + yr;
+        toDate   = fromDate;
       }
       let payDate = t.date;
       if (/^\d{4}-\d{2}-\d{2}$/.test(t.date)) {
