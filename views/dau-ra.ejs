@@ -342,6 +342,7 @@
             </select>
             <button onclick="fetchBankVnpayRefresh()" style="font-size:.78em;padding:.2rem .65rem;background:#9a3412;color:#fff;border:none;border-radius:5px;cursor:pointer">🔄 Làm mới NH</button>
             <button onclick="toggleBankVnpayDetail()" style="font-size:.78em;padding:.2rem .65rem;background:#374151;color:#e5e7eb;border:none;border-radius:5px;cursor:pointer">🏦 Xem raw NH</button>
+            <button onclick="autoMapMttVnpay()" style="font-size:.78em;padding:.2rem .65rem;background:#7c3aed;color:#fff;border:none;border-radius:5px;cursor:pointer;font-weight:600">🧾 Map MTT → VNPay</button>
             <span id="bankVnpayStatus" style="font-size:.78em;color:#64748b"></span>
           </div>
           <div id="bankVnpayDetailPanel" style="display:none;background:#0f172a;border:1px solid #7c2d12;border-radius:6px;padding:.6rem .8rem;margin-bottom:.6rem;font-size:.8em;overflow-x:auto">
@@ -3342,6 +3343,83 @@
         if(p) p.classList.toggle('active', s===sub);
         if(b) b.classList.toggle('active', s===sub);
       });
+    }
+
+    // ── Auto map MTT → VNPay Đối soát ── (Luyen, 2026-09-10: "thêm nút map
+    // với hóa đơn đi á chỗ dịch vụ thu hộ sẽ là vnpay cơ sở rồi tới cái ngày
+    // á bạn tìm số tiền rồi gian map lại với nhau" -- y hệt autoMapMttZalo,
+    // chỉ đổi lọc dịch vụ thu hộ sang "vnpay" và tính DT theo _vnpayFee
+    // (getVnpayMaCT) thay vì OrderDetails Zalo. "Dịch vụ thu hộ" ghi dạng
+    // "VNPAY CƠ SỞ 5,6" nghĩa là hóa đơn GỘP CHUNG doanh thu ngày 5 và 6
+    // (của tháng trước ngày HĐ nếu số ngày > ngày HĐ) thành 1 hóa đơn cho 1
+    // gian -- có thể cộng nhiều hóa đơn/nhiều ngày lại, chia tỷ lệ theo DT
+    // thực tế từng ngày.
+    function autoMapMttVnpay() {
+      const khKey   = COMPANY === 'kh_cu' ? 'cu' : 'moi';
+      const mttRows = khKey === 'cu' ? _mttCu : _mttMoi;
+      if (!mttRows.length) { alert('Chưa có dữ liệu MTT. Vui lòng tải file MTT trước.'); return; }
+
+      const vnpayMtt = mttRows.filter(r => (r.dichVuThuHo||'').toLowerCase().includes('vnpay'));
+      if (!vnpayMtt.length) { alert('Không tìm thấy hóa đơn MTT nào có dịch vụ thu hộ = VNPAY CƠ SỞ.'); return; }
+
+      const maDiemToMaCT = _mttCtMap[khKey] || {};
+
+      const parseDays = s => {
+        const m = /(\d+(?:\s*,\s*\d+)*)\s*$/.exec(s||'');
+        if (!m) return [];
+        return m[1].split(',').map(x=>parseInt(x.trim(),10)).filter(n=>!isNaN(n));
+      };
+      const resolveDate = (ngayHD, dayNum) => {
+        const p = String(ngayHD||'').split('/');
+        if (p.length !== 3) return null;
+        const dd = +p[0], mm = +p[1], yy = +p[2];
+        let month = mm, year = yy;
+        if (dayNum > dd) { month -= 1; if (month < 1) { month = 12; year -= 1; } }
+        return String(dayNum).padStart(2,'0')+'-'+String(month).padStart(2,'0')+'-'+year;
+      };
+
+      // DT trước KM thực tế từng ngày|maCT từ _vnpayFee (mỗi Điểm thu = 1 gian trực tiếp)
+      const grossByDateCT = {};
+      _vnpayFee.forEach(r => {
+        const maCT = getVnpayMaCT(r.dienThu);
+        const key = r.date+'|'+maCT;
+        grossByDateCT[key] = (grossByDateCT[key]||0) + r.gross;
+      });
+
+      // Xóa các ô KHÔNG PHẢI do Luyen tự tay sửa để tính lại từ đầu mỗi lần bấm
+      Object.keys(_vnpayHD).forEach(k => {
+        if (_vnpayHD[k] && !_vnpayHD[k]._manual) {
+          delete _vnpayHD[k].soHD; delete _vnpayHD[k].tienHD;
+        }
+      });
+
+      let filled = 0, skipped = 0;
+      vnpayMtt.forEach(r => {
+        const days = parseDays(r.dichVuThuHo);
+        if (!days.length || !r.ngay) return;
+        const maCT = maDiemToMaCT[r.maDiem] || r.maDiem;
+        const dates = days.map(d => resolveDate(r.ngay, d)).filter(Boolean);
+        if (!dates.length) return;
+        const grosses = dates.map(dt => grossByDateCT[dt+'|'+maCT] || 0);
+        const totalGross = grosses.reduce((s,g)=>s+g,0);
+        dates.forEach((dt, i) => {
+          const hdKey = dt+'|'+maCT;
+          const existing = _vnpayHD[hdKey];
+          if (existing && existing._manual) { skipped++; return; }
+          const share = totalGross>0 ? (grosses[i]/totalGross) : (1/dates.length);
+          const portion = Math.round(r.tongTien * share);
+          if (!_vnpayHD[hdKey]) _vnpayHD[hdKey] = {};
+          const prevHD = String(_vnpayHD[hdKey].soHD||'').split(',').map(s=>s.trim()).filter(Boolean);
+          if (!prevHD.includes(String(r.soHD))) prevHD.push(String(r.soHD));
+          _vnpayHD[hdKey].soHD   = prevHD.join(', ');
+          _vnpayHD[hdKey].tienHD = String((parseFloat(_vnpayHD[hdKey].tienHD)||0) + portion);
+          filled++;
+        });
+      });
+
+      try { lsSet(LS_VNPAY_HD, JSON.stringify(_vnpayHD)); } catch(e){}
+      renderVnpayDoiSoat();
+      alert(`✅ Map xong: ${filled} ô hóa đơn (tự chia tỷ lệ / cộng dồn nếu gộp nhiều ngày) · Bỏ qua ${skipped} ô đã tự nhập tay`);
     }
 
     function saveVnpayHD(hdKey, field, val) {
