@@ -2318,6 +2318,32 @@
             +'</div>';
         }
 
+        // Luyen, 2026-09-10: "ngày 5 với ngày 6 xuất chung 1 cái cộng 1 cái
+        // trừ, cấn trừ qua đi, cùng 1 mã đơn vị (Số HĐ)" -- hóa đơn 3350 gộp
+        // 2 ngày cho VC TC DIY KVCN, autoMapMttZalo chia tỷ lệ theo DT từng
+        // ngày nhưng không khớp CHÍNH XÁC thực tế (05/09 dư -229k, 06/09 dư
+        // +229k dù TỔNG 2 ngày khớp hóa đơn tuyệt đối). Gom theo (maCT|Số HĐ)
+        // qua MỌI ngày (không chỉ ngày đang lọc) -- nếu tổng DT các ngày
+        // trong nhóm khớp tổng Tiền HĐ (lệch <1.000đ) thì cấn trừ, hiện
+        // Chênh = 0đ cho TỪNG ngày trong nhóm thay vì để mỗi ngày lệch dương
+        // âm riêng lẻ do chia tỷ lệ không tròn.
+        const invoiceGroups = {}; // "maCT|soHD" -> {dt, tienHD, dates:[]}
+        allDates.forEach(dt => {
+          const ctData0 = byDate[dt]; if(!ctData0) return;
+          Object.keys(ctData0).forEach(maCT => {
+            const hd = _zaloHD[dt+'|'+maCT] || {};
+            const soHD = (hd.soHD||'').trim();
+            if(!soHD) return;
+            const gDisp0 = getGianDisp(dt, maCT, ctData0[maCT]);
+            const tienHD0 = parseFloat((hd.tienHD||'0').toString().replace(/[^0-9.-]/g,''))||0;
+            const key = maCT+'|'+soHD;
+            if(!invoiceGroups[key]) invoiceGroups[key] = {dt:0, tienHD:0, dates:[]};
+            invoiceGroups[key].dt += gDisp0.dt;
+            invoiceGroups[key].tienHD += tienHD0;
+            invoiceGroups[key].dates.push(dt);
+          });
+        });
+
         // Helper: render one date block
         const renderDateBlock = date => {
           const ctData = byDate[date];
@@ -2359,7 +2385,16 @@
             // không phải Net GW (đã trừ phí GW) -- so sánh với Net trước đây
             // khiến MỌI dòng đều lệch đúng bằng đúng số phí GW, tưởng là
             // chênh thật nhưng không phải.
-            const chenh = tienHD ? (gDisp.dt - tienHD) : null;
+            //
+            // Luyen, 2026-09-10 (thêm): hóa đơn xuất chung nhiều ngày (vd
+            // ngày 5+6 cùng Số HĐ 3350) -- nếu TỔNG các ngày trong nhóm khớp
+            // tổng Tiền HĐ (lệch <1.000đ) thì cấn trừ, hiện Chênh=0 cho từng
+            // ngày thay vì để mỗi ngày lệch dương/âm riêng do chia tỷ lệ
+            // không tròn số.
+            const soHDNow = (hd.soHD||'').trim();
+            const grp = soHDNow ? invoiceGroups[maCT+'|'+soHDNow] : null;
+            const grpBalanced = grp && grp.dates.length > 1 && Math.abs(grp.dt - grp.tienHD) < 1000;
+            const chenh = grpBalanced ? 0 : (tienHD ? (gDisp.dt - tienHD) : null);
             const chenhColor = chenh===null?'#94a3b8':(Math.abs(chenh)<1000?'#16a34a':(chenh<0?'#ef4444':'#d97706'));
             const chenhTxt = chenh===null?'—':((chenh>0?'+':'')+fmtN(chenh));
             const bg = i%2===0?'#f8fafc':'#fff';
