@@ -16,6 +16,15 @@ const DATA_FILE = path.join(DATA_DIR, "store.json");
 // (~7MB), transactions.json (~95MB) va viet_qr_raw.json (~36MB) duoc load lazy.
 const TRANSACTIONS_FILE = path.join(DATA_DIR, "transactions.json");
 const VIET_QR_RAW_FILE = path.join(DATA_DIR, "viet_qr_raw.json");
+// Chi Nhan, 2026-09-10: trang "Dau Ra" (views/dau-ra.ejs) truoc gio luu du lieu
+// (Momo rows/history/ct-map, MTT, Zalo orders/fee/sp-map...) bang localStorage
+// CUA TRINH DUYET -- Luyen bao "sao cung 1 web mo 2 tai khoan/may khac nhau 1
+// cai co du lieu 1 cai khong": vi localStorage la rieng cho tung may/trinh
+// duyet, khong dong bo qua server. Them 1 file rieng (giong pattern
+// transactions.json/viet_qr_raw.json o tren) de luu ban sao cac key do TREN
+// SERVER, theo tung cong ty (kh_cu/kh_moi) -- xem routes/dau-ra.js
+// /api/dau-ra/kv-all|kv|kv-delete va phan hydrate-tu-server trong dau-ra.ejs.
+const DAU_RA_KV_FILE = path.join(DATA_DIR, "dau_ra_kv.json");
 
 if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
 
@@ -49,6 +58,7 @@ let cachedStore = null;
 // Ket qua: baseline RAM khi khoi dong chi ~200MB thay vi ~600MB nhu truoc.
 let cachedTransactions = null;
 let cachedVietQrRaw = null;
+let cachedDauRaKv = null;
 
 // Doc 1 file JSON lon tu dia, tra ve defaultValue neu file chua ton tai hoac loi.
 function loadLargeSection(filePath, defaultValue) {
@@ -89,6 +99,17 @@ function addSplitGetters(storeObj) {
       return cachedVietQrRaw;
     },
     set(val) { cachedVietQrRaw = val; },
+    configurable: true,
+    enumerable: true,
+  });
+  Object.defineProperty(storeObj, "dau_ra_kv", {
+    get() {
+      if (cachedDauRaKv === null) {
+        cachedDauRaKv = loadLargeSection(DAU_RA_KV_FILE, { kh_cu: {}, kh_moi: {} });
+      }
+      return cachedDauRaKv;
+    },
+    set(val) { cachedDauRaKv = val; },
     configurable: true,
     enumerable: true,
   });
@@ -266,6 +287,7 @@ function load() {
     const fresh = emptyStore();
     delete fresh.transactions;
     delete fresh.viet_qr_raw_uploads;
+    delete fresh.dau_ra_kv;
     cachedStore = addSplitGetters(fresh);
     return cachedStore;
   }
@@ -290,8 +312,16 @@ function load() {
     ) {
       if (cachedVietQrRaw === null) cachedVietQrRaw = merged.viet_qr_raw_uploads;
     }
+    if (
+      merged.dau_ra_kv &&
+      typeof merged.dau_ra_kv === "object" &&
+      Object.keys(merged.dau_ra_kv).length > 0
+    ) {
+      if (cachedDauRaKv === null) cachedDauRaKv = merged.dau_ra_kv;
+    }
     delete merged.transactions;
     delete merged.viet_qr_raw_uploads;
+    delete merged.dau_ra_kv;
     cachedStore = addSplitGetters(merged);
     return cachedStore;
   } catch (e) {
@@ -315,8 +345,16 @@ function load() {
       ) {
         if (cachedVietQrRaw === null) cachedVietQrRaw = healed.viet_qr_raw_uploads;
       }
+      if (
+        healed.dau_ra_kv &&
+        typeof healed.dau_ra_kv === "object" &&
+        Object.keys(healed.dau_ra_kv).length > 0
+      ) {
+        if (cachedDauRaKv === null) cachedDauRaKv = healed.dau_ra_kv;
+      }
       delete healed.transactions;
       delete healed.viet_qr_raw_uploads;
+      delete healed.dau_ra_kv;
       cachedStore = addSplitGetters(healed);
       save(cachedStore); // luu ngay phien ban da sua de on dinh
       return cachedStore;
@@ -332,6 +370,7 @@ function load() {
       const emptyS = emptyStore();
       delete emptyS.transactions;
       delete emptyS.viet_qr_raw_uploads;
+      delete emptyS.dau_ra_kv;
       return addSplitGetters(emptyS);
     }
   }
@@ -367,7 +406,7 @@ function save(store) {
   // Xay dung config object (tat ca key tru transactions va viet_qr_raw_uploads).
   const configObj = {};
   for (const key of Object.keys(store)) {
-    if (key === "transactions" || key === "viet_qr_raw_uploads") continue;
+    if (key === "transactions" || key === "viet_qr_raw_uploads" || key === "dau_ra_kv") continue;
     configObj[key] = store[key];
   }
   const mainData = JSON.stringify(configObj);
@@ -378,6 +417,9 @@ function save(store) {
     cachedVietQrRaw !== null
       ? cachedVietQrRaw
       : { bidv7704: [], bidv77020: [], mb11521268: [] }
+  );
+  const dauRaKvData = JSON.stringify(
+    cachedDauRaKv !== null ? cachedDauRaKv : { kh_cu: {}, kh_moi: {} }
   );
 
   function writeDurableWithRetry(filePath, data) {
@@ -426,6 +468,7 @@ function save(store) {
   writeDurableWithRetry(DATA_FILE, mainData);
   writeDurableWithRetry(TRANSACTIONS_FILE, txData);
   writeDurableWithRetry(VIET_QR_RAW_FILE, vqrData);
+  writeDurableWithRetry(DAU_RA_KV_FILE, dauRaKvData);
 
   cachedStore = store; // cap nhat cache sau khi ghi thanh cong
 }
@@ -1788,6 +1831,7 @@ function resetCache() {
   cachedStore = null;
   cachedTransactions = null;
   cachedVietQrRaw = null;
+  cachedDauRaKv = null;
 }
 
-module.exports = { load, save, nextId, DATA_FILE, TRANSACTIONS_FILE, VIET_QR_RAW_FILE, resetCache };
+module.exports = { load, save, nextId, DATA_FILE, TRANSACTIONS_FILE, VIET_QR_RAW_FILE, DAU_RA_KV_FILE, resetCache };

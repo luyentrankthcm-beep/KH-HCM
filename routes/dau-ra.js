@@ -1,13 +1,66 @@
 const express = require("express");
 const router = express.Router();
 const { requireLogin } = require("../middleware/auth");
-const { load } = require("../store");
+const { load, save } = require("../store");
 const { getCompany } = require("../utils/companies");
 
 router.use(requireLogin);
 
 router.get("/dau-ra", (req, res) => {
   res.render("dau-ra", { userName: req.session.userName || req.session.user || "" });
+});
+
+// ── KV store cho trang "Đầu Ra" ──────────────────────────────────────────
+// Chi Nhan, 2026-09-10: trang nay truoc gio luu Momo/MTT/Zalo rows... bang
+// localStorage CUA TRINH DUYET -- Luyen bao mo web o 2 may/tai khoan khac
+// nhau thay 1 cai co du lieu 1 cai khong, vi localStorage khong dong bo qua
+// server. 3 route duoi day luu/doc cung 1 du lieu do TREN SERVER (theo tung
+// cong ty kh_cu/kh_moi, xem store.dau_ra_kv trong store.js) de mo may nao
+// / trinh duyet nao cung thay GIONG NHAU. Client (dau-ra.ejs) van giu
+// localStorage nhu cu de doc/hien nhanh (khong doi logic parse/render), chi
+// them buoc: (1) luc tai trang, keo du lieu server ve ghi de vao localStorage
+// TRUOC khi cac ham cu doc localStorage nhu binh thuong; (2) moi lan cac ham
+// cu ghi vao localStorage thi ALSO gui 1 ban len server qua route POST /kv.
+router.get("/api/dau-ra/kv-all", (req, res) => {
+  try {
+    const store = load();
+    const company = getCompany(req);
+    if (!store.dau_ra_kv) store.dau_ra_kv = { kh_cu: {}, kh_moi: {} };
+    if (!store.dau_ra_kv[company]) store.dau_ra_kv[company] = {};
+    res.json({ ok: true, data: store.dau_ra_kv[company] });
+  } catch (err) {
+    res.json({ ok: false, error: err.message });
+  }
+});
+
+router.post("/api/dau-ra/kv", express.json({ limit: "30mb" }), (req, res) => {
+  try {
+    const { key, value } = req.body || {};
+    if (!key) return res.json({ ok: false, error: "Thiếu key" });
+    const store = load();
+    const company = getCompany(req);
+    if (!store.dau_ra_kv) store.dau_ra_kv = { kh_cu: {}, kh_moi: {} };
+    if (!store.dau_ra_kv[company]) store.dau_ra_kv[company] = {};
+    store.dau_ra_kv[company][key] = value;
+    save(store);
+    res.json({ ok: true });
+  } catch (err) {
+    res.json({ ok: false, error: err.message });
+  }
+});
+
+router.post("/api/dau-ra/kv-delete", express.json({ limit: "1mb" }), (req, res) => {
+  try {
+    const { key } = req.body || {};
+    if (!key) return res.json({ ok: false, error: "Thiếu key" });
+    const store = load();
+    const company = getCompany(req);
+    if (store.dau_ra_kv && store.dau_ra_kv[company]) delete store.dau_ra_kv[company][key];
+    save(store);
+    res.json({ ok: true });
+  } catch (err) {
+    res.json({ ok: false, error: err.message });
+  }
 });
 
 // API: tổng thu ngân hàng theo ngày cho 1 tài khoản

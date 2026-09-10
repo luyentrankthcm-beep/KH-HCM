@@ -514,6 +514,59 @@
   <script>
     // ── Company key (for localStorage namespacing) ──
     const COMPANY = '<%= activeCompany %>';
+
+    // ── Đồng bộ dữ liệu với SERVER (để mở web ở máy/trình duyệt/tài khoản
+    // nào cũng thấy giống nhau, không còn lệ thuộc localStorage của riêng
+    // từng trình duyệt nữa) ──
+    // Toàn bộ code phía dưới đọc localStorage NGAY khi script chạy (không đợi
+    // sự kiện gì cả) nên phải kéo dữ liệu server về ghi đè vào localStorage
+    // TRƯỚC khi các đoạn code đó chạy -- dùng XHR đồng bộ (chặn 1 nhịp lúc
+    // tải trang) thay vì fetch bất đồng bộ để đảm bảo đúng thứ tự này, không
+    // phải sửa lại toàn bộ logic đọc/parse/render đã có bên dưới.
+    // Giữ tham chiếu GỐC tới localStorage.setItem/removeItem (bind sẵn) --
+    // dùng biến _rawLsSet/_rawLsRemove bên trong lsSet/lsRemove (thay vì gọi
+    // thẳng localStorage.setItem/removeItem) để tránh gọi đệ quy vô hạn.
+    const _rawLsSet    = localStorage.setItem.bind(localStorage);
+    const _rawLsRemove = localStorage.removeItem.bind(localStorage);
+
+    (function hydrateFromServer() {
+      try {
+        const xhr = new XMLHttpRequest();
+        xhr.open('GET', '/api/dau-ra/kv-all', false); // false = đồng bộ (chặn)
+        xhr.send(null);
+        if (xhr.status === 200) {
+          const res = JSON.parse(xhr.responseText);
+          if (res && res.ok && res.data) {
+            Object.keys(res.data).forEach(k => {
+              try { _rawLsSet(k, res.data[k]); } catch(e) {}
+            });
+          }
+        }
+      } catch(e) { console.error('Không đồng bộ được dữ liệu từ server:', e); }
+    })();
+    // Đẩy dữ liệu lên server (song song với localStorage) mỗi khi có thay đổi.
+    function kvPush(key, value) {
+      try {
+        fetch('/api/dau-ra/kv', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ key, value }),
+        }).catch(()=>{});
+      } catch(e) {}
+    }
+    function kvRemove(key) {
+      try {
+        fetch('/api/dau-ra/kv-delete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ key }),
+        }).catch(()=>{});
+      } catch(e) {}
+    }
+    // Thay cho localStorage.setItem/removeItem trực tiếp: vẫn ghi local như
+    // cũ (đọc lại tức thì) + đồng thời đẩy lên server ở nền.
+    function lsSet(key, val) { try { _rawLsSet(key, val); } catch(e) {} kvPush(key, val); }
+    function lsRemove(key) { try { _rawLsRemove(key); } catch(e) {} kvRemove(key); }
     const LS_ROWS    = `momo_rows_${COMPANY}`;
     const LS_HISTORY = `momo_history_${COMPANY}`;
     const LS_CT_MAP   = `momo_ct_map_${COMPANY}`;
@@ -572,10 +625,10 @@
     let _serverGross = {}; // { "YYYY-MM-DD|CT_CODE": grossAmount } từ Tổng Momo thực
 
     // ── localStorage helpers ──
-    function saveRows()    { try { localStorage.setItem(LS_ROWS, JSON.stringify(_rows)); } catch(e){} }
-    function saveHistory() { try { localStorage.setItem(LS_HISTORY, JSON.stringify(_history)); } catch(e){} }
-    function saveCtMap()   { try { localStorage.setItem(LS_CT_MAP, JSON.stringify(_ctMap)); localStorage.setItem(LS_CT_CODES, JSON.stringify(_ctCodes)); } catch(e){} }
-    function saveHdData()  { try { localStorage.setItem(LS_HD_DATA, JSON.stringify(_hdData)); } catch(e){} }
+    function saveRows()    { try { lsSet(LS_ROWS, JSON.stringify(_rows)); } catch(e){} }
+    function saveHistory() { try { lsSet(LS_HISTORY, JSON.stringify(_history)); } catch(e){} }
+    function saveCtMap()   { try { lsSet(LS_CT_MAP, JSON.stringify(_ctMap)); lsSet(LS_CT_CODES, JSON.stringify(_ctCodes)); } catch(e){} }
+    function saveHdData()  { try { lsSet(LS_HD_DATA, JSON.stringify(_hdData)); } catch(e){} }
     function loadStored() {
       try {
         const r  = localStorage.getItem(LS_ROWS);
@@ -1484,15 +1537,15 @@
           // Sắp xếp lại theo soHD
           _mttCu.sort((a,b) => String(a.soHD).localeCompare(String(b.soHD), undefined, { numeric: true }));
           _mttMoi.sort((a,b) => String(a.soHD).localeCompare(String(b.soHD), undefined, { numeric: true }));
-          try { localStorage.setItem(LS_MTT_CU,  JSON.stringify(_mttCu));  } catch(e) {}
-          try { localStorage.setItem(LS_MTT_MOI, JSON.stringify(_mttMoi)); } catch(e) {}
+          try { lsSet(LS_MTT_CU,  JSON.stringify(_mttCu));  } catch(e) {}
+          try { lsSet(LS_MTT_MOI, JSON.stringify(_mttMoi)); } catch(e) {}
           // Ghi lịch sử
           const hist = { fileName: file.name, uploadedAt: new Date().toLocaleString('vi'),
             cuAdded: addCu.length, moiAdded: addMoi.length,
             cuSkip: newCu.length - addCu.length, moiSkip: newMoi.length - addMoi.length };
           _mttHist.unshift(hist);
           if (_mttHist.length > 30) _mttHist.length = 30;
-          try { localStorage.setItem(LS_MTT_HIST, JSON.stringify(_mttHist)); } catch(e) {}
+          try { lsSet(LS_MTT_HIST, JSON.stringify(_mttHist)); } catch(e) {}
           const skipMsg = (hist.cuSkip + hist.moiSkip) > 0 ? ` (bỏ qua ${hist.cuSkip + hist.moiSkip} trùng)` : '';
           st.className = 'upload-status ok';
           st.textContent = `✅ Thêm ${addCu.length} KH Cũ · ${addMoi.length} KH Mới${skipMsg} · Tổng: ${_mttCu.length}+${_mttMoi.length}`;
@@ -1636,7 +1689,7 @@
       const md = input.dataset.md;
       const kh = input.dataset.kh || _mttActive;
       if (md && kh) { if (!_mttCtMap[kh]) _mttCtMap[kh] = {}; _mttCtMap[kh][md] = input.value.trim(); }
-      try { localStorage.setItem(LS_MTT_CT_MAP, JSON.stringify(_mttCtMap)); } catch(e) {}
+      try { lsSet(LS_MTT_CT_MAP, JSON.stringify(_mttCtMap)); } catch(e) {}
       renderMttTable();
     }
 
@@ -1645,7 +1698,7 @@
         const md = inp.dataset.md; const kh = inp.dataset.kh || _mttActive;
         if (md && kh) { if (!_mttCtMap[kh]) _mttCtMap[kh] = {}; _mttCtMap[kh][md] = inp.value.trim(); }
       });
-      try { localStorage.setItem(LS_MTT_CT_MAP, JSON.stringify(_mttCtMap)); } catch(e) {}
+      try { lsSet(LS_MTT_CT_MAP, JSON.stringify(_mttCtMap)); } catch(e) {}
       renderMttTable();
       if (closeModal) closeMttCtMapModal();
     }
@@ -1678,7 +1731,7 @@
             const ct = String(row[2]||'').trim();
             if (md && ct) { _mttCtMap[khKey][md] = ct; updated++; }
           });
-          try { localStorage.setItem(LS_MTT_CT_MAP, JSON.stringify(_mttCtMap)); } catch(er) {}
+          try { lsSet(LS_MTT_CT_MAP, JSON.stringify(_mttCtMap)); } catch(er) {}
           alert(`✅ Đã nhập ${updated} mapping`);
           openMttCtMapModal();
           renderMttTable();
@@ -1691,8 +1744,8 @@
     function clearMttData() {
       if (!confirm('Xóa toàn bộ dữ liệu MTT?')) return;
       _mttCu = []; _mttMoi = [];
-      try { localStorage.removeItem(LS_MTT_CU);  } catch(e) {}
-      try { localStorage.removeItem(LS_MTT_MOI); } catch(e) {}
+      try { lsRemove(LS_MTT_CU);  } catch(e) {}
+      try { lsRemove(LS_MTT_MOI); } catch(e) {}
       document.getElementById('mttEmpty').style.display = 'block';
       document.getElementById('mttResults').style.display = 'none';
       document.getElementById('mttSummary').style.display = 'none';
@@ -1714,7 +1767,7 @@
     function clearMttHistory() {
       if (!confirm('Xóa lịch sử tải MTT?')) return;
       _mttHist = [];
-      try { localStorage.removeItem(LS_MTT_HIST); } catch(e) {}
+      try { lsRemove(LS_MTT_HIST); } catch(e) {}
       renderMttHistory();
     }
 
@@ -1786,8 +1839,10 @@
     let _zaloHist   = [];
     let _zaloHD     = {}; // maCT → { soHD, tienHD }
 
-    try { const s=localStorage.getItem(LS_ZALO_ORDERS); if(s) _zaloOrders=JSON.parse(s); } catch(e){}
-    try { const s=localStorage.getItem(LS_ZALO_FEE);    if(s) _zaloFee=JSON.parse(s);    } catch(e){}
+    // Dọn key cũ (array format) để giải phóng quota
+    try { lsRemove('zalo_orders_kh_cu'); lsRemove('zalo_orders_kh_moi'); } catch(e){}
+    try { const s=localStorage.getItem(LS_ZALO_ORDERS); if(s) _zaloOrders=JSON.parse(s); } catch(e){ _zaloOrders={}; }
+    try { const s=localStorage.getItem(LS_ZALO_FEE);    if(s) _zaloFee=JSON.parse(s);    } catch(e){ _zaloFee=[]; }
     try { const s=localStorage.getItem(LS_ZALO_HD);     if(s) _zaloHD=JSON.parse(s);     } catch(e){}
     try { const s=localStorage.getItem(LS_ZALO_SP_MAP); if(s) _zaloSpMap=JSON.parse(s);  } catch(e){}
     try { const s=localStorage.getItem(LS_ZALO_HIST);   if(s) _zaloHist=JSON.parse(s);   } catch(e){}
@@ -1834,13 +1889,23 @@
             if(tenSP && !_zaloSpMap[tenSP]) _zaloSpMap[tenSP]='';
             addedCount++;
           });
-          try { localStorage.setItem(LS_ZALO_ORDERS, JSON.stringify(_zaloOrders)); } catch(e) {
-            console.warn('Quota exceeded khi lưu OrderMap');
+          // Lưu OrderMap vào localStorage, thử giảm size nếu bị quota
+          const orderJson = JSON.stringify(_zaloOrders);
+          let savedOK = false;
+          try { lsSet(LS_ZALO_ORDERS, orderJson); savedOK = true; } catch(e1) {
+            // Thử xóa các key cũ không cần thiết rồi save lại
+            try {
+              lsRemove('zalo_orders_kh_cu'); // key cũ array format
+              lsRemove('zalo_orders_kh_moi');
+              lsSet(LS_ZALO_ORDERS, orderJson); savedOK = true;
+            } catch(e2) {
+              alert('⚠️ Không lưu được dữ liệu vào bộ nhớ trình duyệt (localStorage đầy).\nSau khi F5 sẽ cần tải lại file.\nHãy thử xóa cache trình duyệt hoặc dùng tab ẩn danh.');
+            }
           }
-          localStorage.setItem(LS_ZALO_SP_MAP, JSON.stringify(_zaloSpMap));
+          lsSet(LS_ZALO_SP_MAP, JSON.stringify(_zaloSpMap));
 
           _zaloHist.unshift({type:'order', file:fname, at:new Date().toLocaleString('vi'), added:addedCount, skip:totalInFile-addedCount, total:Object.keys(_zaloOrders).length});
-          localStorage.setItem(LS_ZALO_HIST, JSON.stringify(_zaloHist));
+          lsSet(LS_ZALO_HIST, JSON.stringify(_zaloHist));
 
           renderZaloSummary(); renderZaloDoiSoat(); renderZaloCtMap(); renderZaloHist();
           alert(`✅ OrderDetails: +${addedCount} đơn mới · Bỏ qua ${totalInFile-addedCount} trùng\nTổng tích lũy: ${Object.keys(_zaloOrders).length} đơn`);
@@ -1905,20 +1970,20 @@
           const exFeeKeys = new Set(_zaloFee.map(r=>r.maDonZalo));
           const addedFee = newRows.filter(r=>r.maDonZalo && !exFeeKeys.has(r.maDonZalo));
           _zaloFee = [..._zaloFee, ...addedFee];
-          try { localStorage.setItem(LS_ZALO_FEE, JSON.stringify(_zaloFee)); } catch(e) {
+          try { lsSet(LS_ZALO_FEE, JSON.stringify(_zaloFee)); } catch(e) {
             // Nếu đầy localStorage, lưu 3000 GD gần nhất
             _zaloFee = _zaloFee.slice(-3000);
-            try { localStorage.setItem(LS_ZALO_FEE, JSON.stringify(_zaloFee)); } catch(e2){}
+            try { lsSet(LS_ZALO_FEE, JSON.stringify(_zaloFee)); } catch(e2){}
           }
 
           // Auto-add Điểm thu vào SpMap để user có thể map mã CT
           newRows.forEach(r => {
             if(r.dienThu && !(_zaloSpMap[r.dienThu])) _zaloSpMap[r.dienThu]='';
           });
-          localStorage.setItem(LS_ZALO_SP_MAP, JSON.stringify(_zaloSpMap));
+          lsSet(LS_ZALO_SP_MAP, JSON.stringify(_zaloSpMap));
 
           _zaloHist.unshift({type:'fee', file:fname, at:new Date().toLocaleString('vi'), added:newRows.length, skip:0});
-          localStorage.setItem(LS_ZALO_HIST, JSON.stringify(_zaloHist));
+          lsSet(LS_ZALO_HIST, JSON.stringify(_zaloHist));
 
           renderZaloSummary(); renderZaloDoiSoat(); renderZaloHist();
           fetchBankZalo();
@@ -1933,7 +1998,13 @@
     function renderZaloSummary() {
       const el = document.getElementById('zalo_summary');
       if(!el) return;
-      el.textContent = Object.keys(_zaloOrders).length ? `${Object.keys(_zaloOrders).length} đơn` : '';
+      const n = Object.keys(_zaloOrders).length;
+      if(!n) { el.textContent = ''; return; }
+      // Kiểm tra localStorage có thực sự lưu được không
+      const stored = localStorage.getItem(LS_ZALO_ORDERS);
+      const storedN = stored ? Object.keys(JSON.parse(stored)||{}).length : 0;
+      const saved = storedN === n;
+      el.innerHTML = `${n} đơn <span style="font-size:.75em;color:${saved?'#86efac':'#fca5a5'}" title="${saved?'Đã lưu vào bộ nhớ trình duyệt':'⚠️ Chưa lưu được — F5 sẽ mất dữ liệu!'}">${saved?'💾':'⚠️ chưa lưu'}</span>`;
     }
 
     function getZaloMaCT(tenSP) {
@@ -2189,7 +2260,7 @@
         });
         if(bestCT) { _zaloSpMap[sp]=bestCT; filled++; }
       });
-      localStorage.setItem(LS_ZALO_SP_MAP, JSON.stringify(_zaloSpMap));
+      lsSet(LS_ZALO_SP_MAP, JSON.stringify(_zaloSpMap));
       renderZaloCtMap(); renderZaloDoiSoat();
       alert(`⚡ Auto map: điền được ${filled} SP · Còn ${Object.values(_zaloSpMap).filter(v=>!v).length} chưa map`);
     }
@@ -2244,7 +2315,7 @@
     function clearZaloOrders() {
       // Xóa cache OrderDetails cũ rồi mở file picker
       _zaloOrders = {};
-      try { localStorage.removeItem(LS_ZALO_ORDERS); } catch(e){}
+      try { lsRemove(LS_ZALO_ORDERS); } catch(e){}
       renderZaloSummary(); renderZaloDoiSoat();
       document.getElementById('zaloOrderInput').click();
     }
@@ -2311,7 +2382,7 @@
     function saveZaloHD(maCT, field, val) {
       if(!_zaloHD[maCT]) _zaloHD[maCT] = {};
       _zaloHD[maCT][field] = val.trim();
-      try { localStorage.setItem(LS_ZALO_HD, JSON.stringify(_zaloHD)); } catch(e){}
+      try { lsSet(LS_ZALO_HD, JSON.stringify(_zaloHD)); } catch(e){}
     }
 
     // Click-to-edit số HĐ / tiền HĐ (show inline input, save on blur/Enter)
@@ -2333,7 +2404,7 @@
     function saveZaloUnkCT(date, maCT) {
       if(!maCT.trim()) return;
       _zaloUnk[date] = maCT.trim().toUpperCase();
-      try { localStorage.setItem(LS_ZALO_UNK, JSON.stringify(_zaloUnk)); } catch(e){}
+      try { lsSet(LS_ZALO_UNK, JSON.stringify(_zaloUnk)); } catch(e){}
       renderZaloDoiSoat();
     }
 
@@ -2341,7 +2412,7 @@
       const sp = inp.dataset.sp;
       const maCT = inp.value.trim();
       _zaloSpMap[sp] = maCT;
-      localStorage.setItem(LS_ZALO_SP_MAP, JSON.stringify(_zaloSpMap));
+      lsSet(LS_ZALO_SP_MAP, JSON.stringify(_zaloSpMap));
       renderZaloCtMap();
       renderZaloDoiSoat();
     }
