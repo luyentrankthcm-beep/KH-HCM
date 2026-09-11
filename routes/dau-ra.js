@@ -375,4 +375,58 @@ router.get("/api/dau-ra/bank-payoo", (req, res) => {
   } catch(err) { res.json({ ok: false, error: err.message }); }
 });
 
+// GET /api/dau-ra/bank-vietqr?bank=bidv7704&from=2026-08-01&to=2026-08-31
+// Luyen, 2026-09-11: "tiếp theo là viet qr kh cũ á... đối soát theo số mã
+// tham chiếu đó với ngân hàng á trong sao có á bạn check nha lấy ngân hàng
+// làm chuẩn á" -- trả về các giao dịch "thu" của 1 trong 3 TK VietQR
+// (BIDV7704 / BIDV77020 / MB11521268) mà diễn giải có chứa mã VietQR nhúng
+// sẵn (dạng "VQR" + 13 ký tự chữ/số, luôn theo sau bởi "PaymentForOrder") --
+// đây là mã DUY NHẤT dùng chung giữa file giao dịch VietQR (cột "Nội dung
+// TT") và sao kê ngân hàng (cột "Diễn giải") -- cột "Mã tham chiếu" của file
+// giao dịch KHÔNG xuất hiện trong sao kê nên không dùng được để join trực
+// tiếp. Ngân hàng được coi là chuẩn: client sẽ ưu tiên lấy amount ở đây thay
+// vì amount tự khai trong file giao dịch khi có match theo mã VQR.
+const VIETQR_BANK_SUFFIX = {
+  bidv7704: "7704",
+  bidv77020: "77020",
+  mb11521268: "11521268",
+};
+router.get("/api/dau-ra/bank-vietqr", (req, res) => {
+  try {
+    const { bank, from, to } = req.query;
+    const suffix = VIETQR_BANK_SUFFIX[bank];
+    if (!suffix) return res.json({ ok: false, error: "Tham số bank không hợp lệ (bidv7704 / bidv77020 / mb11521268)" });
+    const store = load();
+    const company = getCompany(req);
+    const bankRow = store.banks.find(b =>
+      (b.company || "kh_cu") === company &&
+      String(b.account_number || b.accountNumber || "").endsWith(suffix)
+    );
+    if (!bankRow) return res.json({ ok: false, error: "Không tìm thấy tài khoản ngân hàng cho " + bank });
+
+    const vqrRe = /VQR[A-Za-z0-9]{13}/;
+    const transactions = [];
+    for (const t of store.transactions) {
+      if (t.bank_id !== bankRow.id) continue;
+      if (t.type !== "thu") continue;
+      if (from && t.date < from) continue;
+      if (to && t.date > to) continue;
+      const desc = t.description || "";
+      const m = vqrRe.exec(desc);
+      if (!m) continue;
+      let dispDate = t.date;
+      if (/^\d{4}-\d{2}-\d{2}$/.test(t.date)) {
+        const p = t.date.split("-");
+        dispDate = p[2] + "-" + p[1] + "-" + p[0];
+      }
+      transactions.push({ date: dispDate, amount: Number(t.amount || 0), vqrCode: m[0], desc: desc.substring(0, 150) });
+    }
+    transactions.sort((a, b) => {
+      const iso = d => { if (!d) return ""; const p = d.split("-"); return p[2]+"-"+p[1]+"-"+p[0]; };
+      return iso(a.date).localeCompare(iso(b.date));
+    });
+    res.json({ ok: true, transactions });
+  } catch (err) { res.json({ ok: false, error: err.message }); }
+});
+
 module.exports = router;

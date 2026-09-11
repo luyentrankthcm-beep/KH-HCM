@@ -455,10 +455,199 @@
     <!-- ==================== VIET QR TAB ==================== -->
     <div id="vietqr" class="tab-panel">
       <div class="channel-header">
-        <div class="acct-info">Viet QR</div>
-        <button class="btn-nhap" style="background:#16a34a" disabled>📤 Nhập liệu đối soát</button>
+        <div class="acct-info">
+          <strong>Viet QR</strong>
+          &nbsp;<span style="font-size:.78em;color:#64748b">· Đối soát theo Mã tham chiếu (VQR) — ngân hàng làm chuẩn</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:.5rem">
+          <button class="btn-nhap" style="background:#0d9488" onclick="document.getElementById('vietqrDiemNameInput').click()">📥 Tên điểm bán</button>
+          <input type="file" id="vietqrDiemNameInput" accept=".xls,.xlsx" style="display:none" onchange="handleVietQrDiemNameFile(this)">
+        </div>
       </div>
-      <div class="empty-state"><div class="big-icon">🟢</div><p>Chưa thiết lập – <%= activeCompany === 'kh_cu' ? 'KH Cũ' : 'KH Mới' %></p></div>
+
+      <!-- Sub-tabs: BIDV7704 / BIDV77020 / MB11521268 -->
+      <div class="sub-tab-bar" style="margin-top:.5rem;margin-bottom:.75rem">
+        <button class="sub-tab-btn active" id="vietqr_btn_bidv7704" onclick="switchVietQrBank('bidv7704')">🟢 BIDV7704</button>
+        <button class="sub-tab-btn" id="vietqr_btn_bidv77020" onclick="switchVietQrBank('bidv77020')">🟢 BIDV77020</button>
+        <button class="sub-tab-btn" id="vietqr_btn_mb11521268" onclick="switchVietQrBank('mb11521268')">🟢 MB11521268</button>
+      </div>
+
+      <!-- BIDV7704 -->
+      <div id="vietqr_bidv7704" class="sub-panel active">
+        <div class="channel-header">
+          <div class="acct-info">
+            <strong>BIDV7704</strong>
+            &nbsp;<span id="vietqr_summary_bidv7704" style="font-size:.82em;color:#64748b"></span>
+          </div>
+          <div style="display:flex;align-items:center;gap:.5rem">
+            <button class="btn-nhap" style="background:#16a34a" onclick="document.getElementById('vietqrTxnInput_bidv7704').click()">📥 Giao dịch Viet QR</button>
+            <input type="file" id="vietqrTxnInput_bidv7704" accept=".xls,.xlsx" style="display:none" onchange="handleVietQrTxnFile(this,'bidv7704')">
+          </div>
+        </div>
+        <div class="sub-tab-bar" style="margin-top:.5rem">
+          <button class="sub-tab-btn active" id="vietqr_bidv7704_btn_ds" onclick="switchVietQrSub('bidv7704','ds')">📅 Đối soát ngày</button>
+          <button class="sub-tab-btn" id="vietqr_bidv7704_btn_diemmap" onclick="switchVietQrSub('bidv7704','diemmap')">🏪 Map Điểm bán → Tên</button>
+          <button class="sub-tab-btn" id="vietqr_bidv7704_btn_ctmap" onclick="switchVietQrSub('bidv7704','ctmap')">🗺️ Map Tên → Mã CT</button>
+          <button class="sub-tab-btn" id="vietqr_bidv7704_btn_hist" onclick="switchVietQrSub('bidv7704','hist')">⏱️ Lịch sử tải</button>
+        </div>
+        <div id="vietqr_bidv7704_sub_ds" class="sub-panel active" style="margin-top:.75rem">
+          <div style="margin-bottom:.5rem;display:flex;gap:.6rem;align-items:center;flex-wrap:wrap">
+            <label style="font-size:.83em;color:#64748b">Lọc tháng:</label>
+            <select id="vietqrFilterMonth_bidv7704" onchange="renderVietQrDoiSoat('bidv7704')" style="font-size:.83em;padding:.2rem .5rem;border:1px solid #cbd5e1;border-radius:5px">
+              <option value="">-- Tất cả --</option>
+            </select>
+            <button onclick="fetchBankVietQrRefresh('bidv7704')" style="font-size:.78em;padding:.2rem .65rem;background:#16a34a;color:#fff;border:none;border-radius:5px;cursor:pointer">🔄 Làm mới NH</button>
+            <button onclick="toggleBankVietQrDetail('bidv7704')" style="font-size:.78em;padding:.2rem .65rem;background:#374151;color:#e5e7eb;border:none;border-radius:5px;cursor:pointer">🏦 Xem raw NH</button>
+            <button onclick="autoMapMttVietQr('bidv7704')" style="font-size:.78em;padding:.2rem .65rem;background:#0d9488;color:#fff;border:none;border-radius:5px;cursor:pointer;font-weight:600">🧾 Map MTT → Viet QR</button>
+            <span id="bankVietQrStatus_bidv7704" style="font-size:.78em;color:#64748b"></span>
+          </div>
+          <div style="font-size:.76em;color:#94a3b8;margin-bottom:.5rem">Đối soát theo <b>Mã tham chiếu (VQR)</b> từng giao dịch với sao kê ngân hàng BIDV7704 — số tiền lấy theo ngân hàng làm chuẩn.</div>
+          <div id="bankVietQrDetailPanel_bidv7704" style="display:none;background:#0f172a;border:1px solid #14532d;border-radius:6px;padding:.6rem .8rem;margin-bottom:.6rem;font-size:.8em;overflow-x:auto">
+            <div style="color:#94a3b8;margin-bottom:.4rem;font-weight:700">Raw transactions ngân hàng có mã VQR:</div>
+            <table style="border-collapse:collapse;width:100%;min-width:500px" id="bankVietQrRawTable_bidv7704">
+              <thead><tr style="color:#bbf7d0">
+                <th style="padding:.25rem .5rem;text-align:left">#</th>
+                <th style="padding:.25rem .5rem;text-align:left">Ngày</th>
+                <th style="padding:.25rem .5rem;text-align:right">Số tiền</th>
+                <th style="padding:.25rem .5rem;text-align:left">Mã VQR / Diễn giải</th>
+              </tr></thead>
+              <tbody id="bankVietQrRawBody_bidv7704"><tr><td colspan="4" style="color:#64748b;padding:.4rem">Nhấn "Làm mới NH" để tải</td></tr></tbody>
+            </table>
+          </div>
+          <div id="vietqrDoiSoatBody_bidv7704">
+            <div class="empty-state"><div class="big-icon">🟢</div><p>Tải file giao dịch BIDV7704 để bắt đầu đối soát</p></div>
+          </div>
+        </div>
+        <div id="vietqr_bidv7704_sub_diemmap" class="sub-panel" style="margin-top:.75rem">
+          <div style="font-size:.85em;color:#475569;margin-bottom:.75rem">Map từng <strong>Mã điểm bán</strong> sang <strong>Tên điểm bán</strong> (đọc từ file "Tên điểm bán" bạn tải ở trên, có thể sửa tay).</div>
+          <div id="vietqrDiemMapContent_bidv7704"><div class="empty-state"><div class="big-icon">🗺️</div><p>Tải file giao dịch Viet QR để thấy danh sách điểm bán</p></div></div>
+        </div>
+        <div id="vietqr_bidv7704_sub_ctmap" class="sub-panel" style="margin-top:.75rem">
+          <div style="font-size:.85em;color:#475569;margin-bottom:.75rem">Map từng <strong>Tên điểm bán</strong> sang <strong>Mã CT</strong>.</div>
+          <div id="vietqrCtMapContent_bidv7704"><div class="empty-state"><div class="big-icon">🏗️</div><p>Map tên điểm bán trước khi map Mã CT</p></div></div>
+        </div>
+        <div id="vietqr_bidv7704_sub_hist" class="sub-panel" style="margin-top:.75rem">
+          <div id="vietqrHistBody_bidv7704"><div class="empty-state"><div class="big-icon">⏱️</div><p>Chưa có lịch sử tải</p></div></div>
+        </div>
+      </div>
+
+      <!-- BIDV77020 -->
+      <div id="vietqr_bidv77020" class="sub-panel">
+        <div class="channel-header">
+          <div class="acct-info">
+            <strong>BIDV77020</strong>
+            &nbsp;<span id="vietqr_summary_bidv77020" style="font-size:.82em;color:#64748b"></span>
+          </div>
+          <div style="display:flex;align-items:center;gap:.5rem">
+            <button class="btn-nhap" style="background:#16a34a" onclick="document.getElementById('vietqrTxnInput_bidv77020').click()">📥 Giao dịch Viet QR</button>
+            <input type="file" id="vietqrTxnInput_bidv77020" accept=".xls,.xlsx" style="display:none" onchange="handleVietQrTxnFile(this,'bidv77020')">
+          </div>
+        </div>
+        <div class="sub-tab-bar" style="margin-top:.5rem">
+          <button class="sub-tab-btn active" id="vietqr_bidv77020_btn_ds" onclick="switchVietQrSub('bidv77020','ds')">📅 Đối soát ngày</button>
+          <button class="sub-tab-btn" id="vietqr_bidv77020_btn_diemmap" onclick="switchVietQrSub('bidv77020','diemmap')">🏪 Map Điểm bán → Tên</button>
+          <button class="sub-tab-btn" id="vietqr_bidv77020_btn_ctmap" onclick="switchVietQrSub('bidv77020','ctmap')">🗺️ Map Tên → Mã CT</button>
+          <button class="sub-tab-btn" id="vietqr_bidv77020_btn_hist" onclick="switchVietQrSub('bidv77020','hist')">⏱️ Lịch sử tải</button>
+        </div>
+        <div id="vietqr_bidv77020_sub_ds" class="sub-panel active" style="margin-top:.75rem">
+          <div style="margin-bottom:.5rem;display:flex;gap:.6rem;align-items:center;flex-wrap:wrap">
+            <label style="font-size:.83em;color:#64748b">Lọc tháng:</label>
+            <select id="vietqrFilterMonth_bidv77020" onchange="renderVietQrDoiSoat('bidv77020')" style="font-size:.83em;padding:.2rem .5rem;border:1px solid #cbd5e1;border-radius:5px">
+              <option value="">-- Tất cả --</option>
+            </select>
+            <button onclick="fetchBankVietQrRefresh('bidv77020')" style="font-size:.78em;padding:.2rem .65rem;background:#16a34a;color:#fff;border:none;border-radius:5px;cursor:pointer">🔄 Làm mới NH</button>
+            <button onclick="toggleBankVietQrDetail('bidv77020')" style="font-size:.78em;padding:.2rem .65rem;background:#374151;color:#e5e7eb;border:none;border-radius:5px;cursor:pointer">🏦 Xem raw NH</button>
+            <button onclick="autoMapMttVietQr('bidv77020')" style="font-size:.78em;padding:.2rem .65rem;background:#0d9488;color:#fff;border:none;border-radius:5px;cursor:pointer;font-weight:600">🧾 Map MTT → Viet QR</button>
+            <span id="bankVietQrStatus_bidv77020" style="font-size:.78em;color:#64748b"></span>
+          </div>
+          <div style="font-size:.76em;color:#94a3b8;margin-bottom:.5rem">Đối soát theo <b>Mã tham chiếu (VQR)</b> từng giao dịch với sao kê ngân hàng BIDV77020 — số tiền lấy theo ngân hàng làm chuẩn.</div>
+          <div id="bankVietQrDetailPanel_bidv77020" style="display:none;background:#0f172a;border:1px solid #14532d;border-radius:6px;padding:.6rem .8rem;margin-bottom:.6rem;font-size:.8em;overflow-x:auto">
+            <div style="color:#94a3b8;margin-bottom:.4rem;font-weight:700">Raw transactions ngân hàng có mã VQR:</div>
+            <table style="border-collapse:collapse;width:100%;min-width:500px" id="bankVietQrRawTable_bidv77020">
+              <thead><tr style="color:#bbf7d0">
+                <th style="padding:.25rem .5rem;text-align:left">#</th>
+                <th style="padding:.25rem .5rem;text-align:left">Ngày</th>
+                <th style="padding:.25rem .5rem;text-align:right">Số tiền</th>
+                <th style="padding:.25rem .5rem;text-align:left">Mã VQR / Diễn giải</th>
+              </tr></thead>
+              <tbody id="bankVietQrRawBody_bidv77020"><tr><td colspan="4" style="color:#64748b;padding:.4rem">Nhấn "Làm mới NH" để tải</td></tr></tbody>
+            </table>
+          </div>
+          <div id="vietqrDoiSoatBody_bidv77020">
+            <div class="empty-state"><div class="big-icon">🟢</div><p>Tải file giao dịch BIDV77020 để bắt đầu đối soát</p></div>
+          </div>
+        </div>
+        <div id="vietqr_bidv77020_sub_diemmap" class="sub-panel" style="margin-top:.75rem">
+          <div style="font-size:.85em;color:#475569;margin-bottom:.75rem">Map từng <strong>Mã điểm bán</strong> sang <strong>Tên điểm bán</strong> (đọc từ file "Tên điểm bán" bạn tải ở trên, có thể sửa tay).</div>
+          <div id="vietqrDiemMapContent_bidv77020"><div class="empty-state"><div class="big-icon">🗺️</div><p>Tải file giao dịch Viet QR để thấy danh sách điểm bán</p></div></div>
+        </div>
+        <div id="vietqr_bidv77020_sub_ctmap" class="sub-panel" style="margin-top:.75rem">
+          <div style="font-size:.85em;color:#475569;margin-bottom:.75rem">Map từng <strong>Tên điểm bán</strong> sang <strong>Mã CT</strong>.</div>
+          <div id="vietqrCtMapContent_bidv77020"><div class="empty-state"><div class="big-icon">🏗️</div><p>Map tên điểm bán trước khi map Mã CT</p></div></div>
+        </div>
+        <div id="vietqr_bidv77020_sub_hist" class="sub-panel" style="margin-top:.75rem">
+          <div id="vietqrHistBody_bidv77020"><div class="empty-state"><div class="big-icon">⏱️</div><p>Chưa có lịch sử tải</p></div></div>
+        </div>
+      </div>
+
+      <!-- MB11521268 -->
+      <div id="vietqr_mb11521268" class="sub-panel">
+        <div class="channel-header">
+          <div class="acct-info">
+            <strong>MB11521268</strong>
+            &nbsp;<span id="vietqr_summary_mb11521268" style="font-size:.82em;color:#64748b"></span>
+          </div>
+          <div style="display:flex;align-items:center;gap:.5rem">
+            <button class="btn-nhap" style="background:#16a34a" onclick="document.getElementById('vietqrTxnInput_mb11521268').click()">📥 Giao dịch Viet QR</button>
+            <input type="file" id="vietqrTxnInput_mb11521268" accept=".xls,.xlsx" style="display:none" onchange="handleVietQrTxnFile(this,'mb11521268')">
+          </div>
+        </div>
+        <div class="sub-tab-bar" style="margin-top:.5rem">
+          <button class="sub-tab-btn active" id="vietqr_mb11521268_btn_ds" onclick="switchVietQrSub('mb11521268','ds')">📅 Đối soát ngày</button>
+          <button class="sub-tab-btn" id="vietqr_mb11521268_btn_diemmap" onclick="switchVietQrSub('mb11521268','diemmap')">🏪 Map Điểm bán → Tên</button>
+          <button class="sub-tab-btn" id="vietqr_mb11521268_btn_ctmap" onclick="switchVietQrSub('mb11521268','ctmap')">🗺️ Map Tên → Mã CT</button>
+          <button class="sub-tab-btn" id="vietqr_mb11521268_btn_hist" onclick="switchVietQrSub('mb11521268','hist')">⏱️ Lịch sử tải</button>
+        </div>
+        <div id="vietqr_mb11521268_sub_ds" class="sub-panel active" style="margin-top:.75rem">
+          <div style="margin-bottom:.5rem;display:flex;gap:.6rem;align-items:center;flex-wrap:wrap">
+            <label style="font-size:.83em;color:#64748b">Lọc tháng:</label>
+            <select id="vietqrFilterMonth_mb11521268" onchange="renderVietQrDoiSoat('mb11521268')" style="font-size:.83em;padding:.2rem .5rem;border:1px solid #cbd5e1;border-radius:5px">
+              <option value="">-- Tất cả --</option>
+            </select>
+            <button onclick="fetchBankVietQrRefresh('mb11521268')" style="font-size:.78em;padding:.2rem .65rem;background:#16a34a;color:#fff;border:none;border-radius:5px;cursor:pointer">🔄 Làm mới NH</button>
+            <button onclick="toggleBankVietQrDetail('mb11521268')" style="font-size:.78em;padding:.2rem .65rem;background:#374151;color:#e5e7eb;border:none;border-radius:5px;cursor:pointer">🏦 Xem raw NH</button>
+            <button onclick="autoMapMttVietQr('mb11521268')" style="font-size:.78em;padding:.2rem .65rem;background:#0d9488;color:#fff;border:none;border-radius:5px;cursor:pointer;font-weight:600">🧾 Map MTT → Viet QR</button>
+            <span id="bankVietQrStatus_mb11521268" style="font-size:.78em;color:#64748b"></span>
+          </div>
+          <div style="font-size:.76em;color:#94a3b8;margin-bottom:.5rem">Đối soát theo <b>Mã tham chiếu (VQR)</b> từng giao dịch với sao kê ngân hàng MB11521268 — số tiền lấy theo ngân hàng làm chuẩn.</div>
+          <div id="bankVietQrDetailPanel_mb11521268" style="display:none;background:#0f172a;border:1px solid #14532d;border-radius:6px;padding:.6rem .8rem;margin-bottom:.6rem;font-size:.8em;overflow-x:auto">
+            <div style="color:#94a3b8;margin-bottom:.4rem;font-weight:700">Raw transactions ngân hàng có mã VQR:</div>
+            <table style="border-collapse:collapse;width:100%;min-width:500px" id="bankVietQrRawTable_mb11521268">
+              <thead><tr style="color:#bbf7d0">
+                <th style="padding:.25rem .5rem;text-align:left">#</th>
+                <th style="padding:.25rem .5rem;text-align:left">Ngày</th>
+                <th style="padding:.25rem .5rem;text-align:right">Số tiền</th>
+                <th style="padding:.25rem .5rem;text-align:left">Mã VQR / Diễn giải</th>
+              </tr></thead>
+              <tbody id="bankVietQrRawBody_mb11521268"><tr><td colspan="4" style="color:#64748b;padding:.4rem">Nhấn "Làm mới NH" để tải</td></tr></tbody>
+            </table>
+          </div>
+          <div id="vietqrDoiSoatBody_mb11521268">
+            <div class="empty-state"><div class="big-icon">🟢</div><p>Tải file giao dịch MB11521268 để bắt đầu đối soát</p></div>
+          </div>
+        </div>
+        <div id="vietqr_mb11521268_sub_diemmap" class="sub-panel" style="margin-top:.75rem">
+          <div style="font-size:.85em;color:#475569;margin-bottom:.75rem">Map từng <strong>Mã điểm bán</strong> sang <strong>Tên điểm bán</strong> (đọc từ file "Tên điểm bán" bạn tải ở trên, có thể sửa tay).</div>
+          <div id="vietqrDiemMapContent_mb11521268"><div class="empty-state"><div class="big-icon">🗺️</div><p>Tải file giao dịch Viet QR để thấy danh sách điểm bán</p></div></div>
+        </div>
+        <div id="vietqr_mb11521268_sub_ctmap" class="sub-panel" style="margin-top:.75rem">
+          <div style="font-size:.85em;color:#475569;margin-bottom:.75rem">Map từng <strong>Tên điểm bán</strong> sang <strong>Mã CT</strong>.</div>
+          <div id="vietqrCtMapContent_mb11521268"><div class="empty-state"><div class="big-icon">🏗️</div><p>Map tên điểm bán trước khi map Mã CT</p></div></div>
+        </div>
+        <div id="vietqr_mb11521268_sub_hist" class="sub-panel" style="margin-top:.75rem">
+          <div id="vietqrHistBody_mb11521268"><div class="empty-state"><div class="big-icon">⏱️</div><p>Chưa có lịch sử tải</p></div></div>
+        </div>
+      </div>
     </div>
 
     <!-- ==================== MTT TAB ==================== -->
@@ -4267,13 +4456,590 @@
       if(p) p.style.display = '';
     }
 
-    // Init Zalo Pay + VNPay + Payoo
+    // ══════════════════════════════════════════
+    // VIET QR (KH Cũ) — Luyen, 2026-09-11: "tiếp theo là viet qr kh cũ á nó
+    // sẽ gồm 3 tab 1 là BIDV7704 2 là BIDV 77020 va 3 là MB 11521268 nhá...
+    // rồi thêm chỗ map các điểm bán với tên điểm bán rồi mới map tên điểm
+    // bán với lại mã công trình á... đối soát theo số mã tham chiếu đó với
+    // ngân hàng á trong sao có á bạn check nha lấy ngân hàng làm chuẩn á
+    // rồi đối soát mẫu đối soát với cách xắp xếp á bạn làm giống với momo
+    // nha". Khác Zalo/VNPay/Payoo (đối soát theo NGÀY/khoảng ngày), Viet QR
+    // đối soát TỪNG GIAO DỊCH qua mã VietQR nhúng sẵn (VQR+13 ký tự) trong
+    // "Nội dung TT" của file & "Diễn giải" của sao kê NH — ngân hàng làm
+    // chuẩn: nếu khớp, lấy amount của NH thay cho amount tự khai trong file.
+    // Map 2 bước (khác Momo map 1 bước _ctMap thẳng gian→CT): Mã điểm bán
+    // (trong file GD) → Tên điểm bán (từ file riêng Luyen tải) → Mã CT. 2
+    // map này DÙNG CHUNG cho cả 3 ngân hàng (không tách riêng theo tab).
+    // ══════════════════════════════════════════
+    const VIETQR_BANKS = ['bidv7704','bidv77020','mb11521268'];
+    const VIETQR_BANK_LABEL = { bidv7704:'BIDV7704', bidv77020:'BIDV77020', mb11521268:'MB11521268' };
+
+    const LS_VIETQR_DIEM_NAME = `vietqr_diem_name_${COMPANY}`; // { maDiemBan: tenDiemBan } — dùng chung 3 NH
+    const LS_VIETQR_CT_MAP    = `vietqr_ct_map_${COMPANY}`;    // { tenDiemBan: maCT } — dùng chung 3 NH
+    const lsVietqrTxnKey  = b => `vietqr_txn_${b}_${COMPANY}`;
+    const lsVietqrHDKey   = b => `vietqr_hd_${b}_${COMPANY}`;
+    const lsVietqrHistKey = b => `vietqr_hist_${b}_${COMPANY}`;
+
+    let _vietqrDiemName = {};
+    let _vietqrCtMap    = {};
+    let _vietqrTxn  = { bidv7704:[], bidv77020:[], mb11521268:[] };
+    let _vietqrHD   = { bidv7704:{}, bidv77020:{}, mb11521268:{} };
+    let _vietqrHist = { bidv7704:[], bidv77020:[], mb11521268:[] };
+    let _bankVietqr    = { bidv7704:[], bidv77020:[], mb11521268:[] };
+    let _bankVietqrMap = { bidv7704:{}, bidv77020:{}, mb11521268:{} };
+
+    try { const s=localStorage.getItem(LS_VIETQR_DIEM_NAME); if(s) _vietqrDiemName=JSON.parse(s); } catch(e){}
+    try { const s=localStorage.getItem(LS_VIETQR_CT_MAP);    if(s) _vietqrCtMap=JSON.parse(s);    } catch(e){}
+    VIETQR_BANKS.forEach(b => {
+      try { const s=localStorage.getItem(lsVietqrTxnKey(b));  if(s) _vietqrTxn[b]=JSON.parse(s);  } catch(e){}
+      try { const s=localStorage.getItem(lsVietqrHDKey(b));   if(s) _vietqrHD[b]=JSON.parse(s);   } catch(e){}
+      try { const s=localStorage.getItem(lsVietqrHistKey(b)); if(s) _vietqrHist[b]=JSON.parse(s); } catch(e){}
+    });
+
+    function switchVietQrBank(bank) {
+      VIETQR_BANKS.forEach(b => {
+        const p = document.getElementById('vietqr_' + b);
+        const btn = document.getElementById('vietqr_btn_' + b);
+        if(p) p.classList.toggle('active', b===bank);
+        if(btn) btn.classList.toggle('active', b===bank);
+      });
+    }
+    function switchVietQrSub(bank, sub) {
+      ['ds','diemmap','ctmap','hist'].forEach(s => {
+        const p = document.getElementById('vietqr_'+bank+'_sub_'+s);
+        const b = document.getElementById('vietqr_'+bank+'_btn_'+s);
+        if(p) p.classList.toggle('active', s===sub);
+        if(b) b.classList.toggle('active', s===sub);
+      });
+      if (sub==='diemmap') renderVietQrDiemMap();
+      if (sub==='ctmap') renderVietQrCtMap();
+    }
+
+    function handleVietQrTxnFile(inp, bank) {
+      if (!inp.files[0]) return;
+      const fname = inp.files[0].name;
+      const reader = new FileReader();
+      reader.onload = e => {
+        try {
+          const wb = XLSX.read(new Uint8Array(e.target.result), {type:'array'});
+          const ws = wb.Sheets['Transactions'] || wb.Sheets[wb.SheetNames.find(n=>/transaction/i.test(n))||''] || wb.Sheets[wb.SheetNames[0]];
+          const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:'', raw:true});
+          if (!rows.length) { alert('Không đọc được dòng dữ liệu nào từ file.'); return; }
+          const hdr = rows[0];
+          const normHdr = s => String(s||'').toLowerCase().normalize('NFC').trim();
+          const findCol = (...kw) => hdr.findIndex(h => kw.some(k => normHdr(h).includes(k)));
+          // Cấu trúc đã xác nhận (sheet "Transactions", header row 0): A=STT,
+          // B=Thời gian TT, C=Số tiền đến, D=Số tiền đi, E=Loại, F=Trạng
+          // thái, G=Mã tham chiếu, H=Mã đơn hàng, I=Mã điểm bán, J=Mã cửa
+          // hàng, K=Tài khoản nhận, L=Thời gian tạo, M=Nội dung TT (có mã
+          // VQR nhúng), N=Ghi chú, O=Loại giao dịch. Dò theo tên cột trước,
+          // fallback về vị trí cột đã xác nhận nếu không tìm thấy tên.
+          let iTime = findCol('thời gian tt','thoi gian tt'); if(iTime<0) iTime=1;
+          let iAmt  = findCol('số tiền đến','so tien den');   if(iAmt<0)  iAmt=2;
+          let iStatus = findCol('trạng thái','trang thai');   if(iStatus<0) iStatus=5;
+          let iRef  = findCol('mã tham chiếu','ma tham chieu'); if(iRef<0) iRef=6;
+          let iDiem = findCol('mã điểm bán','ma diem ban');    if(iDiem<0) iDiem=8;
+          let iCuaHang = findCol('mã cửa hàng','ma cua hang'); if(iCuaHang<0) iCuaHang=9;
+          let iNoiDung = findCol('nội dung','noi dung');       if(iNoiDung<0) iNoiDung=12;
+
+          const toNum = v => { if(typeof v==='number') return v; return parseFloat(String(v||'').replace(/[^0-9.-]/g,'')) || 0; };
+          const badStatus = /thất bại|that bai|huỷ|huy|error|lỗi|loi|fail/i;
+          const vqrRe = /VQR[A-Za-z0-9]{13}/;
+
+          const rawDataRows = rows.slice(1).filter(r => toNum(r[iAmt]) > 0);
+          if (!rawDataRows.length) { alert('Không đọc được giao dịch nào có "Số tiền đến" > 0 — kiểm tra lại đúng file export giao dịch Viet QR chưa.'); return; }
+          const newRows = [];
+          let excludedByStatus = 0;
+          rawDataRows.forEach(r => {
+            const st = String(r[iStatus]||'').trim();
+            if (st && badStatus.test(st)) { excludedByStatus++; return; }
+            let date;
+            const rawD = r[iTime];
+            if (typeof rawD === 'number') { date = excelSerialToDateStr(rawD); }
+            else { const tg = String(rawD||'').split(' ')[0]; const p = tg.split('/'); date = p.length===3 ? `${p[0]}-${p[1]}-${p[2]}` : tg; }
+            const noiDung = String(r[iNoiDung]||'');
+            const mVqr = vqrRe.exec(noiDung);
+            const vqrCode = mVqr ? mVqr[0] : '';
+            const maThamChieu = String(r[iRef]||'').trim();
+            const maDiemBan = String(r[iDiem]||'').trim();
+            const amount = toNum(r[iAmt]);
+            const dedupKey = maThamChieu || vqrCode || (date+'|'+amount+'|'+maDiemBan);
+            newRows.push({ date, amount, maThamChieu, maDiemBan, maCuaHang: String(r[iCuaHang]||'').trim(), vqrCode, noiDung: noiDung.substring(0,120), dedupKey });
+          });
+          const exKeys = new Set(_vietqrTxn[bank].map(r=>r.dedupKey).filter(Boolean));
+          const added = newRows.filter(r=>r.dedupKey && !exKeys.has(r.dedupKey));
+          _vietqrTxn[bank] = [..._vietqrTxn[bank], ...added];
+          try { lsSet(lsVietqrTxnKey(bank), JSON.stringify(_vietqrTxn[bank])); } catch(e) {
+            _vietqrTxn[bank] = _vietqrTxn[bank].slice(-6000);
+            try { lsSet(lsVietqrTxnKey(bank), JSON.stringify(_vietqrTxn[bank])); } catch(e2){}
+          }
+          added.forEach(r => { if(r.maDiemBan && _vietqrDiemName[r.maDiemBan]===undefined) _vietqrDiemName[r.maDiemBan]=''; });
+          lsSet(LS_VIETQR_DIEM_NAME, JSON.stringify(_vietqrDiemName));
+
+          _vietqrHist[bank].unshift({file:fname, at:new Date().toLocaleString('vi'), added:added.length, skip:newRows.length-added.length});
+          lsSet(lsVietqrHistKey(bank), JSON.stringify(_vietqrHist[bank]));
+
+          renderVietQrSummary(bank); renderVietQrDoiSoat(bank); renderVietQrHist(bank); renderVietQrDiemMap(); renderVietQrCtMap();
+          fetchBankVietQr(bank);
+          alert(`✅ ${VIETQR_BANK_LABEL[bank]}: +${added.length} GD mới (bỏ ${newRows.length-added.length} trùng${excludedByStatus?', '+excludedByStatus+' GD trạng thái lỗi':''})\nTổng: ${_vietqrTxn[bank].length} GD`);
+        } catch(err) { alert('Lỗi đọc file Viet QR: ' + err.message); }
+      };
+      reader.readAsArrayBuffer(inp.files[0]);
+      inp.value='';
+    }
+
+    // Luyen sẽ tải thêm 1 file/sheet riêng chứa "Tên điểm bán" (chưa xác
+    // định chắc cấu trúc cột — dò linh hoạt theo TÊN CỘT chứa "mã điểm/mã
+    // cửa hàng" và "tên điểm/tên cửa hàng" trong 10 dòng đầu; nếu không dò
+    // được thì mặc định cột A=mã, cột B=tên).
+    function handleVietQrDiemNameFile(inp) {
+      if (!inp.files[0]) return;
+      const fname = inp.files[0].name;
+      const reader = new FileReader();
+      reader.onload = e => {
+        try {
+          const wb = XLSX.read(new Uint8Array(e.target.result), {type:'array'});
+          const ws = wb.Sheets[wb.SheetNames[0]];
+          const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+          const normHdr = s => String(s||'').toLowerCase().normalize('NFC').trim();
+          let hdrIdx = 0, iMa = 0, iTen = 1, found = false;
+          for (let i=0;i<Math.min(rows.length,10);i++){
+            const r = rows[i];
+            const idxMa  = r.findIndex(c => /mã.*điểm|ma.*diem|mã.*cửa hàng|ma.*cua hang/.test(normHdr(c)));
+            const idxTen = r.findIndex(c => /tên.*điểm|ten.*diem|tên.*cửa hàng|ten.*cua hang/.test(normHdr(c)));
+            if (idxMa > -1 && idxTen > -1) { hdrIdx = i; iMa = idxMa; iTen = idxTen; found = true; break; }
+          }
+          let added = 0, total = 0;
+          rows.slice(hdrIdx+1).forEach(r => {
+            const ma = String(r[iMa]||'').trim();
+            const ten = String(r[iTen]||'').trim();
+            if (!ma) return;
+            total++;
+            if (ten && _vietqrDiemName[ma] !== ten) added++;
+            _vietqrDiemName[ma] = ten || _vietqrDiemName[ma] || '';
+          });
+          lsSet(LS_VIETQR_DIEM_NAME, JSON.stringify(_vietqrDiemName));
+          VIETQR_BANKS.forEach(b => renderVietQrDoiSoat(b));
+          renderVietQrDiemMap(); renderVietQrCtMap();
+          alert(`✅ Tên điểm bán: +${added} tên mới${found?'':' (không dò được đúng tên cột — đã dùng mặc định cột A=mã, cột B=tên, vui lòng kiểm tra lại)'}\nĐọc ${total} dòng · Tổng đã map: ${Object.values(_vietqrDiemName).filter(Boolean).length}/${Object.keys(_vietqrDiemName).length}`);
+        } catch(err) { alert('Lỗi đọc file Tên điểm bán: ' + err.message); }
+      };
+      reader.readAsArrayBuffer(inp.files[0]);
+      inp.value='';
+    }
+
+    function getVietQrTenDiem(maDiemBan) {
+      const t = (_vietqrDiemName[maDiemBan]||'').trim();
+      return t || maDiemBan;
+    }
+    function getVietQrMaCT(tenDiem) {
+      const m = (_vietqrCtMap[tenDiem]||'').trim();
+      return m || tenDiem;
+    }
+    function saveVietQrDiemName(inp) {
+      const ma = inp.dataset.ma;
+      _vietqrDiemName[ma] = inp.value.trim();
+      lsSet(LS_VIETQR_DIEM_NAME, JSON.stringify(_vietqrDiemName));
+      renderVietQrDiemMap(); renderVietQrCtMap();
+      VIETQR_BANKS.forEach(b => renderVietQrDoiSoat(b));
+    }
+    function saveVietQrCtMap(inp) {
+      const ten = inp.dataset.ten;
+      _vietqrCtMap[ten] = inp.value.trim();
+      lsSet(LS_VIETQR_CT_MAP, JSON.stringify(_vietqrCtMap));
+      renderVietQrCtMap();
+      VIETQR_BANKS.forEach(b => renderVietQrDoiSoat(b));
+    }
+
+    function renderVietQrDiemMap() {
+      const allMa = new Set();
+      VIETQR_BANKS.forEach(b => _vietqrTxn[b].forEach(r => { if(r.maDiemBan) allMa.add(r.maDiemBan); }));
+      const mas = [...allMa].sort();
+      let html;
+      if (!mas.length) {
+        html = '<div class="empty-state"><div class="big-icon">🗺️</div><p>Tải file giao dịch Viet QR để thấy danh sách điểm bán</p></div>';
+      } else {
+        const unmapped = mas.filter(m => !(_vietqrDiemName[m]||'').trim()).length;
+        html = `<div style="font-size:.83em;color:#64748b;margin-bottom:.6rem">${mas.length} mã điểm bán · <span style="color:${unmapped?'#d97706':'#16a34a'}">${unmapped} chưa map tên</span></div>`;
+        html += '<table style="width:100%;border-collapse:collapse;font-size:.84em"><thead><tr style="background:#d1fae5;color:#065f46"><th style="padding:.3rem .6rem;text-align:left">Mã điểm bán</th><th style="padding:.3rem .4rem;text-align:left">Tên điểm bán</th><th style="padding:.3rem .4rem;width:56px"></th></tr></thead><tbody>';
+        mas.forEach((ma,i) => {
+          const isMapped = !!(_vietqrDiemName[ma]||'').trim();
+          const bg = isMapped ? (i%2?'#f0fdf4':'#dcfce7') : (i%2?'#fff':'#fffbeb');
+          const esc = ma.replace(/'/g,"&#39;").replace(/"/g,'&quot;');
+          html += `<tr style="background:${bg}">
+            <td style="padding:.3rem .6rem;font-family:monospace;font-size:.85em">${ma}</td>
+            <td style="padding:.3rem .4rem"><input id="vdn_${i}" data-ma="${esc}" value="${(_vietqrDiemName[ma]||'').replace(/"/g,'&quot;')}" placeholder="Tên điểm bán"
+              style="width:100%;border:1px solid ${isMapped?'#86efac':'#cbd5e1'};border-radius:4px;padding:.2rem .35rem;background:${isMapped?'#f0fdf4':'#fff'}"
+              onkeydown="if(event.key==='Enter')saveVietQrDiemName(this)"></td>
+            <td style="padding:.3rem .4rem"><button onclick="saveVietQrDiemName(document.getElementById('vdn_${i}'))" style="background:${isMapped?'#16a34a':'#2563eb'};color:#fff;border:none;border-radius:4px;padding:.2rem .5rem;cursor:pointer;font-size:.78em">Lưu</button></td>
+          </tr>`;
+        });
+        html += '</tbody></table>';
+      }
+      VIETQR_BANKS.forEach(b => { const el=document.getElementById('vietqrDiemMapContent_'+b); if(el) el.innerHTML = html; });
+    }
+
+    function renderVietQrCtMap() {
+      const allMa = new Set();
+      VIETQR_BANKS.forEach(b => _vietqrTxn[b].forEach(r => { if(r.maDiemBan) allMa.add(r.maDiemBan); }));
+      const tens = new Set();
+      allMa.forEach(ma => tens.add(getVietQrTenDiem(ma)));
+      const tenList = [...tens].sort();
+      let html;
+      if (!tenList.length) {
+        html = '<div class="empty-state"><div class="big-icon">🏗️</div><p>Map tên điểm bán trước khi map Mã CT</p></div>';
+      } else {
+        const unmapped = tenList.filter(t => !(_vietqrCtMap[t]||'').trim()).length;
+        html = `<div style="font-size:.83em;color:#64748b;margin-bottom:.6rem">${tenList.length} tên điểm bán · <span style="color:${unmapped?'#d97706':'#16a34a'}">${unmapped} chưa map CT</span></div>`;
+        html += '<table style="width:100%;border-collapse:collapse;font-size:.84em"><thead><tr style="background:#dbeafe;color:#1e3a8a"><th style="padding:.3rem .6rem;text-align:left">Tên điểm bán</th><th style="padding:.3rem .4rem;width:180px">Mã CT</th><th style="padding:.3rem .4rem;width:56px"></th></tr></thead><tbody>';
+        tenList.forEach((ten,i) => {
+          const isMapped = !!(_vietqrCtMap[ten]||'').trim();
+          const bg = isMapped ? (i%2?'#f0fdf4':'#dcfce7') : (i%2?'#fff':'#fffbeb');
+          const esc = ten.replace(/'/g,"&#39;").replace(/"/g,'&quot;');
+          const tenDisp = ten ? ten : '<span style="color:#94a3b8;font-style:italic">(chưa có tên)</span>';
+          html += `<tr style="background:${bg}">
+            <td style="padding:.3rem .6rem;font-size:.85em">${tenDisp}</td>
+            <td style="padding:.3rem .4rem"><input id="vct_${i}" data-ten="${esc}" value="${(_vietqrCtMap[ten]||'').replace(/"/g,'&quot;')}" placeholder="Mã CT"
+              style="width:100%;border:1px solid ${isMapped?'#86efac':'#cbd5e1'};border-radius:4px;padding:.2rem .35rem;background:${isMapped?'#f0fdf4':'#fff'}"
+              onkeydown="if(event.key==='Enter')saveVietQrCtMap(this)"></td>
+            <td style="padding:.3rem .4rem"><button onclick="saveVietQrCtMap(document.getElementById('vct_${i}'))" style="background:${isMapped?'#16a34a':'#2563eb'};color:#fff;border:none;border-radius:4px;padding:.2rem .5rem;cursor:pointer;font-size:.78em">Lưu</button></td>
+          </tr>`;
+        });
+        html += '</tbody></table>';
+      }
+      VIETQR_BANKS.forEach(b => { const el=document.getElementById('vietqrCtMapContent_'+b); if(el) el.innerHTML = html; });
+    }
+
+    function renderVietQrSummary(bank) {
+      const el = document.getElementById('vietqr_summary_'+bank);
+      if(!el) return;
+      const n = _vietqrTxn[bank].length;
+      if(!n) { el.textContent=''; return; }
+      const matched = _vietqrTxn[bank].filter(r=>r.vqrCode && _bankVietqrMap[bank][r.vqrCode]).length;
+      el.innerHTML = `${n} GD · <span style="color:${matched===n?'#16a34a':'#d97706'}">${matched}/${n} khớp NH</span>`;
+    }
+
+    function populateVietQrMonthFilter(bank) {
+      const sel = document.getElementById('vietqrFilterMonth_'+bank);
+      if(!sel) return;
+      const months = [...new Set(_vietqrTxn[bank].map(r => { const p=r.date?r.date.split('-'):[]; return p.length===3?p[1]+'/'+p[2]:''; }).filter(Boolean))].sort().reverse();
+      const cur = sel.value;
+      sel.innerHTML = '<option value="">-- Tất cả --</option>' + months.map(m=>`<option value="${m}"${m===cur?' selected':''}>${m}</option>`).join('');
+    }
+
+    function renderVietQrDoiSoat(bank) {
+      const el = document.getElementById('vietqrDoiSoatBody_'+bank);
+      if(!el) return;
+      const txns = _vietqrTxn[bank];
+      if(!txns.length) {
+        el.innerHTML = '<div class="empty-state"><div class="big-icon">🟢</div><p>Tải file giao dịch '+VIETQR_BANK_LABEL[bank]+' để bắt đầu đối soát</p></div>';
+        return;
+      }
+      const fmtN = n => Math.round(n).toLocaleString('vi');
+      const iso  = d => { const p=d.split('-'); return p[2]+'-'+p[1]+'-'+p[0]; };
+      const sortDate = (a,b) => iso(a).localeCompare(iso(b));
+
+      populateVietQrMonthFilter(bank);
+      const selMonth = (document.getElementById('vietqrFilterMonth_'+bank)||{}).value || '';
+
+      const bankMap = _bankVietqrMap[bank] || {};
+      const byDate = {}; // date -> maCT -> {amount, soGD, matched, tenDiem}
+      txns.forEach(r => {
+        const tenDiem = getVietQrTenDiem(r.maDiemBan);
+        const maCT = getVietQrMaCT(tenDiem);
+        const bankHit = r.vqrCode ? bankMap[r.vqrCode] : null;
+        const amount = bankHit ? bankHit.amount : r.amount; // ngân hàng làm chuẩn
+        if(!byDate[r.date]) byDate[r.date]={};
+        if(!byDate[r.date][maCT]) byDate[r.date][maCT]={amount:0,soGD:0,matched:0,tenDiem};
+        byDate[r.date][maCT].amount += amount;
+        byDate[r.date][maCT].soGD += 1;
+        if(bankHit) byDate[r.date][maCT].matched += 1;
+      });
+      const allDates = Object.keys(byDate).sort(sortDate);
+      const filteredDates = selMonth ? allDates.filter(d => { const p=d.split('-'); return p[1]+'/'+p[2]===selMonth; }) : allDates;
+
+      let totAmount=0, totN=0, totMatched=0;
+      filteredDates.forEach(dt=>Object.values(byDate[dt]).forEach(d=>{totAmount+=d.amount;totN+=d.soGD;totMatched+=d.matched;}));
+
+      let html = '<div style="margin-bottom:.5rem;font-size:.82em;color:#64748b">';
+      html += '📊 '+VIETQR_BANK_LABEL[bank]+': <strong>'+txns.length+'</strong> GD · '+filteredDates.length+' ngày · '
+        + '<span style="color:'+(totMatched===totN?'#16a34a':'#d97706')+'">'+totMatched+'/'+totN+' khớp NH</span>';
+      html += '</div>';
+
+      const unmappedTen = new Set();
+      txns.forEach(r => { const t=getVietQrTenDiem(r.maDiemBan); if(!(_vietqrCtMap[t]||'').trim()) unmappedTen.add(t); });
+      if (unmappedTen.size) {
+        html += '<div style="background:#fef3c7;border:1px solid #f59e0b;border-radius:8px;padding:.6rem 1rem;margin-bottom:.6rem;font-size:.87em;color:#92400e;display:flex;justify-content:space-between;align-items:center;gap:.6rem;flex-wrap:wrap">'
+          +'<span>⚠️ Có <strong>'+unmappedTen.size+'</strong> điểm bán chưa map mã CT.</span>'
+          +'<button onclick="switchVietQrSub(\''+bank+'\',\'ctmap\')" style="background:#f59e0b;color:#fff;border:none;border-radius:6px;padding:.3rem .8rem;font-weight:700;cursor:pointer;white-space:nowrap">🗺️ Map ngay</button>'
+          +'</div>';
+      }
+
+      const invoiceGroups = {};
+      allDates.forEach(dt => {
+        const ctData0 = byDate[dt]; if(!ctData0) return;
+        Object.keys(ctData0).forEach(maCT => {
+          const hd = _vietqrHD[bank][dt+'|'+maCT] || {};
+          const soHD = (hd.soHD||'').trim();
+          if(!soHD) return;
+          const amt0 = ctData0[maCT].amount;
+          const tienHD0 = parseFloat((hd.tienHD||'0').toString().replace(/[^0-9.-]/g,''))||0;
+          const key = maCT+'|'+soHD;
+          if(!invoiceGroups[key]) invoiceGroups[key] = {dt:0, tienHDs:[], dates:[]};
+          invoiceGroups[key].dt += amt0;
+          invoiceGroups[key].tienHDs.push(tienHD0);
+          invoiceGroups[key].dates.push(dt);
+        });
+      });
+      Object.values(invoiceGroups).forEach(g => {
+        const uniq = [...new Set(g.tienHDs.filter(v=>v>0))];
+        g.tienHD = uniq.length <= 1 ? (uniq[0]||0) : g.tienHDs.reduce((s,v)=>s+v,0);
+      });
+
+      const renderDateBlock = date => {
+        const ctData = byDate[date];
+        if(!ctData) return '';
+        const ctKeys = Object.keys(ctData).sort((a,b)=>a.localeCompare(b));
+        const dayAmount = ctKeys.reduce((s,g)=>s+ctData[g].amount,0);
+        const dayN = ctKeys.reduce((s,g)=>s+ctData[g].soGD,0);
+        const dayMatched = ctKeys.reduce((s,g)=>s+ctData[g].matched,0);
+        const [dd,mm,yyyy]=date.split('-');
+        let out = '<div style="margin-bottom:.8rem">'
+          +'<div style="background:#14532d;color:#fff;padding:.4rem .75rem;font-weight:700;font-size:.87em;display:flex;justify-content:space-between">'
+          +'<span>📅 '+dd+'/'+mm+'/'+yyyy+'</span>'
+          +'<span style="font-size:.81em;font-weight:400;color:#bbf7d0">'+dayN+' GD · '+fmtN(dayAmount)+'đ'
+          +(dayMatched===dayN?' · ✅ khớp NH':' · ⚠️ '+dayMatched+'/'+dayN+' khớp NH')+'</span>'
+          +'</div>'
+          +'<table style="width:100%;border-collapse:collapse;font-size:.84em">'
+          +'<thead><tr style="background:#166534;color:#f0fdf4">'
+          +'<th style="padding:.3rem .6rem;text-align:left">Mã CT (Điểm bán)</th>'
+          +'<th style="text-align:right;padding:.3rem .4rem">Số GD</th>'
+          +'<th style="text-align:right;padding:.3rem .4rem">Số tiền (NH)</th>'
+          +'<th style="text-align:center;padding:.3rem .4rem">Khớp NH</th>'
+          +'<th style="text-align:center;padding:.3rem .4rem">Số HĐ</th>'
+          +'<th style="text-align:right;padding:.3rem .4rem">Tiền HĐ</th>'
+          +'<th style="text-align:right;padding:.3rem .4rem">Chênh</th>'
+          +'</tr></thead><tbody>';
+        ctKeys.forEach((maCT,i) => {
+          const d = ctData[maCT];
+          const hdKey = date+'|'+maCT;
+          const hd = _vietqrHD[bank][hdKey] || {};
+          const tienHD = parseFloat((hd.tienHD||'0').toString().replace(/[^0-9.-]/g,''))||0;
+          const soHDNow = (hd.soHD||'').trim();
+          const grp = soHDNow ? invoiceGroups[maCT+'|'+soHDNow] : null;
+          const chenh = (grp && grp.dates.length > 1 && grp.tienHD)
+            ? (d.amount - grp.tienHD * (grp.dt > 0 ? (d.amount / grp.dt) : (1 / grp.dates.length)))
+            : (tienHD ? (d.amount - tienHD) : null);
+          const chenhColor = chenh===null?'#94a3b8':(Math.abs(chenh)<1000?'#16a34a':(chenh<0?'#ef4444':'#d97706'));
+          const chenhTxt = chenh===null?'—':((chenh>0?'+':'')+fmtN(chenh));
+          const bg = i%2===0?'#f0fdf4':'#fff';
+          const escKey = hdKey.replace(/'/g,"\\'");
+          const soHDDisplay = hd.soHD
+            ? '<span style="font-size:.8em;cursor:pointer" onclick="vqHDEdit(this,\''+bank+'\',\''+escKey+'\',\'soHD\')">'+hd.soHD+' ✏️</span>'
+            : '<span style="color:#94a3b8;font-size:.75em;cursor:pointer" onclick="vqHDEdit(this,\''+bank+'\',\''+escKey+'\',\'soHD\')">…</span>';
+          const tienHDDisplay = hd.tienHD
+            ? '<span style="font-size:.8em;cursor:pointer;color:#15803d" onclick="vqHDEdit(this,\''+bank+'\',\''+escKey+'\',\'tienHD\')">'+hd.tienHD+' ✏️</span>'
+            : '<span style="color:#94a3b8;font-size:.75em;cursor:pointer" onclick="vqHDEdit(this,\''+bank+'\',\''+escKey+'\',\'tienHD\')">…</span>';
+          const matchTag = d.soGD===0 ? '—' : (d.matched===d.soGD ? '<span style="color:#16a34a">✅</span>' : (d.matched===0 ? '<span style="color:#ef4444">❌</span>' : '<span style="color:#d97706">⚠️ '+d.matched+'/'+d.soGD+'</span>'));
+          out += '<tr style="background:'+bg+'">'
+            +'<td style="padding:.3rem .6rem"><span class="ct-badge">'+maCT+'</span><div style="font-size:.76em;color:#64748b">'+d.tenDiem+'</div></td>'
+            +'<td style="text-align:right;padding:.3rem .4rem;color:#64748b">'+d.soGD+'</td>'
+            +'<td style="text-align:right;padding:.3rem .4rem;color:#15803d;font-weight:700">'+fmtN(d.amount)+'</td>'
+            +'<td style="text-align:center;padding:.3rem .4rem">'+matchTag+'</td>'
+            +'<td style="padding:.3rem .3rem;text-align:center">'+soHDDisplay+'</td>'
+            +'<td style="padding:.3rem .3rem;text-align:right">'+tienHDDisplay+'</td>'
+            +'<td style="text-align:right;padding:.3rem .4rem;font-weight:700;color:'+chenhColor+'">'+chenhTxt+'</td>'
+            +'</tr>';
+        });
+        out += '</tbody></table></div>';
+        return out;
+      };
+
+      filteredDates.forEach(d => { html += renderDateBlock(d); });
+
+      const byGian = {};
+      filteredDates.forEach(dt => {
+        Object.entries(byDate[dt]).forEach(([maCT,d]) => {
+          if(!byGian[maCT]) byGian[maCT]={soGD:0,amount:0};
+          byGian[maCT].soGD+=d.soGD; byGian[maCT].amount+=d.amount;
+        });
+      });
+      const gianKeys = Object.keys(byGian).sort();
+      html += '<table style="width:100%;border-collapse:collapse;font-size:.85em;margin-top:.6rem"><tbody>'
+        +'<tr style="background:#14532d;color:#fff;font-weight:700">'
+        +'<td style="padding:.5rem .75rem">TỔNG CỘNG ('+filteredDates.length+' ngày)</td>'
+        +'<td style="text-align:right;padding:.5rem .5rem">'+totN+' GD</td>'
+        +'<td style="text-align:right;padding:.5rem .5rem">'+fmtN(totAmount)+'</td>'
+        +'<td colspan="4"></td></tr>';
+      gianKeys.forEach((maCT,i) => {
+        const g = byGian[maCT];
+        html += '<tr style="background:'+(i%2===0?'#f0fdf4':'#dcfce7')+'">'
+          +'<td style="padding:.3rem .75rem;padding-left:1.5rem"><span class="ct-badge">'+maCT+'</span></td>'
+          +'<td style="text-align:right;padding:.3rem .5rem;color:#64748b">'+g.soGD+'</td>'
+          +'<td style="text-align:right;padding:.3rem .5rem;color:#15803d;font-weight:700">'+fmtN(g.amount)+'</td>'
+          +'<td colspan="4"></td></tr>';
+      });
+      html += '</tbody></table>';
+      el.innerHTML = html;
+    }
+
+    function saveVietQrHD(bank, hdKey, field, val) {
+      if(!_vietqrHD[bank][hdKey]) _vietqrHD[bank][hdKey] = {};
+      _vietqrHD[bank][hdKey][field] = val.trim();
+      if (field==='soHD'||field==='tienHD') _vietqrHD[bank][hdKey]._manual = true;
+      try { lsSet(lsVietqrHDKey(bank), JSON.stringify(_vietqrHD[bank])); } catch(e){}
+    }
+    function vqHDEdit(spanEl, bank, hdKey, field) {
+      const cur = _vietqrHD[bank][hdKey] ? (_vietqrHD[bank][hdKey][field]||'') : '';
+      const inp = document.createElement('input');
+      inp.value = cur;
+      inp.style.cssText = 'width:' + (field==='soHD'?'90px':'110px') + ';border:1px solid #16a34a;border-radius:4px;padding:.15rem .3rem;font-size:.8em;' + (field==='tienHD'?'text-align:right':'text-align:center');
+      inp.onblur = () => { saveVietQrHD(bank, hdKey, field, inp.value); renderVietQrDoiSoat(bank); };
+      inp.onkeydown = e => { if(e.key==='Enter'||e.key==='Escape') inp.blur(); };
+      spanEl.replaceWith(inp);
+      inp.focus(); inp.select();
+    }
+
+    function renderVietQrHist(bank) {
+      const el = document.getElementById('vietqrHistBody_'+bank);
+      if(!el) return;
+      const hist = _vietqrHist[bank];
+      if(!hist.length) { el.innerHTML='<div class="empty-state"><div class="big-icon">⏱️</div><p>Chưa có lịch sử tải</p></div>'; return; }
+      let html='<table style="width:100%;border-collapse:collapse;font-size:.84em"><thead><tr style="background:#dcfce7;color:#166534"><th style="padding:.3rem .5rem;text-align:left">File</th><th style="padding:.3rem .5rem">Thêm</th><th style="padding:.3rem .5rem">Bỏ qua</th><th style="padding:.3rem .5rem;text-align:left">Thời gian</th></tr></thead><tbody>';
+      hist.slice(0,20).forEach((h,i) => {
+        html+=`<tr style="background:${i%2?'#f0fdf4':'#fff'}">
+          <td style="padding:.3rem .5rem;font-size:.8em;color:#475569">${h.file}</td>
+          <td style="padding:.3rem .5rem;text-align:center;color:#16a34a;font-weight:700">+${h.added}</td>
+          <td style="padding:.3rem .5rem;text-align:center;color:#94a3b8">${h.skip}</td>
+          <td style="padding:.3rem .5rem;font-size:.8em;color:#64748b">${h.at}</td>
+        </tr>`;
+      });
+      html+='</tbody></table>';
+      el.innerHTML=html;
+    }
+
+    function toggleBankVietQrDetail(bank) {
+      const p = document.getElementById('bankVietQrDetailPanel_'+bank);
+      if(p) p.style.display = p.style.display==='none' ? '' : 'none';
+    }
+    function renderBankVietQrRaw(bank) {
+      const tb = document.getElementById('bankVietQrRawBody_'+bank);
+      if(!tb) return;
+      const list = _bankVietqr[bank] || [];
+      if(!list.length) { tb.innerHTML = '<tr><td colspan="4" style="color:#64748b;padding:.4rem">Không tìm thấy giao dịch nào có mã VQR</td></tr>'; return; }
+      tb.innerHTML = list.slice(0,300).map((t,i) => {
+        const amt = Math.round(t.amount).toLocaleString('vi');
+        return `<tr style="border-top:1px solid #14532d">
+          <td style="padding:.2rem .5rem;color:#64748b">${i+1}</td>
+          <td style="padding:.2rem .5rem;color:#bbf7d0">${t.date}</td>
+          <td style="padding:.2rem .5rem;text-align:right;color:#86efac">${amt}đ</td>
+          <td style="padding:.2rem .5rem;color:#94a3b8;font-size:.78em">${t.vqrCode} — ${(t.desc||'').substring(0,60)}</td>
+        </tr>`;
+      }).join('');
+    }
+    async function fetchBankVietQr(bank) {
+      const st = document.getElementById('bankVietQrStatus_'+bank);
+      if(st) st.textContent = '⏳ Đang tải...';
+      try {
+        const res = await fetch('/api/dau-ra/bank-vietqr?bank='+bank);
+        const json = await res.json();
+        if(json.ok) {
+          _bankVietqr[bank] = json.transactions || [];
+          _bankVietqrMap[bank] = {};
+          _bankVietqr[bank].forEach(t => { if(t.vqrCode) _bankVietqrMap[bank][t.vqrCode] = t; });
+          if(st) st.textContent = '✓ '+_bankVietqr[bank].length+' GD ngân hàng có mã VQR';
+          renderBankVietQrRaw(bank);
+          renderVietQrSummary(bank);
+          renderVietQrDoiSoat(bank);
+        } else if(st) st.textContent = '❌ '+json.error;
+      } catch(e) { if(st) st.textContent = '❌ Lỗi kết nối'; }
+    }
+    async function fetchBankVietQrRefresh(bank) {
+      await fetchBankVietQr(bank);
+      const p = document.getElementById('bankVietQrDetailPanel_'+bank);
+      if(p) p.style.display = '';
+    }
+
+    // ── Auto map MTT → Viet QR ── mirror autoMapMttPayoo, chỉ đổi nguồn
+    // gross theo _vietqrTxn (đã áp dụng "ngân hàng làm chuẩn") và lọc dịch
+    // vụ thu hộ theo "vietqr"/tên ngân hàng — CHƯA xác nhận chính xác text
+    // MTT dùng cho Viet QR, cần Luyen kiểm tra lại nếu không ra kết quả.
+    function autoMapMttVietQr(bank) {
+      const khKey = COMPANY === 'kh_cu' ? 'cu' : 'moi';
+      const mttRows = khKey === 'cu' ? _mttCu : _mttMoi;
+      if (!mttRows.length) { alert('Chưa có dữ liệu MTT. Vui lòng tải file MTT trước.'); return; }
+      const bankKeywords = {
+        bidv7704:   ['bidv7704','bidv 7704'],
+        bidv77020:  ['bidv77020','bidv 77020'],
+        mb11521268: ['mb11521268','mb 11521268','mb1152'],
+      }[bank] || [];
+      const vqMtt = mttRows.filter(r => {
+        const s = (r.dichVuThuHo||'').toLowerCase();
+        return s.includes('vietqr') || s.includes('viet qr') || bankKeywords.some(k=>s.includes(k));
+      });
+      if (!vqMtt.length) { alert('Không tìm thấy hóa đơn MTT nào khớp Viet QR / '+VIETQR_BANK_LABEL[bank]+'.\nKiểm tra lại cột "Dịch vụ thu hộ" trong MTT (có thể chưa đúng từ khóa lọc, báo lại để chỉnh).'); return; }
+
+      const maDiemToMaCT = _mttCtMap[khKey] || {};
+      const parseDays = s => { const m = /(\d+(?:\s*,\s*\d+)*)\s*$/.exec(s||''); if(!m) return []; return m[1].split(',').map(x=>parseInt(x.trim(),10)).filter(n=>!isNaN(n)); };
+      const resolveDate = (ngayHD, dayNum) => {
+        const p = String(ngayHD||'').split('/'); if(p.length!==3) return null;
+        const dd=+p[0], mm=+p[1], yy=+p[2]; let month=mm, year=yy;
+        if (dayNum > dd) { month -= 1; if(month<1){month=12;year-=1;} }
+        return String(dayNum).padStart(2,'0')+'-'+String(month).padStart(2,'0')+'-'+year;
+      };
+
+      const grossByDateCT = {};
+      _vietqrTxn[bank].forEach(r => {
+        const tenDiem = getVietQrTenDiem(r.maDiemBan);
+        const maCT = getVietQrMaCT(tenDiem);
+        const bankHit = r.vqrCode ? _bankVietqrMap[bank][r.vqrCode] : null;
+        const amt = bankHit ? bankHit.amount : r.amount;
+        const key = r.date+'|'+maCT;
+        grossByDateCT[key] = (grossByDateCT[key]||0) + amt;
+      });
+
+      Object.keys(_vietqrHD[bank]).forEach(k => {
+        if (_vietqrHD[bank][k] && !_vietqrHD[bank][k]._manual) { delete _vietqrHD[bank][k].soHD; delete _vietqrHD[bank][k].tienHD; }
+      });
+
+      let filled = 0, skipped = 0;
+      vqMtt.forEach(r => {
+        const days = parseDays(r.dichVuThuHo);
+        if (!days.length || !r.ngay) return;
+        const maCT = maDiemToMaCT[r.maDiem] || r.maDiem;
+        const dates = days.map(d => resolveDate(r.ngay, d)).filter(Boolean);
+        if (!dates.length) return;
+        const grosses = dates.map(dt => grossByDateCT[dt+'|'+maCT] || 0);
+        const totalGross = grosses.reduce((s,g)=>s+g,0);
+        dates.forEach((dt,i) => {
+          const hdKey = dt+'|'+maCT;
+          const existing = _vietqrHD[bank][hdKey];
+          if (existing && existing._manual) { skipped++; return; }
+          const share = totalGross>0 ? (grosses[i]/totalGross) : (1/dates.length);
+          const portion = Math.round(r.tongTien * share);
+          if (!_vietqrHD[bank][hdKey]) _vietqrHD[bank][hdKey] = {};
+          const prevHD = String(_vietqrHD[bank][hdKey].soHD||'').split(',').map(s=>s.trim()).filter(Boolean);
+          if (!prevHD.includes(String(r.soHD))) prevHD.push(String(r.soHD));
+          _vietqrHD[bank][hdKey].soHD = prevHD.join(', ');
+          _vietqrHD[bank][hdKey].tienHD = String((parseFloat(_vietqrHD[bank][hdKey].tienHD)||0) + portion);
+          filled++;
+        });
+      });
+
+      try { lsSet(lsVietqrHDKey(bank), JSON.stringify(_vietqrHD[bank])); } catch(e){}
+      renderVietQrDoiSoat(bank);
+      alert(`✅ Map xong: ${filled} ô hóa đơn (tự chia tỷ lệ / cộng dồn nếu gộp nhiều ngày) · Bỏ qua ${skipped} ô đã tự nhập tay`);
+    }
+
+    // Init Zalo Pay + VNPay + Payoo + Viet QR
     renderZaloSummary(); renderZaloDoiSoat(); renderZaloCtMap(); renderZaloHist();
     fetchBankZalo();
     renderVnpaySummary(); renderVnpayDoiSoat(); renderVnpayCtMap(); renderVnpayHist();
     fetchBankVnpay();
     renderPayooSummary(); renderPayooDoiSoat(); renderPayooCtMap(); renderPayooHist();
     fetchBankPayoo();
+    VIETQR_BANKS.forEach(b => { renderVietQrSummary(b); renderVietQrDoiSoat(b); renderVietQrHist(b); fetchBankVietQr(b); });
+    renderVietQrDiemMap(); renderVietQrCtMap();
 
   </script>
 </body>
