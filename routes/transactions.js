@@ -97,12 +97,18 @@ function addInternalCrossCheck(store, rows) {
   });
 }
 
+// Chi Nhan, 2026-09-11: xem ghi chu day du o computeBalance() trong
+// routes/banks.js -- cung 1 loi cong hai lan cac giao dich TRUOC
+// bank.opening_date (da duoc gop san vao opening_balance roi). Them dieu kien
+// t.date >= bank.opening_date de khong cong lai.
 function bankBalanceBefore(store, bankId, beforeDate) {
   const bank = store.banks.find((b) => b.id === bankId);
   if (!bank) return 0;
+  const openingDate = bank.opening_date || "";
   let bal = bank.opening_balance;
   for (const t of store.transactions) {
     if (t.bank_id !== bankId) continue;
+    if (openingDate && t.date < openingDate) continue;
     if (beforeDate !== null && t.date >= beforeDate) continue;
     bal += t.type === "thu" ? t.amount : -t.amount;
   }
@@ -119,14 +125,22 @@ function bankBalanceBefore(store, bankId, beforeDate) {
 // la moi nhat truoc). Tra ve Map<transactionId, soDuSauGiaoDichDo>, tinh 1
 // lan cho MOI ngan hang trong bankIds (khong phai toan bo store.transactions)
 // de khong tinh du lieu cua ngan hang khong lien quan.
+// Chi Nhan, 2026-09-11: xem ghi chu day du o computeBalance() trong
+// routes/banks.js -- cung 1 loi cong hai lan cac giao dich TRUOC
+// bank.opening_date. Loc bo cac giao dich do truoc khi cong don (khong hien
+// so du luy ke cho cac dong nay nua -- map.set bi bo qua, cot "So du" tren
+// giao dien se hien "-" cho cac dong TRUOC opening_date, dung voi thuc te la
+// cac dong nay da duoc gop san vao opening_balance roi, khong con "so du rieng
+// tinh duoc" nua).
 function buildBalanceMap(store, bankIds) {
   const map = new Map();
   const ids = bankIds instanceof Set ? bankIds : new Set(bankIds || []);
   ids.forEach((bankId) => {
     const bank = store.banks.find((b) => b.id === bankId);
     if (!bank) return;
+    const openingDate = bank.opening_date || "";
     const txs = store.transactions
-      .filter((t) => t.bank_id === bankId)
+      .filter((t) => t.bank_id === bankId && (!openingDate || t.date >= openingDate))
       .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : a.id - b.id));
     let bal = bank.opening_balance || 0;
     for (const t of txs) {

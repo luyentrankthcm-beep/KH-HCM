@@ -6,13 +6,30 @@ const { getCompany } = require("../utils/companies");
 const router = express.Router();
 router.use(requireLogin);
 
+// Chi Nhan, 2026-09-11: "sao số dư cuối kì không khớp trên sao kê vậy check
+// lại cho tôi nhá" -- BIDV123456 hien 521.954.686d nhung sao ke that chi
+// 24.308.501d (lech dung 497.646.185d). Goc re: route /banks/:id/so-du-dau-ky
+// (them 2026-07-31) cho sua opening_balance/opening_date SAU KHI ngan hang da
+// co san giao dich tu truoc (de "doi chieu lai voi sao ke that"), nhung ham
+// nay van cong TAT CA store.transactions cua ngan hang do KHONG LOC theo ngay
+// -- nen cac giao dich co ngay TRUOC opening_date bi CONG HAI LAN: 1 lan an
+// trong opening_balance (vi opening_balance da la so du TINH DEN thoi diem
+// opening_date), 1 lan nua khi vong for nay cong lai chinh cac giao dich do.
+// Da xac nhan tren du lieu that: BIDV123456 co 11 giao dich Thang 1-3/2026
+// truoc opening_date 02/04/2026 van con trong store.transactions, va BIDV8651
+// (Chi Phi) con nghiem trong hon voi toi 664 giao dich truoc opening_date
+// 01/07/2026. Fix: chi cong giao dich co t.date >= bank.opening_date (giao
+// dich truoc do coi nhu DA duoc gop san vao opening_balance rong, khong cong
+// lai nua). Ngan hang nao opening_date <= ngay giao dich dau tien thi khong
+// bi anh huong gi (dieu kien luon dung).
 function computeBalance(store, bankId) {
   const bank = store.banks.find((b) => b.id === Number(bankId));
   if (!bank) return null;
+  const openingDate = bank.opening_date || "";
   let thu = 0;
   let chi = 0;
   for (const t of store.transactions) {
-    if (t.bank_id === bank.id) {
+    if (t.bank_id === bank.id && (!openingDate || t.date >= openingDate)) {
       if (t.type === "thu") thu += t.amount;
       else chi += t.amount;
     }
