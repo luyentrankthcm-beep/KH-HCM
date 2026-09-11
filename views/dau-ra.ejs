@@ -4807,8 +4807,18 @@
       const allDates = Object.keys(byDate).sort(sortDate);
       const filteredDates = selMonth ? allDates.filter(d => { const p=d.split('-'); return p[1]+'/'+p[2]===selMonth; }) : allDates;
 
+      // Luyen, 2026-09-11: "cho tôi nút sửa nhá với lại sửa nhá giống bên
+      // vnpay á" -- them "Số tiền (NH)" sua duoc tay (amtOvr, giong dtOvr cua
+      // Payoo/VNPay), dinh nghia som de dung cho ca tinh tong lan render tung
+      // dong ngay ben duoi.
+      const getVietQrGianDisp = (hdKey, rawAmount) => {
+        const hd = _vietqrHD[bank][hdKey] || {};
+        const amt = (hd.amtOvr != null && hd.amtOvr !== '') ? (parseFloat(String(hd.amtOvr).replace(/[^0-9.-]/g,''))||0) : rawAmount;
+        return { amt, hasAmtOvr: hd.amtOvr!=null && hd.amtOvr!=='' };
+      };
+
       let totAmount=0, totN=0, totMatched=0;
-      filteredDates.forEach(dt=>Object.values(byDate[dt]).forEach(d=>{totAmount+=d.amount;totN+=d.soGD;totMatched+=d.matched;}));
+      filteredDates.forEach(dt=>Object.entries(byDate[dt]).forEach(([maCT,d])=>{totAmount+=getVietQrGianDisp(dt+'|'+maCT,d.amount).amt;totN+=d.soGD;totMatched+=d.matched;}));
 
       let html = '<div style="margin-bottom:.5rem;font-size:.82em;color:#64748b">';
       html += '📊 '+VIETQR_BANK_LABEL[bank]+': <strong>'+txns.length+'</strong> GD · '+filteredDates.length+' ngày · '
@@ -4831,11 +4841,11 @@
           const hd = _vietqrHD[bank][dt+'|'+maCT] || {};
           const soHD = (hd.soHD||'').trim();
           if(!soHD) return;
-          const amt0 = ctData0[maCT].amount;
+          const gDisp0 = getVietQrGianDisp(dt+'|'+maCT, ctData0[maCT].amount);
           const tienHD0 = parseFloat((hd.tienHD||'0').toString().replace(/[^0-9.-]/g,''))||0;
           const key = maCT+'|'+soHD;
           if(!invoiceGroups[key]) invoiceGroups[key] = {dt:0, tienHDs:[], dates:[]};
-          invoiceGroups[key].dt += amt0;
+          invoiceGroups[key].dt += gDisp0.amt;
           invoiceGroups[key].tienHDs.push(tienHD0);
           invoiceGroups[key].dates.push(dt);
         });
@@ -4849,15 +4859,18 @@
         const ctData = byDate[date];
         if(!ctData) return '';
         const ctKeys = Object.keys(ctData).sort((a,b)=>a.localeCompare(b));
-        const dayAmount = ctKeys.reduce((s,g)=>s+ctData[g].amount,0);
+        const disps = {};
+        ctKeys.forEach(maCT => { disps[maCT] = getVietQrGianDisp(date+'|'+maCT, ctData[maCT].amount); });
+        const dayAmount = ctKeys.reduce((s,g)=>s+disps[g].amt,0);
         const dayN = ctKeys.reduce((s,g)=>s+ctData[g].soGD,0);
         const dayMatched = ctKeys.reduce((s,g)=>s+ctData[g].matched,0);
         const [dd,mm,yyyy]=date.split('-');
+        const dateId = date.replace(/-/g,'_');
         let out = '<div style="margin-bottom:.8rem">'
-          +'<div style="background:#14532d;color:#fff;padding:.4rem .75rem;font-weight:700;font-size:.87em;display:flex;justify-content:space-between">'
+          +'<div style="background:#14532d;color:#fff;padding:.4rem .75rem;font-weight:700;font-size:.87em;display:flex;justify-content:space-between;cursor:pointer" onclick="toggleVietQrEditPanel(\''+bank+'\',\''+dateId+'\')">'
           +'<span>📅 '+dd+'/'+mm+'/'+yyyy+'</span>'
           +'<span style="font-size:.81em;font-weight:400;color:#bbf7d0">'+dayN+' GD · '+fmtN(dayAmount)+'đ'
-          +(dayMatched===dayN?' · ✅ khớp NH':' · ⚠️ '+dayMatched+'/'+dayN+' khớp NH')+'</span>'
+          +(dayMatched===dayN?' · ✅ khớp NH':' · ⚠️ '+dayMatched+'/'+dayN+' khớp NH')+' &nbsp;<span style="opacity:.8">✏️ Sửa</span></span>'
           +'</div>'
           +'<table style="width:100%;border-collapse:collapse;font-size:.84em">'
           +'<thead><tr style="background:#166534;color:#f0fdf4">'
@@ -4871,14 +4884,15 @@
           +'</tr></thead><tbody>';
         ctKeys.forEach((maCT,i) => {
           const d = ctData[maCT];
+          const gDisp = disps[maCT];
           const hdKey = date+'|'+maCT;
           const hd = _vietqrHD[bank][hdKey] || {};
           const tienHD = parseFloat((hd.tienHD||'0').toString().replace(/[^0-9.-]/g,''))||0;
           const soHDNow = (hd.soHD||'').trim();
           const grp = soHDNow ? invoiceGroups[maCT+'|'+soHDNow] : null;
           const chenh = (grp && grp.dates.length > 1 && grp.tienHD)
-            ? (d.amount - grp.tienHD * (grp.dt > 0 ? (d.amount / grp.dt) : (1 / grp.dates.length)))
-            : (tienHD ? (d.amount - tienHD) : null);
+            ? (gDisp.amt - grp.tienHD * (grp.dt > 0 ? (gDisp.amt / grp.dt) : (1 / grp.dates.length)))
+            : (tienHD ? (gDisp.amt - tienHD) : null);
           const chenhColor = chenh===null?'#94a3b8':(Math.abs(chenh)<1000?'#16a34a':(chenh<0?'#ef4444':'#d97706'));
           const chenhTxt = chenh===null?'—':((chenh>0?'+':'')+fmtN(chenh));
           const bg = i%2===0?'#f0fdf4':'#fff';
@@ -4893,14 +4907,42 @@
           out += '<tr style="background:'+bg+'">'
             +'<td style="padding:.3rem .6rem"><span class="ct-badge">'+maCT+'</span><div style="font-size:.76em;color:#64748b">'+d.tenDiem+'</div></td>'
             +'<td style="text-align:right;padding:.3rem .4rem;color:#64748b">'+d.soGD+'</td>'
-            +'<td style="text-align:right;padding:.3rem .4rem;color:#15803d;font-weight:700">'+fmtN(d.amount)+'</td>'
+            +'<td style="text-align:right;padding:.3rem .4rem;color:#15803d;font-weight:700">'+fmtN(gDisp.amt)+(gDisp.hasAmtOvr?'<sup style="color:#f59e0b;font-size:.7em">✏</sup>':'')+'</td>'
             +'<td style="text-align:center;padding:.3rem .4rem">'+matchTag+'</td>'
             +'<td style="padding:.3rem .3rem;text-align:center">'+soHDDisplay+'</td>'
             +'<td style="padding:.3rem .3rem;text-align:right">'+tienHDDisplay+'</td>'
             +'<td style="text-align:right;padding:.3rem .4rem;font-weight:700;color:'+chenhColor+'">'+chenhTxt+'</td>'
             +'</tr>';
         });
-        out += '</tbody></table></div>';
+        out += '</tbody></table>';
+        out += '<div id="edit_vietqr_'+bank+'_'+dateId+'" style="display:none;padding:.6rem .75rem;background:#f8fafc;border:1px dashed #16a34a;border-top:none">'
+          +'<div style="font-size:.8em;font-weight:700;color:#14532d;margin-bottom:.4rem">✏️ Chỉnh sửa – '+dd+'/'+mm+'/'+yyyy+'</div>'
+          +'<div style="overflow-x:auto"><table style="min-width:560px;border-collapse:collapse;font-size:.8em">'
+          +'<thead><tr style="background:#dcfce7;color:#14532d">'
+          +'<th style="padding:.25rem .5rem;text-align:left;border:1px solid #bbf7d0">Mã CT / Điểm bán</th>'
+          +'<th style="padding:.25rem .5rem;text-align:right;border:1px solid #bbf7d0">Số tiền (sửa được)</th>'
+          +'<th style="padding:.25rem .5rem;border:1px solid #bbf7d0">Số HĐ</th>'
+          +'<th style="padding:.25rem .5rem;text-align:right;border:1px solid #bbf7d0">Tiền HĐ</th>'
+          +'</tr></thead><tbody>'
+          +ctKeys.map(maCT => {
+            const hd = _vietqrHD[bank][date+'|'+maCT] || {};
+            const gDisp = disps[maCT];
+            const gKey = maCT.replace(/[^a-zA-Z0-9]/g,'_');
+            return '<tr>'
+              +'<td style="padding:.25rem .5rem;border:1px solid #e2e8f0;font-size:.9em">'+maCT+'</td>'
+              +'<td style="padding:.25rem .5rem;border:1px solid #e2e8f0;text-align:right">'
+                +'<input id="vqedit_amt_'+bank+'_'+dateId+'_'+gKey+'" type="text" value="'+gDisp.amt+'" style="width:110px;border:1px solid #bbf7d0;border-radius:4px;padding:.15rem .3rem;text-align:right;background:#f0fdf4;color:#15803d;font-weight:600"></td>'
+              +'<td style="padding:.25rem .5rem;border:1px solid #e2e8f0">'
+                +'<input id="vqedit_soHD_'+bank+'_'+dateId+'_'+gKey+'" type="text" value="'+(hd.soHD||'')+'" placeholder="0000123" style="width:100px;border:1px solid #cbd5e1;border-radius:4px;padding:.15rem .3rem"></td>'
+              +'<td style="padding:.25rem .5rem;border:1px solid #e2e8f0;text-align:right">'
+                +'<input id="vqedit_tienHD_'+bank+'_'+dateId+'_'+gKey+'" type="text" value="'+(hd.tienHD||'')+'" placeholder="0" style="width:100px;border:1px solid #cbd5e1;border-radius:4px;padding:.15rem .3rem;text-align:right"></td>'
+              +'</tr>';
+          }).join('')
+          +'</tbody></table></div>'
+          +'<div style="margin-top:.5rem;display:flex;gap:.5rem">'
+          +'<button onclick="saveVietQrEditPanel(\''+bank+'\',\''+dateId+'\',\''+date+'\',this)" data-gians=\''+JSON.stringify(ctKeys).replace(/'/g,'&#39;')+'\' style="background:#16a34a;color:#fff;border:none;border-radius:6px;padding:.3rem .8rem;font-weight:700;font-size:.8em;cursor:pointer">💾 Lưu</button>'
+          +'<button onclick="toggleVietQrEditPanel(\''+bank+'\',\''+dateId+'\')" style="background:#6b7280;color:#fff;border:none;border-radius:6px;padding:.3rem .8rem;font-weight:600;font-size:.8em;cursor:pointer">✕ Đóng</button>'
+          +'</div></div></div>';
         return out;
       };
 
@@ -4947,6 +4989,36 @@
       inp.onkeydown = e => { if(e.key==='Enter'||e.key==='Escape') inp.blur(); };
       spanEl.replaceWith(inp);
       inp.focus(); inp.select();
+    }
+
+    // Luyen, 2026-09-11: "cho tôi nút sửa nhá với lại sửa nhá giống bên vnpay
+    // á" -- mo/dong bang sua ngay giong cac kenh khac (togglePayooEditPanel),
+    // va luu lai "Số tiền (NH)" sua tay (amtOvr) + Số HĐ/Tiền HĐ cho tung ma
+    // CT trong ngay do, roi ve lai bang.
+    function toggleVietQrEditPanel(bank, dateId) {
+      const row = document.getElementById('edit_vietqr_' + bank + '_' + dateId);
+      if (!row) return;
+      row.style.display = row.style.display === 'none' ? '' : 'none';
+    }
+    function saveVietQrEditPanel(bank, dateId, date, btnEl) {
+      const gianList = btnEl && btnEl.dataset && btnEl.dataset.gians ? JSON.parse(btnEl.dataset.gians) : [];
+      gianList.forEach(maCT => {
+        const gKey = maCT.replace(/[^a-zA-Z0-9]/g,'_');
+        const hdKey = date + '|' + maCT;
+        if (!_vietqrHD[bank][hdKey]) _vietqrHD[bank][hdKey] = {};
+        const amtEl   = document.getElementById('vqedit_amt_'+bank+'_'+dateId+'_'+gKey);
+        const soHDEl  = document.getElementById('vqedit_soHD_'+bank+'_'+dateId+'_'+gKey);
+        const tienEl  = document.getElementById('vqedit_tienHD_'+bank+'_'+dateId+'_'+gKey);
+        const amtOvr  = amtEl ? amtEl.value.trim() : '';
+        const soHD    = soHDEl ? soHDEl.value.trim() : '';
+        const tienHD  = tienEl ? tienEl.value.trim() : '';
+        _vietqrHD[bank][hdKey].amtOvr = amtOvr;
+        _vietqrHD[bank][hdKey].soHD   = soHD;
+        _vietqrHD[bank][hdKey].tienHD = tienHD;
+        if (amtOvr || soHD || tienHD) _vietqrHD[bank][hdKey]._manual = true;
+      });
+      try { lsSet(lsVietqrHDKey(bank), JSON.stringify(_vietqrHD[bank])); } catch(e){}
+      renderVietQrDoiSoat(bank);
     }
 
     function renderVietQrHist(bank) {
