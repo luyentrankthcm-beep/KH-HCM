@@ -4726,63 +4726,75 @@
       VIETQR_BANKS.forEach(b => renderVietQrDoiSoat(b));
     }
 
+    // Luyen, 2026-09-11: "chỗ map tên với mã công trình á nếu tôi đang ở
+    // viet qr khác thì chỉ hiện trang đó thôi đừng hiện map của 77020 á chỉ
+    // hiện các mã có trong giao dịch của trang tôi đang xem thôi á" -- truoc
+    // gio ham nay gop CHUNG ma cua hang cua ca 3 ngan hang lai roi ghi y het
+    // 1 bang do vao ca 3 tab (vi _vietqrDiemName/_vietqrCtMap dung chung),
+    // nen dang xem MB11521268 van thay ca ma/ten cua BIDV77020. Gia tri map
+    // (_vietqrDiemName/_vietqrCtMap) van dung chung binh thuong, nhung DANH
+    // SACH HIEN THI o moi tab gio loc rieng theo dung _vietqrTxn[bank] cua
+    // tab do thoi.
     function renderVietQrDiemMap() {
-      const allMa = new Set();
-      VIETQR_BANKS.forEach(b => _vietqrTxn[b].forEach(r => { if(r.maCuaHang) allMa.add(r.maCuaHang); }));
-      const mas = [...allMa].sort();
-      let html;
-      if (!mas.length) {
-        html = '<div class="empty-state"><div class="big-icon">🗺️</div><p>Tải file giao dịch Viet QR để thấy danh sách cửa hàng</p></div>';
-      } else {
-        const unmapped = mas.filter(m => !(_vietqrDiemName[m]||'').trim()).length;
-        html = `<div style="font-size:.83em;color:#64748b;margin-bottom:.6rem">${mas.length} mã cửa hàng · <span style="color:${unmapped?'#d97706':'#16a34a'}">${unmapped} chưa map tên</span></div>`;
-        html += '<table style="width:100%;border-collapse:collapse;font-size:.84em"><thead><tr style="background:#d1fae5;color:#065f46"><th style="padding:.3rem .6rem;text-align:left">Mã cửa hàng</th><th style="padding:.3rem .4rem;text-align:left">Tên điểm bán</th><th style="padding:.3rem .4rem;width:56px"></th></tr></thead><tbody>';
-        mas.forEach((ma,i) => {
-          const isMapped = !!(_vietqrDiemName[ma]||'').trim();
-          const bg = isMapped ? (i%2?'#f0fdf4':'#dcfce7') : (i%2?'#fff':'#fffbeb');
-          const esc = ma.replace(/'/g,"&#39;").replace(/"/g,'&quot;');
-          html += `<tr style="background:${bg}">
-            <td style="padding:.3rem .6rem;font-family:monospace;font-size:.85em">${ma}</td>
-            <td style="padding:.3rem .4rem"><input id="vdn_${i}" data-ma="${esc}" value="${(_vietqrDiemName[ma]||'').replace(/"/g,'&quot;')}" placeholder="Tên điểm bán"
-              style="width:100%;border:1px solid ${isMapped?'#86efac':'#cbd5e1'};border-radius:4px;padding:.2rem .35rem;background:${isMapped?'#f0fdf4':'#fff'}"
-              onkeydown="if(event.key==='Enter')saveVietQrDiemName(this)"></td>
-            <td style="padding:.3rem .4rem"><button onclick="saveVietQrDiemName(this.closest('tr').querySelector('input'))" style="background:${isMapped?'#16a34a':'#2563eb'};color:#fff;border:none;border-radius:4px;padding:.2rem .5rem;cursor:pointer;font-size:.78em">Lưu</button></td>
-          </tr>`;
-        });
-        html += '</tbody></table>';
-      }
-      VIETQR_BANKS.forEach(b => { const el=document.getElementById('vietqrDiemMapContent_'+b); if(el) el.innerHTML = html; });
+      VIETQR_BANKS.forEach(bank => {
+        const mas = [...new Set(_vietqrTxn[bank].map(r=>r.maCuaHang).filter(Boolean))].sort();
+        let html;
+        if (!mas.length) {
+          html = '<div class="empty-state"><div class="big-icon">🗺️</div><p>Tải file giao dịch Viet QR để thấy danh sách cửa hàng</p></div>';
+        } else {
+          const unmapped = mas.filter(m => !(_vietqrDiemName[m]||'').trim()).length;
+          html = `<div style="font-size:.83em;color:#64748b;margin-bottom:.6rem">${mas.length} mã cửa hàng · <span style="color:${unmapped?'#d97706':'#16a34a'}">${unmapped} chưa map tên</span></div>`;
+          html += '<table style="width:100%;border-collapse:collapse;font-size:.84em"><thead><tr style="background:#d1fae5;color:#065f46"><th style="padding:.3rem .6rem;text-align:left">Mã cửa hàng</th><th style="padding:.3rem .4rem;text-align:left">Tên điểm bán</th><th style="padding:.3rem .4rem;width:56px"></th></tr></thead><tbody>';
+          mas.forEach((ma,i) => {
+            const isMapped = !!(_vietqrDiemName[ma]||'').trim();
+            const bg = isMapped ? (i%2?'#f0fdf4':'#dcfce7') : (i%2?'#fff':'#fffbeb');
+            const esc = ma.replace(/'/g,"&#39;").replace(/"/g,'&quot;');
+            html += `<tr style="background:${bg}">
+              <td style="padding:.3rem .6rem;font-family:monospace;font-size:.85em">${ma}</td>
+              <td style="padding:.3rem .4rem"><input id="vdn_${bank}_${i}" data-ma="${esc}" value="${(_vietqrDiemName[ma]||'').replace(/"/g,'&quot;')}" placeholder="Tên điểm bán"
+                style="width:100%;border:1px solid ${isMapped?'#86efac':'#cbd5e1'};border-radius:4px;padding:.2rem .35rem;background:${isMapped?'#f0fdf4':'#fff'}"
+                onkeydown="if(event.key==='Enter')saveVietQrDiemName(this)"></td>
+              <td style="padding:.3rem .4rem"><button onclick="saveVietQrDiemName(this.closest('tr').querySelector('input'))" style="background:${isMapped?'#16a34a':'#2563eb'};color:#fff;border:none;border-radius:4px;padding:.2rem .5rem;cursor:pointer;font-size:.78em">Lưu</button></td>
+            </tr>`;
+          });
+          html += '</tbody></table>';
+        }
+        const el = document.getElementById('vietqrDiemMapContent_'+bank);
+        if (el) el.innerHTML = html;
+      });
     }
 
     function renderVietQrCtMap() {
-      const allMa = new Set();
-      VIETQR_BANKS.forEach(b => _vietqrTxn[b].forEach(r => { if(r.maCuaHang) allMa.add(r.maCuaHang); }));
-      const tens = new Set();
-      allMa.forEach(ma => tens.add(getVietQrTenDiem(ma)));
-      const tenList = [...tens].sort();
-      let html;
-      if (!tenList.length) {
-        html = '<div class="empty-state"><div class="big-icon">🏗️</div><p>Map tên điểm bán trước khi map Mã CT</p></div>';
-      } else {
-        const unmapped = tenList.filter(t => !(_vietqrCtMap[t]||'').trim()).length;
-        html = `<div style="font-size:.83em;color:#64748b;margin-bottom:.6rem">${tenList.length} tên điểm bán · <span style="color:${unmapped?'#d97706':'#16a34a'}">${unmapped} chưa map CT</span></div>`;
-        html += '<table style="width:100%;border-collapse:collapse;font-size:.84em"><thead><tr style="background:#dbeafe;color:#1e3a8a"><th style="padding:.3rem .6rem;text-align:left">Tên điểm bán</th><th style="padding:.3rem .4rem;width:180px">Mã CT</th><th style="padding:.3rem .4rem;width:56px"></th></tr></thead><tbody>';
-        tenList.forEach((ten,i) => {
-          const isMapped = !!(_vietqrCtMap[ten]||'').trim();
-          const bg = isMapped ? (i%2?'#f0fdf4':'#dcfce7') : (i%2?'#fff':'#fffbeb');
-          const esc = ten.replace(/'/g,"&#39;").replace(/"/g,'&quot;');
-          const tenDisp = ten ? ten : '<span style="color:#94a3b8;font-style:italic">(chưa có tên)</span>';
-          html += `<tr style="background:${bg}">
-            <td style="padding:.3rem .6rem;font-size:.85em">${tenDisp}</td>
-            <td style="padding:.3rem .4rem"><input id="vct_${i}" data-ten="${esc}" value="${(_vietqrCtMap[ten]||'').replace(/"/g,'&quot;')}" placeholder="Mã CT"
-              style="width:100%;border:1px solid ${isMapped?'#86efac':'#cbd5e1'};border-radius:4px;padding:.2rem .35rem;background:${isMapped?'#f0fdf4':'#fff'}"
-              onkeydown="if(event.key==='Enter')saveVietQrCtMap(this)"></td>
-            <td style="padding:.3rem .4rem"><button onclick="saveVietQrCtMap(this.closest('tr').querySelector('input'))" style="background:${isMapped?'#16a34a':'#2563eb'};color:#fff;border:none;border-radius:4px;padding:.2rem .5rem;cursor:pointer;font-size:.78em">Lưu</button></td>
-          </tr>`;
-        });
-        html += '</tbody></table>';
-      }
-      VIETQR_BANKS.forEach(b => { const el=document.getElementById('vietqrCtMapContent_'+b); if(el) el.innerHTML = html; });
+      VIETQR_BANKS.forEach(bank => {
+        const allMa = new Set(_vietqrTxn[bank].map(r=>r.maCuaHang).filter(Boolean));
+        const tens = new Set();
+        allMa.forEach(ma => tens.add(getVietQrTenDiem(ma)));
+        const tenList = [...tens].sort();
+        let html;
+        if (!tenList.length) {
+          html = '<div class="empty-state"><div class="big-icon">🏗️</div><p>Map tên điểm bán trước khi map Mã CT</p></div>';
+        } else {
+          const unmapped = tenList.filter(t => !(_vietqrCtMap[t]||'').trim()).length;
+          html = `<div style="font-size:.83em;color:#64748b;margin-bottom:.6rem">${tenList.length} tên điểm bán · <span style="color:${unmapped?'#d97706':'#16a34a'}">${unmapped} chưa map CT</span></div>`;
+          html += '<table style="width:100%;border-collapse:collapse;font-size:.84em"><thead><tr style="background:#dbeafe;color:#1e3a8a"><th style="padding:.3rem .6rem;text-align:left">Tên điểm bán</th><th style="padding:.3rem .4rem;width:180px">Mã CT</th><th style="padding:.3rem .4rem;width:56px"></th></tr></thead><tbody>';
+          tenList.forEach((ten,i) => {
+            const isMapped = !!(_vietqrCtMap[ten]||'').trim();
+            const bg = isMapped ? (i%2?'#f0fdf4':'#dcfce7') : (i%2?'#fff':'#fffbeb');
+            const esc = ten.replace(/'/g,"&#39;").replace(/"/g,'&quot;');
+            const tenDisp = ten ? ten : '<span style="color:#94a3b8;font-style:italic">(chưa có tên)</span>';
+            html += `<tr style="background:${bg}">
+              <td style="padding:.3rem .6rem;font-size:.85em">${tenDisp}</td>
+              <td style="padding:.3rem .4rem"><input id="vct_${bank}_${i}" data-ten="${esc}" value="${(_vietqrCtMap[ten]||'').replace(/"/g,'&quot;')}" placeholder="Mã CT"
+                style="width:100%;border:1px solid ${isMapped?'#86efac':'#cbd5e1'};border-radius:4px;padding:.2rem .35rem;background:${isMapped?'#f0fdf4':'#fff'}"
+                onkeydown="if(event.key==='Enter')saveVietQrCtMap(this)"></td>
+              <td style="padding:.3rem .4rem"><button onclick="saveVietQrCtMap(this.closest('tr').querySelector('input'))" style="background:${isMapped?'#16a34a':'#2563eb'};color:#fff;border:none;border-radius:4px;padding:.2rem .5rem;cursor:pointer;font-size:.78em">Lưu</button></td>
+            </tr>`;
+          });
+          html += '</tbody></table>';
+        }
+        const el = document.getElementById('vietqrCtMapContent_'+bank);
+        if (el) el.innerHTML = html;
+      });
     }
 
     function renderVietQrSummary(bank) {
