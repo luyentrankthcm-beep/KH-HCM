@@ -860,21 +860,38 @@
     // là lớp cache "cố gắng tốt nhất", không còn là nguồn có thể làm mất dữ
     // liệu nữa).
     let _serverKv = {};
+    // Luyen, 2026-09-11: "sao lại bị mất dữ liệu rồi nè" -- Momo tu nhien chi
+    // con hien "84 GD · 2 ngày" du server van luu du 12.420 dong (kiem tra
+    // truc tiep qua /api/dau-ra/kv-all luc do van thay du) -- goc re: request
+    // dong bo nay chay dung luc Railway dang restart (deploy code moi) nen
+    // nhan ve loi 502 tam thoi (server chua kip nhan request), khien
+    // "if (xhr.status === 200)" false va _serverKv bi bo trong RONG, roi moi
+    // localStorage.getItem sau do fallback ve du lieu THAT trong trinh duyet
+    // (con lai tu lan bi tran quota rat lau truoc -- xem ghi chu ngay tren) --
+    // dung 46-84 dong con sot, KHONG phai mat that. Them thu lai vai lan neu
+    // status khac 200 hoac loi mang -- 502 luc dang restart deploy thuong tu
+    // het chi sau 1-2 giay, thu lai ngay (khong can cho, XHR dong bo da du
+    // do tre) se vuot qua duoc hau het truong hop nay.
     (function hydrateFromServer() {
-      try {
-        const xhr = new XMLHttpRequest();
-        xhr.open('GET', '/api/dau-ra/kv-all', false); // false = đồng bộ (chặn)
-        xhr.send(null);
-        if (xhr.status === 200) {
-          const res = JSON.parse(xhr.responseText);
-          if (res && res.ok && res.data) {
-            _serverKv = res.data;
-            Object.keys(res.data).forEach(k => {
-              try { _rawLsSet(k, res.data[k]); } catch(e) { console.warn('[hydrate] localStorage đầy quota, giữ tạm trong bộ nhớ cho key:', k, e.message); }
-            });
+      for (let attempt = 1; attempt <= 4; attempt++) {
+        try {
+          const xhr = new XMLHttpRequest();
+          xhr.open('GET', '/api/dau-ra/kv-all', false); // false = đồng bộ (chặn)
+          xhr.send(null);
+          if (xhr.status === 200) {
+            const res = JSON.parse(xhr.responseText);
+            if (res && res.ok && res.data) {
+              _serverKv = res.data;
+              Object.keys(res.data).forEach(k => {
+                try { _rawLsSet(k, res.data[k]); } catch(e) { console.warn('[hydrate] localStorage đầy quota, giữ tạm trong bộ nhớ cho key:', k, e.message); }
+              });
+            }
+            return;
           }
-        }
-      } catch(e) { console.error('Không đồng bộ được dữ liệu từ server:', e); }
+          console.warn('[hydrate] status', xhr.status, '-- thử lại lần', attempt);
+        } catch(e) { console.warn('[hydrate] lỗi mạng, thử lại lần', attempt, e.message); }
+      }
+      console.error('Không đồng bộ được dữ liệu từ server sau nhiều lần thử -- trang có thể hiện thiếu dữ liệu, tải lại (F5) để thử lại.');
     })();
     localStorage.getItem = function(key) {
       if (Object.prototype.hasOwnProperty.call(_serverKv, key)) return _serverKv[key];
