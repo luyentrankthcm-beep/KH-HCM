@@ -5092,12 +5092,17 @@
       // Luyen, 2026-09-11: "chỗ hóa đơn á có chỗ dịch vụ thu hộ là 7020 là
       // của 7020 á" -- xac nhan tren du lieu that: MTT ghi "Dịch vụ thu hộ"
       // dang "POSH+JP MB (7020) 29,30,31" (khong ghi ten/ma ngan hang day
-      // du) -- so khop theo 4 so cuoi TK trong dau ngoac "(dddd)", KHONG
-      // dung ten ngan hang day du nhu truoc (khong bao gio khop).
+      // du) -- so khop theo so cuoi TK trong dau ngoac "(ddd(d))", KHONG
+      // dung ten ngan hang day du nhu truoc (khong bao gio khop). Rieng
+      // MB11521268: Luyen gui sample "POSH+JP MB (268) 29,30" -- ngoac chi
+      // co 3 so cuoi "268" (khong phai 4 so "1268" nhu doan truoc), da doi
+      // xac nhan lai tren toan bo du lieu MTT that: dung 26 dong dang
+      // "POSH+JP MB (268) <ngay>", khong dong nao khac trung "268" gay
+      // nham lan.
       const bankKeywords = {
         bidv7704:   ['(7704)'],
         bidv77020:  ['(7020)'],
-        mb11521268: ['(1268)'],
+        mb11521268: ['(268)'],
       }[bank] || [];
       const vqMtt = mttRows.filter(r => {
         const s = (r.dichVuThuHo||'').toLowerCase();
