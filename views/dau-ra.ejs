@@ -4487,6 +4487,14 @@
     // ══════════════════════════════════════════
     const VIETQR_BANKS = ['bidv7704','bidv77020','mb11521268'];
     const VIETQR_BANK_LABEL = { bidv7704:'BIDV7704', bidv77020:'BIDV77020', mb11521268:'MB11521268' };
+    // Luyen, 2026-09-11: "dựa vào chỗ ngân hàng trả về á đặt cảnh báo nếu tải
+    // lên sai nhá" -- xay ra dung 1 lan: file giao dich cua BIDV77020 (cot
+    // "Tài khoản nhận" = "8660077020 - BIDV") bi tai nham vao tab MB11521268,
+    // lam sai het gian/doi soat. Dung chinh cot "Tài khoản nhận" (ngan hang
+    // tra ve trong file export) doi chieu voi so tai khoan that cua tung tab
+    // -- so khac thi loai bo dong do, khong cho nhap vao, kem canh bao ro.
+    const VIETQR_BANK_ACC_SUFFIX = { bidv7704:'7704', bidv77020:'7020', mb11521268:'11521268' };
+    let _vietqrWrongAcc = { bidv7704:0, bidv77020:0, mb11521268:0 }; // so dong bi loai o lan tai gan nhat vi sai tai khoan
 
     const LS_VIETQR_DIEM_NAME    = `vietqr_diem_name_${COMPANY}`;    // { maCuaHang: tenDiemBan } — dùng chung 3 NH
     const LS_VIETQR_DIEM_MANUAL  = `vietqr_diem_manual_${COMPANY}`;  // { maCuaHang: true } — đã sửa tay, không cho auto ghi đè
@@ -4560,6 +4568,7 @@
           let iRef  = findCol('mã tham chiếu','ma tham chieu'); if(iRef<0) iRef=6;
           let iDiem = findCol('mã điểm bán','ma diem ban');    if(iDiem<0) iDiem=8;
           let iCuaHang = findCol('mã cửa hàng','ma cua hang'); if(iCuaHang<0) iCuaHang=9;
+          let iTK   = findCol('tài khoản nhận','tai khoan nhan'); if(iTK<0) iTK=10;
           let iNoiDung = findCol('nội dung','noi dung');       if(iNoiDung<0) iNoiDung=12;
 
           const toNum = v => { if(typeof v==='number') return v; return parseFloat(String(v||'').replace(/[^0-9.-]/g,'')) || 0; };
@@ -4573,9 +4582,19 @@
           if (!rawDataRows.length) { alert('Không đọc được giao dịch nào có "Số tiền đến" > 0 — kiểm tra lại đúng file export giao dịch Viet QR chưa.'); return; }
           const newRows = [];
           let excludedByStatus = 0;
+          let excludedByAccount = 0;
+          const wrongAccSamples = new Set();
+          const expectedSuffix = VIETQR_BANK_ACC_SUFFIX[bank];
           rawDataRows.forEach(r => {
             const st = String(r[iStatus]||'').trim();
             if (st && badStatus.test(st)) { excludedByStatus++; return; }
+            const taiKhoanNhan = String(r[iTK]||'').trim();
+            if (expectedSuffix && taiKhoanNhan) {
+              const accDigits = taiKhoanNhan.split(' - ')[0].replace(/\D/g,'');
+              if (accDigits && !accDigits.endsWith(expectedSuffix)) {
+                excludedByAccount++; wrongAccSamples.add(taiKhoanNhan); return;
+              }
+            }
             let date;
             const rawD = r[iTime];
             if (typeof rawD === 'number') { date = excelSerialToDateStr(rawD); }
@@ -4608,12 +4627,19 @@
           });
           lsSet(LS_VIETQR_DIEM_NAME, JSON.stringify(_vietqrDiemName));
 
-          _vietqrHist[bank].unshift({file:fname, at:new Date().toLocaleString('vi'), added:added.length, skip:newRows.length-added.length});
+          _vietqrHist[bank].unshift({file:fname, at:new Date().toLocaleString('vi'), added:added.length, skip:newRows.length-added.length, wrongAcc:excludedByAccount});
           lsSet(lsVietqrHistKey(bank), JSON.stringify(_vietqrHist[bank]));
 
+          _vietqrWrongAcc[bank] = excludedByAccount;
           renderVietQrSummary(bank); renderVietQrDoiSoat(bank); renderVietQrHist(bank); renderVietQrDiemMap(); renderVietQrCtMap();
           fetchBankVietQr(bank);
-          alert(`✅ ${VIETQR_BANK_LABEL[bank]}: +${added.length} GD mới (bỏ ${newRows.length-added.length} trùng${excludedByStatus?', '+excludedByStatus+' GD trạng thái lỗi':''})\nTổng: ${_vietqrTxn[bank].length} GD`);
+          let msg = `${VIETQR_BANK_LABEL[bank]}: +${added.length} GD mới (bỏ ${newRows.length-added.length} trùng${excludedByStatus?', '+excludedByStatus+' GD trạng thái lỗi':''})\nTổng: ${_vietqrTxn[bank].length} GD`;
+          if (excludedByAccount > 0) {
+            msg = `⚠️ CẢNH BÁO: file có ${excludedByAccount} dòng "Tài khoản nhận" là [${[...wrongAccSamples].join(', ')}] — KHÔNG khớp tài khoản ${VIETQR_BANK_LABEL[bank]}. Các dòng này đã bị BỎ QUA, không nhập vào tab này.\nRất có thể bạn tải nhầm file của ngân hàng khác — kiểm tra lại trước khi map!\n\n` + msg;
+            alert(msg);
+          } else {
+            alert('✅ ' + msg);
+          }
         } catch(err) { alert('Lỗi đọc file Viet QR: ' + err.message); }
       };
       reader.readAsArrayBuffer(inp.files[0]);
@@ -4761,11 +4787,39 @@
 
     function renderVietQrSummary(bank) {
       const el = document.getElementById('vietqr_summary_'+bank);
-      if(!el) return;
-      const n = _vietqrTxn[bank].length;
-      if(!n) { el.textContent=''; return; }
-      const matched = _vietqrTxn[bank].filter(r=>r.vqrCode && _bankVietqrMap[bank][r.vqrCode]).length;
-      el.innerHTML = `${n} GD · <span style="color:${matched===n?'#16a34a':'#d97706'}">${matched}/${n} khớp NH</span>`;
+      if(el) {
+        const n = _vietqrTxn[bank].length;
+        if(!n) { el.textContent=''; }
+        else {
+          const matched = _vietqrTxn[bank].filter(r=>r.vqrCode && _bankVietqrMap[bank][r.vqrCode]).length;
+          el.innerHTML = `${n} GD · <span style="color:${matched===n?'#16a34a':'#d97706'}">${matched}/${n} khớp NH</span>`;
+        }
+      }
+      // Luyen, 2026-09-11: "dựa vào chỗ ngân hàng trả về á đặt cảnh báo nếu
+      // tải lên sai nhá với lại có gian mới chưa map dc cx đặt cảnh báo" --
+      // banner do ngay duoi ten ngan hang, luon hien (khong can bam vao tab
+      // con khac moi thay) khi (1) lan tai gan nhat co dong sai tai khoan
+      // ngan hang, hoac (2) dang co ma cua hang thuc te chua map duoc Tên
+      // điểm bán.
+      const panel = document.getElementById('vietqr_'+bank);
+      if (!panel) return;
+      let warnEl = document.getElementById('vietqrWarnBanner_'+bank);
+      if (!warnEl) {
+        warnEl = document.createElement('div');
+        warnEl.id = 'vietqrWarnBanner_'+bank;
+        const header = panel.querySelector('.channel-header');
+        if (header) header.insertAdjacentElement('afterend', warnEl); else panel.prepend(warnEl);
+      }
+      const msgs = [];
+      if (_vietqrWrongAcc[bank] > 0) {
+        msgs.push(`⚠️ Lần tải gần nhất có ${_vietqrWrongAcc[bank]} dòng "Tài khoản nhận" không khớp ${VIETQR_BANK_LABEL[bank]} — nghi tải nhầm file ngân hàng khác, các dòng đó đã KHÔNG được nhập.`);
+      }
+      const unmappedCodes = new Set();
+      _vietqrTxn[bank].forEach(r => { if (r.maCuaHang && r.maCuaHang!=='-' && !(_vietqrDiemName[r.maCuaHang]||'').trim()) unmappedCodes.add(r.maCuaHang); });
+      if (unmappedCodes.size > 0) {
+        msgs.push(`⚠️ Có ${unmappedCodes.size} mã cửa hàng mới (gian mới) chưa map được Tên điểm bán — vào tab "🏪 Map Cửa hàng → Tên điểm bán" để map.`);
+      }
+      warnEl.innerHTML = msgs.map(m => `<div style="background:#fffbeb;border:1px solid #f59e0b;color:#92400e;border-radius:6px;padding:.4rem .7rem;font-size:.8em;margin:.4rem 0;font-weight:600">${m}</div>`).join('');
     }
 
     function populateVietQrMonthFilter(bank) {
