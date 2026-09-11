@@ -460,8 +460,8 @@
           &nbsp;<span style="font-size:.78em;color:#64748b">· Đối soát theo Mã tham chiếu (VQR) — ngân hàng làm chuẩn</span>
         </div>
         <div style="display:flex;align-items:center;gap:.5rem">
-          <button class="btn-nhap" style="background:#0d9488" onclick="document.getElementById('vietqrDiemNameInput').click()">📥 Tên điểm bán</button>
-          <input type="file" id="vietqrDiemNameInput" accept=".xls,.xlsx" style="display:none" onchange="handleVietQrDiemNameFile(this)">
+          <button class="btn-nhap" style="background:#0d9488" onclick="document.getElementById('vietqrDiemNameInput').click()">📥 DS Cửa hàng ↔ Điểm bán</button>
+          <input type="file" id="vietqrDiemNameInput" accept=".xls,.xlsx" style="display:none" onchange="handleVietQrStoreExportFile(this)">
         </div>
       </div>
 
@@ -486,7 +486,7 @@
         </div>
         <div class="sub-tab-bar" style="margin-top:.5rem">
           <button class="sub-tab-btn active" id="vietqr_bidv7704_btn_ds" onclick="switchVietQrSub('bidv7704','ds')">📅 Đối soát ngày</button>
-          <button class="sub-tab-btn" id="vietqr_bidv7704_btn_diemmap" onclick="switchVietQrSub('bidv7704','diemmap')">🏪 Map Điểm bán → Tên</button>
+          <button class="sub-tab-btn" id="vietqr_bidv7704_btn_diemmap" onclick="switchVietQrSub('bidv7704','diemmap')">🏪 Map Cửa hàng → Tên điểm bán</button>
           <button class="sub-tab-btn" id="vietqr_bidv7704_btn_ctmap" onclick="switchVietQrSub('bidv7704','ctmap')">🗺️ Map Tên → Mã CT</button>
           <button class="sub-tab-btn" id="vietqr_bidv7704_btn_hist" onclick="switchVietQrSub('bidv7704','hist')">⏱️ Lịch sử tải</button>
         </div>
@@ -519,8 +519,8 @@
           </div>
         </div>
         <div id="vietqr_bidv7704_sub_diemmap" class="sub-panel" style="margin-top:.75rem">
-          <div style="font-size:.85em;color:#475569;margin-bottom:.75rem">Map từng <strong>Mã điểm bán</strong> sang <strong>Tên điểm bán</strong> (đọc từ file "Tên điểm bán" bạn tải ở trên, có thể sửa tay).</div>
-          <div id="vietqrDiemMapContent_bidv7704"><div class="empty-state"><div class="big-icon">🗺️</div><p>Tải file giao dịch Viet QR để thấy danh sách điểm bán</p></div></div>
+          <div style="font-size:.85em;color:#475569;margin-bottom:.75rem">Map từng <strong>Mã cửa hàng</strong> (trong file giao dịch Viet QR) sang <strong>Tên điểm bán</strong> — tự động đối chiếu qua file "DS Cửa hàng ↔ Điểm bán" bạn tải ở trên (khớp theo cột "Mã cửa hàng"), có thể sửa tay nếu thiếu.</div>
+          <div id="vietqrDiemMapContent_bidv7704"><div class="empty-state"><div class="big-icon">🗺️</div><p>Tải file giao dịch Viet QR để thấy danh sách cửa hàng</p></div></div>
         </div>
         <div id="vietqr_bidv7704_sub_ctmap" class="sub-panel" style="margin-top:.75rem">
           <div style="font-size:.85em;color:#475569;margin-bottom:.75rem">Map từng <strong>Tên điểm bán</strong> sang <strong>Mã CT</strong>.</div>
@@ -545,7 +545,7 @@
         </div>
         <div class="sub-tab-bar" style="margin-top:.5rem">
           <button class="sub-tab-btn active" id="vietqr_bidv77020_btn_ds" onclick="switchVietQrSub('bidv77020','ds')">📅 Đối soát ngày</button>
-          <button class="sub-tab-btn" id="vietqr_bidv77020_btn_diemmap" onclick="switchVietQrSub('bidv77020','diemmap')">🏪 Map Điểm bán → Tên</button>
+          <button class="sub-tab-btn" id="vietqr_bidv77020_btn_diemmap" onclick="switchVietQrSub('bidv77020','diemmap')">🏪 Map Cửa hàng → Tên điểm bán</button>
           <button class="sub-tab-btn" id="vietqr_bidv77020_btn_ctmap" onclick="switchVietQrSub('bidv77020','ctmap')">🗺️ Map Tên → Mã CT</button>
           <button class="sub-tab-btn" id="vietqr_bidv77020_btn_hist" onclick="switchVietQrSub('bidv77020','hist')">⏱️ Lịch sử tải</button>
         </div>
@@ -578,8 +578,8 @@
           </div>
         </div>
         <div id="vietqr_bidv77020_sub_diemmap" class="sub-panel" style="margin-top:.75rem">
-          <div style="font-size:.85em;color:#475569;margin-bottom:.75rem">Map từng <strong>Mã điểm bán</strong> sang <strong>Tên điểm bán</strong> (đọc từ file "Tên điểm bán" bạn tải ở trên, có thể sửa tay).</div>
-          <div id="vietqrDiemMapContent_bidv77020"><div class="empty-state"><div class="big-icon">🗺️</div><p>Tải file giao dịch Viet QR để thấy danh sách điểm bán</p></div></div>
+          <div style="font-size:.85em;color:#475569;margin-bottom:.75rem">Map từng <strong>Mã cửa hàng</strong> (trong file giao dịch Viet QR) sang <strong>Tên điểm bán</strong> — tự động đối chiếu qua file "DS Cửa hàng ↔ Điểm bán" bạn tải ở trên (khớp theo cột "Mã cửa hàng"), có thể sửa tay nếu thiếu.</div>
+          <div id="vietqrDiemMapContent_bidv77020"><div class="empty-state"><div class="big-icon">🗺️</div><p>Tải file giao dịch Viet QR để thấy danh sách cửa hàng</p></div></div>
         </div>
         <div id="vietqr_bidv77020_sub_ctmap" class="sub-panel" style="margin-top:.75rem">
           <div style="font-size:.85em;color:#475569;margin-bottom:.75rem">Map từng <strong>Tên điểm bán</strong> sang <strong>Mã CT</strong>.</div>
@@ -604,7 +604,7 @@
         </div>
         <div class="sub-tab-bar" style="margin-top:.5rem">
           <button class="sub-tab-btn active" id="vietqr_mb11521268_btn_ds" onclick="switchVietQrSub('mb11521268','ds')">📅 Đối soát ngày</button>
-          <button class="sub-tab-btn" id="vietqr_mb11521268_btn_diemmap" onclick="switchVietQrSub('mb11521268','diemmap')">🏪 Map Điểm bán → Tên</button>
+          <button class="sub-tab-btn" id="vietqr_mb11521268_btn_diemmap" onclick="switchVietQrSub('mb11521268','diemmap')">🏪 Map Cửa hàng → Tên điểm bán</button>
           <button class="sub-tab-btn" id="vietqr_mb11521268_btn_ctmap" onclick="switchVietQrSub('mb11521268','ctmap')">🗺️ Map Tên → Mã CT</button>
           <button class="sub-tab-btn" id="vietqr_mb11521268_btn_hist" onclick="switchVietQrSub('mb11521268','hist')">⏱️ Lịch sử tải</button>
         </div>
@@ -637,8 +637,8 @@
           </div>
         </div>
         <div id="vietqr_mb11521268_sub_diemmap" class="sub-panel" style="margin-top:.75rem">
-          <div style="font-size:.85em;color:#475569;margin-bottom:.75rem">Map từng <strong>Mã điểm bán</strong> sang <strong>Tên điểm bán</strong> (đọc từ file "Tên điểm bán" bạn tải ở trên, có thể sửa tay).</div>
-          <div id="vietqrDiemMapContent_mb11521268"><div class="empty-state"><div class="big-icon">🗺️</div><p>Tải file giao dịch Viet QR để thấy danh sách điểm bán</p></div></div>
+          <div style="font-size:.85em;color:#475569;margin-bottom:.75rem">Map từng <strong>Mã cửa hàng</strong> (trong file giao dịch Viet QR) sang <strong>Tên điểm bán</strong> — tự động đối chiếu qua file "DS Cửa hàng ↔ Điểm bán" bạn tải ở trên (khớp theo cột "Mã cửa hàng"), có thể sửa tay nếu thiếu.</div>
+          <div id="vietqrDiemMapContent_mb11521268"><div class="empty-state"><div class="big-icon">🗺️</div><p>Tải file giao dịch Viet QR để thấy danh sách cửa hàng</p></div></div>
         </div>
         <div id="vietqr_mb11521268_sub_ctmap" class="sub-panel" style="margin-top:.75rem">
           <div style="font-size:.85em;color:#475569;margin-bottom:.75rem">Map từng <strong>Tên điểm bán</strong> sang <strong>Mã CT</strong>.</div>
@@ -4467,20 +4467,38 @@
     // đối soát TỪNG GIAO DỊCH qua mã VietQR nhúng sẵn (VQR+13 ký tự) trong
     // "Nội dung TT" của file & "Diễn giải" của sao kê NH — ngân hàng làm
     // chuẩn: nếu khớp, lấy amount của NH thay cho amount tự khai trong file.
-    // Map 2 bước (khác Momo map 1 bước _ctMap thẳng gian→CT): Mã điểm bán
-    // (trong file GD) → Tên điểm bán (từ file riêng Luyen tải) → Mã CT. 2
-    // map này DÙNG CHUNG cho cả 3 ngân hàng (không tách riêng theo tab).
+    // Map 2 bước (khác Momo map 1 bước _ctMap thẳng gian→CT): Mã cửa hàng
+    // (trong file GD) → Tên điểm bán (tự đối chiếu qua file "store-export"
+    // Luyen tải) → Mã CT. 2 map này DÙNG CHUNG cho cả 3 ngân hàng (không
+    // tách riêng theo tab).
+    //
+    // Chi Nhan, 2026-09-11 -- SỬA LỖI QUAN TRỌNG: bản đầu tiên dùng cột "Mã
+    // điểm bán" của file giao dịch Viet QR (dạng VVB890562...) làm khoá join
+    // với file store-export Luyen tải -- nhưng đã kiểm tra dữ liệu thật: cột
+    // "Mã điểm bán" của file store-export lại là mã KHÁC hoàn toàn (dạng
+    // MC1746117426303, từ hệ thống quản lý cửa hàng nội bộ) -- 2 mã này
+    // không hề trùng nhau, join sai 100% (0/64 khớp mãi mãi). Mã DUY NHẤT
+    // trùng giữa 2 file là "Mã cửa hàng" (mã 10 ký tự chữ+số, vd 9EBD7FGNUS)
+    // -- đã xác nhận: mã này xuất hiện y hệt ở cả file giao dịch (cột J) và
+    // file store-export (cột "Mã cửa hàng") -- 1 "Mã điểm bán"/"Tên điểm
+    // bán" của store-export có thể gồm NHIỀU "Mã cửa hàng" khác nhau (vd 5
+    // mã cửa hàng SB Vinh 06/07/09/10/15 Posh đều chung 1 điểm bán "POSH Sân
+    // Bay Vinh"). Đổi khoá join từ maDiemBan sang maCuaHang.
     // ══════════════════════════════════════════
     const VIETQR_BANKS = ['bidv7704','bidv77020','mb11521268'];
     const VIETQR_BANK_LABEL = { bidv7704:'BIDV7704', bidv77020:'BIDV77020', mb11521268:'MB11521268' };
 
-    const LS_VIETQR_DIEM_NAME = `vietqr_diem_name_${COMPANY}`; // { maDiemBan: tenDiemBan } — dùng chung 3 NH
-    const LS_VIETQR_CT_MAP    = `vietqr_ct_map_${COMPANY}`;    // { tenDiemBan: maCT } — dùng chung 3 NH
+    const LS_VIETQR_DIEM_NAME    = `vietqr_diem_name_${COMPANY}`;    // { maCuaHang: tenDiemBan } — dùng chung 3 NH
+    const LS_VIETQR_DIEM_MANUAL  = `vietqr_diem_manual_${COMPANY}`;  // { maCuaHang: true } — đã sửa tay, không cho auto ghi đè
+    const LS_VIETQR_CUA_HANG_REF = `vietqr_cua_hang_ref_${COMPANY}`; // { maCuaHang: {maDiemBan,tenDiemBan,tenCuaHang} } — bảng gốc từ file store-export
+    const LS_VIETQR_CT_MAP       = `vietqr_ct_map_${COMPANY}`;       // { tenDiemBan: maCT } — dùng chung 3 NH
     const lsVietqrTxnKey  = b => `vietqr_txn_${b}_${COMPANY}`;
     const lsVietqrHDKey   = b => `vietqr_hd_${b}_${COMPANY}`;
     const lsVietqrHistKey = b => `vietqr_hist_${b}_${COMPANY}`;
 
-    let _vietqrDiemName = {};
+    let _vietqrDiemName   = {}; // maCuaHang -> tenDiemBan (có thể sửa tay)
+    let _vietqrDiemManual = {}; // maCuaHang -> true nếu đã sửa tay
+    let _vietqrCuaHangRef = {}; // maCuaHang -> {maDiemBan, tenDiemBan, tenCuaHang} (từ file store-export)
     let _vietqrCtMap    = {};
     let _vietqrTxn  = { bidv7704:[], bidv77020:[], mb11521268:[] };
     let _vietqrHD   = { bidv7704:{}, bidv77020:{}, mb11521268:{} };
@@ -4488,8 +4506,10 @@
     let _bankVietqr    = { bidv7704:[], bidv77020:[], mb11521268:[] };
     let _bankVietqrMap = { bidv7704:{}, bidv77020:{}, mb11521268:{} };
 
-    try { const s=localStorage.getItem(LS_VIETQR_DIEM_NAME); if(s) _vietqrDiemName=JSON.parse(s); } catch(e){}
-    try { const s=localStorage.getItem(LS_VIETQR_CT_MAP);    if(s) _vietqrCtMap=JSON.parse(s);    } catch(e){}
+    try { const s=localStorage.getItem(LS_VIETQR_DIEM_NAME);    if(s) _vietqrDiemName=JSON.parse(s);   } catch(e){}
+    try { const s=localStorage.getItem(LS_VIETQR_DIEM_MANUAL);  if(s) _vietqrDiemManual=JSON.parse(s); } catch(e){}
+    try { const s=localStorage.getItem(LS_VIETQR_CUA_HANG_REF); if(s) _vietqrCuaHangRef=JSON.parse(s); } catch(e){}
+    try { const s=localStorage.getItem(LS_VIETQR_CT_MAP);       if(s) _vietqrCtMap=JSON.parse(s);      } catch(e){}
     VIETQR_BANKS.forEach(b => {
       try { const s=localStorage.getItem(lsVietqrTxnKey(b));  if(s) _vietqrTxn[b]=JSON.parse(s);  } catch(e){}
       try { const s=localStorage.getItem(lsVietqrHDKey(b));   if(s) _vietqrHD[b]=JSON.parse(s);   } catch(e){}
@@ -4576,7 +4596,16 @@
             _vietqrTxn[bank] = _vietqrTxn[bank].slice(-6000);
             try { lsSet(lsVietqrTxnKey(bank), JSON.stringify(_vietqrTxn[bank])); } catch(e2){}
           }
-          added.forEach(r => { if(r.maDiemBan && _vietqrDiemName[r.maDiemBan]===undefined) _vietqrDiemName[r.maDiemBan]=''; });
+          added.forEach(r => {
+            if(!r.maCuaHang) return;
+            // Tự seed tên điểm bán ngay nếu đã có sẵn trong bảng tham chiếu
+            // store-export (Luyen tải trước hoặc sau đều được, tự khớp lại
+            // mỗi lần render), nếu chưa có thì để trống cho tới khi map.
+            if(_vietqrDiemName[r.maCuaHang]===undefined) {
+              const ref = _vietqrCuaHangRef[r.maCuaHang];
+              _vietqrDiemName[r.maCuaHang] = ref ? (ref.tenDiemBan || ref.tenCuaHang || '') : '';
+            }
+          });
           lsSet(LS_VIETQR_DIEM_NAME, JSON.stringify(_vietqrDiemName));
 
           _vietqrHist[bank].unshift({file:fname, at:new Date().toLocaleString('vi'), added:added.length, skip:newRows.length-added.length});
@@ -4591,49 +4620,64 @@
       inp.value='';
     }
 
-    // Luyen sẽ tải thêm 1 file/sheet riêng chứa "Tên điểm bán" (chưa xác
-    // định chắc cấu trúc cột — dò linh hoạt theo TÊN CỘT chứa "mã điểm/mã
-    // cửa hàng" và "tên điểm/tên cửa hàng" trong 10 dòng đầu; nếu không dò
-    // được thì mặc định cột A=mã, cột B=tên).
-    function handleVietQrDiemNameFile(inp) {
+    // File "store-export" (Luyen tải, sheet "store-export"): STT, Tên cửa
+    // hàng, Mã cửa hàng, Mã điểm bán, Tên điểm bán, Doanh thu ngày, Số lượng
+    // GD ngày, Ngày tạo — đã xác nhận đúng cấu trúc trên dữ liệu thật ngày
+    // 2026-09-11. Khoá join với file giao dịch Viet QR là "Mã cửa hàng" (mã
+    // 10 ký tự, KHÔNG PHẢI "Mã điểm bán" — 2 file dùng 2 hệ mã điểm bán khác
+    // nhau, xem ghi chú ở đầu block Viet QR). Nhiều "Mã cửa hàng" có thể
+    // cùng chung 1 "Mã điểm bán"/"Tên điểm bán".
+    function handleVietQrStoreExportFile(inp) {
       if (!inp.files[0]) return;
       const fname = inp.files[0].name;
       const reader = new FileReader();
       reader.onload = e => {
         try {
           const wb = XLSX.read(new Uint8Array(e.target.result), {type:'array'});
-          const ws = wb.Sheets[wb.SheetNames[0]];
+          const ws = wb.Sheets['store-export'] || wb.Sheets[wb.SheetNames[0]];
           const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+          if (!rows.length) { alert('File rỗng.'); return; }
+          const hdr = rows[0];
           const normHdr = s => String(s||'').toLowerCase().normalize('NFC').trim();
-          let hdrIdx = 0, iMa = 0, iTen = 1, found = false;
-          for (let i=0;i<Math.min(rows.length,10);i++){
-            const r = rows[i];
-            const idxMa  = r.findIndex(c => /mã.*điểm|ma.*diem|mã.*cửa hàng|ma.*cua hang/.test(normHdr(c)));
-            const idxTen = r.findIndex(c => /tên.*điểm|ten.*diem|tên.*cửa hàng|ten.*cua hang/.test(normHdr(c)));
-            if (idxMa > -1 && idxTen > -1) { hdrIdx = i; iMa = idxMa; iTen = idxTen; found = true; break; }
-          }
-          let added = 0, total = 0;
-          rows.slice(hdrIdx+1).forEach(r => {
-            const ma = String(r[iMa]||'').trim();
-            const ten = String(r[iTen]||'').trim();
-            if (!ma) return;
+          const findCol = (...kw) => hdr.findIndex(h => kw.some(k=>normHdr(h).includes(k)));
+          let iTenCuaHang = findCol('tên cửa hàng','ten cua hang'); if(iTenCuaHang<0) iTenCuaHang=1;
+          let iMaCuaHang  = findCol('mã cửa hàng','ma cua hang');   if(iMaCuaHang<0) iMaCuaHang=2;
+          let iMaDiem     = findCol('mã điểm bán','ma diem ban');   if(iMaDiem<0) iMaDiem=3;
+          let iTenDiem    = findCol('tên điểm bán','ten diem ban'); if(iTenDiem<0) iTenDiem=4;
+
+          let total = 0, autoFilled = 0;
+          rows.slice(1).forEach(r => {
+            const maCH = String(r[iMaCuaHang]||'').trim();
+            if (!maCH) return;
             total++;
-            if (ten && _vietqrDiemName[ma] !== ten) added++;
-            _vietqrDiemName[ma] = ten || _vietqrDiemName[ma] || '';
+            const info = {
+              maDiemBan: String(r[iMaDiem]||'').trim(),
+              tenDiemBan: String(r[iTenDiem]||'').trim(),
+              tenCuaHang: String(r[iTenCuaHang]||'').trim(),
+            };
+            _vietqrCuaHangRef[maCH] = info;
+            const auto = info.tenDiemBan || info.tenCuaHang;
+            // Không ghi đè nếu Luyen đã tự sửa tay ở bảng "Map Cửa hàng → Tên"
+            if (auto && !_vietqrDiemManual[maCH]) {
+              if (_vietqrDiemName[maCH] !== auto) autoFilled++;
+              _vietqrDiemName[maCH] = auto;
+            }
           });
+          lsSet(LS_VIETQR_CUA_HANG_REF, JSON.stringify(_vietqrCuaHangRef));
           lsSet(LS_VIETQR_DIEM_NAME, JSON.stringify(_vietqrDiemName));
           VIETQR_BANKS.forEach(b => renderVietQrDoiSoat(b));
           renderVietQrDiemMap(); renderVietQrCtMap();
-          alert(`✅ Tên điểm bán: +${added} tên mới${found?'':' (không dò được đúng tên cột — đã dùng mặc định cột A=mã, cột B=tên, vui lòng kiểm tra lại)'}\nĐọc ${total} dòng · Tổng đã map: ${Object.values(_vietqrDiemName).filter(Boolean).length}/${Object.keys(_vietqrDiemName).length}`);
-        } catch(err) { alert('Lỗi đọc file Tên điểm bán: ' + err.message); }
+          const mappedCount = Object.values(_vietqrDiemName).filter(Boolean).length;
+          alert(`✅ Đã đọc ${total} dòng cửa hàng · Tự map ${autoFilled} tên điểm bán\nCác Mã cửa hàng đang xuất hiện trong GD Viet QR đã map tên: ${mappedCount}/${Object.keys(_vietqrDiemName).length}`);
+        } catch(err) { alert('Lỗi đọc file Cửa hàng/Điểm bán: ' + err.message); }
       };
       reader.readAsArrayBuffer(inp.files[0]);
       inp.value='';
     }
 
-    function getVietQrTenDiem(maDiemBan) {
-      const t = (_vietqrDiemName[maDiemBan]||'').trim();
-      return t || maDiemBan;
+    function getVietQrTenDiem(maCuaHang) {
+      const t = (_vietqrDiemName[maCuaHang]||'').trim();
+      return t || maCuaHang;
     }
     function getVietQrMaCT(tenDiem) {
       const m = (_vietqrCtMap[tenDiem]||'').trim();
@@ -4642,7 +4686,9 @@
     function saveVietQrDiemName(inp) {
       const ma = inp.dataset.ma;
       _vietqrDiemName[ma] = inp.value.trim();
+      _vietqrDiemManual[ma] = true; // đã sửa tay -- lần tải file store-export sau không tự ghi đè nữa
       lsSet(LS_VIETQR_DIEM_NAME, JSON.stringify(_vietqrDiemName));
+      lsSet(LS_VIETQR_DIEM_MANUAL, JSON.stringify(_vietqrDiemManual));
       renderVietQrDiemMap(); renderVietQrCtMap();
       VIETQR_BANKS.forEach(b => renderVietQrDoiSoat(b));
     }
@@ -4656,15 +4702,15 @@
 
     function renderVietQrDiemMap() {
       const allMa = new Set();
-      VIETQR_BANKS.forEach(b => _vietqrTxn[b].forEach(r => { if(r.maDiemBan) allMa.add(r.maDiemBan); }));
+      VIETQR_BANKS.forEach(b => _vietqrTxn[b].forEach(r => { if(r.maCuaHang) allMa.add(r.maCuaHang); }));
       const mas = [...allMa].sort();
       let html;
       if (!mas.length) {
-        html = '<div class="empty-state"><div class="big-icon">🗺️</div><p>Tải file giao dịch Viet QR để thấy danh sách điểm bán</p></div>';
+        html = '<div class="empty-state"><div class="big-icon">🗺️</div><p>Tải file giao dịch Viet QR để thấy danh sách cửa hàng</p></div>';
       } else {
         const unmapped = mas.filter(m => !(_vietqrDiemName[m]||'').trim()).length;
-        html = `<div style="font-size:.83em;color:#64748b;margin-bottom:.6rem">${mas.length} mã điểm bán · <span style="color:${unmapped?'#d97706':'#16a34a'}">${unmapped} chưa map tên</span></div>`;
-        html += '<table style="width:100%;border-collapse:collapse;font-size:.84em"><thead><tr style="background:#d1fae5;color:#065f46"><th style="padding:.3rem .6rem;text-align:left">Mã điểm bán</th><th style="padding:.3rem .4rem;text-align:left">Tên điểm bán</th><th style="padding:.3rem .4rem;width:56px"></th></tr></thead><tbody>';
+        html = `<div style="font-size:.83em;color:#64748b;margin-bottom:.6rem">${mas.length} mã cửa hàng · <span style="color:${unmapped?'#d97706':'#16a34a'}">${unmapped} chưa map tên</span></div>`;
+        html += '<table style="width:100%;border-collapse:collapse;font-size:.84em"><thead><tr style="background:#d1fae5;color:#065f46"><th style="padding:.3rem .6rem;text-align:left">Mã cửa hàng</th><th style="padding:.3rem .4rem;text-align:left">Tên điểm bán</th><th style="padding:.3rem .4rem;width:56px"></th></tr></thead><tbody>';
         mas.forEach((ma,i) => {
           const isMapped = !!(_vietqrDiemName[ma]||'').trim();
           const bg = isMapped ? (i%2?'#f0fdf4':'#dcfce7') : (i%2?'#fff':'#fffbeb');
@@ -4684,7 +4730,7 @@
 
     function renderVietQrCtMap() {
       const allMa = new Set();
-      VIETQR_BANKS.forEach(b => _vietqrTxn[b].forEach(r => { if(r.maDiemBan) allMa.add(r.maDiemBan); }));
+      VIETQR_BANKS.forEach(b => _vietqrTxn[b].forEach(r => { if(r.maCuaHang) allMa.add(r.maCuaHang); }));
       const tens = new Set();
       allMa.forEach(ma => tens.add(getVietQrTenDiem(ma)));
       const tenList = [...tens].sort();
@@ -4748,7 +4794,7 @@
       const bankMap = _bankVietqrMap[bank] || {};
       const byDate = {}; // date -> maCT -> {amount, soGD, matched, tenDiem}
       txns.forEach(r => {
-        const tenDiem = getVietQrTenDiem(r.maDiemBan);
+        const tenDiem = getVietQrTenDiem(r.maCuaHang);
         const maCT = getVietQrMaCT(tenDiem);
         const bankHit = r.vqrCode ? bankMap[r.vqrCode] : null;
         const amount = bankHit ? bankHit.amount : r.amount; // ngân hàng làm chuẩn
@@ -4770,7 +4816,7 @@
       html += '</div>';
 
       const unmappedTen = new Set();
-      txns.forEach(r => { const t=getVietQrTenDiem(r.maDiemBan); if(!(_vietqrCtMap[t]||'').trim()) unmappedTen.add(t); });
+      txns.forEach(r => { const t=getVietQrTenDiem(r.maCuaHang); if(!(_vietqrCtMap[t]||'').trim()) unmappedTen.add(t); });
       if (unmappedTen.size) {
         html += '<div style="background:#fef3c7;border:1px solid #f59e0b;border-radius:8px;padding:.6rem 1rem;margin-bottom:.6rem;font-size:.87em;color:#92400e;display:flex;justify-content:space-between;align-items:center;gap:.6rem;flex-wrap:wrap">'
           +'<span>⚠️ Có <strong>'+unmappedTen.size+'</strong> điểm bán chưa map mã CT.</span>'
@@ -4993,7 +5039,7 @@
 
       const grossByDateCT = {};
       _vietqrTxn[bank].forEach(r => {
-        const tenDiem = getVietQrTenDiem(r.maDiemBan);
+        const tenDiem = getVietQrTenDiem(r.maCuaHang);
         const maCT = getVietQrMaCT(tenDiem);
         const bankHit = r.vqrCode ? _bankVietqrMap[bank][r.vqrCode] : null;
         const amt = bankHit ? bankHit.amount : r.amount;
