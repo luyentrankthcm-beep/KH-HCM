@@ -227,6 +227,9 @@
 
       <!-- Sub: History -->
       <div id="momo-history" class="sub-panel">
+        <div style="display:flex;justify-content:flex-end;margin-bottom:.6rem">
+          <button class="btn-export" onclick="exportMomoMisa()" style="background:#7c3aed">📥 Xuất Misa (MISATHUE123456)</button>
+        </div>
         <div id="historyList" style="max-height:60vh;overflow-y:auto">
           <p class="empty-hint">Chưa có lịch sử tải lên</p>
         </div>
@@ -1894,6 +1897,137 @@
       const ws = XLSX.utils.aoa_to_sheet(aoa);
       XLSX.utils.book_append_sheet(wb, ws, 'Momo pivot');
       XLSX.writeFile(wb, 'Momo_pivot.xlsx');
+    }
+
+    // ── Xuất Misa (Lịch sử tải) ──
+    // Luyen, 2026-09-11: "cho thêm cho tôi sao cái lịch sử tải á thêm cái
+    // xuất file Misa cho tôi nhá mẫu xuất xuống giống như thế này nhá ...
+    // số với gian lấy ra á cũng là soa khi trừ phí nhá với diễn giải á" --
+    // xuất ĐÚNG định dạng "MISATHUE123456" (mẫu phiếu thu tiền gửi nhập AMIS)
+    // Luyen đã dùng ở trang /doi-soat/momo cũ (xem routes/doisoat.js, route
+    // /doi-soat/momo/export.xlsx, cùng MOMO_CHANNELS.kh_cu -- giữ đồng bộ
+    // đúng các giá trị cố định: Mã đối tượng "TRỰC TUYẾN0305289153", TK Nợ
+    // 1121 / TK Có 131, TK 8699123456 tại BIDV), nhưng lấy số liệu TỪ CHÍNH
+    // trang Đầu Ra này (mới tải file trực tiếp ở đây, không qua trang đối
+    // soát cũ nữa) -- "Số tiền" xuất ra là Net SAU KHI TRỪ PHÍ (đúng số đang
+    // hiện ở cột "Tiền Net" bên tab Đối soát ngày), "Doanh thu gộp (trước
+    // phí)" là số thô trước phí. Mỗi NGÀY 1 "Số chứng từ" (NTTK...), các gian
+    // cùng ngày dùng chung. Gian CHƯA map Mã CT (tab Map CT) không xuất được
+    // (Misa bắt buộc phải có Mã công trình) -- báo riêng danh sách này để
+    // Luyen map trước rồi xuất lại.
+    function exportMomoMisa() {
+      if (!_rows.length) { alert('Chưa có dữ liệu Momo để xuất.'); return; }
+      const selMonth = (document.getElementById('filterMonth') || {}).value || '';
+      const toSlash = d => d.replace(/-/g, '/'); // "DD-MM-YYYY" -> "DD/MM/YYYY"
+      const sortKey = d => { const [dd,mm,yy] = d.split('-'); return `${yy}-${mm}-${dd}`; };
+
+      const filteredDates = _dates.filter(d => {
+        if (!selMonth) return true;
+        const [dd, mm, yy] = d.split('-');
+        return `${mm}/${yy}` === selMonth;
+      });
+      if (!filteredDates.length) { alert('Không có dữ liệu cho tháng đang lọc.'); return; }
+
+      // Đúng theo MOMO_CHANNELS trong routes/doisoat.js -- giữ khớp nếu sau
+      // này đổi tài khoản Momo.
+      const MOMO_BANK_ACCOUNT  = COMPANY === 'kh_moi' ? 8620107701 : 8699123456;
+      const MOMO_BANK_FULLNAME = 'Ngân hàng TMCP Đầu tư và Phát triển Việt Nam';
+
+      // Group giống hệt renderDoiSoatNgay: date -> groupKey(maCT||gian) -> {amount, fee, maCT, gians[]}
+      const byDate = {};
+      _rows.forEach(r => {
+        const [dd,mm,yy] = r.date.split('-');
+        if (selMonth && `${mm}/${yy}` !== selMonth) return;
+        if (!byDate[r.date]) byDate[r.date] = {};
+        const maCT = (_ctMap[r.gian] || {}).maCT;
+        const gKey = maCT || r.gian;
+        if (!byDate[r.date][gKey]) byDate[r.date][gKey] = { amount: 0, fee: 0, maCT: maCT || null, gians: [] };
+        const rate = r.feeRate != null ? r.feeRate : (COMPANY === 'kh_cu' ? 0.011 : 0.01);
+        byDate[r.date][gKey].amount += r.amount;
+        byDate[r.date][gKey].fee    += r.amount * rate;
+        if (!byDate[r.date][gKey].gians.includes(r.gian)) byDate[r.date][gKey].gians.push(r.gian);
+      });
+
+      const rows = [];
+      const skippedUnmapped = [];
+      let seq = 1;
+      filteredDates.slice().sort((a,b) => sortKey(a).localeCompare(sortKey(b))).forEach(date => {
+        const gianData = byDate[date] || {};
+        const gianList = Object.keys(gianData).sort();
+        if (!gianList.length) return;
+        const soCt = 'NTTK' + String(seq).padStart(7,'0') + '/26';
+        let usedThisDate = false;
+        gianList.forEach(g => {
+          const dg = gianData[g];
+          if (!dg.maCT) { skippedUnmapped.push(dg.gians.join(', ') || g); return; }
+          const feeR = Math.round(dg.fee);
+          const hd = _hdData[`${date}|${g}`] || {};
+          const serverKey = `${sortKey(date)}|${dg.maCT}`;
+          const serverNetVal   = _serverNet[serverKey]   != null ? _serverNet[serverKey]   : null;
+          const serverGrossVal = _serverGross[serverKey] != null ? _serverGross[serverKey] : null;
+          const dt  = (hd.dtOvr  != null && hd.dtOvr  !== '') ? (parseFloat(String(hd.dtOvr).replace(/[^0-9.-]/g,''))||0)
+                     : (serverGrossVal != null ? serverGrossVal : dg.amount);
+          const net = (hd.netOvr != null && hd.netOvr !== '') ? (parseFloat(String(hd.netOvr).replace(/[^0-9.-]/g,''))||0)
+                     : (serverNetVal != null ? serverNetVal : (dg.amount - feeR));
+          const soHD = (hd.soHD||'').trim();
+          const tienHD = parseFloat(String(hd.soTienHD||'').replace(/[^0-9.]/g,'')) || 0;
+          const dienGiai = soHD
+            ? `Thu tiền dịch vụ vui chơi giải trí - MM theo HĐ ${soHD}`
+            : 'Thu tiền dịch vụ vui chơi giải trí - MM';
+          rows.push({
+            'Ngày hạch toán (*)': toSlash(date),
+            'Ngày chứng từ (*)': toSlash(date),
+            'Số chứng từ (*)': soCt,
+            'Mã đối tượng': 'TRỰC TUYẾN0305289153',
+            'Tên đối tượng': '',
+            'Địa chỉ': '',
+            'Nộp vào TK': MOMO_BANK_ACCOUNT,
+            'Mở tại ngân hàng': MOMO_BANK_FULLNAME,
+            'Lý do thu': 'Thu tiền khách hàng (không theo hóa đơn)',
+            'Diễn giải lý do thu': dienGiai,
+            'Mã nhân viên thu': '',
+            'Diễn giải (hạch toán)': dienGiai,
+            'TK Nợ (*)': 1121,
+            'TK Có (*)': '131',
+            'Số tiền': Math.round(net),
+            'Mã đối tượng (hạch toán)': 'TRỰC TUYẾN0305289153',
+            'Số khế ước đi vay': '',
+            'Số khế ước cho vay': '',
+            'Mã khoản mục chi phí': '',
+            'Mã đơn vị': '',
+            'Mã đối tượng THCP': '',
+            'Mã công trình': dg.maCT,
+            'Số đơn đặt hàng': '',
+            'Số đơn mua hàng': '',
+            'Số hợp đồng mua': '',
+            'Số hợp đồng bán': '',
+            'Mã thống kê': '',
+            'CP không hợp lý': '',
+            'Số HĐ khớp': soHD,
+            'Tổng tiền HĐ khớp': tienHD,
+            'Doanh thu gộp (trước phí)': Math.round(dt),
+            'Chênh lệch HĐ vs doanh thu': Math.round(tienHD - dt),
+            'Trạng thái': !soHD ? 'Chưa có HĐ' : (Math.abs(tienHD - dt) <= 1000 ? 'Khớp' : 'Lệch'),
+          });
+          usedThisDate = true;
+        });
+        if (usedThisDate) seq++;
+      });
+
+      if (!rows.length) { alert('Không có gian nào đã map Mã CT để xuất -- vào tab "📊 Theo gian" bấm "Map CT" map trước rồi xuất lại.'); return; }
+
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.json_to_sheet(rows);
+      XLSX.utils.book_append_sheet(wb, ws, 'MISATHUE123456');
+      const fname = 'MISATHUE123456_Momo' + (selMonth ? '_' + selMonth.replace('/','-') : '') + '.xlsx';
+      XLSX.writeFile(wb, fname);
+
+      if (skippedUnmapped.length) {
+        const uniq = [...new Set(skippedUnmapped)];
+        alert(`✅ Đã xuất ${rows.length} dòng vào file ${fname}\n\n⚠️ Bỏ qua ${uniq.length} gian CHƯA map Mã CT (vào tab "Map CT" map rồi xuất lại):\n${uniq.slice(0,10).join(', ')}${uniq.length>10?'...':''}`);
+      } else {
+        alert(`✅ Đã xuất ${rows.length} dòng vào file ${fname}`);
+      }
     }
 
     // ── MTT / Hóa đơn ──
