@@ -826,6 +826,7 @@
         <button class="btn-cancel" onclick="closeZvpMisaModal()">Hủy</button>
         <button onclick="confirmExportZvpMisa('online')" style="background:#2563eb;color:#fff;border:none;border-radius:6px;padding:.45rem 1.2rem;cursor:pointer;font-weight:600">📥 Xuất Online (Zalo)</button>
         <button onclick="confirmExportZvpMisa('offline')" style="background:#7c3aed;color:#fff;border:none;border-radius:6px;padding:.45rem 1.2rem;cursor:pointer;font-weight:600">📥 Xuất Offline (VNPay+Payoo)</button>
+        <button onclick="confirmExportZvpMisa('all')" style="background:#16a34a;color:#fff;border:none;border-radius:6px;padding:.45rem 1.2rem;cursor:pointer;font-weight:700">📥 Xuất cả 2 file (Online + Offline)</button>
       </div>
     </div>
   </div>
@@ -4971,6 +4972,11 @@
       const batches = [];
       const coveredDates = new Set();
       (bankPayments||[]).forEach(pay => {
+        // Chi Nhan, 2026-09-11: 1 vai dong sao ke Payoo co dang dien giai la
+        // (vd "TT TD NGAY 14.08 DEN 16.08.2026") server chua doan duoc thi
+        // fromDate/toDate se la null -- bo qua an toan (roi vao fallback
+        // "chua co dot NH tra" thay vi crash toan bo luc xuat).
+        if (!pay.fromDate || !pay.toDate || !pay.payDate) return;
         const payDates = allDates.filter(d => inRangeDdmm(d, pay.fromDate, pay.toDate));
         if (!payDates.length) return;
         payDates.forEach(d => coveredDates.add(d));
@@ -5094,22 +5100,23 @@
       if (stEl) stEl.textContent = '';
       closeZvpMisaModal();
 
-      if (kind === 'online') {
-        if (!_zaloFee.length) { alert('Chưa có dữ liệu Zalo Pay để xuất.'); return; }
+      function doOnline() {
+        if (!_zaloFee.length) { return { ok:false, msg:'Chưa có dữ liệu Zalo Pay để xuất.' }; }
         const { rows, skipped } = buildZvpMisaRows({
           byDate: buildZaloByDateForExport(), getGianDisp: getGianDisp_Zalo_Wrap(),
           hdObj: _zaloHD, bankPayments: _bankZaloPayments,
           dienGiaiSuffix: 'VNP', maDoiTuong: 'VN PAY0102182292',
           startSeq, fromIso, toIso,
         });
-        if (!rows.length) { alert('Không có dòng nào để xuất trong khoảng ngày đã chọn.'); return; }
+        if (!rows.length) { return { ok:false, msg:'Không có dòng nào để xuất (Online/Zalo) trong khoảng ngày đã chọn.' }; }
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'MISATHue Online');
         const fname = 'MISATHue-online_' + fromIso + '_den_' + toIso + '.xlsx';
         XLSX.writeFile(wb, fname);
-        alert(`✅ Đã xuất ${rows.length} dòng vào file ${fname}` + (skipped.length ? `\n\n⚠️ Bỏ qua ${skipped.length} nhóm chưa xác định gian.` : ''));
-      } else {
-        if (!_vnpayFee.length && !_payooFee.length) { alert('Chưa có dữ liệu VNPay/Payoo để xuất.'); return; }
+        return { ok:true, fname, count: rows.length, skipped: skipped.length };
+      }
+      function doOffline() {
+        if (!_vnpayFee.length && !_payooFee.length) { return { ok:false, msg:'Chưa có dữ liệu VNPay/Payoo để xuất.' }; }
         const vnpayPart = buildZvpMisaRows({
           byDate: buildVnpayByDateForExport(), getGianDisp: getVnpayGianDisp,
           hdObj: _vnpayHD, bankPayments: _bankVnpayPayments,
@@ -5124,12 +5131,36 @@
         });
         const rows = [...vnpayPart.rows, ...payooPart.rows];
         const skipped = [...vnpayPart.skipped, ...payooPart.skipped];
-        if (!rows.length) { alert('Không có dòng nào để xuất trong khoảng ngày đã chọn.'); return; }
+        if (!rows.length) { return { ok:false, msg:'Không có dòng nào để xuất (Offline/VNPay+Payoo) trong khoảng ngày đã chọn.' }; }
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'MISAThue OFFLINE');
         const fname = 'MISATHue-offline_' + fromIso + '_den_' + toIso + '.xlsx';
         XLSX.writeFile(wb, fname);
-        alert(`✅ Đã xuất ${rows.length} dòng (VNPay + Payoo) vào file ${fname}` + (skipped.length ? `\n\n⚠️ Bỏ qua ${skipped.length} nhóm chưa xác định gian.` : ''));
+        return { ok:true, fname, count: rows.length, skipped: skipped.length };
+      }
+
+      if (kind === 'online') {
+        const r = doOnline();
+        if (!r.ok) { alert(r.msg); return; }
+        alert(`✅ Đã xuất ${r.count} dòng vào file ${r.fname}` + (r.skipped ? `\n\n⚠️ Bỏ qua ${r.skipped} nhóm chưa xác định gian.` : ''));
+      } else if (kind === 'offline') {
+        const r = doOffline();
+        if (!r.ok) { alert(r.msg); return; }
+        alert(`✅ Đã xuất ${r.count} dòng (VNPay + Payoo) vào file ${r.fname}` + (r.skipped ? `\n\n⚠️ Bỏ qua ${r.skipped} nhóm chưa xác định gian.` : ''));
+      } else if (kind === 'all') {
+        // Chi Nhan, 2026-09-11: "cho cái xuất 1 lần cả 3 luôn nhá" -- xuất cả
+        // Online (Zalo) va Offline (VNPay+Payoo) chi voi 1 lan bam, dung
+        // chung 1 bo tham so (fromIso/toIso/startSeq) nhu khi bam rieng tung
+        // cai. 2 file van tach rieng (dung cau truc/ten file nhu cu) vi
+        // Online va Offline la 2 file Misa khac nhau, khong gop chung sheet.
+        const r1 = doOnline();
+        const r2 = doOffline();
+        const msgs = [];
+        if (r1.ok) msgs.push(`✅ Online: ${r1.count} dòng → ${r1.fname}` + (r1.skipped ? ` (bỏ qua ${r1.skipped} nhóm)` : ''));
+        else msgs.push(`⚠️ Online: ${r1.msg}`);
+        if (r2.ok) msgs.push(`✅ Offline: ${r2.count} dòng → ${r2.fname}` + (r2.skipped ? ` (bỏ qua ${r2.skipped} nhóm)` : ''));
+        else msgs.push(`⚠️ Offline: ${r2.msg}`);
+        alert(msgs.join('\n'));
       }
     }
     // getGianDisp cho Zalo không có tên hàm riêng dùng chung như VNPay/Payoo

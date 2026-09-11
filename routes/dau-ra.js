@@ -341,10 +341,27 @@ router.get("/api/dau-ra/bank-payoo", (req, res) => {
       const loai = /QRCODE/i.test(desc) ? "QR" : "THE";
 
       let fromDate = null, toDate = null;
-      const mCross  = /NGAY\s+(\d{1,2})\.(\d{1,2})_(\d{1,2})\.(\d{1,2})\.(\d{2,4})/i.exec(desc);
-      const mSame   = !mCross && /NGAY\s+(\d{1,2})_(\d{1,2})\.(\d{1,2})\.(\d{2,4})/i.exec(desc);
-      const mSingle = !mCross && !mSame && /NGAY\s+(\d{1,2})\.(\d{1,2})\.(\d{2,4})/i.exec(desc);
-      if (mCross) {
+      // Chi Nhan, 2026-09-11: phat hien them 1 dang dien giai Payoo khac --
+      // dung chu " DEN " thay vi dau "_" de noi khoang ngay (vd "TT TD NGAY
+      // 14.08 DEN 16.08.2026", khac thang) -- khien ca 3 regex duoi deu
+      // KHONG khop, fromDate/toDate = null, gay crash khi loc theo khoang
+      // ngay (TypeError o ddmmToISO). Them regex rieng cho dang " DEN " nay.
+      const mCrossDen = /NGAY\s+(\d{1,2})\.(\d{1,2})\s+DEN\s+(\d{1,2})\.(\d{1,2})\.(\d{2,4})/i.exec(desc);
+      const mSameDen  = !mCrossDen && /NGAY\s+(\d{1,2})\s+DEN\s+(\d{1,2})\.(\d{1,2})\.(\d{2,4})/i.exec(desc);
+      const mCross  = !mCrossDen && !mSameDen && /NGAY\s+(\d{1,2})\.(\d{1,2})_(\d{1,2})\.(\d{1,2})\.(\d{2,4})/i.exec(desc);
+      const mSame   = !mCrossDen && !mSameDen && !mCross && /NGAY\s+(\d{1,2})_(\d{1,2})\.(\d{1,2})\.(\d{2,4})/i.exec(desc);
+      const mSingle = !mCrossDen && !mSameDen && !mCross && !mSame && /NGAY\s+(\d{1,2})\.(\d{1,2})\.(\d{2,4})/i.exec(desc);
+      if (mCrossDen) {
+        const [, d1, mo1, d2, mo2, y] = mCrossDen;
+        const yr = y.length === 2 ? "20" + y : y;
+        fromDate = d1.padStart(2, "0") + "-" + mo1.padStart(2, "0") + "-" + yr;
+        toDate   = d2.padStart(2, "0") + "-" + mo2.padStart(2, "0") + "-" + yr;
+      } else if (mSameDen) {
+        const [, d1, d2, mo, y] = mSameDen;
+        const yr = y.length === 2 ? "20" + y : y;
+        fromDate = d1.padStart(2, "0") + "-" + mo.padStart(2, "0") + "-" + yr;
+        toDate   = d2.padStart(2, "0") + "-" + mo.padStart(2, "0") + "-" + yr;
+      } else if (mCross) {
         const [, d1, mo1, d2, mo2, y] = mCross;
         const yr = y.length === 2 ? "20" + y : y;
         fromDate = d1.padStart(2, "0") + "-" + mo1.padStart(2, "0") + "-" + yr;
