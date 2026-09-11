@@ -148,6 +148,7 @@
         <button class="sub-tab-btn" onclick="switchSub('momo','doisoat',this); populateMonthFilter(); renderDoiSoatNgay(); fetchBankMomo(); fetchServerNet()">📅 Đối soát ngày</button>
         <button class="sub-tab-btn" onclick="switchSub('momo','detail',this)">📋 Chi tiết GD</button>
         <button class="sub-tab-btn" onclick="switchSub('momo','history',this)">🕓 Lịch sử tải</button>
+        <button class="sub-tab-btn" onclick="openMomoMisaModal()" style="margin-left:auto;background:#7c3aed;color:#fff;border-color:#7c3aed">📥 Xuất Misa</button>
       </div>
 
       <!-- Sub: Pivot -->
@@ -227,9 +228,6 @@
 
       <!-- Sub: History -->
       <div id="momo-history" class="sub-panel">
-        <div style="display:flex;justify-content:flex-end;margin-bottom:.6rem">
-          <button class="btn-export" onclick="exportMomoMisa()" style="background:#7c3aed">📥 Xuất Misa (MISATHUE123456)</button>
-        </div>
         <div id="historyList" style="max-height:60vh;overflow-y:auto">
           <p class="empty-hint">Chưa có lịch sử tải lên</p>
         </div>
@@ -734,6 +732,31 @@
       <div id="momoUploadStatus" class="upload-status"></div>
       <div class="modal-actions">
         <button class="btn-cancel" onclick="closeMomoModal()">Đóng</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== MOMO MISA EXPORT MODAL ==================== -->
+  <div id="momoMisaModal" class="modal-overlay" onclick="if(event.target===this)closeMomoMisaModal()">
+    <div class="modal-box">
+      <h3>📥 Xuất Misa (MISATHUE123456)</h3>
+      <p class="modal-sub">Chọn khoảng ngày hạch toán (ngày ngân hàng trả tiền về) và số chứng từ bắt đầu.</p>
+      <div style="display:flex;flex-direction:column;gap:.7rem;margin-top:.5rem">
+        <label style="font-size:.85em;font-weight:600;color:#1e3a5f">Từ ngày
+          <input type="date" id="misaFromDate" style="display:block;width:100%;margin-top:.25rem;padding:.4rem .6rem;border:1px solid #cbd5e1;border-radius:6px;font-size:.9em">
+        </label>
+        <label style="font-size:.85em;font-weight:600;color:#1e3a5f">Đến ngày
+          <input type="date" id="misaToDate" style="display:block;width:100%;margin-top:.25rem;padding:.4rem .6rem;border:1px solid #cbd5e1;border-radius:6px;font-size:.9em">
+        </label>
+        <label style="font-size:.85em;font-weight:600;color:#1e3a5f">Số chứng từ bắt đầu từ số
+          <input type="number" id="misaStartSeq" min="1" value="1" style="display:block;width:100%;margin-top:.25rem;padding:.4rem .6rem;border:1px solid #cbd5e1;border-radius:6px;font-size:.9em">
+          <span style="font-weight:400;color:#94a3b8;font-size:.85em">Ví dụ nhập 5 → chứng từ đầu tiên là NTTK0000005/26</span>
+        </label>
+      </div>
+      <div id="momoMisaModalStatus" style="font-size:.8em;color:#dc2626;margin-top:.5rem"></div>
+      <div class="modal-actions">
+        <button class="btn-cancel" onclick="closeMomoMisaModal()">Hủy</button>
+        <button onclick="confirmExportMomoMisa()" style="background:#7c3aed;color:#fff;border:none;border-radius:6px;padding:.45rem 1.2rem;cursor:pointer;font-weight:600">📥 Xuất Excel</button>
       </div>
     </div>
   </div>
@@ -1899,45 +1922,118 @@
       XLSX.writeFile(wb, 'Momo_pivot.xlsx');
     }
 
-    // ── Xuất Misa (Lịch sử tải) ──
+    // ── Xuất Misa (toolbar chính, có modal chọn ngày + số chứng từ) ──
     // Luyen, 2026-09-11: "cho thêm cho tôi sao cái lịch sử tải á thêm cái
-    // xuất file Misa cho tôi nhá mẫu xuất xuống giống như thế này nhá ...
-    // số với gian lấy ra á cũng là soa khi trừ phí nhá với diễn giải á" --
-    // xuất ĐÚNG định dạng "MISATHUE123456" (mẫu phiếu thu tiền gửi nhập AMIS)
-    // Luyen đã dùng ở trang /doi-soat/momo cũ (xem routes/doisoat.js, route
-    // /doi-soat/momo/export.xlsx, cùng MOMO_CHANNELS.kh_cu -- giữ đồng bộ
-    // đúng các giá trị cố định: Mã đối tượng "TRỰC TUYẾN0305289153", TK Nợ
-    // 1121 / TK Có 131, TK 8699123456 tại BIDV), nhưng lấy số liệu TỪ CHÍNH
-    // trang Đầu Ra này (mới tải file trực tiếp ở đây, không qua trang đối
-    // soát cũ nữa) -- "Số tiền" xuất ra là Net SAU KHI TRỪ PHÍ (đúng số đang
-    // hiện ở cột "Tiền Net" bên tab Đối soát ngày), "Doanh thu gộp (trước
-    // phí)" là số thô trước phí. Mỗi NGÀY 1 "Số chứng từ" (NTTK...), các gian
-    // cùng ngày dùng chung. Gian CHƯA map Mã CT (tab Map CT) không xuất được
-    // (Misa bắt buộc phải có Mã công trình) -- báo riêng danh sách này để
-    // Luyen map trước rồi xuất lại.
-    function exportMomoMisa() {
+    // xuất file Misa cho tôi nhá ... số với gian lấy ra á cũng là soa khi
+    // trừ phí nhá với diễn giải á" -- xuất ĐÚNG định dạng "MISATHUE123456"
+    // (mẫu phiếu thu tiền gửi nhập AMIS), lấy số liệu TỪ CHÍNH trang Đầu Ra.
+    //
+    // Update 2026-09-11 (2): "cột ngày hoạch toán là cột ngày ngân hàng trả
+    // tiền về á ... nếu mà ngân hàng trả về gom lại thì gom lại cho tôi luôn
+    // nhá giống bên đối soát momo á gom lại về đúng ngày trả về cộng các đối
+    // soát thực của khoản tiền đó lấy ngân hàng làm chuẩn" -- "Ngày hạch
+    // toán"/"Ngày chứng từ" giờ lấy theo NGÀY NGÂN HÀNG THỰC TRẢ TIỀN VỀ
+    // (đợt "NH trả về" -- _bankMomoPayments, y hệt logic renderDoiSoatNgay),
+    // KHÔNG phải ngày giao dịch Momo. Nếu 1 đợt NH trả gộp nhiều ngày Momo
+    // lại (fromDate→toDate), GOM các ngày đó thành 1 chứng từ duy nhất theo
+    // từng Mã CT (cộng dồn), và dùng ĐÚNG số tiền ngân hàng trả về làm chuẩn
+    // (chênh lệch làm tròn ≤700đ dồn vào Mã CT có số tiền lớn nhất trong đợt,
+    // y hệt _batchAdjMap bên renderDoiSoatNgay). Ngày Momo NÀO CHƯA có đợt NH
+    // trả về thì fallback xuất riêng theo đúng ngày Momo như cũ. Kèm modal
+    // chọn khoảng ngày hạch toán cần xuất + số chứng từ bắt đầu (nối tiếp
+    // lần xuất trước, tránh trùng số NTTK).
+    function openMomoMisaModal() {
       if (!_rows.length) { alert('Chưa có dữ liệu Momo để xuất.'); return; }
-      const selMonth = (document.getElementById('filterMonth') || {}).value || '';
-      const toSlash = d => d.replace(/-/g, '/'); // "DD-MM-YYYY" -> "DD/MM/YYYY"
-      const sortKey = d => { const [dd,mm,yy] = d.split('-'); return `${yy}-${mm}-${dd}`; };
+      const ddmmToISO = d => { const [dd,mm,yy] = d.split('-'); return `${yy}-${mm}-${dd}`; };
+      const sorted = [..._dates].sort((a,b) => ddmmToISO(a).localeCompare(ddmmToISO(b)));
+      const fromEl = document.getElementById('misaFromDate');
+      const toEl   = document.getElementById('misaToDate');
+      const seqEl  = document.getElementById('misaStartSeq');
+      const stEl   = document.getElementById('momoMisaModalStatus');
+      if (stEl) stEl.textContent = '';
+      if (fromEl) fromEl.value = ddmmToISO(sorted[0]);
+      if (toEl)   toEl.value   = ddmmToISO(sorted[sorted.length-1]);
+      if (seqEl)  seqEl.value  = 1;
+      document.getElementById('momoMisaModal').classList.add('open');
+    }
+    function closeMomoMisaModal() {
+      document.getElementById('momoMisaModal').classList.remove('open');
+    }
 
-      const filteredDates = _dates.filter(d => {
-        if (!selMonth) return true;
-        const [dd, mm, yy] = d.split('-');
-        return `${mm}/${yy}` === selMonth;
-      });
-      if (!filteredDates.length) { alert('Không có dữ liệu cho tháng đang lọc.'); return; }
+    async function confirmExportMomoMisa() {
+      const stEl = document.getElementById('momoMisaModalStatus');
+      const fromIso = (document.getElementById('misaFromDate')||{}).value;
+      const toIso   = (document.getElementById('misaToDate')||{}).value;
+      const startSeq = parseInt((document.getElementById('misaStartSeq')||{}).value, 10) || 1;
+      if (!fromIso || !toIso) { if (stEl) stEl.textContent = 'Vui lòng chọn đủ Từ ngày và Đến ngày.'; return; }
+      if (fromIso > toIso) { if (stEl) stEl.textContent = 'Từ ngày phải trước Đến ngày.'; return; }
+      if (stEl) stEl.textContent = 'Đang tải dữ liệu ngân hàng...';
+      // Đảm bảo có dữ liệu mới nhất từ server trước khi tính (đợt NH trả + net thực)
+      try { await fetchBankMomo(); } catch(e) {}
+      try { await fetchServerNet(); } catch(e) {}
+      if (stEl) stEl.textContent = '';
+      closeMomoMisaModal();
+      runExportMomoMisa(fromIso, toIso, startSeq);
+    }
 
-      // Đúng theo MOMO_CHANNELS trong routes/doisoat.js -- giữ khớp nếu sau
-      // này đổi tài khoản Momo.
+    function buildMisaRow({ date, soCt, maCT, dt, net, soHD, tienHD, dienGiai, bankAcc, bankName, toSlash }) {
+      return {
+        'Ngày hạch toán (*)': toSlash(date),
+        'Ngày chứng từ (*)': toSlash(date),
+        'Số chứng từ (*)': soCt,
+        'Mã đối tượng': 'TRỰC TUYẾN0305289153',
+        'Tên đối tượng': '',
+        'Địa chỉ': '',
+        'Nộp vào TK': bankAcc,
+        'Mở tại ngân hàng': bankName,
+        'Lý do thu': 'Thu tiền khách hàng (không theo hóa đơn)',
+        'Diễn giải lý do thu': dienGiai,
+        'Mã nhân viên thu': '',
+        'Diễn giải (hạch toán)': dienGiai,
+        'TK Nợ (*)': 1121,
+        'TK Có (*)': '131',
+        'Số tiền': Math.round(net),
+        'Mã đối tượng (hạch toán)': 'TRỰC TUYẾN0305289153',
+        'Số khế ước đi vay': '',
+        'Số khế ước cho vay': '',
+        'Mã khoản mục chi phí': '',
+        'Mã đơn vị': '',
+        'Mã đối tượng THCP': '',
+        'Mã công trình': maCT,
+        'Số đơn đặt hàng': '',
+        'Số đơn mua hàng': '',
+        'Số hợp đồng mua': '',
+        'Số hợp đồng bán': '',
+        'Mã thống kê': '',
+        'CP không hợp lý': '',
+        'Số HĐ khớp': soHD,
+        'Tổng tiền HĐ khớp': tienHD,
+        'Doanh thu gộp (trước phí)': Math.round(dt),
+        'Chênh lệch HĐ vs doanh thu': Math.round(tienHD - dt),
+        'Trạng thái': !soHD ? 'Chưa có HĐ' : (Math.abs(tienHD - dt) <= 1000 ? 'Khớp' : 'Lệch'),
+      };
+    }
+
+    function runExportMomoMisa(fromIso, toIso, startSeq) {
+      const toSlash   = d => d.replace(/-/g, '/'); // "DD-MM-YYYY" -> "DD/MM/YYYY"
+      const ddmmToISO = d => { const [dd,mm,yy] = d.split('-'); return `${yy}-${mm}-${dd}`; };
+      const inRangeDdmm = (dateDdmm, fromDdmm, toDdmm) => {
+        const d = ddmmToISO(dateDdmm);
+        return d >= ddmmToISO(fromDdmm) && d <= ddmmToISO(toDdmm);
+      };
+      const inRangeIso = (dateDdmm) => {
+        const d = ddmmToISO(dateDdmm);
+        return d >= fromIso && d <= toIso;
+      };
+
       const MOMO_BANK_ACCOUNT  = COMPANY === 'kh_moi' ? 8620107701 : 8699123456;
       const MOMO_BANK_FULLNAME = 'Ngân hàng TMCP Đầu tư và Phát triển Việt Nam';
 
-      // Group giống hệt renderDoiSoatNgay: date -> groupKey(maCT||gian) -> {amount, fee, maCT, gians[]}
+      // byDate: TẤT CẢ ngày Momo (không lọc theo khoảng xuất) -- 1 đợt NH trả
+      // có thể gộp ngày Momo nằm ngoài khoảng đang chọn xuất, cần đủ dữ liệu
+      // để tính đúng chênh lệch làm tròn của cả đợt.
       const byDate = {};
       _rows.forEach(r => {
-        const [dd,mm,yy] = r.date.split('-');
-        if (selMonth && `${mm}/${yy}` !== selMonth) return;
         if (!byDate[r.date]) byDate[r.date] = {};
         const maCT = (_ctMap[r.gian] || {}).maCT;
         const gKey = maCT || r.gian;
@@ -1948,78 +2044,164 @@
         if (!byDate[r.date][gKey].gians.includes(r.gian)) byDate[r.date][gKey].gians.push(r.gian);
       });
 
+      // Net thực 1 ngày -- y hệt computeDayFinalNet bên renderDoiSoatNgay.
+      const computeDayFinalNet = (date) => {
+        const gianData = byDate[date] || {};
+        const gList = Object.keys(gianData).sort();
+        if (!gList.length) return 0;
+        const nets = gList.map(g => {
+          const dg = gianData[g];
+          const hd = _hdData[`${date}|${g}`] || {};
+          const maCT = dg.maCT;
+          const serverKey = maCT ? `${ddmmToISO(date)}|${maCT}` : null;
+          let serverNetVal = serverKey && _serverNet[serverKey] != null ? _serverNet[serverKey] : null;
+          const net = (hd.netOvr != null && hd.netOvr !== '') ? (parseFloat(String(hd.netOvr).replace(/[^0-9.-]/g,''))||0)
+                    : (serverNetVal != null ? serverNetVal : (dg.amount - Math.round(dg.fee)));
+          return net;
+        });
+        const dayNet = nets.reduce((s,n) => s+n, 0);
+        let rounded = nets.map(n => Math.round(n));
+        const sumR = rounded.reduce((s,n) => s+n, 0);
+        const adj = Math.round(dayNet) - sumR;
+        if (adj !== 0) {
+          const maxIdx = nets.reduce((mi, n, i) => n >= nets[mi] ? i : mi, 0);
+          rounded[maxIdx] += adj;
+        }
+        const dayNH = gList.reduce((s,g) => {
+          const v = parseFloat(String((_hdData[`${date}|${g}`]||{}).tienNH||'').replace(/[^0-9.]/g,''))||0;
+          return s + v;
+        }, 0);
+        const sumFinal = rounded.reduce((s,n) => s+n, 0);
+        const nhChenh = dayNH > 0 ? (dayNH - sumFinal) : 0;
+        if (nhChenh === 1 || nhChenh === -1) return sumFinal + nhChenh;
+        return sumFinal;
+      };
+
+      // dt/net thực cho 1 (date, gKey) -- y hệt getGianDisplay bên renderDoiSoatNgay.
+      const getGianDT = (date, g) => {
+        const dg = byDate[date][g];
+        const feeR = Math.round(dg.fee);
+        const hd = _hdData[`${date}|${g}`] || {};
+        const maCT = dg.maCT;
+        const serverKey = maCT ? `${ddmmToISO(date)}|${maCT}` : null;
+        const serverNetVal   = serverKey && _serverNet[serverKey]   != null ? _serverNet[serverKey]   : null;
+        const serverGrossVal = serverKey && _serverGross[serverKey] != null ? _serverGross[serverKey] : null;
+        const dt  = (hd.dtOvr  != null && hd.dtOvr  !== '') ? (parseFloat(String(hd.dtOvr).replace(/[^0-9.-]/g,''))||0)
+                   : (serverGrossVal != null ? serverGrossVal : dg.amount);
+        const net = (hd.netOvr != null && hd.netOvr !== '') ? (parseFloat(String(hd.netOvr).replace(/[^0-9.-]/g,''))||0)
+                   : (serverNetVal != null ? serverNetVal : (dg.amount - feeR));
+        return { dt, net, hd };
+      };
+
+      // Chênh lệch làm tròn của từng đợt NH trả, dồn vào (date|gKey) có amount
+      // lớn nhất trong đợt -- y hệt _batchAdjMap bên renderDoiSoatNgay.
+      const batchAdjMap = {};
+      const hasBankPayments = _bankMomoPayments.length > 0;
+      const batches = [];
+      if (hasBankPayments) {
+        _bankMomoPayments.forEach(pay => {
+          const payDates = _dates.filter(d => inRangeDdmm(d, pay.fromDate, pay.toDate));
+          if (!payDates.length) return;
+          const momoNet = payDates.reduce((s,d) => s + computeDayFinalNet(d), 0);
+          const chenhNH = pay.amount - momoNet;
+          if (chenhNH !== 0 && Math.abs(chenhNH) <= 700) {
+            let maxAmt = -1, adjDate = null, adjGian = null;
+            payDates.forEach(d => {
+              Object.entries(byDate[d] || {}).forEach(([g, dg]) => {
+                if (dg.amount > maxAmt) { maxAmt = dg.amount; adjDate = d; adjGian = g; }
+              });
+            });
+            if (adjDate && adjGian) batchAdjMap[`${adjDate}|${adjGian}`] = chenhNH;
+          }
+          batches.push({ payDate: pay.payDate, payDates });
+        });
+      }
+
       const rows = [];
       const skippedUnmapped = [];
-      let seq = 1;
-      filteredDates.slice().sort((a,b) => sortKey(a).localeCompare(sortKey(b))).forEach(date => {
-        const gianData = byDate[date] || {};
-        const gianList = Object.keys(gianData).sort();
-        if (!gianList.length) return;
-        const soCt = 'NTTK' + String(seq).padStart(7,'0') + '/26';
-        let usedThisDate = false;
-        gianList.forEach(g => {
-          const dg = gianData[g];
-          if (!dg.maCT) { skippedUnmapped.push(dg.gians.join(', ') || g); return; }
-          const feeR = Math.round(dg.fee);
-          const hd = _hdData[`${date}|${g}`] || {};
-          const serverKey = `${sortKey(date)}|${dg.maCT}`;
-          const serverNetVal   = _serverNet[serverKey]   != null ? _serverNet[serverKey]   : null;
-          const serverGrossVal = _serverGross[serverKey] != null ? _serverGross[serverKey] : null;
-          const dt  = (hd.dtOvr  != null && hd.dtOvr  !== '') ? (parseFloat(String(hd.dtOvr).replace(/[^0-9.-]/g,''))||0)
-                     : (serverGrossVal != null ? serverGrossVal : dg.amount);
-          const net = (hd.netOvr != null && hd.netOvr !== '') ? (parseFloat(String(hd.netOvr).replace(/[^0-9.-]/g,''))||0)
-                     : (serverNetVal != null ? serverNetVal : (dg.amount - feeR));
-          const soHD = (hd.soHD||'').trim();
-          const tienHD = parseFloat(String(hd.soTienHD||'').replace(/[^0-9.]/g,'')) || 0;
-          const dienGiai = soHD
-            ? `Thu tiền dịch vụ vui chơi giải trí - MM theo HĐ ${soHD}`
-            : 'Thu tiền dịch vụ vui chơi giải trí - MM';
-          rows.push({
-            'Ngày hạch toán (*)': toSlash(date),
-            'Ngày chứng từ (*)': toSlash(date),
-            'Số chứng từ (*)': soCt,
-            'Mã đối tượng': 'TRỰC TUYẾN0305289153',
-            'Tên đối tượng': '',
-            'Địa chỉ': '',
-            'Nộp vào TK': MOMO_BANK_ACCOUNT,
-            'Mở tại ngân hàng': MOMO_BANK_FULLNAME,
-            'Lý do thu': 'Thu tiền khách hàng (không theo hóa đơn)',
-            'Diễn giải lý do thu': dienGiai,
-            'Mã nhân viên thu': '',
-            'Diễn giải (hạch toán)': dienGiai,
-            'TK Nợ (*)': 1121,
-            'TK Có (*)': '131',
-            'Số tiền': Math.round(net),
-            'Mã đối tượng (hạch toán)': 'TRỰC TUYẾN0305289153',
-            'Số khế ước đi vay': '',
-            'Số khế ước cho vay': '',
-            'Mã khoản mục chi phí': '',
-            'Mã đơn vị': '',
-            'Mã đối tượng THCP': '',
-            'Mã công trình': dg.maCT,
-            'Số đơn đặt hàng': '',
-            'Số đơn mua hàng': '',
-            'Số hợp đồng mua': '',
-            'Số hợp đồng bán': '',
-            'Mã thống kê': '',
-            'CP không hợp lý': '',
-            'Số HĐ khớp': soHD,
-            'Tổng tiền HĐ khớp': tienHD,
-            'Doanh thu gộp (trước phí)': Math.round(dt),
-            'Chênh lệch HĐ vs doanh thu': Math.round(tienHD - dt),
-            'Trạng thái': !soHD ? 'Chưa có HĐ' : (Math.abs(tienHD - dt) <= 1000 ? 'Khớp' : 'Lệch'),
-          });
-          usedThisDate = true;
-        });
-        if (usedThisDate) seq++;
-      });
+      const coveredDates = new Set();
+      let seq = startSeq;
 
-      if (!rows.length) { alert('Không có gian nào đã map Mã CT để xuất -- vào tab "📊 Theo gian" bấm "Map CT" map trước rồi xuất lại.'); return; }
+      // 1) Các đợt NH trả về -- gom tất cả ngày Momo trong đợt thành 1 chứng
+      // từ theo đúng ngày NH thực trả, cộng dồn theo từng Mã CT.
+      batches
+        .slice()
+        .sort((a,b) => ddmmToISO(a.payDate).localeCompare(ddmmToISO(b.payDate)))
+        .forEach(bg => {
+          bg.payDates.forEach(d => coveredDates.add(d));
+          if (!inRangeIso(bg.payDate)) return;
+          const byMaCT = {};
+          bg.payDates.forEach(date => {
+            const gianData = byDate[date] || {};
+            Object.keys(gianData).forEach(g => {
+              const dg = gianData[g];
+              if (!dg.maCT) { skippedUnmapped.push(dg.gians.join(', ') || g); return; }
+              const { dt, net, hd } = getGianDT(date, g);
+              const bAdj = batchAdjMap[`${date}|${g}`] || 0;
+              if (!byMaCT[dg.maCT]) byMaCT[dg.maCT] = { dt: 0, net: 0, soHDs: [], tienHD: 0 };
+              byMaCT[dg.maCT].dt  += dt;
+              byMaCT[dg.maCT].net += net + bAdj;
+              const soHD = (hd.soHD||'').trim();
+              if (soHD) {
+                byMaCT[dg.maCT].soHDs.push(soHD);
+                byMaCT[dg.maCT].tienHD += parseFloat(String(hd.soTienHD||'').replace(/[^0-9.]/g,'')) || 0;
+              }
+            });
+          });
+          const maCTList = Object.keys(byMaCT).sort();
+          if (!maCTList.length) return;
+          const soCt = 'NTTK' + String(seq).padStart(7,'0') + '/26';
+          maCTList.forEach(maCT => {
+            const b = byMaCT[maCT];
+            const soHD = b.soHDs.join(', ');
+            const dienGiai = soHD
+              ? `Thu tiền dịch vụ vui chơi giải trí - MM theo HĐ ${soHD}`
+              : 'Thu tiền dịch vụ vui chơi giải trí - MM';
+            rows.push(buildMisaRow({
+              date: bg.payDate, soCt, maCT, dt: b.dt, net: b.net,
+              soHD, tienHD: b.tienHD, dienGiai,
+              bankAcc: MOMO_BANK_ACCOUNT, bankName: MOMO_BANK_FULLNAME, toSlash,
+            }));
+          });
+          seq++;
+        });
+
+      // 2) Ngày Momo CHƯA có đợt NH trả về -- fallback xuất riêng theo đúng
+      // ngày Momo (như trước), lọc theo khoảng ngày hạch toán đang chọn.
+      const unpaidDates = _dates.filter(d => !coveredDates.has(d) && inRangeIso(d));
+      unpaidDates
+        .slice()
+        .sort((a,b) => ddmmToISO(a).localeCompare(ddmmToISO(b)))
+        .forEach(date => {
+          const gianData = byDate[date] || {};
+          const gianList = Object.keys(gianData).sort();
+          if (!gianList.length) return;
+          const soCt = 'NTTK' + String(seq).padStart(7,'0') + '/26';
+          let used = false;
+          gianList.forEach(g => {
+            const dg = gianData[g];
+            if (!dg.maCT) { skippedUnmapped.push(dg.gians.join(', ') || g); return; }
+            const { dt, net, hd } = getGianDT(date, g);
+            const soHD = (hd.soHD||'').trim();
+            const tienHD = parseFloat(String(hd.soTienHD||'').replace(/[^0-9.]/g,'')) || 0;
+            const dienGiai = soHD
+              ? `Thu tiền dịch vụ vui chơi giải trí - MM theo HĐ ${soHD}`
+              : 'Thu tiền dịch vụ vui chơi giải trí - MM';
+            rows.push(buildMisaRow({
+              date, soCt, maCT: dg.maCT, dt, net, soHD, tienHD, dienGiai,
+              bankAcc: MOMO_BANK_ACCOUNT, bankName: MOMO_BANK_FULLNAME, toSlash,
+            }));
+            used = true;
+          });
+          if (used) seq++;
+        });
+
+      if (!rows.length) { alert('Không có gian nào đã map Mã CT để xuất trong khoảng ngày đã chọn -- vào tab "📊 Theo gian" bấm "Map CT" map trước rồi xuất lại.'); return; }
 
       const wb = XLSX.utils.book_new();
       const ws = XLSX.utils.json_to_sheet(rows);
       XLSX.utils.book_append_sheet(wb, ws, 'MISATHUE123456');
-      const fname = 'MISATHUE123456_Momo' + (selMonth ? '_' + selMonth.replace('/','-') : '') + '.xlsx';
+      const fname = 'MISATHUE123456_Momo_' + fromIso + '_den_' + toIso + '.xlsx';
       XLSX.writeFile(wb, fname);
 
       if (skippedUnmapped.length) {
@@ -2388,7 +2570,11 @@
       const sorted = [..._dates].sort((a, b) => toYMD(a).localeCompare(toYMD(b)));
       const from = toYMD(sorted[0]);
       const to   = toYMD(sorted[sorted.length - 1]);
-      const account = '7701';
+      // Luyen, 2026-09-11: trước đây hardcode '7701' (chỉ đúng cho KH Mới -
+      // TK 8620107701) khiến KH Cũ (TK 8699123456) KHÔNG BAO GIỜ khớp được
+      // ngân hàng nào -- _bankMomoPayments luôn rỗng, mất hẳn tính năng gom
+      // theo đợt NH trả cho KH Cũ. Sửa lại theo đúng COMPANY như MOMO_BANK_ACCOUNT.
+      const account = COMPANY === 'kh_moi' ? '7701' : '123456';
       try {
         const res  = await fetch(`/api/dau-ra/bank-momo?account=${account}&from=${from}&to=${to}`);
         const json = await res.json();
