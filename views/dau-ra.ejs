@@ -5017,10 +5017,15 @@
       const khKey = COMPANY === 'kh_cu' ? 'cu' : 'moi';
       const mttRows = khKey === 'cu' ? _mttCu : _mttMoi;
       if (!mttRows.length) { alert('Chưa có dữ liệu MTT. Vui lòng tải file MTT trước.'); return; }
+      // Luyen, 2026-09-11: "chỗ hóa đơn á có chỗ dịch vụ thu hộ là 7020 là
+      // của 7020 á" -- xac nhan tren du lieu that: MTT ghi "Dịch vụ thu hộ"
+      // dang "POSH+JP MB (7020) 29,30,31" (khong ghi ten/ma ngan hang day
+      // du) -- so khop theo 4 so cuoi TK trong dau ngoac "(dddd)", KHONG
+      // dung ten ngan hang day du nhu truoc (khong bao gio khop).
       const bankKeywords = {
-        bidv7704:   ['bidv7704','bidv 7704'],
-        bidv77020:  ['bidv77020','bidv 77020'],
-        mb11521268: ['mb11521268','mb 11521268','mb1152'],
+        bidv7704:   ['(7704)'],
+        bidv77020:  ['(7020)'],
+        mb11521268: ['(1268)'],
       }[bank] || [];
       const vqMtt = mttRows.filter(r => {
         const s = (r.dichVuThuHo||'').toLowerCase();
