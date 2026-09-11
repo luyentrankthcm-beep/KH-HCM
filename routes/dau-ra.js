@@ -410,6 +410,17 @@ router.get("/api/dau-ra/bank-vietqr", (req, res) => {
     // khop). Doi sang do dai linh hoat 8-20 ky tu de an toan voi ca 2 dinh
     // dang, khop dung phan "VQR..." lien tuc truoc khoang trang.
     const vqrRe = /VQR[A-Za-z0-9]{8,20}/;
+    // Luyen, 2026-09-11: "trong nội dung á VQR26375407F1W là mã đơn hàng á
+    // nên bạn check theo mã đơn hàng" -- file giao dich xuat tu MB11521268
+    // hau nhu KHONG nhung "Ma tham chieu" cua no lai TRUNG KHOP TUYET DOI voi
+    // cot "BÚT TOÁN" tren sao ke that (vd "FT26254796100178") -- cot nay da
+    // duoc utils/bankStatementParser.js doc san thanh t.reference (xem
+    // REF_HEADER_PATTERNS_FALLBACK). Truoc gio route nay CHI tra ve dong co
+    // ma VQR trong dien giai (bo qua het nhung dong khong co, vd "PaymentFor
+    // Order" tron trui cua MB), khien phia client khong co gi de doi chieu
+    // theo Ma tham chieu ca du du lieu van co san server-side. Gio: giu dong
+    // neu co MA VQR trong dien giai HOAC co san t.reference (BÚT TOÁN/So
+    // tham chieu) -- tra ca 2 truong cho client tu chon khoa khop phu hop.
     const transactions = [];
     for (const t of store.transactions) {
       if (t.bank_id !== bankRow.id) continue;
@@ -418,13 +429,14 @@ router.get("/api/dau-ra/bank-vietqr", (req, res) => {
       if (to && t.date > to) continue;
       const desc = t.description || "";
       const m = vqrRe.exec(desc);
-      if (!m) continue;
+      const reference = (t.reference || "").trim();
+      if (!m && !reference) continue;
       let dispDate = t.date;
       if (/^\d{4}-\d{2}-\d{2}$/.test(t.date)) {
         const p = t.date.split("-");
         dispDate = p[2] + "-" + p[1] + "-" + p[0];
       }
-      transactions.push({ date: dispDate, amount: Number(t.amount || 0), vqrCode: m[0], desc: desc.substring(0, 150) });
+      transactions.push({ date: dispDate, amount: Number(t.amount || 0), vqrCode: m ? m[0] : "", reference, desc: desc.substring(0, 150) });
     }
     transactions.sort((a, b) => {
       const iso = d => { if (!d) return ""; const p = d.split("-"); return p[2]+"-"+p[1]+"-"+p[0]; };

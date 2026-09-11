@@ -4513,6 +4513,21 @@
     let _vietqrHist = { bidv7704:[], bidv77020:[], mb11521268:[] };
     let _bankVietqr    = { bidv7704:[], bidv77020:[], mb11521268:[] };
     let _bankVietqrMap = { bidv7704:{}, bidv77020:{}, mb11521268:{} };
+    // Luyen, 2026-09-11: "VQR26375407F1W là mã đơn hàng á nên bạn check theo
+    // mã đơn hàng" -- file MB11521268 hau nhu khong nhung ma VQR trong Nội
+    // dung TT (chi co "PaymentForOrder" tron trui), nhung "Mã tham chiếu" cua
+    // no (vd "FT26254796100178") lai KHOP TUYET DOI voi cot "BÚT TOÁN" tren
+    // sao kê MB thật (t.reference, da duoc bankStatementParser.js doc san).
+    // Them 1 index rieng theo reference -- xem getVietQrBankHit ben duoi, uu
+    // tien reference (dang khop chinh xac hon, hoat dong ca cho MB) truoc khi
+    // fallback ve vqrCode (van can cho BIDV, noi vqrCode luon co san va dang
+    // hoat dong tot).
+    let _bankVietqrRefMap = { bidv7704:{}, bidv77020:{}, mb11521268:{} };
+    function getVietQrBankHit(bank, r) {
+      if (r.maThamChieu && _bankVietqrRefMap[bank][r.maThamChieu]) return _bankVietqrRefMap[bank][r.maThamChieu];
+      if (r.vqrCode && _bankVietqrMap[bank][r.vqrCode]) return _bankVietqrMap[bank][r.vqrCode];
+      return null;
+    }
 
     try { const s=localStorage.getItem(LS_VIETQR_DIEM_NAME);    if(s) _vietqrDiemName=JSON.parse(s);   } catch(e){}
     try { const s=localStorage.getItem(LS_VIETQR_DIEM_MANUAL);  if(s) _vietqrDiemManual=JSON.parse(s); } catch(e){}
@@ -4830,7 +4845,7 @@
         const n = _vietqrTxn[bank].length;
         if(!n) { el.textContent=''; }
         else {
-          const matched = _vietqrTxn[bank].filter(r=>r.vqrCode && _bankVietqrMap[bank][r.vqrCode]).length;
+          const matched = _vietqrTxn[bank].filter(r=>getVietQrBankHit(bank, r)).length;
           el.innerHTML = `${n} GD · <span style="color:${matched===n?'#16a34a':'#d97706'}">${matched}/${n} khớp NH</span>`;
         }
       }
@@ -4884,12 +4899,11 @@
       populateVietQrMonthFilter(bank);
       const selMonth = (document.getElementById('vietqrFilterMonth_'+bank)||{}).value || '';
 
-      const bankMap = _bankVietqrMap[bank] || {};
       const byDate = {}; // date -> maCT -> {amount, soGD, matched, tenDiem}
       txns.forEach(r => {
         const tenDiem = getVietQrTenDiem(r.maCuaHang);
         const maCT = getVietQrMaCT(bank, r.maCuaHang);
-        const bankHit = r.vqrCode ? bankMap[r.vqrCode] : null;
+        const bankHit = getVietQrBankHit(bank, r);
         const amount = bankHit ? bankHit.amount : r.amount; // ngân hàng làm chuẩn
         if(!byDate[r.date]) byDate[r.date]={};
         if(!byDate[r.date][maCT]) byDate[r.date][maCT]={amount:0,soGD:0,matched:0,tenDiem};
@@ -5147,7 +5161,7 @@
           <td style="padding:.2rem .5rem;color:#64748b">${i+1}</td>
           <td style="padding:.2rem .5rem;color:#bbf7d0">${t.date}</td>
           <td style="padding:.2rem .5rem;text-align:right;color:#86efac">${amt}đ</td>
-          <td style="padding:.2rem .5rem;color:#94a3b8;font-size:.78em">${t.vqrCode} — ${(t.desc||'').substring(0,60)}</td>
+          <td style="padding:.2rem .5rem;color:#94a3b8;font-size:.78em">${t.vqrCode || t.reference || ''} — ${(t.desc||'').substring(0,60)}</td>
         </tr>`;
       }).join('');
     }
@@ -5160,8 +5174,12 @@
         if(json.ok) {
           _bankVietqr[bank] = json.transactions || [];
           _bankVietqrMap[bank] = {};
-          _bankVietqr[bank].forEach(t => { if(t.vqrCode) _bankVietqrMap[bank][t.vqrCode] = t; });
-          if(st) st.textContent = '✓ '+_bankVietqr[bank].length+' GD ngân hàng có mã VQR';
+          _bankVietqrRefMap[bank] = {};
+          _bankVietqr[bank].forEach(t => {
+            if(t.vqrCode) _bankVietqrMap[bank][t.vqrCode] = t;
+            if(t.reference) _bankVietqrRefMap[bank][t.reference] = t;
+          });
+          if(st) st.textContent = '✓ '+_bankVietqr[bank].length+' GD ngân hàng có mã VQR/mã tham chiếu';
           renderBankVietQrRaw(bank);
           renderVietQrSummary(bank);
           renderVietQrDoiSoat(bank);
@@ -5216,7 +5234,7 @@
       _vietqrTxn[bank].forEach(r => {
         const tenDiem = getVietQrTenDiem(r.maCuaHang);
         const maCT = getVietQrMaCT(bank, r.maCuaHang);
-        const bankHit = r.vqrCode ? _bankVietqrMap[bank][r.vqrCode] : null;
+        const bankHit = getVietQrBankHit(bank, r);
         const amt = bankHit ? bankHit.amount : r.amount;
         const key = r.date+'|'+maCT;
         grossByDateCT[key] = (grossByDateCT[key]||0) + amt;
