@@ -4720,7 +4720,7 @@
             <td style="padding:.3rem .4rem"><input id="vdn_${i}" data-ma="${esc}" value="${(_vietqrDiemName[ma]||'').replace(/"/g,'&quot;')}" placeholder="Tên điểm bán"
               style="width:100%;border:1px solid ${isMapped?'#86efac':'#cbd5e1'};border-radius:4px;padding:.2rem .35rem;background:${isMapped?'#f0fdf4':'#fff'}"
               onkeydown="if(event.key==='Enter')saveVietQrDiemName(this)"></td>
-            <td style="padding:.3rem .4rem"><button onclick="saveVietQrDiemName(document.getElementById('vdn_${i}'))" style="background:${isMapped?'#16a34a':'#2563eb'};color:#fff;border:none;border-radius:4px;padding:.2rem .5rem;cursor:pointer;font-size:.78em">Lưu</button></td>
+            <td style="padding:.3rem .4rem"><button onclick="saveVietQrDiemName(this.closest('tr').querySelector('input'))" style="background:${isMapped?'#16a34a':'#2563eb'};color:#fff;border:none;border-radius:4px;padding:.2rem .5rem;cursor:pointer;font-size:.78em">Lưu</button></td>
           </tr>`;
         });
         html += '</tbody></table>';
@@ -4751,7 +4751,7 @@
             <td style="padding:.3rem .4rem"><input id="vct_${i}" data-ten="${esc}" value="${(_vietqrCtMap[ten]||'').replace(/"/g,'&quot;')}" placeholder="Mã CT"
               style="width:100%;border:1px solid ${isMapped?'#86efac':'#cbd5e1'};border-radius:4px;padding:.2rem .35rem;background:${isMapped?'#f0fdf4':'#fff'}"
               onkeydown="if(event.key==='Enter')saveVietQrCtMap(this)"></td>
-            <td style="padding:.3rem .4rem"><button onclick="saveVietQrCtMap(document.getElementById('vct_${i}'))" style="background:${isMapped?'#16a34a':'#2563eb'};color:#fff;border:none;border-radius:4px;padding:.2rem .5rem;cursor:pointer;font-size:.78em">Lưu</button></td>
+            <td style="padding:.3rem .4rem"><button onclick="saveVietQrCtMap(this.closest('tr').querySelector('input'))" style="background:${isMapped?'#16a34a':'#2563eb'};color:#fff;border:none;border-radius:4px;padding:.2rem .5rem;cursor:pointer;font-size:.78em">Lưu</button></td>
           </tr>`;
         });
         html += '</tbody></table>';
