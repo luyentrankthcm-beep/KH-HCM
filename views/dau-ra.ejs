@@ -5007,6 +5007,7 @@
 
       const allDates = Object.keys(byDate);
       const batches = [];
+      const seenBatchKeys = new Set();
       const coveredDates = new Set();
       (bankPayments||[]).forEach(pay => {
         // Chi Nhan, 2026-09-11: 1 vai dong sao ke Payoo co dang dien giai la
@@ -5016,6 +5017,20 @@
         if (!pay.fromDate || !pay.toDate || !pay.payDate) return;
         const payDates = allDates.filter(d => inRangeDdmm(d, pay.fromDate, pay.toDate));
         if (!payDates.length) return;
+        // Chi Nhan, 2026-09-11: Luyen phat hien "ngày 10 bị xuất nhầm 2 lần" --
+        // goc re: Payoo tra tien THE va QR RIENG 2 dong sao ke khac nhau
+        // ("...TT TD NGAY.....DVGIAITRIKH_TONG" va "...QRCODE.DVGIAITRIKH_TONG")
+        // nhung CUNG 1 payDate + CUNG 1 khoang fromDate/toDate (vd ca 2 dong
+        // deu tra cho ngay 09/09, cung ve tai khoan ngay 10/09) -- moi dong sao
+        // ke duoc coi la 1 "dot NH tra" rieng, sinh ra 2 batch trung nhau ->
+        // xuat lap toan bo dong cho ngay do. Cac dong nay KHONG cong so tien
+        // lai (amount cua bank statement khong duoc dung truc tiep trong ham
+        // nay, "Số tiền" lay tu du lieu doi soat theo maCT), nen chi can loai
+        // batch trung (cung payDate + cung tap payDates) la du, khong can gop
+        // amount.
+        const batchKey = pay.payDate + '|' + payDates.slice().sort().join(',');
+        if (seenBatchKeys.has(batchKey)) return;
+        seenBatchKeys.add(batchKey);
         payDates.forEach(d => coveredDates.add(d));
         batches.push({ payDate: pay.payDate, payDates });
       });
