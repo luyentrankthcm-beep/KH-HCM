@@ -1004,21 +1004,58 @@
     // return sau khi server da luu xong -- dam bao F5 ngay sau khi tai file
     // van an toan, khong mat du lieu (danh doi: khung UI dung khoang 1 giay
     // trong luc luu, chap nhan duoc de tranh mat du lieu).
+    // Chi Nhan, 2026-09-11: Luyen bao "tôi đẩy map lên xong hay đối soát tải
+    // xong cái lát quay lại lại mất" -- goc re: ham nay truoc day GUI XONG LA
+    // COI NHU XONG, khong he kiem tra xhr.status/response -- neu request
+    // trung dung luc Railway dang restart (vd ngay sau 1 lan tôi git push
+    // trong luc Luyen dang thao tac) se nhan ve loi 502/500 (hoac loi mang),
+    // XHR dong bo KHONG throw exception cho truong hop nay (chi throw khi mat
+    // ket noi han), nen catch(e) khong bat duoc, ham tra ve BINH THUONG nhu
+    // da luu thanh cong -- man hinh Luyen dang xem van con du lieu (o
+    // localStorage/bo nho), nhung SERVER THUC RA CHUA HE NHAN DUOC. Den luc
+    // sau do quay lai / mo may khac, hydrateFromServer keo du lieu THAT tu
+    // server ve (khong co ban vua sua) -- nhin nhu "bi mat" nhung thuc chat
+    // la CHUA BAO GIO DUOC LUU. Fix: kiem tra xhr.status===200 VA
+    // res.ok===true, thu lai toi 4 lan (loi 502 luc restart thuong tu het chi
+    // sau 1-2 giay) - neu van that bai het thi BAO LOI RO RANG cho Luyen biet
+    // (thay vi im lang mat du lieu), de Luyen thu lai thao tac ngay.
     function kvPush(key, value) {
-      try {
-        const xhr = new XMLHttpRequest();
-        xhr.open('POST', '/api/dau-ra/kv', false); // false = đồng bộ, đợi lưu xong
-        xhr.setRequestHeader('Content-Type', 'application/json');
-        xhr.send(JSON.stringify({ key, value }));
-      } catch(e) { console.error('Lưu server thất bại (kvPush):', e); }
+      for (let attempt = 1; attempt <= 4; attempt++) {
+        try {
+          const xhr = new XMLHttpRequest();
+          xhr.open('POST', '/api/dau-ra/kv', false); // false = đồng bộ, đợi lưu xong
+          xhr.setRequestHeader('Content-Type', 'application/json');
+          xhr.send(JSON.stringify({ key, value }));
+          if (xhr.status === 200) {
+            let res = null;
+            try { res = JSON.parse(xhr.responseText); } catch(e) {}
+            if (res && res.ok) return; // luu thanh cong
+            console.warn('[kvPush] server trả lỗi, thử lại lần', attempt, res && res.error);
+          } else {
+            console.warn('[kvPush] status', xhr.status, '-- thử lại lần', attempt);
+          }
+        } catch(e) { console.warn('[kvPush] lỗi mạng, thử lại lần', attempt, e.message); }
+      }
+      alert('⚠️ LƯU DỮ LIỆU LÊN SERVER THẤT BẠI (key: ' + key + ') sau nhiều lần thử.\n\nThay đổi vừa rồi CÓ THỂ CHƯA được lưu -- vui lòng tải lại trang (F5) để kiểm tra, và làm lại thao tác nếu cần. Đừng đóng tab/tắt máy ngay lúc này.');
     }
     function kvRemove(key) {
-      try {
-        const xhr = new XMLHttpRequest();
-        xhr.open('POST', '/api/dau-ra/kv-delete', false);
-        xhr.setRequestHeader('Content-Type', 'application/json');
-        xhr.send(JSON.stringify({ key }));
-      } catch(e) { console.error('Xoá server thất bại (kvRemove):', e); }
+      for (let attempt = 1; attempt <= 4; attempt++) {
+        try {
+          const xhr = new XMLHttpRequest();
+          xhr.open('POST', '/api/dau-ra/kv-delete', false);
+          xhr.setRequestHeader('Content-Type', 'application/json');
+          xhr.send(JSON.stringify({ key }));
+          if (xhr.status === 200) {
+            let res = null;
+            try { res = JSON.parse(xhr.responseText); } catch(e) {}
+            if (res && res.ok) return;
+            console.warn('[kvRemove] server trả lỗi, thử lại lần', attempt, res && res.error);
+          } else {
+            console.warn('[kvRemove] status', xhr.status, '-- thử lại lần', attempt);
+          }
+        } catch(e) { console.warn('[kvRemove] lỗi mạng, thử lại lần', attempt, e.message); }
+      }
+      alert('⚠️ XOÁ DỮ LIỆU TRÊN SERVER THẤT BẠI (key: ' + key + ') sau nhiều lần thử.\n\nVui lòng tải lại trang (F5) để kiểm tra lại.');
     }
     // Thay cho localStorage.setItem/removeItem trực tiếp: vẫn ghi local như
     // cũ (đọc lại tức thì) + đồng thời đẩy lên server ở nền. Cập nhật
