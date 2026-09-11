@@ -459,7 +459,17 @@ router.get("/api/dau-ra/bank-vietqr", (req, res) => {
       const iso = d => { if (!d) return ""; const p = d.split("-"); return p[2]+"-"+p[1]+"-"+p[0]; };
       return iso(a.date).localeCompare(iso(b.date));
     });
-    res.json({ ok: true, transactions });
+    // Chi Nhan, 2026-09-11: "cho tôi cái xuất misa nhá" -- can biet dung so
+    // TK/ten ngan hang THAT cua tung tab (BIDV7704/BIDV77020/MB11521268) de
+    // dien vao cot "Nộp vào TK"/"Mở tại ngân hàng" cua file xuat Misa, giong
+    // cach lam voi Momo/ZVP -- lay thang tu bankRow da tim duoc o tren (dung
+    // 1 lan tim, khong can them route rieng).
+    res.json({
+      ok: true,
+      transactions,
+      bankAccount: bankRow.account_number || bankRow.accountNumber || "",
+      bankFullName: "Ngân hàng " + (bankRow.bank_name || bankRow.name || ""),
+    });
   } catch (err) { res.json({ ok: false, error: err.message }); }
 });
 

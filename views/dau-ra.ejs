@@ -464,6 +464,47 @@
         <div style="display:flex;align-items:center;gap:.5rem">
           <button class="btn-nhap" style="background:#0d9488" onclick="document.getElementById('vietqrDiemNameInput').click()">📥 DS Cửa hàng ↔ Điểm bán</button>
           <input type="file" id="vietqrDiemNameInput" accept=".xls,.xlsx" style="display:none" onchange="handleVietQrStoreExportFile(this)">
+          <button class="sub-tab-btn" onclick="openVietQrMisaModal()" style="background:#7c3aed;color:#fff">📥 Xuất Misa</button>
+        </div>
+      </div>
+
+      <!-- Chi Nhan, 2026-09-11: "cho tôi cái xuất misa nhá cái bảng xuất có
+           thể từng cái hay xuất 1 lúc tất cả nha để có chỗ ngân hàng khác
+           nhau số mỗi 1 ngày là 1 chứng từ" -- modal dung chung 1 bo tham so
+           (tu ngay/den ngay/so chung tu bat dau) cho ca 3 ngan hang VietQR,
+           voi 3 nut xuat RIENG (moi ngan hang 1 file, vi moi ngan hang co so
+           TK/Mo tai ngan hang KHAC nhau, giong cach lam cua he thong CU
+           routes/doisoat-vietqr.js) + 1 nut xuat CA 3 cung luc (xuat lien
+           tiep 3 file, dung CHUNG 1 so chung tu bat dau cho moi file -- giong
+           cach nut "Xuat Online"/"Xuat Offline" cua ZVP deu dung chung 1
+           startSeq, vi la 3 file RIENG BIET, khong can noi tiep so). Moi ngay
+           = 1 chung tu (khong gom theo dot ngan hang tra nhu Momo/Zalo/VNPay/
+           Payoo) vi VietQR doi soat THEO TUNG GIAO DICH qua ngan hang lam
+           chuan ngay, khong co do tre thanh toan theo dot.
+      -->
+      <div id="vietqrMisaModal" class="modal-overlay" onclick="if(event.target===this)closeVietQrMisaModal()">
+        <div class="modal-box" style="max-width:480px">
+          <h3 style="margin-top:0">📥 Xuất Misa — Viet QR</h3>
+          <div style="margin-bottom:.6rem">
+            <label style="display:block;font-size:.85em;color:#475569;margin-bottom:.2rem">Từ ngày</label>
+            <input type="date" id="vietqrMisaFromDate" style="width:100%;padding:.4rem .6rem;border:1px solid #cbd5e1;border-radius:6px">
+          </div>
+          <div style="margin-bottom:.6rem">
+            <label style="display:block;font-size:.85em;color:#475569;margin-bottom:.2rem">Đến ngày</label>
+            <input type="date" id="vietqrMisaToDate" style="width:100%;padding:.4rem .6rem;border:1px solid #cbd5e1;border-radius:6px">
+          </div>
+          <div style="margin-bottom:.6rem">
+            <label style="display:block;font-size:.85em;color:#475569;margin-bottom:.2rem">Số chứng từ bắt đầu</label>
+            <input type="number" id="vietqrMisaStartSeq" value="1" min="1" style="width:100%;padding:.4rem .6rem;border:1px solid #cbd5e1;border-radius:6px">
+          </div>
+          <div id="vietqrMisaModalStatus" style="font-size:.82em;color:#dc2626;margin-bottom:.4rem"></div>
+          <div class="modal-actions" style="flex-wrap:wrap">
+            <button class="btn-cancel" onclick="closeVietQrMisaModal()">Hủy</button>
+            <button onclick="confirmExportVietQrMisa('bidv7704')" style="background:#2563eb;color:#fff;border:none;border-radius:6px;padding:.45rem 1rem;cursor:pointer;font-weight:600">📥 BIDV7704</button>
+            <button onclick="confirmExportVietQrMisa('bidv77020')" style="background:#2563eb;color:#fff;border:none;border-radius:6px;padding:.45rem 1rem;cursor:pointer;font-weight:600">📥 BIDV77020</button>
+            <button onclick="confirmExportVietQrMisa('mb11521268')" style="background:#2563eb;color:#fff;border:none;border-radius:6px;padding:.45rem 1rem;cursor:pointer;font-weight:600">📥 MB11521268</button>
+            <button onclick="confirmExportVietQrMisa('all')" style="background:#16a34a;color:#fff;border:none;border-radius:6px;padding:.45rem 1.2rem;cursor:pointer;font-weight:700">📥 Xuất cả 3 ngân hàng</button>
+          </div>
         </div>
       </div>
 
@@ -5284,6 +5325,11 @@
     let _vietqrHist = { bidv7704:[], bidv77020:[], mb11521268:[] };
     let _bankVietqr    = { bidv7704:[], bidv77020:[], mb11521268:[] };
     let _bankVietqrMap = { bidv7704:{}, bidv77020:{}, mb11521268:{} };
+    // Chi Nhan, 2026-09-11: {account, fullName} that cua tung TK VietQR (lay
+    // tu store.banks qua /api/dau-ra/bank-vietqr, dien vao "Nộp vào TK"/"Mở
+    // tại ngân hàng" luc xuat Misa) -- chi co gia tri SAU KHI da bam "Làm mới
+    // NH" (fetchBankVietQr) it nhat 1 lan cho ngan hang do.
+    let _vietqrBankInfo = { bidv7704:null, bidv77020:null, mb11521268:null };
     // Luyen, 2026-09-11: "VQR26375407F1W là mã đơn hàng á nên bạn check theo
     // mã đơn hàng" -- file MB11521268 hau nhu khong nhung ma VQR trong Nội
     // dung TT (chi co "PaymentForOrder" tron trui), nhung "Mã tham chiếu" cua
@@ -5957,6 +6003,151 @@
       el.innerHTML = html;
     }
 
+    // ══════════════════════════════════════════
+    // XUẤT MISA — VIET QR (BIDV7704 / BIDV77020 / MB11521268)
+    // Chi Nhan, 2026-09-11: "cho tôi cái xuất misa nhá cái bảng xuất có thể
+    // từng cái hay xuất 1 lúc tất cả nha để có chỗ ngân hàng khác nhau số
+    // mỗi 1 ngày là 1 chứng từ" -- mau cot + quy uoc dien giai lay DUNG theo
+    // file mau Luyen gui (MISAThue-vietqr-bidv7702), la file xuat cua he
+    // thong CU (routes/doisoat-vietqr.js, TK 8640107702/BIDV, Mã đối tượng
+    // co dinh "KL") -- xac nhan: MOI NGAY la 1 so chung tu rieng (khong gom
+    // nhieu ngay vao 1 dot nhu Momo/Zalo/VNPay/Payoo, vi VietQR doi soat
+    // TUNG GIAO DICH qua ngan hang lam chuan ngay, khong co do tre thanh
+    // toan theo dot nhu cac kenh kia), "Số tiền" = "Doanh thu (VietQR)" =
+    // CUNG 1 gia tri (khac Momo/Zalo/VNPay/Payoo co tach dt/net truoc-sau
+    // phi -- VietQR khong tach). Mã đối tượng/Mã đối tượng (hạch toán) LUON
+    // la "KL" co dinh (giong y het file mau, khong doi theo ngan hang).
+    // "Nộp vào TK"/"Mở tại ngân hàng" lay THEO TUNG NGAN HANG (tu
+    // _vietqrBankInfo, do fetchBankVietQr dien vao sau khi bam "Làm mới NH").
+    function openVietQrMisaModal() {
+      document.getElementById('vietqrMisaModal').classList.add('open');
+      const stEl = document.getElementById('vietqrMisaModalStatus');
+      if (stEl) stEl.textContent = '';
+    }
+    function closeVietQrMisaModal() {
+      document.getElementById('vietqrMisaModal').classList.remove('open');
+    }
+    function buildVietQrByDateForExport(bank) {
+      const byDate = {};
+      (_vietqrTxn[bank]||[]).forEach(r => {
+        const maCT = getVietQrMaCT(bank, r.maCuaHang);
+        const bankHit = getVietQrBankHit(bank, r);
+        const amount = bankHit ? bankHit.amount : r.amount; // ngân hàng làm chuẩn
+        if (!byDate[r.date]) byDate[r.date] = {};
+        if (!byDate[r.date][maCT]) byDate[r.date][maCT] = { amount: 0 };
+        byDate[r.date][maCT].amount += amount;
+      });
+      return byDate;
+    }
+    function getVietQrAmtDisp(bank, hdKey, rawAmount) {
+      const hd = _vietqrHD[bank][hdKey] || {};
+      return (hd.amtOvr != null && hd.amtOvr !== '') ? (parseFloat(String(hd.amtOvr).replace(/[^0-9.-]/g,''))||0) : rawAmount;
+    }
+    function buildVietQrMisaRows({ bank, byDate, fromIso, toIso, startSeq }) {
+      const ddmmToISO = d => { const [dd,mm,yy]=d.split('-'); return `${yy}-${mm}-${dd}`; };
+      const toSlash   = d => d.replace(/-/g,'/');
+      const inRangeIso = d => { const x = ddmmToISO(d); return x >= fromIso && x <= toIso; };
+      const lyDoThu = 'Thu tiền khách hàng (không theo hóa đơn)';
+      const info = _vietqrBankInfo[bank];
+      const bankAccount  = info ? info.account  : '';
+      const bankFullName = info ? info.fullName : '';
+
+      const dates = Object.keys(byDate)
+        .filter(inRangeIso)
+        .sort((a, b) => ddmmToISO(a).localeCompare(ddmmToISO(b)));
+
+      const rows = [];
+      let seq = startSeq;
+      dates.forEach(date => {
+        const ctData = byDate[date] || {};
+        const maCTList = Object.keys(ctData).sort();
+        if (!maCTList.length) return;
+        const soCt = 'NTTK' + String(seq).padStart(7, '0') + '/26';
+        maCTList.forEach(maCT => {
+          const hdKey = date + '|' + maCT;
+          const hd = _vietqrHD[bank][hdKey] || {};
+          const amt = getVietQrAmtDisp(bank, hdKey, ctData[maCT].amount);
+          const soHD = (hd.soHD || '').trim();
+          const tienHD = parseFloat(String(hd.tienHD || '').replace(/[^0-9.]/g, '')) || 0;
+          const dienGiai = soHD
+            ? `Thu tiền dịch vụ vui chơi giải trí - KL theo HĐ ${soHD}`
+            : `Thu tiền dịch vụ vui chơi giải trí - KL`;
+          rows.push({
+            'Ngày hạch toán (*)': toSlash(date),
+            'Ngày chứng từ (*)': toSlash(date),
+            'Số chứng từ (*)': soCt,
+            'Mã đối tượng': 'KL',
+            'Tên đối tượng': '',
+            'Địa chỉ': '',
+            'Nộp vào TK': bankAccount,
+            'Mở tại ngân hàng': bankFullName,
+            'Lý do thu': lyDoThu,
+            'Diễn giải lý do thu': dienGiai,
+            'Mã nhân viên thu': '',
+            'Diễn giải (hạch toán)': dienGiai,
+            'TK Nợ (*)': 1121,
+            'TK Có (*)': '131',
+            'Số tiền': Math.round(amt),
+            'Mã đối tượng (hạch toán)': 'KL',
+            'Số khế ước đi vay': '',
+            'Số khế ước cho vay': '',
+            'Mã khoản mục chi phí': '',
+            'Mã đơn vị': '',
+            'Mã đối tượng THCP': '',
+            'Mã công trình': maCT,
+            'Số đơn đặt hàng': '',
+            'Số đơn mua hàng': '',
+            'Số hợp đồng mua': '',
+            'Số hợp đồng bán': '',
+            'Mã thống kê': '',
+            'CP không hợp lý': '',
+            'Số HĐ khớp': soHD,
+            'Tổng tiền HĐ khớp': tienHD,
+            'Doanh thu (VietQR)': Math.round(amt),
+            'Chênh lệch HĐ vs doanh thu': Math.round(tienHD - amt),
+            'Trạng thái': !soHD ? 'Chưa có HĐ' : (Math.abs(tienHD - amt) <= 1000 ? 'Khớp' : 'Lệch'),
+          });
+        });
+        seq++;
+      });
+      return { rows, nextSeq: seq };
+    }
+    async function confirmExportVietQrMisa(bankOrAll) {
+      const stEl = document.getElementById('vietqrMisaModalStatus');
+      const fromIso = (document.getElementById('vietqrMisaFromDate')||{}).value;
+      const toIso   = (document.getElementById('vietqrMisaToDate')||{}).value;
+      const startSeq = parseInt((document.getElementById('vietqrMisaStartSeq')||{}).value, 10) || 1;
+      if (!fromIso || !toIso) { if (stEl) stEl.textContent = 'Vui lòng chọn đủ Từ ngày và Đến ngày.'; return; }
+      if (fromIso > toIso) { if (stEl) stEl.textContent = 'Từ ngày phải trước Đến ngày.'; return; }
+
+      const banksToExport = bankOrAll === 'all' ? VIETQR_BANKS : [bankOrAll];
+      if (stEl) stEl.textContent = 'Đang tải dữ liệu ngân hàng...';
+      for (const b of banksToExport) { try { await fetchBankVietQr(b); } catch(e) {} }
+      if (stEl) stEl.textContent = '';
+      closeVietQrMisaModal();
+
+      const results = [];
+      banksToExport.forEach(bank => {
+        if (!_vietqrTxn[bank].length) { results.push({ bank, ok:false, msg:'Chưa có dữ liệu giao dịch.' }); return; }
+        if (!_vietqrBankInfo[bank]) { results.push({ bank, ok:false, msg:'Chưa lấy được thông tin TK ngân hàng — bấm "Làm mới NH" ở tab này trước.' }); return; }
+        const { rows } = buildVietQrMisaRows({
+          bank, byDate: buildVietQrByDateForExport(bank),
+          fromIso, toIso, startSeq,
+        });
+        if (!rows.length) { results.push({ bank, ok:false, msg:'Không có dòng nào để xuất trong khoảng ngày đã chọn.' }); return; }
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'MISAThue VietQR');
+        const fname = 'MISAThue-vietqr-' + bank + '_' + fromIso + '_den_' + toIso + '.xlsx';
+        XLSX.writeFile(wb, fname);
+        results.push({ bank, ok:true, fname, count: rows.length });
+      });
+
+      const msgs = results.map(r => r.ok
+        ? `✅ ${VIETQR_BANK_LABEL[r.bank]}: ${r.count} dòng → ${r.fname}`
+        : `⚠️ ${VIETQR_BANK_LABEL[r.bank]}: ${r.msg}`);
+      alert(msgs.join('\n'));
+    }
+
     function saveVietQrHD(bank, hdKey, field, val) {
       if(!_vietqrHD[bank][hdKey]) _vietqrHD[bank][hdKey] = {};
       _vietqrHD[bank][hdKey][field] = val.trim();
@@ -6051,6 +6242,7 @@
           _bankVietqr[bank] = json.transactions || [];
           _bankVietqrMap[bank] = {};
           _bankVietqrRefMap[bank] = {};
+          _vietqrBankInfo[bank] = { account: json.bankAccount || '', fullName: json.bankFullName || '' };
           _bankVietqr[bank].forEach(t => {
             if(t.vqrCode) _bankVietqrMap[bank][t.vqrCode] = t;
             if(t.reference) _bankVietqrRefMap[bank][t.reference] = t;
