@@ -410,17 +410,6 @@ function save(store) {
     configObj[key] = store[key];
   }
   const mainData = JSON.stringify(configObj);
-  const txData = JSON.stringify(
-    cachedTransactions !== null ? cachedTransactions : []
-  );
-  const vqrData = JSON.stringify(
-    cachedVietQrRaw !== null
-      ? cachedVietQrRaw
-      : { bidv7704: [], bidv77020: [], mb11521268: [] }
-  );
-  const dauRaKvData = JSON.stringify(
-    cachedDauRaKv !== null ? cachedDauRaKv : { kh_cu: {}, kh_moi: {} }
-  );
 
   function writeDurableWithRetry(filePath, data) {
     const expectedBytes = Buffer.byteLength(data, "utf8");
@@ -466,9 +455,27 @@ function save(store) {
   }
 
   writeDurableWithRetry(DATA_FILE, mainData);
-  writeDurableWithRetry(TRANSACTIONS_FILE, txData);
-  writeDurableWithRetry(VIET_QR_RAW_FILE, vqrData);
-  writeDurableWithRetry(DAU_RA_KV_FILE, dauRaKvData);
+
+  // Chi Nhan, 2026-09-11: QUAN TRONG -- chi ghi lai transactions.json /
+  // viet_qr_raw.json / dau_ra_kv.json khi cache tuong ung DA duoc lazy-load
+  // (khac null) trong PROCESS NAY. Neu mot request nao do goi save(store) ma
+  // chua he dong cham toi store.transactions / store.viet_qr_raw_uploads /
+  // store.dau_ra_kv (vi du: chi sua thong tin ngan hang), thi cac bien
+  // cachedTransactions/cachedVietQrRaw/cachedDauRaKv van con null trong
+  // process do -- truoc day code se GHI DE file that tren dia bang gia tri
+  // rong mac dinh ([] hoac {kh_cu:{},kh_moi:{}}), XOA SACH du lieu that su
+  // dang co san. Day chinh la nguyen nhan gay mat toan bo du lieu dau_ra_kv
+  // (Momo/VietQR) phat hien ngay 2026-09-11. Fix: bo qua (khong dung toi)
+  // file nao ma cache cua no chua tung duoc load trong process nay.
+  if (cachedTransactions !== null) {
+    writeDurableWithRetry(TRANSACTIONS_FILE, JSON.stringify(cachedTransactions));
+  }
+  if (cachedVietQrRaw !== null) {
+    writeDurableWithRetry(VIET_QR_RAW_FILE, JSON.stringify(cachedVietQrRaw));
+  }
+  if (cachedDauRaKv !== null) {
+    writeDurableWithRetry(DAU_RA_KV_FILE, JSON.stringify(cachedDauRaKv));
+  }
 
   cachedStore = store; // cap nhat cache sau khi ghi thanh cong
 }
