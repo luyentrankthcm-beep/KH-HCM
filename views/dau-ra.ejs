@@ -241,6 +241,7 @@
         <button class="sub-tab-btn active" id="zvp_btn_zalo" onclick="switchZvpTab('zalo')">🔵 Zalo Pay</button>
         <button class="sub-tab-btn" id="zvp_btn_vnpay" onclick="switchZvpTab('vnpay')">🟦 VNPay</button>
         <button class="sub-tab-btn" id="zvp_btn_payoo" onclick="switchZvpTab('payoo')">🟪 Payoo</button>
+        <button class="sub-tab-btn" onclick="openZvpMisaModal()" style="margin-left:auto;background:#7c3aed;color:#fff;border-color:#7c3aed">📥 Xuất Misa</button>
       </div>
 
       <!-- Zalo Pay -->
@@ -757,6 +758,32 @@
       <div class="modal-actions">
         <button class="btn-cancel" onclick="closeMomoMisaModal()">Hủy</button>
         <button onclick="confirmExportMomoMisa()" style="background:#7c3aed;color:#fff;border:none;border-radius:6px;padding:.45rem 1.2rem;cursor:pointer;font-weight:600">📥 Xuất Excel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== ZVP MISA EXPORT MODAL ==================== -->
+  <div id="zvpMisaModal" class="modal-overlay" onclick="if(event.target===this)closeZvpMisaModal()">
+    <div class="modal-box">
+      <h3>📥 Xuất Misa (Zalo / VNPay / Payoo)</h3>
+      <p class="modal-sub">Chọn khoảng ngày hạch toán (ngày ngân hàng trả tiền về) và số chứng từ bắt đầu. Zalo Pay xuất riêng file Online; VNPay + Payoo gộp chung file Offline (nối tiếp số chứng từ).</p>
+      <div style="display:flex;flex-direction:column;gap:.7rem;margin-top:.5rem">
+        <label style="font-size:.85em;font-weight:600;color:#1e3a5f">Từ ngày
+          <input type="date" id="zvpMisaFromDate" style="display:block;width:100%;margin-top:.25rem;padding:.4rem .6rem;border:1px solid #cbd5e1;border-radius:6px;font-size:.9em">
+        </label>
+        <label style="font-size:.85em;font-weight:600;color:#1e3a5f">Đến ngày
+          <input type="date" id="zvpMisaToDate" style="display:block;width:100%;margin-top:.25rem;padding:.4rem .6rem;border:1px solid #cbd5e1;border-radius:6px;font-size:.9em">
+        </label>
+        <label style="font-size:.85em;font-weight:600;color:#1e3a5f">Số chứng từ bắt đầu từ số
+          <input type="number" id="zvpMisaStartSeq" min="1" value="1" style="display:block;width:100%;margin-top:.25rem;padding:.4rem .6rem;border:1px solid #cbd5e1;border-radius:6px;font-size:.9em">
+          <span style="font-weight:400;color:#94a3b8;font-size:.85em">Áp dụng chung cho cả 2 file (Online và Offline đánh số độc lập, cùng bắt đầu từ số này)</span>
+        </label>
+      </div>
+      <div id="zvpMisaModalStatus" style="font-size:.8em;color:#dc2626;margin-top:.5rem"></div>
+      <div class="modal-actions" style="flex-wrap:wrap">
+        <button class="btn-cancel" onclick="closeZvpMisaModal()">Hủy</button>
+        <button onclick="confirmExportZvpMisa('online')" style="background:#2563eb;color:#fff;border:none;border-radius:6px;padding:.45rem 1.2rem;cursor:pointer;font-weight:600">📥 Xuất Online (Zalo)</button>
+        <button onclick="confirmExportZvpMisa('offline')" style="background:#7c3aed;color:#fff;border:none;border-radius:6px;padding:.45rem 1.2rem;cursor:pointer;font-weight:600">📥 Xuất Offline (VNPay+Payoo)</button>
       </div>
     </div>
   </div>
@@ -4799,6 +4826,270 @@
       await fetchBankPayoo();
       const p = document.getElementById('bankPayooDetailPanel');
       if(p) p.style.display = '';
+    }
+
+    // ── Xuất Misa Zalo/VNPay/Payoo (Online/Offline) ──
+    // Luyen, 2026-09-11: "cho tôi cái xuất misa nhá mẫu giống như này nè ...
+    // nhớ đối tượng bên vnpay với payoo khác nhau nhá chỗ misathue onle là
+    // của zalo á còn offline là của vnpay offline với lại payoo" -- theo
+    // đúng logic/mẫu đã có sẵn ở hệ thống ĐỐI SOÁT CŨ (routes/doisoat-zvp.js
+    // buildExportRows/export-online.xlsx/export-offline.xlsx, đã xác minh
+    // qua 2 file mẫu Luyen gửi): Zalo Pay → file "MISATHue Online", Mã đối
+    // tượng "VN PAY0102182292", hậu tố diễn giải "VNP". VNPay Offline CŨNG
+    // dùng "VN PAY0102182292"/"VNP" nhưng xuất vào file "MISAThue OFFLINE"
+    // GỘP CHUNG với Payoo (Payoo dùng Mã đối tượng riêng "DONGVIET0305458683",
+    // hậu tố "PAYOO") -- offline nối tiếp số chứng từ, VNPay xuất trước rồi
+    // Payoo tiếp theo. TK nhận tiền CỐ ĐỊNH 12131268 - Ngân hàng TMCP Á Châu
+    // (đúng ZVP_BANK_ACCOUNT/ZVP_BANK_FULLNAME bên hệ thống cũ, module này
+    // hiện chỉ áp dụng cho KH Cũ). Gom theo ngày NH trả về giống Momo, nhưng
+    // KHÔNG auto-điều chỉnh chênh lệch làm tròn (khác Momo) -- Luyen đã xác
+    // nhận rõ ZVP không được ép số cho khớp, chênh thật phải hiện đúng.
+    const ZVP_BANK_ACCOUNT  = 12131268;
+    const ZVP_BANK_FULLNAME = 'Ngân hàng TMCP Á Châu';
+
+    function openZvpMisaModal() {
+      const allDates = [
+        ..._zaloFee.map(r=>r.date), ..._vnpayFee.map(r=>r.date), ..._payooFee.map(r=>r.date)
+      ];
+      if (!allDates.length) { alert('Chưa có dữ liệu Zalo/VNPay/Payoo để xuất.'); return; }
+      const ddmmToISO = d => { const [dd,mm,yy] = d.split('-'); return `${yy}-${mm}-${dd}`; };
+      const sorted = [...new Set(allDates)].sort((a,b) => ddmmToISO(a).localeCompare(ddmmToISO(b)));
+      const fromEl = document.getElementById('zvpMisaFromDate');
+      const toEl   = document.getElementById('zvpMisaToDate');
+      const seqEl  = document.getElementById('zvpMisaStartSeq');
+      const stEl   = document.getElementById('zvpMisaModalStatus');
+      if (stEl) stEl.textContent = '';
+      if (fromEl) fromEl.value = ddmmToISO(sorted[0]);
+      if (toEl)   toEl.value   = ddmmToISO(sorted[sorted.length-1]);
+      if (seqEl)  seqEl.value  = 1;
+      document.getElementById('zvpMisaModal').classList.add('open');
+    }
+    function closeZvpMisaModal() {
+      document.getElementById('zvpMisaModal').classList.remove('open');
+    }
+
+    // byDate builders -- y hệt logic bên renderZaloDoiSoat/renderVnpayDoiSoat/
+    // renderPayooDoiSoat (không refactor lại các hàm render đang chạy tốt,
+    // chỉ xây riêng bản dùng cho xuất Misa để tránh ảnh hưởng màn hình đối soát).
+    function buildZaloByDateForExport() {
+      const byDate = {};
+      _zaloFee.forEach(r => {
+        const isFunzone = r.maDiem==='FUNZONE1' || (r.dienThu||'').toUpperCase().includes('FUNZONE');
+        if(!isFunzone) return; // rows kênh khác đã tách riêng vào _vnpayFee lúc nhập
+        const ordVal = r.maFunzone ? _zaloOrders[String(r.maFunzone)] : undefined;
+        const { tenSP: tenSP_lu, sku: skuLu } = unpackZaloOrder(ordVal);
+        const maCT = ordVal !== undefined ? (getZaloMaCT(tenSP_lu, skuLu)||tenSP_lu||ordVal) : (_zaloUnk[r.date] || '_unknown_');
+        if(!byDate[r.date]) byDate[r.date]={};
+        if(!byDate[r.date][maCT]) byDate[r.date][maCT]={gross:0,phi:0,net:0,soDon:0};
+        byDate[r.date][maCT].gross += r.gross;
+        byDate[r.date][maCT].phi   += r.phi;
+        byDate[r.date][maCT].net   += r.net;
+        byDate[r.date][maCT].soDon += 1;
+      });
+      return byDate;
+    }
+    function buildVnpayByDateForExport() {
+      const byDate = {};
+      _vnpayFee.forEach(r => {
+        const maCT = getVnpayMaCT(r.dienThu);
+        if(!byDate[r.date]) byDate[r.date]={};
+        if(!byDate[r.date][maCT]) byDate[r.date][maCT]={gross:0,phi:0,net:0,soDon:0};
+        byDate[r.date][maCT].gross += r.gross;
+        byDate[r.date][maCT].phi   += r.phi;
+        byDate[r.date][maCT].net   += r.net;
+        byDate[r.date][maCT].soDon += 1;
+      });
+      return byDate;
+    }
+    function buildPayooByDateForExport() {
+      const byDate = {};
+      _payooFee.forEach(r => {
+        const maCT = getPayooMaCT(r.gian);
+        if(!byDate[r.date]) byDate[r.date]={};
+        if(!byDate[r.date][maCT]) byDate[r.date][maCT]={gross:0,phi:0,net:0,soDon:0,loai:r.loai};
+        byDate[r.date][maCT].gross += r.gross;
+        byDate[r.date][maCT].phi   += r.phi;
+        byDate[r.date][maCT].net   += r.net;
+        byDate[r.date][maCT].soDon += 1;
+      });
+      return byDate;
+    }
+
+    // Gom theo đợt NH trả về (payDate) -- KHÔNG auto-điều chỉnh chênh lệch
+    // (khác Momo), cộng dồn dt/net thật theo từng Mã CT qua các ngày trong
+    // đợt; ngày chưa có đợt NH trả thì fallback xuất riêng theo đúng ngày gốc.
+    function buildZvpMisaRows({ byDate, getGianDisp, hdObj, bankPayments, dienGiaiSuffix, maDoiTuong, startSeq, fromIso, toIso }) {
+      const ddmmToISO = d => { const [dd,mm,yy]=d.split('-'); return `${yy}-${mm}-${dd}`; };
+      const toSlash   = d => d.replace(/-/g,'/');
+      const inRangeDdmm = (d,f,t) => { const x=ddmmToISO(d); return x>=ddmmToISO(f) && x<=ddmmToISO(t); };
+      const inRangeIso  = (d) => { const x=ddmmToISO(d); return x>=fromIso && x<=toIso; };
+      const lyDoThu = 'Thu tiền khách hàng (không theo hóa đơn)';
+
+      const allDates = Object.keys(byDate);
+      const batches = [];
+      const coveredDates = new Set();
+      (bankPayments||[]).forEach(pay => {
+        const payDates = allDates.filter(d => inRangeDdmm(d, pay.fromDate, pay.toDate));
+        if (!payDates.length) return;
+        payDates.forEach(d => coveredDates.add(d));
+        batches.push({ payDate: pay.payDate, payDates });
+      });
+
+      const rows = [];
+      const skipped = [];
+      let seq = startSeq;
+
+      const collectByMaCT = (dates) => {
+        const byMaCT = {};
+        dates.forEach(date => {
+          const ctData = byDate[date] || {};
+          Object.keys(ctData).forEach(maCT => {
+            if (maCT === '_unknown_') { skipped.push('(chưa xác định gian ngày ' + date + ')'); return; }
+            const gDisp = getGianDisp(date, maCT, ctData[maCT]);
+            const hd = hdObj[date + '|' + maCT] || {};
+            if (!byMaCT[maCT]) byMaCT[maCT] = { dt: 0, net: 0, soHDs: [], tienHD: 0 };
+            byMaCT[maCT].dt  += gDisp.dt;
+            byMaCT[maCT].net += gDisp.net;
+            const soHD = (hd.soHD || '').trim();
+            if (soHD) {
+              byMaCT[maCT].soHDs.push(soHD);
+              byMaCT[maCT].tienHD += parseFloat(String(hd.tienHD || '').replace(/[^0-9.]/g, '')) || 0;
+            }
+          });
+        });
+        return byMaCT;
+      };
+
+      const pushBatch = (date, byMaCT) => {
+        const maCTList = Object.keys(byMaCT).sort();
+        if (!maCTList.length) return;
+        const soCt = 'NTTK' + String(seq).padStart(7, '0') + '/26';
+        maCTList.forEach(maCT => {
+          const b = byMaCT[maCT];
+          const soHD = b.soHDs.join(', ');
+          const dienGiai = soHD
+            ? `Thu tiền dịch vụ vui chơi giải trí - ${dienGiaiSuffix} theo HĐ ${soHD}`
+            : `Thu tiền dịch vụ vui chơi giải trí - ${dienGiaiSuffix}`;
+          rows.push({
+            'Ngày hạch toán (*)': toSlash(date),
+            'Ngày chứng từ (*)': toSlash(date),
+            'Số chứng từ (*)': soCt,
+            'Mã đối tượng': maDoiTuong,
+            'Tên đối tượng': '',
+            'Địa chỉ': '',
+            'Nộp vào TK': ZVP_BANK_ACCOUNT,
+            'Mở tại ngân hàng': ZVP_BANK_FULLNAME,
+            'Lý do thu': lyDoThu,
+            'Diễn giải lý do thu': dienGiai,
+            'Mã nhân viên thu': '',
+            'Diễn giải (hạch toán)': dienGiai,
+            'TK Nợ (*)': 1121,
+            'TK Có (*)': '131',
+            'Số tiền': Math.round(b.net),
+            'Mã đối tượng (hạch toán)': maDoiTuong,
+            'Số khế ước đi vay': '',
+            'Số khế ước cho vay': '',
+            'Mã khoản mục chi phí': '',
+            'Mã đơn vị': '',
+            'Mã đối tượng THCP': '',
+            'Mã công trình': maCT,
+            'Số đơn đặt hàng': '',
+            'Số đơn mua hàng': '',
+            'Số hợp đồng mua': '',
+            'Số hợp đồng bán': '',
+            'Mã thống kê': '',
+            'CP không hợp lý': '',
+            'Số HĐ khớp': soHD,
+            'Tổng tiền HĐ khớp': b.tienHD,
+            'Doanh thu gộp (trước phí)': Math.round(b.dt),
+            'Chênh lệch HĐ vs doanh thu': Math.round(b.tienHD - b.dt),
+            'Trạng thái': !soHD ? 'Chưa có HĐ' : (Math.abs(b.tienHD - b.dt) <= 1000 ? 'Khớp' : 'Lệch'),
+          });
+        });
+        seq++;
+      };
+
+      batches
+        .slice()
+        .sort((a, b) => ddmmToISO(a.payDate).localeCompare(ddmmToISO(b.payDate)))
+        .forEach(bg => {
+          if (!inRangeIso(bg.payDate)) return;
+          pushBatch(bg.payDate, collectByMaCT(bg.payDates));
+        });
+
+      const unpaidDates = allDates.filter(d => !coveredDates.has(d) && inRangeIso(d));
+      unpaidDates
+        .slice()
+        .sort((a, b) => ddmmToISO(a).localeCompare(ddmmToISO(b)))
+        .forEach(date => {
+          pushBatch(date, collectByMaCT([date]));
+        });
+
+      return { rows, skipped, nextSeq: seq };
+    }
+
+    async function confirmExportZvpMisa(kind) {
+      const stEl = document.getElementById('zvpMisaModalStatus');
+      const fromIso = (document.getElementById('zvpMisaFromDate')||{}).value;
+      const toIso   = (document.getElementById('zvpMisaToDate')||{}).value;
+      const startSeq = parseInt((document.getElementById('zvpMisaStartSeq')||{}).value, 10) || 1;
+      if (!fromIso || !toIso) { if (stEl) stEl.textContent = 'Vui lòng chọn đủ Từ ngày và Đến ngày.'; return; }
+      if (fromIso > toIso) { if (stEl) stEl.textContent = 'Từ ngày phải trước Đến ngày.'; return; }
+      if (stEl) stEl.textContent = 'Đang tải dữ liệu ngân hàng...';
+      try { await fetchBankZalo(); } catch(e) {}
+      try { await fetchBankVnpay(); } catch(e) {}
+      try { await fetchBankPayoo(); } catch(e) {}
+      if (stEl) stEl.textContent = '';
+      closeZvpMisaModal();
+
+      if (kind === 'online') {
+        if (!_zaloFee.length) { alert('Chưa có dữ liệu Zalo Pay để xuất.'); return; }
+        const { rows, skipped } = buildZvpMisaRows({
+          byDate: buildZaloByDateForExport(), getGianDisp: getGianDisp_Zalo_Wrap(),
+          hdObj: _zaloHD, bankPayments: _bankZaloPayments,
+          dienGiaiSuffix: 'VNP', maDoiTuong: 'VN PAY0102182292',
+          startSeq, fromIso, toIso,
+        });
+        if (!rows.length) { alert('Không có dòng nào để xuất trong khoảng ngày đã chọn.'); return; }
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'MISATHue Online');
+        const fname = 'MISATHue-online_' + fromIso + '_den_' + toIso + '.xlsx';
+        XLSX.writeFile(wb, fname);
+        alert(`✅ Đã xuất ${rows.length} dòng vào file ${fname}` + (skipped.length ? `\n\n⚠️ Bỏ qua ${skipped.length} nhóm chưa xác định gian.` : ''));
+      } else {
+        if (!_vnpayFee.length && !_payooFee.length) { alert('Chưa có dữ liệu VNPay/Payoo để xuất.'); return; }
+        const vnpayPart = buildZvpMisaRows({
+          byDate: buildVnpayByDateForExport(), getGianDisp: getVnpayGianDisp,
+          hdObj: _vnpayHD, bankPayments: _bankVnpayPayments,
+          dienGiaiSuffix: 'VNP', maDoiTuong: 'VN PAY0102182292',
+          startSeq, fromIso, toIso,
+        });
+        const payooPart = buildZvpMisaRows({
+          byDate: buildPayooByDateForExport(), getGianDisp: getPayooGianDisp,
+          hdObj: _payooHD, bankPayments: _bankPayooPayments,
+          dienGiaiSuffix: 'PAYOO', maDoiTuong: 'DONGVIET0305458683',
+          startSeq: vnpayPart.nextSeq, fromIso, toIso,
+        });
+        const rows = [...vnpayPart.rows, ...payooPart.rows];
+        const skipped = [...vnpayPart.skipped, ...payooPart.skipped];
+        if (!rows.length) { alert('Không có dòng nào để xuất trong khoảng ngày đã chọn.'); return; }
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'MISAThue OFFLINE');
+        const fname = 'MISATHue-offline_' + fromIso + '_den_' + toIso + '.xlsx';
+        XLSX.writeFile(wb, fname);
+        alert(`✅ Đã xuất ${rows.length} dòng (VNPay + Payoo) vào file ${fname}` + (skipped.length ? `\n\n⚠️ Bỏ qua ${skipped.length} nhóm chưa xác định gian.` : ''));
+      }
+    }
+    // getGianDisp cho Zalo không có tên hàm riêng dùng chung như VNPay/Payoo
+    // (định nghĩa cục bộ trong renderZaloDoiSoat) -- tạo bản wrap riêng cho
+    // xuất Misa, y hệt logic getGianDisp trong renderZaloDoiSoat.
+    function getGianDisp_Zalo_Wrap() {
+      return (date, maCT, d) => {
+        const hd = _zaloHD[date+'|'+maCT] || {};
+        const dt  = (hd.dtOvr  != null && hd.dtOvr  !== '') ? (parseFloat(String(hd.dtOvr).replace(/[^0-9.-]/g,''))||0)  : d.gross;
+        const net = (hd.netOvr != null && hd.netOvr !== '') ? (parseFloat(String(hd.netOvr).replace(/[^0-9.-]/g,''))||0) : d.net;
+        return { dt, net };
+      };
     }
 
     // ══════════════════════════════════════════
