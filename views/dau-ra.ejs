@@ -2853,11 +2853,23 @@
           // co the do lot giao dich CHUA THANH CONG (vd "Het han thanh toan",
           // "Khong thanh cong") -- cot Trang thai (AQ, iTrangThai=42) da duoc
           // loc dung == 'Thanh cong' tu truoc, chi them log de de kiem tra.
+          //
+          // Luyen, 2026-09-11: "bạn cộng luôn trạng thái không thành công nè
+          // nên là nó sẽ nên là lệch cái trạng thái nè" -- kiem tra thuc te:
+          // ngay 08-09-2026 (ZaloPay), 3 dong co "Trang thai" != "Thanh cong"
+          // (Kenh VNPAY, gop 510.000d: 120.000+234.000+156.000) NHUNG ngan
+          // hang van tra du tien ve (dung 510.000d lech giua "NH tra ve" va
+          // "Momo/Zalo Net" tinh duoc). Tuc la giong het truong hop da xu ly
+          // o handleZaloOrderFile ben tren (don "Da huy"/"Cho xu ly" nhung
+          // BaoCaoPhi van xac nhan tien that da ve) -- cot "Trang thai" trong
+          // chinh file BaoCaoPhi nay CUNG khong dang tin cay 100% de xac dinh
+          // co thu duoc tien hay khong. BaoCaoPhi la nguon xac nhan tien that
+          // (co Gross > 0 la co tien), nen BO HAN dieu kien loc theo Trang
+          // thai -- chi con loc theo Gross la so va > 0 (rawDataRows).
           const rawDataRows = rows.slice(HDR+1).filter(r => typeof r[iGross]==='number' && r[iGross]>0);
-          const excludedByStatus = rawDataRows.filter(r => String(r[iTrangThai]||'').trim()!=='Thành công').length;
-          if (excludedByStatus) console.log('[BaoCaoPhi] Bo qua', excludedByStatus, 'dong khac "Thành công" (vd Het han/Khong thanh cong).');
+          const notThanhCongCount = rawDataRows.filter(r => String(r[iTrangThai]||'').trim()!=='Thành công').length;
+          if (notThanhCongCount) console.log('[BaoCaoPhi] Co', notThanhCongCount, 'dong khac "Thành công" (vd Het han/Khong thanh cong) -- VAN TINH vi Gross>0 nghia la tien da ve that.');
           const newRows = rawDataRows
-            .filter(r => String(r[iTrangThai]||'').trim()==='Thành công')
             .map(r => {
               // Chi Nhan, 2026-09-10: cot "Thoi gian GD" (iTime) thuong la
               // chuoi "07/09/2026 10:23:00" nhung 1 so dong (tuy file/tuy
