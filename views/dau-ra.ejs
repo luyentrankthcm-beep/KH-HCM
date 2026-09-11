@@ -4544,7 +4544,10 @@
 
           const toNum = v => { if(typeof v==='number') return v; return parseFloat(String(v||'').replace(/[^0-9.-]/g,'')) || 0; };
           const badStatus = /thất bại|that bai|huỷ|huy|error|lỗi|loi|fail/i;
-          const vqrRe = /VQR[A-Za-z0-9]{13}/;
+          // Chi Nhan, 2026-09-11: ma VQR cua BIDV dai 13 ky tu nhung cua MB
+          // chi dai 11 ky tu -- dung do dai linh hoat cho khop ca 2 phia
+          // (phia sao ke NH trong routes/dau-ra.js cung da sua tuong tu).
+          const vqrRe = /VQR[A-Za-z0-9]{8,20}/;
 
           const rawDataRows = rows.slice(1).filter(r => toNum(r[iAmt]) > 0);
           if (!rawDataRows.length) { alert('Không đọc được giao dịch nào có "Số tiền đến" > 0 — kiểm tra lại đúng file export giao dịch Viet QR chưa.'); return; }

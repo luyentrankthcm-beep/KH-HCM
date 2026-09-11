@@ -404,7 +404,12 @@ router.get("/api/dau-ra/bank-vietqr", (req, res) => {
     );
     if (!bankRow) return res.json({ ok: false, error: "Không tìm thấy tài khoản ngân hàng cho " + bank });
 
-    const vqrRe = /VQR[A-Za-z0-9]{13}/;
+    // Chi Nhan, 2026-09-11: xac nhan tren du lieu that -- ma VQR cua BIDV
+    // dai 13 ky tu (vd VQR26375334CLIBH) nhung cua MB11521268 chi dai 11 ky
+    // tu (vd VQR26343E6DDF5) -- regex cung {13} lam mat het GD cua MB (0/0
+    // khop). Doi sang do dai linh hoat 8-20 ky tu de an toan voi ca 2 dinh
+    // dang, khop dung phan "VQR..." lien tuc truoc khoang trang.
+    const vqrRe = /VQR[A-Za-z0-9]{8,20}/;
     const transactions = [];
     for (const t of store.transactions) {
       if (t.bank_id !== bankRow.id) continue;
