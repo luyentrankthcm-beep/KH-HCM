@@ -4947,15 +4947,25 @@
             if (maCT === '_unknown_') { skipped.push('(chưa xác định gian ngày ' + date + ')'); return; }
             const gDisp = getGianDisp(date, maCT, ctData[maCT]);
             const hd = hdObj[date + '|' + maCT] || {};
-            if (!byMaCT[maCT]) byMaCT[maCT] = { dt: 0, net: 0, soHDs: [], tienHD: 0 };
+            // Chi Nhan, 2026-09-11: mot hoa don co the duoc ghi CHUNG tren
+            // NHIEU ngay trong cung 1 dot NH tra (vd hoa don 3350 cover ca
+            // ngay 5+6, xem ghi chu invoiceGroups ben renderZaloDoiSoat) --
+            // dung Map theo soHD (khong push() thang vao mang) de KHONG cong
+            // don/lap lai cung 1 so hoa don + so tien nhieu lan khi gom qua
+            // nhieu ngay.
+            if (!byMaCT[maCT]) byMaCT[maCT] = { dt: 0, net: 0, hdMap: new Map() };
             byMaCT[maCT].dt  += gDisp.dt;
             byMaCT[maCT].net += gDisp.net;
             const soHD = (hd.soHD || '').trim();
             if (soHD) {
-              byMaCT[maCT].soHDs.push(soHD);
-              byMaCT[maCT].tienHD += parseFloat(String(hd.tienHD || '').replace(/[^0-9.]/g, '')) || 0;
+              const tienHD = parseFloat(String(hd.tienHD || '').replace(/[^0-9.]/g, '')) || 0;
+              byMaCT[maCT].hdMap.set(soHD, tienHD);
             }
           });
+        });
+        Object.values(byMaCT).forEach(b => {
+          b.soHDs = [...b.hdMap.keys()];
+          b.tienHD = [...b.hdMap.values()].reduce((s, v) => s + v, 0);
         });
         return byMaCT;
       };
