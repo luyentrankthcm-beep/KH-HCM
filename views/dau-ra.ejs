@@ -466,6 +466,28 @@
     </div>
 
     <!-- ==================== VIET QR TAB ==================== -->
+    <%
+      // Chi Nhan, 2026-09-12: Luyen bao "2 KH á là khác nhau hoàn toàn á 2
+      // công ty khác nhau á ... đừng hiện các dữ liệu liên quan tới kh cũ
+      // nha" -- KH Moi co RIENG 4 TK Viet QR (BIDV7702/BIDV77021/MB02865168/
+      // BIDV8613600999), KHONG PHAI 3 TK cua KH Cu (BIDV7704/BIDV77020/
+      // MB11521268, xem BANK_COMPANY trong utils/bankCompany.js). Danh sach
+      // nay dieu khien toan bo sub-tab-bar + cac panel ben duoi qua 1 vong
+      // lap DUY NHAT (thay vi 3-4 khoi HTML gan cung tung ngan hang) de sau
+      // nay them/bot ngan hang chi can sua O DAY, khong phai dao lai HTML.
+      const vietQrTabBanks = activeCompany === 'kh_moi'
+        ? [
+            { key: 'bidv7702', label: 'BIDV7702' },
+            { key: 'bidv77021', label: 'BIDV77021' },
+            { key: 'mb02865168', label: 'MB02865168' },
+            { key: 'bidv8613600999', label: 'BIDV8613600999' },
+          ]
+        : [
+            { key: 'bidv7704', label: 'BIDV7704' },
+            { key: 'bidv77020', label: 'BIDV77020' },
+            { key: 'mb11521268', label: 'MB11521268' },
+          ];
+    %>
     <div id="vietqr" class="tab-panel">
       <div class="channel-header">
         <div class="acct-info">
@@ -511,239 +533,94 @@
           <div id="vietqrMisaModalStatus" style="font-size:.82em;color:#dc2626;margin-bottom:.4rem"></div>
           <div class="modal-actions" style="flex-wrap:wrap">
             <button class="btn-cancel" onclick="closeVietQrMisaModal()">Hủy</button>
-            <button onclick="confirmExportVietQrMisa('bidv7704')" style="background:#2563eb;color:#fff;border:none;border-radius:6px;padding:.45rem 1rem;cursor:pointer;font-weight:600">📥 BIDV7704</button>
-            <button onclick="confirmExportVietQrMisa('bidv77020')" style="background:#2563eb;color:#fff;border:none;border-radius:6px;padding:.45rem 1rem;cursor:pointer;font-weight:600">📥 BIDV77020</button>
-            <button onclick="confirmExportVietQrMisa('mb11521268')" style="background:#2563eb;color:#fff;border:none;border-radius:6px;padding:.45rem 1rem;cursor:pointer;font-weight:600">📥 MB11521268</button>
-            <button onclick="confirmExportVietQrMisa('all')" style="background:#16a34a;color:#fff;border:none;border-radius:6px;padding:.45rem 1.2rem;cursor:pointer;font-weight:700">📥 Xuất cả 3 ngân hàng</button>
+            <% vietQrTabBanks.forEach(function(b) { %>
+            <button onclick="confirmExportVietQrMisa('<%= b.key %>')" style="background:#2563eb;color:#fff;border:none;border-radius:6px;padding:.45rem 1rem;cursor:pointer;font-weight:600">📥 <%= b.label %></button>
+            <% }); %>
+            <button onclick="confirmExportVietQrMisa('all')" style="background:#16a34a;color:#fff;border:none;border-radius:6px;padding:.45rem 1.2rem;cursor:pointer;font-weight:700">📥 Xuất cả <%= vietQrTabBanks.length %> ngân hàng</button>
           </div>
         </div>
       </div>
 
-      <!-- Sub-tabs: BIDV7704 / BIDV77020 / MB11521268 -->
+      <!-- Sub-tabs: 1 vong lap cho ca KH Cu (3 NH) va KH Moi (4 NH) -->
       <div class="sub-tab-bar" style="margin-top:.5rem;margin-bottom:.75rem">
-        <button class="sub-tab-btn active" id="vietqr_btn_bidv7704" onclick="switchVietQrBank('bidv7704')">🟢 BIDV7704</button>
-        <button class="sub-tab-btn" id="vietqr_btn_bidv77020" onclick="switchVietQrBank('bidv77020')">🟢 BIDV77020</button>
-        <button class="sub-tab-btn" id="vietqr_btn_mb11521268" onclick="switchVietQrBank('mb11521268')">🟢 MB11521268</button>
+        <% vietQrTabBanks.forEach(function(b, i) { %>
+        <button class="sub-tab-btn<%= i===0 ? ' active' : '' %>" id="vietqr_btn_<%= b.key %>" onclick="switchVietQrBank('<%= b.key %>')">🟢 <%= b.label %></button>
+        <% }); %>
       </div>
 
-      <!-- BIDV7704 -->
-      <div id="vietqr_bidv7704" class="sub-panel active">
+      <% vietQrTabBanks.forEach(function(vb, vi) { const bank = vb.key; const label = vb.label; %>
+      <div id="vietqr_<%= bank %>" class="sub-panel<%= vi===0 ? ' active' : '' %>">
         <div class="channel-header">
           <div class="acct-info">
-            <strong>BIDV7704</strong>
-            &nbsp;<span id="vietqr_summary_bidv7704" style="font-size:.82em;color:#64748b"></span>
+            <strong><%= label %></strong>
+            &nbsp;<span id="vietqr_summary_<%= bank %>" style="font-size:.82em;color:#64748b"></span>
           </div>
           <div style="display:flex;align-items:center;gap:.5rem">
-            <button class="btn-nhap" style="background:#16a34a" onclick="document.getElementById('vietqrTxnInput_bidv7704').click()">📥 Giao dịch Viet QR</button>
-            <input type="file" id="vietqrTxnInput_bidv7704" accept=".xls,.xlsx" style="display:none" onchange="handleVietQrTxnFile(this,'bidv7704')">
+            <button class="btn-nhap" style="background:#16a34a" onclick="document.getElementById('vietqrTxnInput_<%= bank %>').click()">📥 Giao dịch Viet QR</button>
+            <input type="file" id="vietqrTxnInput_<%= bank %>" accept=".xls,.xlsx" style="display:none" onchange="handleVietQrTxnFile(this,'<%= bank %>')">
           </div>
         </div>
         <div class="sub-tab-bar" style="margin-top:.5rem">
-          <button class="sub-tab-btn active" id="vietqr_bidv7704_btn_ds" onclick="switchVietQrSub('bidv7704','ds')">📅 Đối soát ngày</button>
-          <button class="sub-tab-btn" id="vietqr_bidv7704_btn_diemmap" onclick="switchVietQrSub('bidv7704','diemmap')">🏪 Map Cửa hàng → Tên điểm bán</button>
-          <button class="sub-tab-btn" id="vietqr_bidv7704_btn_ctmap" onclick="switchVietQrSub('bidv7704','ctmap')">🗺️ Map Tên → Mã CT</button>
-          <button class="sub-tab-btn" id="vietqr_bidv7704_btn_hist" onclick="switchVietQrSub('bidv7704','hist')">⏱️ Lịch sử tải</button>
+          <button class="sub-tab-btn active" id="vietqr_<%= bank %>_btn_ds" onclick="switchVietQrSub('<%= bank %>','ds')">📅 Đối soát ngày</button>
+          <button class="sub-tab-btn" id="vietqr_<%= bank %>_btn_diemmap" onclick="switchVietQrSub('<%= bank %>','diemmap')">🏪 Map Cửa hàng → Tên điểm bán</button>
+          <button class="sub-tab-btn" id="vietqr_<%= bank %>_btn_ctmap" onclick="switchVietQrSub('<%= bank %>','ctmap')">🗺️ Map Tên → Mã CT</button>
+          <button class="sub-tab-btn" id="vietqr_<%= bank %>_btn_hist" onclick="switchVietQrSub('<%= bank %>','hist')">⏱️ Lịch sử tải</button>
         </div>
-        <div id="vietqr_bidv7704_sub_ds" class="sub-panel active" style="margin-top:.75rem">
+        <div id="vietqr_<%= bank %>_sub_ds" class="sub-panel active" style="margin-top:.75rem">
           <div style="margin-bottom:.5rem;display:flex;gap:.6rem;align-items:center;flex-wrap:wrap">
             <label style="font-size:.83em;color:#64748b">Lọc tháng:</label>
-            <select id="vietqrFilterMonth_bidv7704" onchange="renderVietQrDoiSoat('bidv7704')" style="font-size:.83em;padding:.2rem .5rem;border:1px solid #cbd5e1;border-radius:5px">
+            <select id="vietqrFilterMonth_<%= bank %>" onchange="renderVietQrDoiSoat('<%= bank %>')" style="font-size:.83em;padding:.2rem .5rem;border:1px solid #cbd5e1;border-radius:5px">
               <option value="">-- Tất cả --</option>
             </select>
-            <button onclick="fetchBankVietQrRefresh('bidv7704')" style="font-size:.78em;padding:.2rem .65rem;background:#16a34a;color:#fff;border:none;border-radius:5px;cursor:pointer">🔄 Làm mới NH</button>
-            <button onclick="toggleBankVietQrDetail('bidv7704')" style="font-size:.78em;padding:.2rem .65rem;background:#374151;color:#e5e7eb;border:none;border-radius:5px;cursor:pointer">🏦 Xem raw NH</button>
-            <button onclick="autoMapMttVietQr('bidv7704')" style="font-size:.78em;padding:.2rem .65rem;background:#0d9488;color:#fff;border:none;border-radius:5px;cursor:pointer;font-weight:600">🧾 Map MTT → Viet QR</button>
-            <span id="bankVietQrStatus_bidv7704" style="font-size:.78em;color:#64748b"></span>
+            <button onclick="fetchBankVietQrRefresh('<%= bank %>')" style="font-size:.78em;padding:.2rem .65rem;background:#16a34a;color:#fff;border:none;border-radius:5px;cursor:pointer">🔄 Làm mới NH</button>
+            <button onclick="toggleBankVietQrDetail('<%= bank %>')" style="font-size:.78em;padding:.2rem .65rem;background:#374151;color:#e5e7eb;border:none;border-radius:5px;cursor:pointer">🏦 Xem raw NH</button>
+            <button onclick="autoMapMttVietQr('<%= bank %>')" style="font-size:.78em;padding:.2rem .65rem;background:#0d9488;color:#fff;border:none;border-radius:5px;cursor:pointer;font-weight:600">🧾 Map MTT → Viet QR</button>
+            <span id="bankVietQrStatus_<%= bank %>" style="font-size:.78em;color:#64748b"></span>
           </div>
-          <div style="font-size:.76em;color:#94a3b8;margin-bottom:.5rem">Đối soát theo <b>Mã tham chiếu (VQR)</b> từng giao dịch với sao kê ngân hàng BIDV7704 — số tiền lấy theo ngân hàng làm chuẩn.</div>
-          <div id="bankVietQrDetailPanel_bidv7704" style="display:none;background:#0f172a;border:1px solid #14532d;border-radius:6px;padding:.6rem .8rem;margin-bottom:.6rem;font-size:.8em;overflow-x:auto">
+          <div style="font-size:.76em;color:#94a3b8;margin-bottom:.5rem">Đối soát theo <b>Mã tham chiếu (VQR)</b> từng giao dịch với sao kê ngân hàng <%= label %> — số tiền lấy theo ngân hàng làm chuẩn.</div>
+          <div id="bankVietQrDetailPanel_<%= bank %>" style="display:none;background:#0f172a;border:1px solid #14532d;border-radius:6px;padding:.6rem .8rem;margin-bottom:.6rem;font-size:.8em;overflow-x:auto">
             <div style="color:#94a3b8;margin-bottom:.4rem;font-weight:700">Raw transactions ngân hàng có mã VQR:</div>
-            <table style="border-collapse:collapse;width:100%;min-width:500px" id="bankVietQrRawTable_bidv7704">
+            <table style="border-collapse:collapse;width:100%;min-width:500px" id="bankVietQrRawTable_<%= bank %>">
               <thead><tr style="color:#bbf7d0">
                 <th style="padding:.25rem .5rem;text-align:left">#</th>
                 <th style="padding:.25rem .5rem;text-align:left">Ngày</th>
                 <th style="padding:.25rem .5rem;text-align:right">Số tiền</th>
                 <th style="padding:.25rem .5rem;text-align:left">Mã VQR / Diễn giải</th>
               </tr></thead>
-              <tbody id="bankVietQrRawBody_bidv7704"><tr><td colspan="4" style="color:#64748b;padding:.4rem">Nhấn "Làm mới NH" để tải</td></tr></tbody>
+              <tbody id="bankVietQrRawBody_<%= bank %>"><tr><td colspan="4" style="color:#64748b;padding:.4rem">Nhấn "Làm mới NH" để tải</td></tr></tbody>
             </table>
           </div>
-          <div id="vietqrDoiSoatBody_bidv7704">
-            <div class="empty-state"><div class="big-icon">🟢</div><p>Tải file giao dịch BIDV7704 để bắt đầu đối soát</p></div>
+          <div id="vietqrDoiSoatBody_<%= bank %>">
+            <div class="empty-state"><div class="big-icon">🟢</div><p>Tải file giao dịch <%= label %> để bắt đầu đối soát</p></div>
           </div>
         </div>
-        <div id="vietqr_bidv7704_sub_diemmap" class="sub-panel" style="margin-top:.75rem">
+        <div id="vietqr_<%= bank %>_sub_diemmap" class="sub-panel" style="margin-top:.75rem">
           <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:.5rem;flex-wrap:wrap;margin-bottom:.5rem">
             <div style="font-size:.85em;color:#475569;flex:1;min-width:260px">Map từng <strong>Mã cửa hàng</strong> (trong file giao dịch Viet QR) sang <strong>Tên điểm bán</strong> — tự động đối chiếu qua file "DS Cửa hàng ↔ Điểm bán" bạn tải ở trên (khớp theo cột "Mã cửa hàng"), có thể sửa tay nếu thiếu.</div>
             <div style="display:flex;gap:.4rem;flex-shrink:0">
-              <button onclick="exportVietQrDiemMap('bidv7704')" style="background:#0d9488;color:#fff;border:none;border-radius:5px;padding:.3rem .7rem;cursor:pointer;font-size:.78em;font-weight:600">⬇️ Xuất Excel</button>
-              <button onclick="document.getElementById('vietqrDiemMapUpload_bidv7704').click()" style="background:#2563eb;color:#fff;border:none;border-radius:5px;padding:.3rem .7rem;cursor:pointer;font-size:.78em;font-weight:600">⬆️ Tải lên</button>
-              <input type="file" id="vietqrDiemMapUpload_bidv7704" accept=".xlsx,.xls" style="display:none" onchange="handleVietQrDiemMapUpload(this,'bidv7704')">
+              <button onclick="exportVietQrDiemMap('<%= bank %>')" style="background:#0d9488;color:#fff;border:none;border-radius:5px;padding:.3rem .7rem;cursor:pointer;font-size:.78em;font-weight:600">⬇️ Xuất Excel</button>
+              <button onclick="document.getElementById('vietqrDiemMapUpload_<%= bank %>').click()" style="background:#2563eb;color:#fff;border:none;border-radius:5px;padding:.3rem .7rem;cursor:pointer;font-size:.78em;font-weight:600">⬆️ Tải lên</button>
+              <input type="file" id="vietqrDiemMapUpload_<%= bank %>" accept=".xlsx,.xls" style="display:none" onchange="handleVietQrDiemMapUpload(this,'<%= bank %>')">
             </div>
           </div>
-          <div id="vietqrDiemMapContent_bidv7704"><div class="empty-state"><div class="big-icon">🗺️</div><p>Tải file giao dịch Viet QR để thấy danh sách cửa hàng</p></div></div>
+          <div id="vietqrDiemMapContent_<%= bank %>"><div class="empty-state"><div class="big-icon">🗺️</div><p>Tải file giao dịch Viet QR để thấy danh sách cửa hàng</p></div></div>
         </div>
-        <div id="vietqr_bidv7704_sub_ctmap" class="sub-panel" style="margin-top:.75rem">
+        <div id="vietqr_<%= bank %>_sub_ctmap" class="sub-panel" style="margin-top:.75rem">
           <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:.5rem;flex-wrap:wrap;margin-bottom:.5rem">
             <div style="font-size:.85em;color:#475569;flex:1;min-width:260px">Map từng <strong>Tên điểm bán</strong> sang <strong>Mã CT</strong>.</div>
             <div style="display:flex;gap:.4rem;flex-shrink:0">
-              <button onclick="exportVietQrCtMap('bidv7704')" style="background:#0d9488;color:#fff;border:none;border-radius:5px;padding:.3rem .7rem;cursor:pointer;font-size:.78em;font-weight:600">⬇️ Xuất Excel</button>
-              <button onclick="document.getElementById('vietqrCtMapUpload_bidv7704').click()" style="background:#2563eb;color:#fff;border:none;border-radius:5px;padding:.3rem .7rem;cursor:pointer;font-size:.78em;font-weight:600">⬆️ Tải lên</button>
-              <input type="file" id="vietqrCtMapUpload_bidv7704" accept=".xlsx,.xls" style="display:none" onchange="handleVietQrCtMapUpload(this,'bidv7704')">
+              <button onclick="exportVietQrCtMap('<%= bank %>')" style="background:#0d9488;color:#fff;border:none;border-radius:5px;padding:.3rem .7rem;cursor:pointer;font-size:.78em;font-weight:600">⬇️ Xuất Excel</button>
+              <button onclick="document.getElementById('vietqrCtMapUpload_<%= bank %>').click()" style="background:#2563eb;color:#fff;border:none;border-radius:5px;padding:.3rem .7rem;cursor:pointer;font-size:.78em;font-weight:600">⬆️ Tải lên</button>
+              <input type="file" id="vietqrCtMapUpload_<%= bank %>" accept=".xlsx,.xls" style="display:none" onchange="handleVietQrCtMapUpload(this,'<%= bank %>')">
             </div>
           </div>
-          <div id="vietqrCtMapContent_bidv7704"><div class="empty-state"><div class="big-icon">🏗️</div><p>Map tên điểm bán trước khi map Mã CT</p></div></div>
+          <div id="vietqrCtMapContent_<%= bank %>"><div class="empty-state"><div class="big-icon">🏗️</div><p>Map tên điểm bán trước khi map Mã CT</p></div></div>
         </div>
-        <div id="vietqr_bidv7704_sub_hist" class="sub-panel" style="margin-top:.75rem">
-          <div id="vietqrHistBody_bidv7704"><div class="empty-state"><div class="big-icon">⏱️</div><p>Chưa có lịch sử tải</p></div></div>
+        <div id="vietqr_<%= bank %>_sub_hist" class="sub-panel" style="margin-top:.75rem">
+          <div id="vietqrHistBody_<%= bank %>"><div class="empty-state"><div class="big-icon">⏱️</div><p>Chưa có lịch sử tải</p></div></div>
         </div>
       </div>
-
-      <!-- BIDV77020 -->
-      <div id="vietqr_bidv77020" class="sub-panel">
-        <div class="channel-header">
-          <div class="acct-info">
-            <strong>BIDV77020</strong>
-            &nbsp;<span id="vietqr_summary_bidv77020" style="font-size:.82em;color:#64748b"></span>
-          </div>
-          <div style="display:flex;align-items:center;gap:.5rem">
-            <button class="btn-nhap" style="background:#16a34a" onclick="document.getElementById('vietqrTxnInput_bidv77020').click()">📥 Giao dịch Viet QR</button>
-            <input type="file" id="vietqrTxnInput_bidv77020" accept=".xls,.xlsx" style="display:none" onchange="handleVietQrTxnFile(this,'bidv77020')">
-          </div>
-        </div>
-        <div class="sub-tab-bar" style="margin-top:.5rem">
-          <button class="sub-tab-btn active" id="vietqr_bidv77020_btn_ds" onclick="switchVietQrSub('bidv77020','ds')">📅 Đối soát ngày</button>
-          <button class="sub-tab-btn" id="vietqr_bidv77020_btn_diemmap" onclick="switchVietQrSub('bidv77020','diemmap')">🏪 Map Cửa hàng → Tên điểm bán</button>
-          <button class="sub-tab-btn" id="vietqr_bidv77020_btn_ctmap" onclick="switchVietQrSub('bidv77020','ctmap')">🗺️ Map Tên → Mã CT</button>
-          <button class="sub-tab-btn" id="vietqr_bidv77020_btn_hist" onclick="switchVietQrSub('bidv77020','hist')">⏱️ Lịch sử tải</button>
-        </div>
-        <div id="vietqr_bidv77020_sub_ds" class="sub-panel active" style="margin-top:.75rem">
-          <div style="margin-bottom:.5rem;display:flex;gap:.6rem;align-items:center;flex-wrap:wrap">
-            <label style="font-size:.83em;color:#64748b">Lọc tháng:</label>
-            <select id="vietqrFilterMonth_bidv77020" onchange="renderVietQrDoiSoat('bidv77020')" style="font-size:.83em;padding:.2rem .5rem;border:1px solid #cbd5e1;border-radius:5px">
-              <option value="">-- Tất cả --</option>
-            </select>
-            <button onclick="fetchBankVietQrRefresh('bidv77020')" style="font-size:.78em;padding:.2rem .65rem;background:#16a34a;color:#fff;border:none;border-radius:5px;cursor:pointer">🔄 Làm mới NH</button>
-            <button onclick="toggleBankVietQrDetail('bidv77020')" style="font-size:.78em;padding:.2rem .65rem;background:#374151;color:#e5e7eb;border:none;border-radius:5px;cursor:pointer">🏦 Xem raw NH</button>
-            <button onclick="autoMapMttVietQr('bidv77020')" style="font-size:.78em;padding:.2rem .65rem;background:#0d9488;color:#fff;border:none;border-radius:5px;cursor:pointer;font-weight:600">🧾 Map MTT → Viet QR</button>
-            <span id="bankVietQrStatus_bidv77020" style="font-size:.78em;color:#64748b"></span>
-          </div>
-          <div style="font-size:.76em;color:#94a3b8;margin-bottom:.5rem">Đối soát theo <b>Mã tham chiếu (VQR)</b> từng giao dịch với sao kê ngân hàng BIDV77020 — số tiền lấy theo ngân hàng làm chuẩn.</div>
-          <div id="bankVietQrDetailPanel_bidv77020" style="display:none;background:#0f172a;border:1px solid #14532d;border-radius:6px;padding:.6rem .8rem;margin-bottom:.6rem;font-size:.8em;overflow-x:auto">
-            <div style="color:#94a3b8;margin-bottom:.4rem;font-weight:700">Raw transactions ngân hàng có mã VQR:</div>
-            <table style="border-collapse:collapse;width:100%;min-width:500px" id="bankVietQrRawTable_bidv77020">
-              <thead><tr style="color:#bbf7d0">
-                <th style="padding:.25rem .5rem;text-align:left">#</th>
-                <th style="padding:.25rem .5rem;text-align:left">Ngày</th>
-                <th style="padding:.25rem .5rem;text-align:right">Số tiền</th>
-                <th style="padding:.25rem .5rem;text-align:left">Mã VQR / Diễn giải</th>
-              </tr></thead>
-              <tbody id="bankVietQrRawBody_bidv77020"><tr><td colspan="4" style="color:#64748b;padding:.4rem">Nhấn "Làm mới NH" để tải</td></tr></tbody>
-            </table>
-          </div>
-          <div id="vietqrDoiSoatBody_bidv77020">
-            <div class="empty-state"><div class="big-icon">🟢</div><p>Tải file giao dịch BIDV77020 để bắt đầu đối soát</p></div>
-          </div>
-        </div>
-        <div id="vietqr_bidv77020_sub_diemmap" class="sub-panel" style="margin-top:.75rem">
-          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:.5rem;flex-wrap:wrap;margin-bottom:.5rem">
-            <div style="font-size:.85em;color:#475569;flex:1;min-width:260px">Map từng <strong>Mã cửa hàng</strong> (trong file giao dịch Viet QR) sang <strong>Tên điểm bán</strong> — tự động đối chiếu qua file "DS Cửa hàng ↔ Điểm bán" bạn tải ở trên (khớp theo cột "Mã cửa hàng"), có thể sửa tay nếu thiếu.</div>
-            <div style="display:flex;gap:.4rem;flex-shrink:0">
-              <button onclick="exportVietQrDiemMap('bidv77020')" style="background:#0d9488;color:#fff;border:none;border-radius:5px;padding:.3rem .7rem;cursor:pointer;font-size:.78em;font-weight:600">⬇️ Xuất Excel</button>
-              <button onclick="document.getElementById('vietqrDiemMapUpload_bidv77020').click()" style="background:#2563eb;color:#fff;border:none;border-radius:5px;padding:.3rem .7rem;cursor:pointer;font-size:.78em;font-weight:600">⬆️ Tải lên</button>
-              <input type="file" id="vietqrDiemMapUpload_bidv77020" accept=".xlsx,.xls" style="display:none" onchange="handleVietQrDiemMapUpload(this,'bidv77020')">
-            </div>
-          </div>
-          <div id="vietqrDiemMapContent_bidv77020"><div class="empty-state"><div class="big-icon">🗺️</div><p>Tải file giao dịch Viet QR để thấy danh sách cửa hàng</p></div></div>
-        </div>
-        <div id="vietqr_bidv77020_sub_ctmap" class="sub-panel" style="margin-top:.75rem">
-          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:.5rem;flex-wrap:wrap;margin-bottom:.5rem">
-            <div style="font-size:.85em;color:#475569;flex:1;min-width:260px">Map từng <strong>Tên điểm bán</strong> sang <strong>Mã CT</strong>.</div>
-            <div style="display:flex;gap:.4rem;flex-shrink:0">
-              <button onclick="exportVietQrCtMap('bidv77020')" style="background:#0d9488;color:#fff;border:none;border-radius:5px;padding:.3rem .7rem;cursor:pointer;font-size:.78em;font-weight:600">⬇️ Xuất Excel</button>
-              <button onclick="document.getElementById('vietqrCtMapUpload_bidv77020').click()" style="background:#2563eb;color:#fff;border:none;border-radius:5px;padding:.3rem .7rem;cursor:pointer;font-size:.78em;font-weight:600">⬆️ Tải lên</button>
-              <input type="file" id="vietqrCtMapUpload_bidv77020" accept=".xlsx,.xls" style="display:none" onchange="handleVietQrCtMapUpload(this,'bidv77020')">
-            </div>
-          </div>
-          <div id="vietqrCtMapContent_bidv77020"><div class="empty-state"><div class="big-icon">🏗️</div><p>Map tên điểm bán trước khi map Mã CT</p></div></div>
-        </div>
-        <div id="vietqr_bidv77020_sub_hist" class="sub-panel" style="margin-top:.75rem">
-          <div id="vietqrHistBody_bidv77020"><div class="empty-state"><div class="big-icon">⏱️</div><p>Chưa có lịch sử tải</p></div></div>
-        </div>
-      </div>
-
-      <!-- MB11521268 -->
-      <div id="vietqr_mb11521268" class="sub-panel">
-        <div class="channel-header">
-          <div class="acct-info">
-            <strong>MB11521268</strong>
-            &nbsp;<span id="vietqr_summary_mb11521268" style="font-size:.82em;color:#64748b"></span>
-          </div>
-          <div style="display:flex;align-items:center;gap:.5rem">
-            <button class="btn-nhap" style="background:#16a34a" onclick="document.getElementById('vietqrTxnInput_mb11521268').click()">📥 Giao dịch Viet QR</button>
-            <input type="file" id="vietqrTxnInput_mb11521268" accept=".xls,.xlsx" style="display:none" onchange="handleVietQrTxnFile(this,'mb11521268')">
-          </div>
-        </div>
-        <div class="sub-tab-bar" style="margin-top:.5rem">
-          <button class="sub-tab-btn active" id="vietqr_mb11521268_btn_ds" onclick="switchVietQrSub('mb11521268','ds')">📅 Đối soát ngày</button>
-          <button class="sub-tab-btn" id="vietqr_mb11521268_btn_diemmap" onclick="switchVietQrSub('mb11521268','diemmap')">🏪 Map Cửa hàng → Tên điểm bán</button>
-          <button class="sub-tab-btn" id="vietqr_mb11521268_btn_ctmap" onclick="switchVietQrSub('mb11521268','ctmap')">🗺️ Map Tên → Mã CT</button>
-          <button class="sub-tab-btn" id="vietqr_mb11521268_btn_hist" onclick="switchVietQrSub('mb11521268','hist')">⏱️ Lịch sử tải</button>
-        </div>
-        <div id="vietqr_mb11521268_sub_ds" class="sub-panel active" style="margin-top:.75rem">
-          <div style="margin-bottom:.5rem;display:flex;gap:.6rem;align-items:center;flex-wrap:wrap">
-            <label style="font-size:.83em;color:#64748b">Lọc tháng:</label>
-            <select id="vietqrFilterMonth_mb11521268" onchange="renderVietQrDoiSoat('mb11521268')" style="font-size:.83em;padding:.2rem .5rem;border:1px solid #cbd5e1;border-radius:5px">
-              <option value="">-- Tất cả --</option>
-            </select>
-            <button onclick="fetchBankVietQrRefresh('mb11521268')" style="font-size:.78em;padding:.2rem .65rem;background:#16a34a;color:#fff;border:none;border-radius:5px;cursor:pointer">🔄 Làm mới NH</button>
-            <button onclick="toggleBankVietQrDetail('mb11521268')" style="font-size:.78em;padding:.2rem .65rem;background:#374151;color:#e5e7eb;border:none;border-radius:5px;cursor:pointer">🏦 Xem raw NH</button>
-            <button onclick="autoMapMttVietQr('mb11521268')" style="font-size:.78em;padding:.2rem .65rem;background:#0d9488;color:#fff;border:none;border-radius:5px;cursor:pointer;font-weight:600">🧾 Map MTT → Viet QR</button>
-            <span id="bankVietQrStatus_mb11521268" style="font-size:.78em;color:#64748b"></span>
-          </div>
-          <div style="font-size:.76em;color:#94a3b8;margin-bottom:.5rem">Đối soát theo <b>Mã tham chiếu (VQR)</b> từng giao dịch với sao kê ngân hàng MB11521268 — số tiền lấy theo ngân hàng làm chuẩn.</div>
-          <div id="bankVietQrDetailPanel_mb11521268" style="display:none;background:#0f172a;border:1px solid #14532d;border-radius:6px;padding:.6rem .8rem;margin-bottom:.6rem;font-size:.8em;overflow-x:auto">
-            <div style="color:#94a3b8;margin-bottom:.4rem;font-weight:700">Raw transactions ngân hàng có mã VQR:</div>
-            <table style="border-collapse:collapse;width:100%;min-width:500px" id="bankVietQrRawTable_mb11521268">
-              <thead><tr style="color:#bbf7d0">
-                <th style="padding:.25rem .5rem;text-align:left">#</th>
-                <th style="padding:.25rem .5rem;text-align:left">Ngày</th>
-                <th style="padding:.25rem .5rem;text-align:right">Số tiền</th>
-                <th style="padding:.25rem .5rem;text-align:left">Mã VQR / Diễn giải</th>
-              </tr></thead>
-              <tbody id="bankVietQrRawBody_mb11521268"><tr><td colspan="4" style="color:#64748b;padding:.4rem">Nhấn "Làm mới NH" để tải</td></tr></tbody>
-            </table>
-          </div>
-          <div id="vietqrDoiSoatBody_mb11521268">
-            <div class="empty-state"><div class="big-icon">🟢</div><p>Tải file giao dịch MB11521268 để bắt đầu đối soát</p></div>
-          </div>
-        </div>
-        <div id="vietqr_mb11521268_sub_diemmap" class="sub-panel" style="margin-top:.75rem">
-          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:.5rem;flex-wrap:wrap;margin-bottom:.5rem">
-            <div style="font-size:.85em;color:#475569;flex:1;min-width:260px">Map từng <strong>Mã cửa hàng</strong> (trong file giao dịch Viet QR) sang <strong>Tên điểm bán</strong> — tự động đối chiếu qua file "DS Cửa hàng ↔ Điểm bán" bạn tải ở trên (khớp theo cột "Mã cửa hàng"), có thể sửa tay nếu thiếu.</div>
-            <div style="display:flex;gap:.4rem;flex-shrink:0">
-              <button onclick="exportVietQrDiemMap('mb11521268')" style="background:#0d9488;color:#fff;border:none;border-radius:5px;padding:.3rem .7rem;cursor:pointer;font-size:.78em;font-weight:600">⬇️ Xuất Excel</button>
-              <button onclick="document.getElementById('vietqrDiemMapUpload_mb11521268').click()" style="background:#2563eb;color:#fff;border:none;border-radius:5px;padding:.3rem .7rem;cursor:pointer;font-size:.78em;font-weight:600">⬆️ Tải lên</button>
-              <input type="file" id="vietqrDiemMapUpload_mb11521268" accept=".xlsx,.xls" style="display:none" onchange="handleVietQrDiemMapUpload(this,'mb11521268')">
-            </div>
-          </div>
-          <div id="vietqrDiemMapContent_mb11521268"><div class="empty-state"><div class="big-icon">🗺️</div><p>Tải file giao dịch Viet QR để thấy danh sách cửa hàng</p></div></div>
-        </div>
-        <div id="vietqr_mb11521268_sub_ctmap" class="sub-panel" style="margin-top:.75rem">
-          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:.5rem;flex-wrap:wrap;margin-bottom:.5rem">
-            <div style="font-size:.85em;color:#475569;flex:1;min-width:260px">Map từng <strong>Tên điểm bán</strong> sang <strong>Mã CT</strong>.</div>
-            <div style="display:flex;gap:.4rem;flex-shrink:0">
-              <button onclick="exportVietQrCtMap('mb11521268')" style="background:#0d9488;color:#fff;border:none;border-radius:5px;padding:.3rem .7rem;cursor:pointer;font-size:.78em;font-weight:600">⬇️ Xuất Excel</button>
-              <button onclick="document.getElementById('vietqrCtMapUpload_mb11521268').click()" style="background:#2563eb;color:#fff;border:none;border-radius:5px;padding:.3rem .7rem;cursor:pointer;font-size:.78em;font-weight:600">⬆️ Tải lên</button>
-              <input type="file" id="vietqrCtMapUpload_mb11521268" accept=".xlsx,.xls" style="display:none" onchange="handleVietQrCtMapUpload(this,'mb11521268')">
-            </div>
-          </div>
-          <div id="vietqrCtMapContent_mb11521268"><div class="empty-state"><div class="big-icon">🏗️</div><p>Map tên điểm bán trước khi map Mã CT</p></div></div>
-        </div>
-        <div id="vietqr_mb11521268_sub_hist" class="sub-panel" style="margin-top:.75rem">
-          <div id="vietqrHistBody_mb11521268"><div class="empty-state"><div class="big-icon">⏱️</div><p>Chưa có lịch sử tải</p></div></div>
-        </div>
-      </div>
+      <% }); %>
     </div>
 
     <!-- ==================== MTT TAB ==================== -->
@@ -5350,21 +5227,44 @@
     // mã cửa hàng SB Vinh 06/07/09/10/15 Posh đều chung 1 điểm bán "POSH Sân
     // Bay Vinh"). Đổi khoá join từ maDiemBan sang maCuaHang.
     // ══════════════════════════════════════════
-    const VIETQR_BANKS = ['bidv7704','bidv77020','mb11521268'];
-    const VIETQR_BANK_LABEL = { bidv7704:'BIDV7704', bidv77020:'BIDV77020', mb11521268:'MB11521268' };
+    // Chi Nhan, 2026-09-12: Luyen bao "2 KH á là khác nhau hoàn toàn á 2 công
+    // ty khác nhau á khi chọn KH mới là công ty khác KH cũ nên đừng hiện các
+    // dữ liệu liên quan tới kh cũ nha" -- KH Moi co RIENG 4 TK Viet QR cua no
+    // (BIDV7702/BIDV77021/MB02865168/BIDV8613600999, KHONG PHAI 3 TK cua KH
+    // Cu). Doi toan bo danh sach/nhan/doi chieu-tai-khoan duoi day sang company-
+    // aware -- KH Cu giu y nguyen 3 tab cu, KH Moi hien dung 4 tab cua no.
+    const VIETQR_BANKS = COMPANY === 'kh_moi'
+      ? ['bidv7702','bidv77021','mb02865168','bidv8613600999']
+      : ['bidv7704','bidv77020','mb11521268'];
+    const VIETQR_BANK_LABEL = COMPANY === 'kh_moi'
+      ? { bidv7702:'BIDV7702', bidv77021:'BIDV77021', mb02865168:'MB02865168', bidv8613600999:'BIDV8613600999' }
+      : { bidv7704:'BIDV7704', bidv77020:'BIDV77020', mb11521268:'MB11521268' };
     // Luyen, 2026-09-11: "dựa vào chỗ ngân hàng trả về á đặt cảnh báo nếu tải
     // lên sai nhá" -- xay ra dung 1 lan: file giao dich cua BIDV77020 (cot
     // "Tài khoản nhận" = "8660077020 - BIDV") bi tai nham vao tab MB11521268,
     // lam sai het gian/doi soat. Dung chinh cot "Tài khoản nhận" (ngan hang
     // tra ve trong file export) doi chieu voi so tai khoan that cua tung tab
     // -- so khac thi loai bo dong do, khong cho nhap vao, kem canh bao ro.
-    const VIETQR_BANK_ACC_SUFFIX = { bidv7704:'7704', bidv77020:'7020', mb11521268:'11521268' };
-    let _vietqrWrongAcc = { bidv7704:0, bidv77020:0, mb11521268:0 }; // so dong bi loai o lan tai gan nhat vi sai tai khoan
+    const VIETQR_BANK_ACC_SUFFIX = COMPANY === 'kh_moi'
+      ? { bidv7702:'7702', bidv77021:'77021', mb02865168:'02865168', bidv8613600999:'8613600999' }
+      : { bidv7704:'7704', bidv77020:'7020', mb11521268:'11521268' };
+    let _vietqrWrongAcc = {}; VIETQR_BANKS.forEach(b => _vietqrWrongAcc[b] = 0); // so dong bi loai o lan tai gan nhat vi sai tai khoan
 
-    const LS_VIETQR_DIEM_NAME    = `vietqr_diem_name_${COMPANY}`;    // { maCuaHang: tenDiemBan } — dùng chung 3 NH
+    // Luyen, 2026-09-12: "các mã cửa hàng á với tên cửa hàng điều chung á trừ
+    // 7702 mà mã cửa hàng và tên map khác á" -- 4 map ben duoi hien dang dung
+    // CHUNG cho CA 4 TK cua KH Moi (giong cach 3 TK KH Cu tung dung chung).
+    // Dieu nay DUNG cho 3 TK bidv77021/mb02865168/bidv8613600999 (cung 1 he
+    // thong may quet QR/Ma cua hang, xem CHANNELS trong routes/doisoat-vietqr.js),
+    // nhung bidv7702 dung 1 he thong Ma cua hang RIENG (khac may POS) nen VE
+    // NGUYEN TAC can 1 bang map RIENG, khong dung chung voi 3 TK kia -- hien
+    // CHUA tach (rui ro: neu 1 "Ma cua hang" cua 7702 vo tinh trung voi ma cua
+    // 3 TK kia thi ten/CT se bi dung chung nham). Se tach rieng khi co du lieu
+    // that de kiem tra ky truoc khi doi cau truc luu tru (tranh sua sai lam
+    // mat du lieu dang dung tot cua 3 TK kia).
+    const LS_VIETQR_DIEM_NAME    = `vietqr_diem_name_${COMPANY}`;    // { maCuaHang: tenDiemBan } — dùng chung các NH cùng công ty
     const LS_VIETQR_DIEM_MANUAL  = `vietqr_diem_manual_${COMPANY}`;  // { maCuaHang: true } — đã sửa tay, không cho auto ghi đè
     const LS_VIETQR_CUA_HANG_REF = `vietqr_cua_hang_ref_${COMPANY}`; // { maCuaHang: {maDiemBan,tenDiemBan,tenCuaHang} } — bảng gốc từ file store-export
-    const LS_VIETQR_CT_MAP       = `vietqr_ct_map_${COMPANY}`;       // { tenDiemBan: maCT } — dùng chung 3 NH
+    const LS_VIETQR_CT_MAP       = `vietqr_ct_map_${COMPANY}`;       // { tenDiemBan: maCT } — dùng chung các NH cùng công ty
     const lsVietqrTxnKey  = b => `vietqr_txn_${b}_${COMPANY}`;
     const lsVietqrHDKey   = b => `vietqr_hd_${b}_${COMPANY}`;
     const lsVietqrHistKey = b => `vietqr_hist_${b}_${COMPANY}`;
@@ -5373,16 +5273,16 @@
     let _vietqrDiemManual = {}; // maCuaHang -> true nếu đã sửa tay
     let _vietqrCuaHangRef = {}; // maCuaHang -> {maDiemBan, tenDiemBan, tenCuaHang} (từ file store-export)
     let _vietqrCtMap    = {};
-    let _vietqrTxn  = { bidv7704:[], bidv77020:[], mb11521268:[] };
-    let _vietqrHD   = { bidv7704:{}, bidv77020:{}, mb11521268:{} };
-    let _vietqrHist = { bidv7704:[], bidv77020:[], mb11521268:[] };
-    let _bankVietqr    = { bidv7704:[], bidv77020:[], mb11521268:[] };
-    let _bankVietqrMap = { bidv7704:{}, bidv77020:{}, mb11521268:{} };
+    let _vietqrTxn  = {}; VIETQR_BANKS.forEach(b => _vietqrTxn[b] = []);
+    let _vietqrHD   = {}; VIETQR_BANKS.forEach(b => _vietqrHD[b] = {});
+    let _vietqrHist = {}; VIETQR_BANKS.forEach(b => _vietqrHist[b] = []);
+    let _bankVietqr    = {}; VIETQR_BANKS.forEach(b => _bankVietqr[b] = []);
+    let _bankVietqrMap = {}; VIETQR_BANKS.forEach(b => _bankVietqrMap[b] = {});
     // Chi Nhan, 2026-09-11: {account, fullName} that cua tung TK VietQR (lay
     // tu store.banks qua /api/dau-ra/bank-vietqr, dien vao "Nộp vào TK"/"Mở
     // tại ngân hàng" luc xuat Misa) -- chi co gia tri SAU KHI da bam "Làm mới
     // NH" (fetchBankVietQr) it nhat 1 lan cho ngan hang do.
-    let _vietqrBankInfo = { bidv7704:null, bidv77020:null, mb11521268:null };
+    let _vietqrBankInfo = {}; VIETQR_BANKS.forEach(b => _vietqrBankInfo[b] = null);
     // Luyen, 2026-09-11: "VQR26375407F1W là mã đơn hàng á nên bạn check theo
     // mã đơn hàng" -- file MB11521268 hau nhu khong nhung ma VQR trong Nội
     // dung TT (chi co "PaymentForOrder" tron trui), nhung "Mã tham chiếu" cua
@@ -5391,8 +5291,10 @@
     // Them 1 index rieng theo reference -- xem getVietQrBankHit ben duoi, uu
     // tien reference (dang khop chinh xac hon, hoat dong ca cho MB) truoc khi
     // fallback ve vqrCode (van can cho BIDV, noi vqrCode luon co san va dang
-    // hoat dong tot).
-    let _bankVietqrRefMap = { bidv7704:{}, bidv77020:{}, mb11521268:{} };
+    // hoat dong tot). Ap dung cho ca 4 TK cua KH Moi (deu dung dinh dang "Mã
+    // tham chiếu"/"Số tham chiếu" chuoi giong bidv7702/77021, xem CHANNELS
+    // trong routes/doisoat-vietqr.js).
+    let _bankVietqrRefMap = {}; VIETQR_BANKS.forEach(b => _bankVietqrRefMap[b] = {});
     function getVietQrBankHit(bank, r) {
       if (r.maThamChieu && _bankVietqrRefMap[bank][r.maThamChieu]) return _bankVietqrRefMap[bank][r.maThamChieu];
       if (r.vqrCode && _bankVietqrMap[bank][r.vqrCode]) return _bankVietqrMap[bank][r.vqrCode];
@@ -6331,14 +6233,37 @@
       // xac nhan lai tren toan bo du lieu MTT that: dung 26 dong dang
       // "POSH+JP MB (268) <ngay>", khong dong nao khac trung "268" gay
       // nham lan.
-      const bankKeywords = {
-        bidv7704:   ['(7704)'],
-        bidv77020:  ['(7020)'],
-        mb11521268: ['(268)'],
-      }[bank] || [];
+      //
+      // Chi Nhan, 2026-09-12: them 4 TK Viet QR cua KH Moi -- Luyen xac nhan
+      // tag "Dịch vụ thu hộ" dung cho tung TK: BIDV7702 = "MTD MN", BIDV77021
+      // = "VietQR POSH MB", MB02865168 = "POSH TK168"/"JP TK168", BIDV8613600999
+      // = "QR JP" (deu kem theo ngay o cuoi, giong cau truc KH Cu). DUNG LAI
+      // CHINH XAC cac regex tagPattern da xac nhan/dang chay that trong
+      // CHANNELS cua routes/doisoat-vietqr.js (khong doan lai) -- doi tu so
+      // khop chuoi con (bankKeywords.some(s.includes)) sang regex .test() vi
+      // 3 TK bidv77021/mb02865168/bidv8613600999 co phan tag CHUNG got chu
+      // ("VietQR POSH MB"/"QR JP") chi khac o hau to "tk 168" hay khong -- so
+      // khop chuoi con don gian se bi LAN (vd "qr jp" cung la substring cua
+      // "qr jp tk 168") neu khong loai truong hop co "tk" bang lookahead nhu
+      // ban goc.
+      const VIETQR_TAG_PATTERN = {
+        bidv7704:   /POSH\+JP\s*MB\s*\(7704\)/i,
+        bidv77020:  /POSH\+JP\s*MB\s*\(7020\)/i,
+        mb11521268: /POSH\+JP\s*MB\s*\(268\)/i,
+        bidv7702:      /MTD\s*MN/i,
+        bidv77021:     /VietQR\s*POSH\s*MB(?!\s*tk)/i,
+        mb02865168:    /(?:VietQR\s*POSH\s*MB|POSH|QR\s*JP)\s*tk\s*168/i,
+        bidv8613600999:/QR\s*JP(?!\s*tk)/i,
+      };
+      const tagPattern = VIETQR_TAG_PATTERN[bank];
       const vqMtt = mttRows.filter(r => {
-        const s = (r.dichVuThuHo||'').toLowerCase();
-        return s.includes('vietqr') || s.includes('viet qr') || bankKeywords.some(k=>s.includes(k));
+        const s = r.dichVuThuHo || '';
+        if (tagPattern && tagPattern.test(s)) return true;
+        // Fallback chung (giu lai hanh vi cu cho KH Cu): dong nao ghi ro chu
+        // "vietqr"/"viet qr" ma khong khop tag rieng cua bat ky TK nao khac.
+        const low = s.toLowerCase();
+        return (low.includes('vietqr') || low.includes('viet qr')) &&
+          !Object.entries(VIETQR_TAG_PATTERN).some(([b,p]) => b!==bank && p.test(s));
       });
       if (!vqMtt.length) { alert('Không tìm thấy hóa đơn MTT nào khớp Viet QR / '+VIETQR_BANK_LABEL[bank]+'.\nKiểm tra lại cột "Dịch vụ thu hộ" trong MTT (có thể chưa đúng từ khóa lọc, báo lại để chỉnh).'); return; }
 

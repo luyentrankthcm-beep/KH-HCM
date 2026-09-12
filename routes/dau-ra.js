@@ -403,21 +403,36 @@ router.get("/api/dau-ra/bank-payoo", (req, res) => {
 // giao dịch KHÔNG xuất hiện trong sao kê nên không dùng được để join trực
 // tiếp. Ngân hàng được coi là chuẩn: client sẽ ưu tiên lấy amount ở đây thay
 // vì amount tự khai trong file giao dịch khi có match theo mã VQR.
-const VIETQR_BANK_SUFFIX = {
-  bidv7704: "7704",
-  bidv77020: "77020",
-  mb11521268: "11521268",
+// Chi Nhan, 2026-09-12: Luyen bao "2 KH á là khác nhau hoàn toàn á 2 công ty
+// khác nhau á ... đừng hiện các dữ liệu liên quan tới kh cũ nha" -- truoc gio
+// route nay CHI biet 3 TK Viet QR cua KH Cu (bidv7704/bidv77020/mb11521268),
+// nen khi dang xem KH Moi, tab Viet QR (dau-ra.ejs) van bi hien NHAM 3 tab
+// nay. KH Moi co RIENG 4 TK Viet QR cua no (BIDV7702/BIDV77021/MB02865168/
+// BIDV8613600999 -- xem BANK_COMPANY trong utils/bankCompany.js va CHANNELS
+// trong routes/doisoat-vietqr.js, noi 7 kenh nay da duoc xac nhan tu truoc).
+// Doi tu "doan so cuoi tai khoan" (VIETQR_BANK_SUFFIX cu) sang khop THANG
+// theo TEN ngan hang that (giong y het cach routes/doisoat-vietqr.js dang
+// lam, "b.name === bankName") -- an toan hon, khong lo do dai/so chu so tai
+// khoan khac nhau giua cac TK gay nham lan.
+const VIETQR_BANK_NAME = {
+  bidv7704: "BIDV7704",
+  bidv77020: "BIDV77020",
+  mb11521268: "MB11521268",
+  bidv7702: "BIDV7702",
+  bidv77021: "BIDV77021",
+  mb02865168: "MB02865168",
+  bidv8613600999: "BIDV8613600999",
 };
 router.get("/api/dau-ra/bank-vietqr", (req, res) => {
   try {
     const { bank, from, to } = req.query;
-    const suffix = VIETQR_BANK_SUFFIX[bank];
-    if (!suffix) return res.json({ ok: false, error: "Tham số bank không hợp lệ (bidv7704 / bidv77020 / mb11521268)" });
+    const bankName = VIETQR_BANK_NAME[bank];
+    if (!bankName) return res.json({ ok: false, error: "Tham số bank không hợp lệ" });
     const store = load();
     const company = getCompany(req);
     const bankRow = store.banks.find(b =>
       (b.company || "kh_cu") === company &&
-      String(b.account_number || b.accountNumber || "").endsWith(suffix)
+      b.name === bankName
     );
     if (!bankRow) return res.json({ ok: false, error: "Không tìm thấy tài khoản ngân hàng cho " + bank });
 
