@@ -502,10 +502,25 @@ function migrateVnpayKhMoiInvoices(store) {
       if (!zaloKeys.has(k)) {
         zaloKeys.add(k);
         store.zvp_invoices.zalo.push(restored);
+        changed = true;
       }
-      changed = true;
     });
+    // Chi Nhan, 2026-09-12: Luyen bao "web chậm" -- BUG o day la nguyen nhan
+    // CHINH khien buildAllFlatLines cache (xem utils/overviewAggregate.js)
+    // khong bao gio hit: "changed = true" TRUOC DAY bi dat VO DIEU KIEN trong
+    // forEach o tren (ke ca khi hoa don DA co san o zvp_invoices.zalo tu lan
+    // truoc, khong co gi thuc su thay doi), khien ham nay bao "co thay doi"
+    // MOI LAN duoc goi (goi toi 5 lan/request qua doisoat-zvp.js +
+    // doisoat-vnpay-khmoi.js + doisoat-vietqr.js x3 kenh) -- moi lan "changed"
+    // lai kich hoat 1 save() GHI DIA DONG BO (~7MB+, co fsync) NGAY TRONG luc
+    // dang render trang, vua tu lam cham trang vua lam dataVersion tang lien
+        // tuc nen cache khong bao gio con hop le cho request ke tiep. Sua: chi bao
+    // changed=true khi THUC SU them moi (nam trong nhanh !zaloKeys.has(k) o
+    // tren) hoac khi filter ben duoi thuc su bo bot phan tu (so sanh do dai
+    // truoc/sau), khong con dat true theo so luong "stillZaloTagged" tim thay.
+    const beforeLen = store.viet_qr_invoices.vnpayKhMoi.length;
     store.viet_qr_invoices.vnpayKhMoi = target.filter((inv) => !ZALO_MAI_TAG_PATTERN.test(inv.raw || ""));
+    if (store.viet_qr_invoices.vnpayKhMoi.length !== beforeLen) changed = true;
   }
   // Sua nguoc: hoa don KH Cu Offline (tag "VNPAY CO SO") bi migrate nham sang
   // vnpayKhMoi truoc khi co check nay -- tra ve zvp_invoices.vnpay, giu nguyen
@@ -524,12 +539,17 @@ function migrateVnpayKhMoiInvoices(store) {
       if (!vnpayKeys.has(k)) {
         vnpayKeys.add(k);
         store.zvp_invoices.vnpay.push(restored);
+        changed = true;
       }
-      changed = true;
     });
+    // Chi Nhan, 2026-09-12: cung 1 loi voi khoi "stillZaloTagged" o tren --
+    // xem ghi chu day du o do. Chi bao changed=true khi thuc su them moi
+    // hoac filter thuc su bo bot phan tu.
+    const beforeLen2 = store.viet_qr_invoices.vnpayKhMoi.length;
     store.viet_qr_invoices.vnpayKhMoi = store.viet_qr_invoices.vnpayKhMoi.filter(
       (inv) => !isKhCuOfflineVnpay(inv.raw)
     );
+    if (store.viet_qr_invoices.vnpayKhMoi.length !== beforeLen2) changed = true;
   }
   return changed;
 }

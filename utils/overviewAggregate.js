@@ -267,7 +267,16 @@ function buildAllFlatLines(store) {
   });
 
   _flatAllCache = flat;
-  _flatAllCacheVersion = currentVersion;
+  // Chi Nhan, 2026-09-12: dung lai getDataVersion() SAU KHI tinh xong (khong
+  // dung "currentVersion" da bat luc BAT DAU o tren) -- cac ham buildXxxReconciliation
+  // o tren (Momo/ZVP/VNPay KH Moi/VietQR) tu dong chay vai buoc "don dep du
+  // lieu" (vd migrateVnpayKhMoiInvoices) va co the tu goi save() ngay TRONG
+  // luc tinh, lam dataVersion tang len giua chung. Neu van dung "currentVersion"
+  // cu de luu cache thi lan goi KE TIEP se luon thay version MOI hon version
+  // da luu -> luon coi la "cache mat hieu luc" -> tinh lai TU DAU MOI LAN, dung
+  // y het bug "cache khong bao gio hit" ma Luyen gap phai. Doc lai gia tri MOI
+  // NHAT o day de cache luon dung voi trang thai du lieu THUC TE sau cung.
+  _flatAllCacheVersion = getDataVersion();
   return flat;
 }
 
