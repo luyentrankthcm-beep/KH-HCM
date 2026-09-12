@@ -237,15 +237,26 @@
     <!-- ==================== ZVP TAB ==================== -->
     <div id="zvp" class="tab-panel">
       <!-- Sub-tabs: Zalo / VNPay / Payoo -->
+      <!-- Chi Nhan, 2026-09-12: Luyen bao "kh mới không có zalo pay á có vn
+           pay với payoo á" -- KH Mới KHÔNG dùng kênh Zalo Pay (khớp với quy
+           tắc đã xác nhận từ trước ở hệ thống CŨ, routes/doisoat-zvp.js:
+           middleware chặn hẳn kh_moi khỏi trang Zalo/VNPay/Payoo cũ) -- ẩn
+           hẳn nút "Zalo Pay" khi activeCompany==='kh_moi' (VNPay vẫn dùng
+           chung 1 file BaoCaoPhi qua nút riêng của chính nó, xem input
+           #vnpayFeeInput bên dưới, nên không cần tab Zalo Pay để tải file).
+           Không xoá hẳn panel #zvp_zalo khỏi DOM (tránh vỡ các hàm render
+           gọi getElementById không kiểm tra null) -- chỉ ẩn lối vào. -->
       <div class="sub-tab-bar" style="margin-bottom:.75rem">
+        <% if (activeCompany !== 'kh_moi') { %>
         <button class="sub-tab-btn active" id="zvp_btn_zalo" onclick="switchZvpTab('zalo')">🔵 Zalo Pay</button>
-        <button class="sub-tab-btn" id="zvp_btn_vnpay" onclick="switchZvpTab('vnpay')">🟦 VNPay</button>
+        <% } %>
+        <button class="sub-tab-btn <%= activeCompany === 'kh_moi' ? 'active' : '' %>" id="zvp_btn_vnpay" onclick="switchZvpTab('vnpay')">🟦 VNPay</button>
         <button class="sub-tab-btn" id="zvp_btn_payoo" onclick="switchZvpTab('payoo')">🟪 Payoo</button>
         <button class="sub-tab-btn" onclick="openZvpMisaModal()" style="margin-left:auto;background:#7c3aed;color:#fff;border-color:#7c3aed">📥 Xuất Misa</button>
       </div>
 
       <!-- Zalo Pay -->
-      <div id="zvp_zalo" class="sub-panel active">
+      <div id="zvp_zalo" class="sub-panel <%= activeCompany === 'kh_moi' ? '' : 'active' %>">
         <div class="channel-header">
           <div class="acct-info">
             <strong>Zalo Pay</strong>
@@ -315,7 +326,7 @@
       </div>
 
       <!-- VNPay -->
-      <div id="zvp_vnpay" class="sub-panel">
+      <div id="zvp_vnpay" class="sub-panel <%= activeCompany === 'kh_moi' ? 'active' : '' %>">
         <div class="channel-header">
           <div class="acct-info">
             <strong>VNPay</strong>
@@ -848,8 +859,10 @@
   <!-- ==================== ZVP MISA EXPORT MODAL ==================== -->
   <div id="zvpMisaModal" class="modal-overlay" onclick="if(event.target===this)closeZvpMisaModal()">
     <div class="modal-box">
-      <h3>📥 Xuất Misa (Zalo / VNPay / Payoo)</h3>
-      <p class="modal-sub">Chọn khoảng ngày hạch toán (ngày ngân hàng trả tiền về) và số chứng từ bắt đầu. Zalo Pay xuất riêng file Online; VNPay + Payoo gộp chung file Offline (nối tiếp số chứng từ).</p>
+      <h3>📥 Xuất Misa (<%= activeCompany === 'kh_moi' ? 'VNPay / Payoo' : 'Zalo / VNPay / Payoo' %>)</h3>
+      <p class="modal-sub">Chọn khoảng ngày hạch toán (ngày ngân hàng trả tiền về) và số chứng từ bắt đầu.
+        <% if (activeCompany === 'kh_moi') { %>KH Mới không dùng Zalo Pay — VNPay + Payoo gộp chung 1 file Offline.<% } else { %>Zalo Pay xuất riêng file Online; VNPay + Payoo gộp chung file Offline (nối tiếp số chứng từ).<% } %>
+      </p>
       <div style="display:flex;flex-direction:column;gap:.7rem;margin-top:.5rem">
         <label style="font-size:.85em;font-weight:600;color:#1e3a5f">Từ ngày
           <input type="date" id="zvpMisaFromDate" style="display:block;width:100%;margin-top:.25rem;padding:.4rem .6rem;border:1px solid #cbd5e1;border-radius:6px;font-size:.9em">
@@ -859,15 +872,19 @@
         </label>
         <label style="font-size:.85em;font-weight:600;color:#1e3a5f">Số chứng từ bắt đầu từ số
           <input type="number" id="zvpMisaStartSeq" min="1" value="1" style="display:block;width:100%;margin-top:.25rem;padding:.4rem .6rem;border:1px solid #cbd5e1;border-radius:6px;font-size:.9em">
-          <span style="font-weight:400;color:#94a3b8;font-size:.85em">Áp dụng chung cho cả 2 file (Online và Offline đánh số độc lập, cùng bắt đầu từ số này)</span>
+          <span style="font-weight:400;color:#94a3b8;font-size:.85em"><%= activeCompany === 'kh_moi' ? 'Số chứng từ bắt đầu cho file Offline (VNPay+Payoo)' : 'Áp dụng chung cho cả 2 file (Online và Offline đánh số độc lập, cùng bắt đầu từ số này)' %></span>
         </label>
       </div>
       <div id="zvpMisaModalStatus" style="font-size:.8em;color:#dc2626;margin-top:.5rem"></div>
       <div class="modal-actions" style="flex-wrap:wrap">
         <button class="btn-cancel" onclick="closeZvpMisaModal()">Hủy</button>
+        <% if (activeCompany !== 'kh_moi') { %>
         <button onclick="confirmExportZvpMisa('online')" style="background:#2563eb;color:#fff;border:none;border-radius:6px;padding:.45rem 1.2rem;cursor:pointer;font-weight:600">📥 Xuất Online (Zalo)</button>
+        <% } %>
         <button onclick="confirmExportZvpMisa('offline')" style="background:#7c3aed;color:#fff;border:none;border-radius:6px;padding:.45rem 1.2rem;cursor:pointer;font-weight:600">📥 Xuất Offline (VNPay+Payoo)</button>
+        <% if (activeCompany !== 'kh_moi') { %>
         <button onclick="confirmExportZvpMisa('all')" style="background:#16a34a;color:#fff;border:none;border-radius:6px;padding:.45rem 1.2rem;cursor:pointer;font-weight:700">📥 Xuất cả 2 file (Online + Offline)</button>
+        <% } %>
       </div>
     </div>
   </div>
@@ -2775,7 +2792,12 @@
         const btnEl = document.querySelector(`.tab-bar .tab-btn[onclick*="'${savedTab}'"]`);
         if (tabEl && btnEl) switchTab(savedTab, btnEl);
       }
-      const savedZvp = localStorage.getItem(LS_ACTIVE_ZVP_SUB);
+      // Chi Nhan, 2026-09-12: KH Mới không có tab Zalo Pay (xem ghi chú ở
+      // HTML nút zvp_btn_zalo) -- nếu localStorage còn nhớ 'zalo' từ TRƯỚC
+      // khi ẩn tab này (hoặc lỡ dính từ máy/khoảng thời gian khác), ép về
+      // 'vnpay' cho KH Mới thay vì phục hồi 1 tab không còn nút để bấm vào.
+      let savedZvp = localStorage.getItem(LS_ACTIVE_ZVP_SUB);
+      if (COMPANY === 'kh_moi' && savedZvp === 'zalo') savedZvp = 'vnpay';
       if (savedZvp && ['zalo','vnpay','payoo'].includes(savedZvp)) switchZvpTab(savedZvp);
     } catch(e) {}
 
