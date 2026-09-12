@@ -2,7 +2,8 @@ const express = require("express");
 const { load } = require("../store");
 const { requireLogin } = require("../middleware/auth");
 const { computeBalance } = require("./banks");
-const { buildAllFlatLines, buildGianPivot, buildChannelSummary } = require("../utils/overviewAggregate");
+const { buildAllFlatLines, buildGianPivot, buildChannelSummary, getCacheDebugInfo } = require("../utils/overviewAggregate");
+const { getDataVersion } = require("../store");
 const { COMPANIES, getCompany } = require("../utils/companies");
 const { BANK_COMPANY } = require("../utils/bankCompany");
 
@@ -62,6 +63,11 @@ router.get("/", (req, res) => {
   let gianPivot = { channels: [], gianRows: [], totalsByChannel: [], grandTotal: 0 };
   let channelSummary = [];
   let vietQrChannelSummary = [];
+  // Chi Nhan, 2026-09-12: debug tam thoi -- xem ghi chu getCacheDebugInfo
+  // trong utils/overviewAggregate.js. Xoa cac dong "Debug-*" nay sau khi tim
+  // ra ly do cache khong giam duoc thoi gian request lap lai.
+  const debugBefore = getCacheDebugInfo();
+  const versionBefore = getDataVersion();
   try {
     const flatAll = buildAllFlatLines(store);
     const flat = flatAll.filter((l) => (BANK_COMPANY[l.bankLabel] || "kh_cu") === activeCompany);
@@ -75,6 +81,14 @@ router.get("/", (req, res) => {
     // so du/giao dich phia tren van hien binh thuong, chi thieu phan nay.
     console.error("Loi tong hop dong tien theo gian:", e);
   }
+  try {
+    const debugAfter = getCacheDebugInfo();
+    res.set("X-Debug-Pid", String(process.pid));
+    res.set("X-Debug-Version-Before", String(versionBefore));
+    res.set("X-Debug-Version-After", String(getDataVersion()));
+    res.set("X-Debug-Cache-Before", JSON.stringify(debugBefore));
+    res.set("X-Debug-Cache-After", JSON.stringify(debugAfter));
+  } catch (e) {}
 
   // Chi phi theo loai, thang nay, cho dung 1 cong ty dang xem -- tra loi
   // "chi phí nào nhiều / hàng hóa" (Chi Nhan, 2026-07-30). Top 8 danh muc

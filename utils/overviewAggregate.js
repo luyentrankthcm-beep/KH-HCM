@@ -271,6 +271,20 @@ function buildAllFlatLines(store) {
   return flat;
 }
 
+// Chi Nhan, 2026-09-12: ham debug tam thoi -- phuc vu dieu tra vi sao cache
+// buildAllFlatLines duong nhu khong giam duoc thoi gian request lap lai. Cho
+// phep route "/" gan cac gia tri nay vao response header de so sanh giua
+// nhieu request lien tiep (dataVersion co doi khong, cache co duoc dung
+// khong, co phai request roi vao process khac khong). Co the xoa sau khi tim
+// ra nguyen nhan.
+function getCacheDebugInfo() {
+  return {
+    hasCache: _flatAllCache !== null,
+    cacheVersion: _flatAllCacheVersion,
+    cacheLen: _flatAllCache ? _flatAllCache.length : null,
+  };
+}
+
 module.exports = {
   flattenChannel,
   isResolved,
@@ -279,4 +293,5 @@ module.exports = {
   buildAgingRows,
   buildAllFlatLines,
   bucketFor,
+  getCacheDebugInfo,
 };
