@@ -2997,16 +2997,36 @@
           if(!ws) ws = wb.Sheets[wb.SheetNames[0]]; // fallback
           const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:'', raw:true});
           const toNum = v => { if(typeof v==='number') return v; return parseFloat(String(v||'').replace(/[^0-9.-]/g,'')) || 0; };
-          // HARDCODE: cấu trúc file BaoCaoPhi cố định (đã xác minh):
-          //   Row index 2 = header, data từ row index 3
-          //   Col B(1)=Thời gian GD, I(8)=Mã đơn hàng ZaloPay, V(21)=Số tiền trước KM
-          //   AA(26)=Số tiền phí thu hộ, AS(44)=Ghi chú
-          const HDR=2, iTime=1, iMaGD=2, iMaDiem=4, iDienThu=5, iMaDonZalo=8, iGross=21, iPhi=26, iGhiChu=44, iTrangThai=42;
-          // Validate: nếu cột 21 của row đầu tiên không phải số → báo lỗi debug
+          const HDR=2;
+          // Chi Nhan, 2026-09-12: Luyen tai 1 file BaoCaoPhi moi (VNPay
+          // Offline: GHOST BRIDE MEGA DN/FARM AEON MALL HUE/GHOST VC TIMES
+          // CITY), ket qua "+0 GD moi" ca 2 ben Zalo lan VNPay -- goc re: cong
+          // ty phat hanh BaoCaoPhi vua THEM 1 COT MOI "Lọc ngày" ngay sau STT
+          // (thay doi dinh dang file, khong bao truoc), day TOAN BO cac cot
+          // sau do LECH DI 1 VI TRI so voi cac chi so HARDCODE cu (vd cot
+          // "Số tiền trước KM" tu vi tri 21 doi thanh 22) -- khien iGross cu
+          // tro nham vao cot "Kênh thanh toán KTS" (chu, khong phai so) nen
+          // rawDataRows loc ra RONG (typeof number that bai voi MOI dong),
+          // im lang bao "+0 GD moi" thay vi bao loi ro rang. Fix TAN GOC: do
+          // vi tri cot BANG TEN header (indexOf) thay vi hardcode so, tu dong
+          // thich nghi neu cong ty phat hanh doi thu tu/them cot lan nua --
+          // fallback ve so hardcode cu neu khong tim thay ten (file rat cu).
+          const hdr = rows[HDR] || [];
+          const findCol = (name, fallbackIdx) => { const i = hdr.indexOf(name); return i >= 0 ? i : fallbackIdx; };
+          const iTime      = findCol('Thời gian GD', 1);
+          const iMaGD      = findCol('Mã giao dịch', 2);
+          const iMaDiem    = findCol('Mã điểm thu', 4);
+          const iDienThu   = findCol('Điểm thu', 5);
+          const iMaDonZalo = findCol('Mã đơn hàng', 8);
+          const iGross     = findCol('Số tiền trước KM', 21);
+          const iPhi       = findCol('Số tiền phí thu hộ', 26);
+          const iGhiChu    = findCol('Ghi chú', 44);
+          const iTrangThai = findCol('Trạng thái', 42);
+          // Validate: nếu cột Gross của row đầu tiên không phải số → báo lỗi debug
           const sample = rows[HDR+1];
-          console.log('[BaoCaoPhi] row0=',rows[0]?.[0],'hdr2=',rows[HDR]?.[0],rows[HDR]?.[1],'sampleGross=',sample?.[iGross],'sampleTime=',sample?.[iTime]);
+          console.log('[BaoCaoPhi] cols=',{iTime,iMaGD,iMaDiem,iDienThu,iMaDonZalo,iGross,iPhi,iGhiChu,iTrangThai},'row0=',rows[0]?.[0],'hdr2=',rows[HDR]?.[0],rows[HDR]?.[1],'sampleGross=',sample?.[iGross],'sampleTime=',sample?.[iTime]);
           if(sample && typeof sample[iGross] !== 'number')
-            console.warn('[BaoCaoPhi] WARN: gross col',iGross,'=',sample[iGross],'(not number!) — hdr:',rows[HDR]?.slice(20,28));
+            console.warn('[BaoCaoPhi] WARN: gross col',iGross,'=',sample[iGross],'(not number!) — hdr:',hdr);
 
           // Chi Nhan, 2026-09-10: Luyen nghi cac dong "chua xac dinh gian"
           // co the do lot giao dich CHUA THANH CONG (vd "Het han thanh toan",
