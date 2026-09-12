@@ -823,7 +823,7 @@
   <!-- ==================== MOMO MISA EXPORT MODAL ==================== -->
   <div id="momoMisaModal" class="modal-overlay" onclick="if(event.target===this)closeMomoMisaModal()">
     <div class="modal-box">
-      <h3>📥 Xuất Misa (MISATHUE123456)</h3>
+      <h3 id="momoMisaModalTitle">📥 Xuất Misa (MISATHUE123456)</h3>
       <p class="modal-sub">Chọn khoảng ngày hạch toán (ngày ngân hàng trả tiền về) và số chứng từ bắt đầu.</p>
       <div style="display:flex;flex-direction:column;gap:.7rem;margin-top:.5rem">
         <label style="font-size:.85em;font-weight:600;color:#1e3a5f">Từ ngày
@@ -2090,8 +2090,19 @@
     // trả về thì fallback xuất riêng theo đúng ngày Momo như cũ. Kèm modal
     // chọn khoảng ngày hạch toán cần xuất + số chứng từ bắt đầu (nối tiếp
     // lần xuất trước, tránh trùng số NTTK).
+    // Chi Nhan, 2026-09-12: Luyen bao "tôi chọn KH mới nè xuất ra giống mẫu
+    // hôm bửa á mà tk 7701 á sao nó hiện 123456 KH cũ dạ" -- du lieu THAT
+    // trong file xuat (Nộp vào TK) da dung tu truoc (MOMO_BANK_ACCOUNT o
+    // duoi da re nhanh theo COMPANY dung roi), nhung TIEU DE MODAL + ten
+    // sheet/ten file lai bi HARDCODE cung "MISATHUE123456" bat ke cong ty --
+    // gay hieu lam nham la xuat nham tai khoan (dù so lieu ben trong van
+    // dung). Sua: tinh nhan MISATHUE7701 (kh_moi) / MISATHUE123456 (kh_cu)
+    // dua theo COMPANY, dung chung cho ca tieu de modal LAN sheet/ten file.
+    const MOMO_MISA_LABEL = COMPANY === 'kh_moi' ? 'MISATHUE7701' : 'MISATHUE123456';
     function openMomoMisaModal() {
       if (!_rows.length) { alert('Chưa có dữ liệu Momo để xuất.'); return; }
+      const titleEl = document.getElementById('momoMisaModalTitle');
+      if (titleEl) titleEl.textContent = '📥 Xuất Misa (' + MOMO_MISA_LABEL + ')';
       const ddmmToISO = d => { const [dd,mm,yy] = d.split('-'); return `${yy}-${mm}-${dd}`; };
       const sorted = [..._dates].sort((a,b) => ddmmToISO(a).localeCompare(ddmmToISO(b)));
       const fromEl = document.getElementById('misaFromDate');
@@ -2348,8 +2359,8 @@
 
       const wb = XLSX.utils.book_new();
       const ws = XLSX.utils.json_to_sheet(rows);
-      XLSX.utils.book_append_sheet(wb, ws, 'MISATHUE123456');
-      const fname = 'MISATHUE123456_Momo_' + fromIso + '_den_' + toIso + '.xlsx';
+      XLSX.utils.book_append_sheet(wb, ws, MOMO_MISA_LABEL);
+      const fname = MOMO_MISA_LABEL + '_Momo_' + fromIso + '_den_' + toIso + '.xlsx';
       XLSX.writeFile(wb, fname);
 
       if (skippedUnmapped.length) {
