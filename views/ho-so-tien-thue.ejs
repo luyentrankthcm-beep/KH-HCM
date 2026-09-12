@@ -24,6 +24,12 @@
     .btn-add { background:#2563eb; color:#fff; border:none; border-radius:5px; padding:.38rem .9rem; cursor:pointer; font-weight:600; font-size:.85em; white-space:nowrap; }
     .btn-del { background:none; border:none; color:#ef4444; cursor:pointer; font-size:.85em; padding:.1rem .3rem; }
     .btn-del:hover { color:#b91c1c; }
+    .btn-doc { background:#0d9488; color:#fff; border:none; border-radius:5px; padding:.38rem .75rem; cursor:pointer; font-weight:600; font-size:.85em; white-space:nowrap; }
+    .btn-doc:disabled { background:#94a3b8; cursor:not-allowed; }
+    .btn-save-diem { background:#7c3aed; color:#fff; border:none; border-radius:6px; padding:.45rem 1.1rem; cursor:pointer; font-weight:700; font-size:.85em; }
+    #hopDongReviewPanel { display:none; background:#fffbeb; border:1px solid #fde68a; border-radius:8px; padding:1rem 1.25rem; margin-bottom:1.25rem; }
+    #hopDongReviewPanel h3 { margin:0 0 .4rem; font-size:.9rem; color:#92400e; }
+    #hopDongReviewPanel .form-row input, #hopDongReviewPanel .form-row textarea { padding:.35rem .55rem; border:1px solid #cbd5e1; border-radius:4px; font-size:.85em; font-family:inherit; }
   </style>
 </head>
 <body>
@@ -45,7 +51,7 @@
     <!-- Add form -->
     <div class="add-form">
       <h3>➕ Thêm tiền thuê</h3>
-      <form method="POST" action="/ho-so/tien-thue/them">
+      <form method="POST" action="/ho-so/tien-thue/them" id="tienThueAddForm">
         <div class="form-row">
           <div>
             <label>Tháng/Năm</label>
@@ -53,7 +59,7 @@
           </div>
           <div>
             <label>Gian</label>
-            <input type="text" name="gian" placeholder="VD: Lotte Phú Thọ" style="min-width:180px;" />
+            <input type="text" name="gian" id="tienThueGianInput" placeholder="VD: Lotte Phú Thọ" style="min-width:180px;" />
           </div>
           <div>
             <label>Số HĐ / Chứng từ</label>
@@ -65,7 +71,7 @@
           </div>
           <div style="flex:1;min-width:200px;">
             <label>Link tài liệu (Drive)</label>
-            <input type="text" name="linkFile" placeholder="https://drive.google.com/..." style="width:100%;" />
+            <input type="text" name="linkFile" id="tienThueLinkInput" placeholder="https://drive.google.com/..." style="width:100%;" />
           </div>
           <div style="flex:1;min-width:160px;">
             <label>Ghi chú</label>
@@ -75,8 +81,62 @@
             <label>&nbsp;</label>
             <button type="submit" class="btn-add">Thêm</button>
           </div>
+          <div>
+            <label>&nbsp;</label>
+            <button type="button" class="btn-doc" id="btnDocHopDong">📄 Đọc hợp đồng</button>
+          </div>
         </div>
       </form>
+    </div>
+
+    <!-- Review panel: hiện sau khi đọc hợp đồng thành công -->
+    <div id="hopDongReviewPanel">
+      <h3>📋 Thông tin đọc từ hợp đồng — kiểm tra &amp; bổ sung trước khi lưu điểm mới</h3>
+      <div class="form-row" style="margin-bottom:.6rem;">
+        <div>
+          <label>Mã công trình *</label>
+          <input type="text" id="rvMaCongTrinh" placeholder="VD: LOTTE-PT" style="min-width:160px;" />
+        </div>
+        <div>
+          <label>Tên điểm / gian *</label>
+          <input type="text" id="rvTenDiem" placeholder="VD: Lotte Phú Thọ" style="min-width:200px;" />
+        </div>
+        <div>
+          <label>Bên cho thuê</label>
+          <input type="text" id="rvBenChoThue" style="min-width:200px;" />
+        </div>
+        <div>
+          <label>MST bên cho thuê</label>
+          <input type="text" id="rvMstBenChoThue" style="min-width:140px;" />
+        </div>
+      </div>
+      <div class="form-row" style="margin-bottom:.6rem;">
+        <div>
+          <label>Tiền thuê/tháng</label>
+          <input type="text" id="rvTienThueThang" style="min-width:140px;" />
+        </div>
+        <div>
+          <label>Ngày ký HĐ</label>
+          <input type="text" id="rvNgayKyHD" placeholder="dd/mm/yyyy" style="min-width:120px;" />
+        </div>
+        <div>
+          <label>Thời hạn hợp đồng</label>
+          <input type="text" id="rvThoiHanHopDong" style="min-width:160px;" />
+        </div>
+        <div style="flex:1;min-width:220px;">
+          <label>Vị trí</label>
+          <input type="text" id="rvViTri" style="width:100%;" />
+        </div>
+      </div>
+      <div class="form-row" style="margin-bottom:.75rem;">
+        <div style="flex:1;min-width:280px;">
+          <label>Điều khoản thanh toán</label>
+          <textarea id="rvDieuKhoanThanhToan" rows="2" style="width:100%;"></textarea>
+        </div>
+      </div>
+      <button type="button" class="btn-save-diem" id="btnSaveDiem">💾 Lưu điểm mới</button>
+      <button type="button" class="btn-del" id="btnCancelReview" style="margin-left:.5rem;">Hủy</button>
+      <span id="hopDongReviewMsg" style="margin-left:.75rem;font-size:.85em;"></span>
     </div>
 
     <% if (rows.length === 0) { %>
@@ -123,5 +183,118 @@
     <p style="color:#888;font-size:.82em;margin-top:.5rem;"><strong><%= rows.length %></strong> bản ghi</p>
     <% } %>
   </main>
+
+  <script>
+    (function () {
+      var btnDoc = document.getElementById('btnDocHopDong');
+      var linkInput = document.getElementById('tienThueLinkInput');
+      var gianInput = document.getElementById('tienThueGianInput');
+      var panel = document.getElementById('hopDongReviewPanel');
+      var msgEl = document.getElementById('hopDongReviewMsg');
+      var savedLink = '';
+
+      function setMsg(text, isError) {
+        msgEl.textContent = text || '';
+        msgEl.style.color = isError ? '#dc2626' : '#15803d';
+      }
+
+      btnDoc.addEventListener('click', function () {
+        var link = (linkInput.value || '').trim();
+        if (!link) {
+          alert('Vui lòng dán link Google Drive của hợp đồng trước.');
+          return;
+        }
+        savedLink = link;
+        btnDoc.disabled = true;
+        btnDoc.textContent = '⏳ Đang đọc...';
+        setMsg('', false);
+
+        fetch('/ho-so/tien-thue/doc-hop-dong', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ link: link })
+        })
+          .then(function (r) { return r.json(); })
+          .then(function (data) {
+            btnDoc.disabled = false;
+            btnDoc.textContent = '📄 Đọc hợp đồng';
+            if (!data || !data.success) {
+              alert((data && data.error) || 'Không đọc được hợp đồng.');
+              return;
+            }
+            document.getElementById('rvMaCongTrinh').value = '';
+            document.getElementById('rvTenDiem').value = gianInput.value || '';
+            document.getElementById('rvBenChoThue').value = data.benChoThue || '';
+            document.getElementById('rvMstBenChoThue').value = data.mstBenChoThue || '';
+            document.getElementById('rvTienThueThang').value = data.tienThueThang || '';
+            document.getElementById('rvNgayKyHD').value = data.ngayKyHD || '';
+            document.getElementById('rvThoiHanHopDong').value = data.thoiHanHopDong || '';
+            document.getElementById('rvViTri').value = data.viTri || '';
+            document.getElementById('rvDieuKhoanThanhToan').value = data.dieuKhoanThanhToan || '';
+            panel.style.display = 'block';
+            panel.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          })
+          .catch(function (err) {
+            btnDoc.disabled = false;
+            btnDoc.textContent = '📄 Đọc hợp đồng';
+            alert('Lỗi kết nối: ' + err.message);
+          });
+      });
+
+      document.getElementById('btnCancelReview').addEventListener('click', function () {
+        panel.style.display = 'none';
+        setMsg('', false);
+      });
+
+      document.getElementById('btnSaveDiem').addEventListener('click', function () {
+        var maCongTrinh = document.getElementById('rvMaCongTrinh').value.trim();
+        var tenDiem = document.getElementById('rvTenDiem').value.trim();
+        if (!maCongTrinh || !tenDiem) {
+          setMsg('Vui lòng nhập Mã công trình và Tên điểm/gian.', true);
+          return;
+        }
+        var payload = {
+          maCongTrinh: maCongTrinh,
+          tenDiem: tenDiem,
+          benChoThue: document.getElementById('rvBenChoThue').value.trim(),
+          mstBenChoThue: document.getElementById('rvMstBenChoThue').value.trim(),
+          tienThueThang: document.getElementById('rvTienThueThang').value.trim(),
+          ngayKyHD: document.getElementById('rvNgayKyHD').value.trim(),
+          thoiHanHopDong: document.getElementById('rvThoiHanHopDong').value.trim(),
+          ghiChu: document.getElementById('rvViTri').value.trim(),
+          dieuKhoanThanhToan: document.getElementById('rvDieuKhoanThanhToan').value.trim(),
+          link: savedLink
+        };
+        var btnSave = document.getElementById('btnSaveDiem');
+        btnSave.disabled = true;
+        setMsg('Đang lưu...', false);
+
+        fetch('/ho-so/tien-thue/tao-diem-tu-hop-dong', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        })
+          .then(function (r) { return r.json(); })
+          .then(function (data) {
+            btnSave.disabled = false;
+            if (!data || !data.success) {
+              setMsg((data && data.error) || 'Lưu thất bại.', true);
+              return;
+            }
+            setMsg('✅ Đã lưu mã công trình "' + data.maCongTrinh + '".', false);
+            gianInput.value = data.tenDiem || tenDiem;
+            linkInput.value = savedLink;
+            setTimeout(function () {
+              panel.style.display = 'none';
+              setMsg('', false);
+            }, 1500);
+          })
+          .catch(function (err) {
+            btnSave.disabled = false;
+            setMsg('Lỗi kết nối: ' + err.message, true);
+          });
+      });
+    })();
+  </script>
 </body>
 </html>

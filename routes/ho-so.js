@@ -824,6 +824,151 @@ router.post("/ho-so/tien-thue/:id/xoa", requireAdmin, (req, res) => {
   res.redirect("/ho-so/tien-thue?success=Đã+xóa");
 });
 
+// Nhan, 2026-09-12: "cho toi chỗ tải link gg drive của hợp đồng á xong rồi
+// bạn đọc và lấy ra thông tin thêm điểm cho tôi nhá rồi lưu lại 1 mã công
+// trình và các thông tin cơ bản rồi thêm cái link đó lên nhá" -- o form them
+// dong "Tien Thue" da co san o "Link tai lieu (Drive)". Them nut "Doc hop
+// dong" doc PDF hop dong thue tu Drive link do (dung LAI dung 1 co che da
+// chung minh hoat dong trong routes/phap-danh.js, muc /hop-dong-thue-gian-tong/
+// :id/doc-hop-dong: lay access token qua utils/gmailApi.js (chung voi Gmail
+// OAuth), tai file qua Drive API alt=media, parse bang pdf-parse), rieng ham
+// trich xuat duoi day mo rong hon (rieng cho hop dong thue gian: ben cho
+// thue, MST, tien thue/thang, ngay ky, thoi han...) thay vi chi 4 truong
+// chung chung nhu ham cu. Chi la GOI Y (best-effort tren van ban hop dong
+// that su rat da dang ve cach trinh bay) -- luon hien cho Luyen xem lai/sua
+// truoc khi luu, khong tu dong ghi thang.
+function extractTienThueHopDongInfo(text) {
+  const norm = (s) => (s || "").replace(/[ \t]+/g, " ").replace(/\n+/g, " ").trim();
+  const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  const joined = lines.join("\n");
+
+  function grabNear(re, span) {
+    const idx = lines.findIndex((l) => re.test(l));
+    if (idx < 0) return "";
+    return norm(lines.slice(idx, idx + span).join(" "));
+  }
+
+  // Ben cho thue -- doan "BEN CHO THUE (BEN A)" hoac "BEN A:", lay ten cong ty/
+  // ca nhan ngay sau, cat bot o cac tu khoa ke tiep (Dia chi/MST) neu dinh lien.
+  let benChoThue = "";
+  const benAIdx = lines.findIndex((l) => /bên\s*(cho\s*thuê|a)\b/i.test(l));
+  if (benAIdx >= 0) {
+    const seg = norm(lines.slice(benAIdx, benAIdx + 6).join(" "));
+    const m = /(?:tên\s*(?:công\s*ty|doanh\s*nghiệp)?\s*[:\-]?\s*)([^;]{3,80})/i.exec(seg);
+    if (m) benChoThue = m[1].split(/địa chỉ|mã số thuế|\bmst\b/i)[0].trim();
+  }
+
+  let mstBenChoThue = "";
+  const mstM = /(?:mã\s*số\s*thuế|mst)\s*[:\-]?\s*([0-9\-]{8,15})/i.exec(joined);
+  if (mstM) mstBenChoThue = mstM[1];
+
+  let tienThueThang = "";
+  const rentM = /(?:tiền\s*thuê|giá\s*thuê)[^\d]{0,40}([\d.,]{5,})\s*(?:đồng|vnđ|vnd)/i.exec(joined);
+  if (rentM) tienThueThang = rentM[1].replace(/[.,](?=\d{3}\b)/g, "").replace(/[^\d]/g, "");
+
+  let ngayKyHD = "";
+  const kyM = /ngày\s*(\d{1,2})\s*tháng\s*(\d{1,2})\s*năm\s*(\d{4})/i.exec(joined);
+  if (kyM) ngayKyHD = `${kyM[1].padStart(2, "0")}/${kyM[2].padStart(2, "0")}/${kyM[3]}`;
+
+  const thoiHanHopDong = grabNear(/thời\s*hạn\s*(thuê|hợp\s*đồng)/i, 3);
+  const viTri = grabNear(/vị\s*trí|địa\s*điểm\s*thuê|mặt\s*bằng/i, 3);
+  const dieuKhoanThanhToan = grabNear(/thanh\s*toán/i, 5);
+
+  return { benChoThue, mstBenChoThue, tienThueThang, ngayKyHD, thoiHanHopDong, viTri, dieuKhoanThanhToan };
+}
+
+router.post("/ho-so/tien-thue/doc-hop-dong", requireAdmin, express.json(), async (req, res) => {
+  const link = (req.body && req.body.link || "").trim();
+  if (!link) return res.json({ success: false, error: "Thiếu link Drive." });
+  const driveMatch = link.match(/\/d\/([a-zA-Z0-9_-]{10,})/);
+  const openMatch = link.match(/[?&]id=([a-zA-Z0-9_-]{10,})/);
+  const fileId = (driveMatch && driveMatch[1]) || (openMatch && openMatch[1]);
+  if (!fileId) return res.json({ success: false, error: "Không nhận dạng được file ID từ link Drive (link phải dạng .../d/<id>/... hoặc ...?id=<id>)." });
+  try {
+    const store = load();
+    const gmailApi = require("../utils/gmailApi");
+    const accessToken = await gmailApi.getValidAccessToken(store);
+    const dlResp = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
+      headers: { Authorization: "Bearer " + accessToken },
+    });
+    if (!dlResp.ok) throw new Error("Drive trả lỗi " + dlResp.status + ": " + (await dlResp.text()).slice(0, 300));
+    const arrayBuffer = await dlResp.arrayBuffer();
+    const pdfBuffer = Buffer.from(arrayBuffer);
+    const pdfParse = require("pdf-parse");
+    const data = await pdfParse(pdfBuffer);
+    const result = extractTienThueHopDongInfo(data.text || "");
+    res.json({ success: true, ...result });
+  } catch (e) {
+    res.json({ success: false, error: "Không đọc được file (kiểm tra file có phải PDF, có chia sẻ quyền xem cho tài khoản Google đã kết nối chưa): " + e.message });
+  }
+});
+
+// Tao 1 "diem" moi tu thong tin da doc/sua tren hop dong: (1) them vao Danh
+// Muc Ma Cong Trinh (dung chung toan he thong cho doi soat), (2) them 1 ho so
+// day du vao Phap danh > Hop Dong Thue Gian Hang (co san cot ben cho thue/tien
+// thue/thoi han/link...). Ca 2 cho deu luu cung 1 link Drive vua doc.
+router.post("/ho-so/tien-thue/tao-diem-tu-hop-dong", requireAdmin, express.json(), (req, res) => {
+  try {
+    const store = load();
+    const company = getCompany(req);
+    const {
+      maCongTrinh, tenDiem, benChoThue, mstBenChoThue, tienThueThang,
+      ngayKyHD, ngayBatDauHD, ngayHetHanHD, thoiHanHopDong, ghiChu, link,
+    } = req.body || {};
+    const ma = (maCongTrinh || "").trim();
+    if (!ma) throw new Error("Thiếu Mã công trình.");
+    const ten = (tenDiem || "").trim();
+
+    // 1) Danh Muc Ma Cong Trinh (danh_muc_ma_cong_trinh_cu / _moi) -- xem
+    // routes/danh-muc.js, cung 1 quy uoc storeKey + kiem tra trung ma.
+    const dmKey = "danh_muc_ma_cong_trinh_" + (company === "kh_moi" ? "moi" : "cu");
+    if (!Array.isArray(store[dmKey])) store[dmKey] = [];
+    const dup = store[dmKey].find((r) => (r.ma || "").toLowerCase() === ma.toLowerCase());
+    if (dup) throw new Error(`Mã công trình "${ma}" đã có sẵn trong Danh mục.`);
+    store[dmKey].push({
+      id: nextId(store),
+      ma,
+      ten: ten || "",
+      ghiChu: "Tạo từ đọc hợp đồng Drive (Hồ Sơ > Tiền Thuê)",
+      createdAt: new Date().toISOString(),
+    });
+
+    // 2) Phap Danh > Hop Dong Thue Gian Hang -- dung lai dung shape voi form
+    // "them" cua routes/phap-danh.js (POST /phap-danh/hop-dong-thue-gian-hang).
+    if (!Array.isArray(store.phap_danh_hop_dong_thue)) store.phap_danh_hop_dong_thue = [];
+    const amt = tienThueThang ? Number(String(tienThueThang).replace(/[^\d]/g, "")) : 0;
+    store.phap_danh_hop_dong_thue.push({
+      id: nextId(store, "phap_danh_hop_dong_thue_seq") || Date.now(),
+      loaiHinh: "",
+      congTy: company,
+      maDiemMisa: "",
+      tenDiemNoiBo: ten,
+      khuVuc: "",
+      gian: ten || ma,
+      maCongTrinh: ma,
+      maKH: "",
+      benChoThue: (benChoThue || "").trim(),
+      mstBenChoThue: (mstBenChoThue || "").trim(),
+      hinhThucHopTac: "",
+      trangThaiHoatDong: "",
+      thoiHanHopDong: (thoiHanHopDong || "").trim(),
+      tienThueThang: amt,
+      ghiChu: (ghiChu || "").trim(),
+      ngayKyHD: (ngayKyHD || "").trim(),
+      ngayBatDauHD: (ngayBatDauHD || "").trim(),
+      ngayHetHanHD: (ngayHetHanHD || "").trim(),
+      linkHopDongChuaDuDau: (link || "").trim(),
+      createdAt: new Date().toISOString(),
+      source: "Đọc từ Drive (Hồ Sơ > Tiền Thuê)",
+    });
+
+    save(store);
+    res.json({ success: true, maCongTrinh: ma, tenDiem: ten });
+  } catch (e) {
+    res.json({ success: false, error: e.message });
+  }
+});
+
 // POST /ho-so/dtcs-chiase/mall/bulk-upsert
 // Body JSON: { records: [{diemId, thang, tongDT, tienThue, khoauTru, soTienMinhNhan, linkDoiSoat, ghiChu}] }
 // Skip duplicates by (diemId, thang). Used by Cowork Claude Drive-sync skill.
