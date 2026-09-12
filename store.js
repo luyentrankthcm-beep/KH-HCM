@@ -60,6 +60,22 @@ let cachedTransactions = null;
 let cachedVietQrRaw = null;
 let cachedDauRaKv = null;
 
+// Chi Nhan, 2026-09-12: Luyen bao "web chậm" -- do gốc: trang Tổng quan ("/")
+// gọi lại buildAllFlatLines() (chạy lại TOÀN BỘ đối soát Momo/Zalo/VNPay/
+// Payoo/VietQR từ đầu) trên MỖI lần tải trang, dù dữ liệu chưa hề thay đổi
+// giữa 2 lần xem -- mất ~11 giây mỗi lần với lượng giao dịch hiện tại. Luyen
+// xác nhận cách sửa: "tính 1 lần thôi đừng tính lại, cái nào đụng dữ liệu cũ
+// (đổi) thì tính lại, cái nào khớp rồi thì thôi". Bộ đếm phiên bản dữ liệu ở
+// ĐÂY (nơi duy nhất mọi thay đổi dữ liệu đều đi qua, bất kể route nào gọi) --
+// tăng lên mỗi lần save() ghi thành công hoặc resetCache() chạy. Noi can cache
+// (routes/dashboard.js) so sanh version nay voi version luc tinh lan truoc:
+// khac thi tinh lai, giong thi dung ngay ket qua cu -- khong can biet CHI
+// TIET cai gi da doi, chi can biet "co doi hay khong" la du, an toan cho MOI
+// route ghi du lieu (khong phai sua tung noi). Khai bao O DAU FILE (truoc IIFE
+// seed ben duoi co goi save() luc khoi dong) de tranh loi "truy cap truoc khi
+// khoi tao" (temporal dead zone) neu dung let o cuoi file.
+let dataVersion = 0;
+
 // Doc 1 file JSON lon tu dia, tra ve defaultValue neu file chua ton tai hoac loi.
 function loadLargeSection(filePath, defaultValue) {
   if (!fs.existsSync(filePath)) return defaultValue;
@@ -478,6 +494,7 @@ function save(store) {
   }
 
   cachedStore = store; // cap nhat cache sau khi ghi thanh cong
+  dataVersion++; // xem ghi chu dataVersion o cuoi file -- bao cho cac cache o tang tren (vd trang Tong quan) biet du lieu vua doi, can tinh lai
 }
 
 function nextId(store, collection) {
@@ -1839,6 +1856,11 @@ function resetCache() {
   cachedTransactions = null;
   cachedVietQrRaw = null;
   cachedDauRaKv = null;
+  dataVersion++; // xem ghi chu o khai bao dataVersion (dau file) -- reset cache cung la 1 dang "du lieu co the da doi"
 }
 
-module.exports = { load, save, nextId, DATA_FILE, TRANSACTIONS_FILE, VIET_QR_RAW_FILE, DAU_RA_KV_FILE, resetCache };
+function getDataVersion() {
+  return dataVersion;
+}
+
+module.exports = { load, save, nextId, DATA_FILE, TRANSACTIONS_FILE, VIET_QR_RAW_FILE, DAU_RA_KV_FILE, resetCache, getDataVersion };

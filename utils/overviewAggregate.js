@@ -191,7 +191,27 @@ function buildAgingRows(flatLines, todayIso) {
 // nen ve ly thuyet khong co vong lap, nhung require ngay luc goi ham van an
 // toan hon va de doc hon la require o dau file khi ban than cac module nay
 // cung export qua nhieu thu (router + cac ham dinh kem).
+// Chi Nhan, 2026-09-12: Luyen bao "web chậm" -- ham nay chay lai TOAN BO doi
+// soat Momo (2 cong ty) + Zalo/VNPay/Payoo + VNPay KH Moi + 3 kenh Viet QR TU
+// DAU moi lan goi, va duoc goi tu RAT NHIEU noi (trang Tong quan, Cong No,
+// mot so bao cao, phap danh...) tren MOI request -- voi luong giao dich hien
+// tai mat ~11 giay MOI LAN, khien "ca trang web" cam giac cham (dung ra chi
+// 1 ham nay cham, nhung duoc goi khap noi nen cam giac lan ra toan bo web).
+// Luyen xac nhan cach sua: "tính 1 lần thôi đừng tính lại, cái nào đụng dữ
+// liệu cũ (đổi) thì tính lại, cái nào khớp rồi thì thôi" -- cache ket qua
+// theo dataVersion (store.js, tang moi lan save() ghi thanh cong): con so
+// nay GIONG lan truoc nghia la CHUA CO GHI DU LIEU MOI nao xen giua, dung
+// luon ket qua cu KHONG tinh lai; khac thi tinh lai 1 lan roi cache lai.
+// An toan cho MOI noi goi ham nay (khong phai sua tung route rieng le).
+let _flatAllCache = null;
+let _flatAllCacheVersion = null;
 function buildAllFlatLines(store) {
+  const { getDataVersion } = require("../store");
+  const currentVersion = getDataVersion();
+  if (_flatAllCache !== null && _flatAllCacheVersion === currentVersion) {
+    return _flatAllCache;
+  }
+
   const momoRouter = require("../routes/doisoat");
   const zvpRouter = require("../routes/doisoat-zvp");
   const vietqrRouter = require("../routes/doisoat-vietqr");
@@ -246,6 +266,8 @@ function buildAllFlatLines(store) {
     }
   });
 
+  _flatAllCache = flat;
+  _flatAllCacheVersion = currentVersion;
   return flat;
 }
 
