@@ -2172,6 +2172,19 @@ router.post("/phap-danh/hop-dong-thue-gian-tong/them", requireAdmin, (req, res) 
   res.json({ success: true, row: r });
 });
 
+// Nhan, 2026-09-14: xoa 1 gian (dung khi tao nham / test) -- cap sau "Them
+// gian" cho doi xung voi cac trang khac (hoa-don-dau-ra.js co ca them/sua/
+// xoa), admin-only giong cac route sua/them o tren.
+router.post("/phap-danh/hop-dong-thue-gian-tong/:id/xoa", requireAdmin, (req, res) => {
+  const store = load();
+  ensureShape(store);
+  const idx = store.phap_danh_hop_dong_thue_tong.findIndex(x => String(x.id) === req.params.id);
+  if (idx === -1) return res.json({ success: false, error: "Không tìm thấy" });
+  const removed = store.phap_danh_hop_dong_thue_tong.splice(idx, 1)[0];
+  save(store);
+  res.json({ success: true, removed });
+});
+
 // Nhan, 2026-08-25: doc noi dung hop dong PDF tu Google Drive (link co san
 // trong truong linkHopDong cua ban ghi). Lay file qua Drive API bang access
 // token hien co (dung chung voi Gmail OAuth), parse PDF bang pdf-parse, trich
