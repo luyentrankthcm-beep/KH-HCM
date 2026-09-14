@@ -30,6 +30,7 @@
               onsubmit="return confirm('Đồng bộ từ Google Sheet? Dữ liệu hiện có sẽ được GIỮ NGUYÊN, chỉ bù thêm vào các ô đang trống.');">
           <button type="submit" class="btn btn-primary">🔄 Cập nhật từ Google Sheet</button>
         </form>
+        <button type="button" class="btn btn-secondary" onclick="openGianModalNew()">➕ Thêm gian</button>
         <h2>Chọn sheet</h2>
       </div>
 
@@ -175,6 +176,8 @@
 
   <script>
     const GIAN_ROWS = <%- JSON.stringify(rows).replace(/<\/script>/gi, '<\\/script>') %>;
+    const CURRENT_SHEET_PARAM = '<%= sheetParam %>';
+    const CURRENT_SHEET_LABEL = '<%= sheets.find(s => s.key === sheetParam).label %>';
     let currentId = null;
 
     function openGianModal(id) {
@@ -198,6 +201,29 @@
       document.getElementById('saveMsg').style.display = 'none';
       document.getElementById('docHopDongSection').style.display = 'none';
       document.getElementById('docHopDongContent').innerHTML = '';
+      document.querySelector('#gianModalForm button[onclick="docHopDong()"]').style.display = '';
+      document.getElementById('gianModal').style.display = 'block';
+    }
+
+    // Nhan, 2026-09-14: "cho thêm 1 chỗ ô là Thêm Gian ... nhấn vô thì nó sẽ
+    // cho ra cái bản này rồi tôi nhấn thêm thì bạn lưu phía dưới luôn" -- dung
+    // lai CUNG modal "Chi tiết gian", chi khac: form rong, currentId = null
+    // (saveGian() se tu nhan biet va goi route /them thay vi /:id/cap-nhat).
+    // Gian moi gan vao sheet dang xem (CURRENT_SHEET_PARAM) de hien ra ngay
+    // "phía dưới" bang sau khi luu + reload, dung y "lưu phía dưới luôn".
+    function openGianModalNew() {
+      currentId = null;
+      document.getElementById('gianModalTitle').textContent = 'Thêm gian mới — ' + CURRENT_SHEET_LABEL;
+      ['f_tenNoiBo','f_maCongTrinh','f_mstKhachHang','f_tenKhachHang','f_hinhThucThue',
+       'f_tienThueThang','f_thoiHanBatDau','f_thoiHanKetThuc','f_thoiHanThueRaw',
+       'f_ghiChu','f_linkHopDong'].forEach(id => { document.getElementById(id).value = ''; });
+
+      document.getElementById('saveMsg').style.display = 'none';
+      document.getElementById('docHopDongSection').style.display = 'none';
+      document.getElementById('docHopDongContent').innerHTML = '';
+      // Chưa có gian (chưa có id) nên chưa có gì để đọc hợp đồng -- ẩn nút này
+      // trong chế độ tạo mới, hiện lại khi mở gian đã có (openGianModal).
+      document.querySelector('#gianModalForm button[onclick="docHopDong()"]').style.display = 'none';
       document.getElementById('gianModal').style.display = 'block';
     }
 
@@ -217,7 +243,15 @@
       msgEl.style.color = '#555';
       msgEl.textContent = 'Đang lưu...';
 
-      fetch('/phap-danh/hop-dong-thue-gian-tong/' + currentId + '/cap-nhat', {
+      // currentId === null -> đang ở chế độ "Thêm gian" (openGianModalNew()),
+      // gọi route tạo mới thay vì route cập nhật theo id.
+      const isNew = currentId === null;
+      const url = isNew
+        ? '/phap-danh/hop-dong-thue-gian-tong/them'
+        : '/phap-danh/hop-dong-thue-gian-tong/' + currentId + '/cap-nhat';
+      if (isNew) data.append('sheetKey', CURRENT_SHEET_PARAM);
+
+      fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: new URLSearchParams(data)

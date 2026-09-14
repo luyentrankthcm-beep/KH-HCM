@@ -2126,6 +2126,52 @@ router.post("/phap-danh/hop-dong-thue-gian-tong/:id/cap-nhat", requireAdmin, (re
   res.json({ success: true });
 });
 
+// Nhan, 2026-09-14: "cho thêm 1 chỗ ô là Thêm Gian" -- them 1 gian moi (rong)
+// ngay trong modal "Chi tiet gian" (dung LAI modal co san, chi khac cho ID
+// rong = che do tao moi thay vi sua). Gian moi gan vao sheetKey dang xem
+// (tab KVC MN/MB, MTD MN/MB dang chon) va cong ty dang chon (Cu/Moi) de hien
+// ra ngay trong bang sau khi luu, khong can F5 chuyen tab/cong ty.
+router.post("/phap-danh/hop-dong-thue-gian-tong/them", requireAdmin, (req, res) => {
+  const store = load();
+  ensureShape(store);
+  const sheetInfo = HOP_DONG_THUE_TONG_SHEETS.find((s) => s.key === req.body.sheetKey);
+  if (!sheetInfo) return res.json({ success: false, error: "Sheet không hợp lệ" });
+  const activeCompany = getCompany(req);
+
+  const r = {
+    id: nextId(store, "phap_danh_hop_dong_thue_tong_seq") || Date.now(),
+    sheetKey: sheetInfo.storeKey,
+    congTy: activeCompany,
+    congTyRaw: "",
+    khuVuc: "",
+    dichVu: "",
+    tenNoiBo: "",
+    maCongTrinh: "",
+    diaDiem: "",
+    tenKhachHang: "",
+    mstKhachHang: "",
+    hinhThucThue: "",
+    tienThueThang: 0,
+    thoiHanThueRaw: "",
+    ngayBatDauThue: "",
+    ngayHetHanThue: "",
+    ghiChu: "",
+    linkHopDong: "",
+    trangThaiRaw: "",
+  };
+  const fields = ['tenNoiBo','maCongTrinh','mstKhachHang','tenKhachHang','hinhThucThue',
+    'tienThueThang','thoiHanBatDau','thoiHanKetThuc','thoiHanThueRaw','ghiChu','linkHopDong'];
+  fields.forEach(f => { if (req.body[f] !== undefined) r[f] = (req.body[f]||'').trim(); });
+  if (req.body.thoiHanBatDau !== undefined) r.ngayBatDauThue = r.thoiHanBatDau;
+  if (req.body.thoiHanKetThuc !== undefined) r.ngayHetHanThue = r.thoiHanKetThuc;
+  const amt = Number(String(r.tienThueThang||'').replace(/[.,\s]/g,''));
+  r.tienThueThang = isNaN(amt) ? 0 : amt;
+
+  store.phap_danh_hop_dong_thue_tong.push(r);
+  save(store);
+  res.json({ success: true, row: r });
+});
+
 // Nhan, 2026-08-25: doc noi dung hop dong PDF tu Google Drive (link co san
 // trong truong linkHopDong cua ban ghi). Lay file qua Drive API bang access
 // token hien co (dung chung voi Gmail OAuth), parse PDF bang pdf-parse, trich
