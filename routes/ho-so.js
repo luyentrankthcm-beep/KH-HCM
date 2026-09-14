@@ -923,22 +923,39 @@ router.post("/ho-so/tien-thue/nhap-excel", requireAdmin, uploadMem.single("file"
 
     const store = load();
     if (!store.ho_so_tien_thue) store.ho_so_tien_thue = [];
-    const existingChungTu = new Set(store.ho_so_tien_thue.map((r) => r.soChungTu).filter(Boolean));
+    // Nhan, 2026-09-14: 1 "So chung tu" co the co NHIEU dong TIEN THUE (vd
+    // gop chung nhieu khoan cua cung 1 CT/1 hoa don, chi khac Gia tri mua)
+    // -- dedupe CHI theo So chung tu se lam mat cac dong nay. Khoa dedupe
+    // phai gom them So hoa don + Ma NCC + So tien (Gia tri mua) de phan
+    // biet cac dong that su khac nhau, nhung van chan duoc import trung khi
+    // tai lai CHINH XAC 1 file nhieu lan.
+    function dedupeKey(soChungTu, soHoaDon, maNCC, giaTriMua) {
+      return [soChungTu, soHoaDon, maNCC, Math.round(Number(giaTriMua) || 0)].join("|");
+    }
+    const existingKeys = new Set(
+      store.ho_so_tien_thue
+        .filter((r) => r.soChungTu)
+        .map((r) => dedupeKey(
+          r.soChungTu, r.soHoaDon, r.maNCC,
+          r.soTienRaw !== undefined ? r.soTienRaw : String(r.soTien || "").replace(/[.,\s]/g, "")
+        ))
+    );
     const activeCompany = getCompany(req);
 
     let added = 0, skipped = 0;
     tienThueRows.forEach((r) => {
       const soChungTu = String(r[idx["Số chứng từ"]] || "").trim();
-      if (soChungTu && existingChungTu.has(soChungTu)) { skipped++; return; }
-
       const maNCCRaw = String(r[idx["Mã nhà cung cấp"]] || "").trim();
+      const soHoaDon = String(r[idx["Số hóa đơn"]] || "").trim();
+      const giaTriMua = Number(r[idx["Giá trị mua"]]) || 0;
+      const key = dedupeKey(soChungTu, soHoaDon, maNCCRaw, giaTriMua);
+      if (soChungTu && existingKeys.has(key)) { skipped++; return; }
+
       const { tenNCC, maSoThueNCC } = parseNccString(maNCCRaw);
       const maCongTrinh = String(r[idx["Mã công trình"]] || "").trim();
       const tenCongTrinh = String(r[idx["Tên công trình"]] || "").trim();
-      const soHoaDon = String(r[idx["Số hóa đơn"]] || "").trim();
       const ngayHoaDon = excelSerialToDateStr(r[idx["Ngày hóa đơn"]]) ||
         (idx["Ngày chứng từ"] !== undefined ? excelSerialToDateStr(r[idx["Ngày chứng từ"]]) : "");
-      const giaTriMua = Number(r[idx["Giá trị mua"]]) || 0;
       const soTien = giaTriMua ? giaTriMua.toLocaleString("vi-VN") : "";
       let thang = "";
       const dm = ngayHoaDon.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
@@ -954,6 +971,7 @@ router.post("/ho-so/tien-thue/nhap-excel", requireAdmin, uploadMem.single("file"
         soHoaDon,
         soChungTu,
         soTien,
+        soTienRaw: giaTriMua,
         maNCC: maNCCRaw,
         tenNCC,
         maSoThueNCC,
@@ -962,7 +980,7 @@ router.post("/ho-so/tien-thue/nhap-excel", requireAdmin, uploadMem.single("file"
         ghiChu: "",
         createdAt: new Date().toISOString(),
       });
-      if (soChungTu) existingChungTu.add(soChungTu);
+      if (soChungTu) existingKeys.add(key);
       added++;
     });
 
@@ -971,6 +989,22 @@ router.post("/ho-so/tien-thue/nhap-excel", requireAdmin, uploadMem.single("file"
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
+});
+
+// Nhan, 2026-09-14: cong cu don import loi (vd sau khi sua bug dedupe) -- xoa
+// het cac dong da nhap tu Excel (co maNCC) cua cong ty dang active, de import
+// lai sach tu dau. Khong co nut tren UI (chi goi thu cong khi can), tranh
+// bam nham xoa nham nhap tay.
+router.post("/ho-so/tien-thue/xoa-import", requireAdmin, (req, res) => {
+  const store = load();
+  const activeCompany = getCompany(req);
+  const before = (store.ho_so_tien_thue || []).length;
+  store.ho_so_tien_thue = (store.ho_so_tien_thue || []).filter(
+    (r) => !(r.maNCC && (!r.company || r.company === activeCompany))
+  );
+  const deleted = before - store.ho_so_tien_thue.length;
+  save(store);
+  res.json({ success: true, deleted });
 });
 
 // Nhan, 2026-09-12: "cho toi chỗ tải link gg drive của hợp đồng á xong rồi
