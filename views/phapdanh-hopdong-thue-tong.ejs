@@ -153,7 +153,16 @@
           </label>
           <label>
             <span style="font-size:13px; color:#555;">Tiền thuê/tháng</span>
-            <input type="number" id="f_tienThueThang" name="tienThueThang" style="width:100%; margin-top:3px;" />
+            <!-- Nhan, 2026-09-14: "tiền thuê hàng tháng á nảy tôi thêm có mà
+                 sao lại mất hết rồi" -- input type="number" cua HTML KHONG
+                 chap nhan dinh dang co nhieu dau cham phan cach nghin kieu VN
+                 (vd "10.000.000"): trinh duyet coi la gia tri KHONG HOP LE va
+                 tu dong tra ve rong ("") ngay khi go, du man hinh VAN HIEN
+                 chu chi go -- luu xong thanh 0/rong ma khong bao loi gi ca.
+                 Doi sang text (server da tu dong bo dau cham/phay/khoang
+                 trang o route /cap-nhat va /them) de nhap duoc ca "10000000"
+                 lan "10.000.000"/"10,000,000" deu ra dung so. -->
+            <input type="text" inputmode="decimal" id="f_tienThueThang" name="tienThueThang" placeholder="vd: 10000000 hoặc 10.000.000" style="width:100%; margin-top:3px;" />
           </label>
           <label>
             <span style="font-size:13px; color:#555;">Thời hạn thuê (raw)</span>
