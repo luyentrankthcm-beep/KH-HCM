@@ -3479,16 +3479,10 @@
             const gDisp0 = getGianDisp(dt, maCT, ctData0[maCT]);
             const tienHD0 = parseFloat((hd.tienHD||'0').toString().replace(/[^0-9.-]/g,''))||0;
             const key = maCT+'|'+soHD;
-            if(!invoiceGroups[key]) invoiceGroups[key] = {dt:0, tienHDs:[], dates:[], ownMatches:[]};
+            if(!invoiceGroups[key]) invoiceGroups[key] = {dt:0, tienHDs:[], dates:[]};
             invoiceGroups[key].dt += gDisp0.dt;
             invoiceGroups[key].tienHDs.push(tienHD0);
             invoiceGroups[key].dates.push(dt);
-            // Nhan, 2026-09-14 (v2): "tienHD của NGÀY NÀY có khớp với chính
-            // Số tiền (NH) của NGÀY NÀY không" -- xem ghi chú BUG chi tiết ở
-            // dưới, đây là cách phân biệt "tay gõ nguyên hóa đơn gộp lặp lại
-            // mỗi ngày" (Luyen, cấn trừ) với "tay gõ đúng phần chia mỗi ngày"
-            // (vd Lý Chính Thắng) mà KHÔNG cần dựa vào cờ _manual.
-            invoiceGroups[key].ownMatches.push(Math.abs(tienHD0 - gDisp0.dt) <= 1000);
           });
         });
         // Luyen, 2026-09-10: "nếu xuất hóa đơn này cộng trừ cấn trừ qua lại
@@ -3496,22 +3490,25 @@
         // gộp trên MỌI ngày nó che phủ (không tự chia), nên CỘNG DỒN tienHD
         // qua các ngày (như code cũ) sẽ tính ra gấp đôi/gấp ba số thật, khiến
         // "cấn trừ" không bao giờ khớp.
-        // Nhan, 2026-09-14 (v2): "Go Trà Vinh" (autoMap chia đúng 120k/120k)
-        // VÀ "Lý Chính Thắng" (tay gõ đúng 120k/120k, khớp NH từng ngày) đều
-        // bị heuristic cũ (dựa vào cờ _manual + "uniq<=1") tính sai thành
-        // Chênh +60k, vì không phân biệt được "gõ tay nguyên hóa đơn lặp lại"
-        // (Luyen) với "gõ tay đúng phần chia" (Nhẫn) chỉ từ cờ _manual. Cách
-        // đúng: so mỗi tienHD với CHÍNH Số tiền (NH) của ngày đó (ownMatches ở
-        // trên) -- nếu MỌI ngày trong nhóm đều khớp phần của riêng nó thì đó
-        // chắc chắn là các phần chia thật (auto-map hoặc tay gõ đều vậy) nên
-        // CỘNG DỒN; ngược lại (giống Luyen: tienHD mỗi ngày đều là 1 số KHÔNG
-        // khớp riêng ngày đó, mà là tổng hóa đơn gốc lặp lại) thì lấy 1 giá
-        // trị duy nhất, không cộng dồn.
+        // Nhan, 2026-09-14 (v3): 2 lần sửa trước (dựa cờ _manual, rồi dựa
+        // "tienHD khớp NH từng ngày") đều vẫn sai cho ít nhất 1 trong 3 ca
+        // thật: "Go Trà Vinh" (auto-map, mỗi ngày ĐÚNG bằng NH ngày đó -- cần
+        // cộng dồn), "Lý Chính Thắng" (tay gõ đúng 120k/120k = khớp NH từng
+        // ngày -- cần cộng dồn), "Lotte Phan Thiết" (tay gõ 2 phần LỆCH NH
+        // từng ngày, vd 295.238 và 944.762 dù NH ngày là 320k/920k, nhưng
+        // TỔNG 2 phần = TỔNG NH 2 ngày = đúng hóa đơn 1.240.000 -- vẫn cần
+        // cộng dồn). Cách ĐÚNG: so TỔNG các tienHD trong nhóm với TỔNG Số
+        // tiền (NH) cả nhóm (g.dt) -- nếu 2 tổng này khớp nhau (lệch nhỏ) thì
+        // các tienHD là CÁC PHẦN THẬT của hóa đơn (dù chia đều, chia lệch,
+        // hay auto-map) nên CỘNG DỒN đúng; chỉ khi KHÔNG khớp (vd Luyen gõ
+        // nguyên số hóa đơn gộp lặp lại N ngày -> tổng gấp N lần g.dt) thì đó
+        // là 1 số duy nhất bị lặp lại, lấy 1 giá trị thay vì cộng dồn.
         Object.values(invoiceGroups).forEach(g => {
-          const allOwnMatch = g.ownMatches.length > 0 && g.ownMatches.every(Boolean);
-          g.tienHD = allOwnMatch
-            ? g.tienHDs.reduce((s,v)=>s+v,0)
-            : (g.tienHDs.find(v=>v>0) || 0);
+          const summed = g.tienHDs.reduce((s,v)=>s+v,0);
+          const tol = Math.max(1000, g.dt * 0.02);
+          g.tienHD = (g.dt > 0 && Math.abs(summed - g.dt) <= tol)
+            ? summed
+            : ([...new Set(g.tienHDs.filter(v=>v>0))][0] || 0);
         });
 
         // Helper: render one date block
@@ -4166,24 +4163,22 @@
           const gDisp0 = getVnpayGianDisp(dt, maCT, ctData0[maCT]);
           const tienHD0 = parseFloat((hd.tienHD||'0').toString().replace(/[^0-9.-]/g,''))||0;
           const key = maCT+'|'+soHD;
-          if(!invoiceGroups[key]) invoiceGroups[key] = {dt:0, tienHDs:[], dates:[], ownMatches:[]};
+          if(!invoiceGroups[key]) invoiceGroups[key] = {dt:0, tienHDs:[], dates:[]};
           invoiceGroups[key].dt += gDisp0.dt;
           invoiceGroups[key].tienHDs.push(tienHD0);
           invoiceGroups[key].dates.push(dt);
-          invoiceGroups[key].ownMatches.push(Math.abs(tienHD0 - gDisp0.dt) <= 1000);
         });
       });
-      // Xem ghi chú BUG chi tiết ở renderZaloDoiSoat. Nhan, 2026-09-14 (v2):
-      // so tienHD với CHÍNH Số tiền (NH) của cùng ngày đó (ownMatches) để
-      // phân biệt "gõ tay nguyên hóa đơn gộp lặp lại mỗi ngày" (Luyen, cấn
-      // trừ -- không cộng dồn) với "gõ tay/auto-map đúng phần chia mỗi ngày"
-      // (vd Lý Chính Thắng -- phải cộng dồn), thay vì heuristic cũ dựa vào
-      // cờ _manual đã sai cho cả 2 trường hợp thực tế.
+      // Xem ghi chú BUG chi tiết (v3) ở renderZaloDoiSoat -- so TỔNG tienHD cả
+      // nhóm với TỔNG Số tiền (NH) cả nhóm (g.dt), khớp thì cộng dồn (đúng cho
+      // cả chia đều, chia lệch theo tỷ lệ thật, hay auto-map), không khớp mới
+      // là 1 số bị lặp lại (Luyen) nên lấy 1 giá trị duy nhất.
       Object.values(invoiceGroups).forEach(g => {
-        const allOwnMatch = g.ownMatches.length > 0 && g.ownMatches.every(Boolean);
-        g.tienHD = allOwnMatch
-          ? g.tienHDs.reduce((s,v)=>s+v,0)
-          : (g.tienHDs.find(v=>v>0) || 0);
+        const summed = g.tienHDs.reduce((s,v)=>s+v,0);
+        const tol = Math.max(1000, g.dt * 0.02);
+        g.tienHD = (g.dt > 0 && Math.abs(summed - g.dt) <= tol)
+          ? summed
+          : ([...new Set(g.tienHDs.filter(v=>v>0))][0] || 0);
       });
 
       const renderDateBlock = date => {
@@ -4697,24 +4692,22 @@
           const gDisp0 = getPayooGianDisp(dt, maCT, ctData0[maCT]);
           const tienHD0 = parseFloat((hd.tienHD||'0').toString().replace(/[^0-9.-]/g,''))||0;
           const key = maCT+'|'+soHD;
-          if(!invoiceGroups[key]) invoiceGroups[key] = {dt:0, tienHDs:[], dates:[], ownMatches:[]};
+          if(!invoiceGroups[key]) invoiceGroups[key] = {dt:0, tienHDs:[], dates:[]};
           invoiceGroups[key].dt += gDisp0.dt;
           invoiceGroups[key].tienHDs.push(tienHD0);
           invoiceGroups[key].dates.push(dt);
-          invoiceGroups[key].ownMatches.push(Math.abs(tienHD0 - gDisp0.dt) <= 1000);
         });
       });
-      // Xem ghi chú BUG chi tiết ở renderZaloDoiSoat. Nhan, 2026-09-14 (v2):
-      // so tienHD với CHÍNH Số tiền (NH) của cùng ngày đó (ownMatches) để
-      // phân biệt "gõ tay nguyên hóa đơn gộp lặp lại mỗi ngày" (Luyen, cấn
-      // trừ -- không cộng dồn) với "gõ tay/auto-map đúng phần chia mỗi ngày"
-      // (vd Lý Chính Thắng -- phải cộng dồn), thay vì heuristic cũ dựa vào
-      // cờ _manual đã sai cho cả 2 trường hợp thực tế.
+      // Xem ghi chú BUG chi tiết (v3) ở renderZaloDoiSoat -- so TỔNG tienHD cả
+      // nhóm với TỔNG Số tiền (NH) cả nhóm (g.dt), khớp thì cộng dồn (đúng cho
+      // cả chia đều, chia lệch theo tỷ lệ thật, hay auto-map), không khớp mới
+      // là 1 số bị lặp lại (Luyen) nên lấy 1 giá trị duy nhất.
       Object.values(invoiceGroups).forEach(g => {
-        const allOwnMatch = g.ownMatches.length > 0 && g.ownMatches.every(Boolean);
-        g.tienHD = allOwnMatch
-          ? g.tienHDs.reduce((s,v)=>s+v,0)
-          : (g.tienHDs.find(v=>v>0) || 0);
+        const summed = g.tienHDs.reduce((s,v)=>s+v,0);
+        const tol = Math.max(1000, g.dt * 0.02);
+        g.tienHD = (g.dt > 0 && Math.abs(summed - g.dt) <= tol)
+          ? summed
+          : ([...new Set(g.tienHDs.filter(v=>v>0))][0] || 0);
       });
 
       const renderDateBlock = date => {
@@ -6084,24 +6077,22 @@
           const gDisp0 = getVietQrGianDisp(dt+'|'+maCT, ctData0[maCT].amount);
           const tienHD0 = parseFloat((hd.tienHD||'0').toString().replace(/[^0-9.-]/g,''))||0;
           const key = maCT+'|'+soHD;
-          if(!invoiceGroups[key]) invoiceGroups[key] = {dt:0, tienHDs:[], dates:[], ownMatches:[]};
+          if(!invoiceGroups[key]) invoiceGroups[key] = {dt:0, tienHDs:[], dates:[]};
           invoiceGroups[key].dt += gDisp0.amt;
           invoiceGroups[key].tienHDs.push(tienHD0);
           invoiceGroups[key].dates.push(dt);
-          invoiceGroups[key].ownMatches.push(Math.abs(tienHD0 - gDisp0.amt) <= 1000);
         });
       });
-      // Xem ghi chú BUG chi tiết ở renderZaloDoiSoat. Nhan, 2026-09-14 (v2):
-      // so tienHD với CHÍNH Số tiền (NH) của cùng ngày đó (ownMatches) để
-      // phân biệt "gõ tay nguyên hóa đơn gộp lặp lại mỗi ngày" (Luyen, cấn
-      // trừ -- không cộng dồn) với "gõ tay/auto-map đúng phần chia mỗi ngày"
-      // (vd Lý Chính Thắng -- phải cộng dồn), thay vì heuristic cũ dựa vào
-      // cờ _manual đã sai cho cả 2 trường hợp thực tế.
+      // Xem ghi chú BUG chi tiết (v3) ở renderZaloDoiSoat -- so TỔNG tienHD cả
+      // nhóm với TỔNG Số tiền (NH) cả nhóm (g.dt), khớp thì cộng dồn (đúng cho
+      // cả chia đều, chia lệch theo tỷ lệ thật, hay auto-map), không khớp mới
+      // là 1 số bị lặp lại (Luyen) nên lấy 1 giá trị duy nhất.
       Object.values(invoiceGroups).forEach(g => {
-        const allOwnMatch = g.ownMatches.length > 0 && g.ownMatches.every(Boolean);
-        g.tienHD = allOwnMatch
-          ? g.tienHDs.reduce((s,v)=>s+v,0)
-          : (g.tienHDs.find(v=>v>0) || 0);
+        const summed = g.tienHDs.reduce((s,v)=>s+v,0);
+        const tol = Math.max(1000, g.dt * 0.02);
+        g.tienHD = (g.dt > 0 && Math.abs(summed - g.dt) <= tol)
+          ? summed
+          : ([...new Set(g.tienHDs.filter(v=>v>0))][0] || 0);
       });
 
       const renderDateBlock = date => {
