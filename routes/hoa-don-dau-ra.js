@@ -335,6 +335,84 @@ router.get("/hoa-don-dau-ra/export-misa", requireLogin, (req, res) => {
   res.send(buf);
 });
 
+// Nhan, 2026-09-14: API JSON cho sub-tab "Hóa đơn đầu ra" nhúng trong
+// tab MTT / Hóa đơn (dau-ra.ejs) -- de trang do goi fetch() ma khong
+// phai chuyen sang trang /hoa-don-dau-ra rieng (van dung chung du lieu
+// store.hoa_don_dau_ra, chi khac cach tra ve: JSON thay vi redirect).
+
+// GET /hoa-don-dau-ra/api/list
+router.get("/hoa-don-dau-ra/api/list", requireLogin, (req, res) => {
+  const store = load();
+  ensureShape(store);
+  const activeCompany = getCompany(req);
+  let rows = store.hoa_don_dau_ra.filter((r) => (r.congTy || "kh_cu") === activeCompany);
+  rows = [...rows].sort((a, b) => (b.ngayHD || "").localeCompare(a.ngayHD || ""));
+  res.json({ ok: true, rows });
+});
+
+// POST /hoa-don-dau-ra/api/them
+router.post("/hoa-don-dau-ra/api/them", requireDataEntry, (req, res) => {
+  const store = load();
+  ensureShape(store);
+  const activeCompany = getCompany(req);
+
+  const row = {
+    id: nextId(store),
+    congTy: activeCompany,
+    ngayHD: (req.body.ngayHD || "").trim(),
+    soHD: (req.body.soHD || "").trim(),
+    maKH: (req.body.maKH || "").trim(),
+    tenKhachHang: (req.body.tenKhachHang || "").trim(),
+    loaiHD: (req.body.loaiHD || "").trim(),
+    dienGiai: (req.body.dienGiai || "").trim(),
+    soTien: Number(String(req.body.soTien || "0").replace(/[^\d.-]/g, "")) || 0,
+    soTienVAT: Number(String(req.body.soTienVAT || "0").replace(/[^\d.-]/g, "")) || 0,
+    thueVAT: (req.body.thueVAT || "").trim(),
+    ghiChu: (req.body.ghiChu || "").trim(),
+    createdAt: new Date().toISOString(),
+  };
+
+  store.hoa_don_dau_ra.push(row);
+  save(store);
+  res.json({ ok: true, row });
+});
+
+// POST /hoa-don-dau-ra/api/sua/:id
+router.post("/hoa-don-dau-ra/api/sua/:id", requireDataEntry, (req, res) => {
+  const store = load();
+  ensureShape(store);
+  const id = Number(req.params.id);
+  const row = store.hoa_don_dau_ra.find((r) => r.id === id);
+  if (!row) return res.status(404).json({ ok: false, error: "Không tìm thấy hóa đơn id=" + id });
+
+  row.ngayHD = (req.body.ngayHD || "").trim();
+  row.soHD = (req.body.soHD || "").trim();
+  row.maKH = (req.body.maKH || "").trim();
+  row.tenKhachHang = (req.body.tenKhachHang || "").trim();
+  row.loaiHD = (req.body.loaiHD || "").trim();
+  row.dienGiai = (req.body.dienGiai || "").trim();
+  row.soTien = Number(String(req.body.soTien || "0").replace(/[^\d.-]/g, "")) || 0;
+  row.soTienVAT = Number(String(req.body.soTienVAT || "0").replace(/[^\d.-]/g, "")) || 0;
+  row.thueVAT = (req.body.thueVAT || "").trim();
+  row.ghiChu = (req.body.ghiChu || "").trim();
+  row.updatedAt = new Date().toISOString();
+
+  save(store);
+  res.json({ ok: true, row });
+});
+
+// POST /hoa-don-dau-ra/api/xoa/:id
+router.post("/hoa-don-dau-ra/api/xoa/:id", requireAdmin, (req, res) => {
+  const store = load();
+  ensureShape(store);
+  const id = Number(req.params.id);
+  const idx = store.hoa_don_dau_ra.findIndex((r) => r.id === id);
+  if (idx === -1) return res.status(404).json({ ok: false, error: "Không tìm thấy hóa đơn id=" + id });
+  const removed = store.hoa_don_dau_ra.splice(idx, 1)[0];
+  save(store);
+  res.json({ ok: true, removed });
+});
+
 // POST /hoa-don-dau-ra/them -- them moi 1 dong
 router.post("/hoa-don-dau-ra/them", requireDataEntry, (req, res) => {
   const store = load();

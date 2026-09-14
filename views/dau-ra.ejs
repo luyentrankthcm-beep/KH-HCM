@@ -633,11 +633,15 @@
       </div>
 
       <!-- Sub-tabs KH Cũ / KH Mới + filter -->
-      <div id="mttSubTabs" style="display:none;margin:.4rem 0 0;border-bottom:2px solid #e2e8f0;display:none;align-items:center">
+      <!-- Nhan, 2026-09-14: bar này luôn hiển thị (không còn ẩn theo dữ liệu
+           MTT) vì sub-tab "Hóa đơn đầu ra" là tính năng độc lập, không phụ
+           thuộc việc đã nhập file MTT hay chưa. -->
+      <div id="mttSubTabs" style="display:flex;margin:.4rem 0 0;border-bottom:2px solid #e2e8f0;align-items:center;flex-wrap:wrap">
         <button id="mttTabCu"   class="sub-tab-btn active" onclick="switchMttTab('cu')">📋 KH Cũ (989)</button>
         <button id="mttTabMoi"  class="sub-tab-btn"       onclick="switchMttTab('moi')">📋 KH Mới (705)</button>
+        <button id="mttTabHddr" class="sub-tab-btn"       onclick="switchMttTab('hddr')">🧾 Hóa đơn đầu ra</button>
         <button id="mttTabHist" class="sub-tab-btn"       onclick="switchMttTab('hist')">🕓 Lịch sử tải</button>
-        <div style="margin-left:auto;display:flex;gap:.5rem;align-items:center;padding:.2rem .5rem">
+        <div id="mttMonthFilterWrap" style="margin-left:auto;display:flex;gap:.5rem;align-items:center;padding:.2rem .5rem">
           <label style="font-size:.82em;font-weight:600;color:#1e3a5f">Tháng:</label>
           <select id="mttMonthFilter" onchange="renderMttTable()" style="padding:.25rem .5rem;border:1px solid #cbd5e1;border-radius:6px;font-size:.82em;font-weight:600;background:#fff;cursor:pointer"></select>
           <button onclick="openMttCtMapModal()" style="background:#6366f1;color:#fff;border:none;border-radius:5px;padding:.3rem .7rem;cursor:pointer;font-size:.82em;font-weight:600">🗺️ Map CT</button>
@@ -685,6 +689,67 @@
           <button onclick="clearMttHistory()" style="background:#ef4444;color:#fff;border:none;border-radius:5px;padding:.25rem .6rem;cursor:pointer;font-size:.78em">🗑️ Xóa lịch sử</button>
         </div>
         <div id="mttHistBody" style="border:1px solid #e2e8f0;border-radius:8px;overflow:hidden"></div>
+      </div>
+
+      <!-- Nhan, 2026-09-14: sub-tab "Hóa đơn đầu ra" -- danh sách hóa đơn bán
+           hàng xuất cho khách (store.hoa_don_dau_ra, dùng chung với trang
+           /hoa-don-dau-ra ở menu bên trái), nhúng ngay trong tab MTT để
+           không phải rời trang. -->
+      <div id="mttHddrPanel" style="display:none;padding:.5rem .75rem">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem;flex-wrap:wrap;gap:.5rem">
+          <span style="font-size:.85em;font-weight:700;color:#1e3a5f">🧾 Hóa đơn đầu ra <span id="mttHddrMeta" style="font-weight:400;color:#64748b"></span></span>
+          <div style="display:flex;gap:.4rem;align-items:center">
+            <input id="mttHddrSearch" placeholder="Tìm số HĐ / khách hàng..." oninput="renderHddrTable()" style="padding:.3rem .5rem;border:1px solid #cbd5e1;border-radius:6px;font-size:.82em;min-width:180px">
+            <a href="/hoa-don-dau-ra" target="_blank" style="font-size:.78em;color:#2563eb;font-weight:600;white-space:nowrap">↗ Mở trang đầy đủ</a>
+            <button onclick="openHddrForm()" style="background:#16a34a;color:#fff;border:none;border-radius:5px;padding:.35rem .75rem;cursor:pointer;font-size:.82em;font-weight:600">➕ Thêm hóa đơn</button>
+          </div>
+        </div>
+
+        <!-- Form thêm/sửa (ẩn mặc định) -->
+        <div id="mttHddrForm" style="display:none;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:.75rem;margin-bottom:.6rem">
+          <input type="hidden" id="hddrEditId" value="">
+          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:.5rem">
+            <div><label style="font-size:.75em;color:#64748b;font-weight:600">Ngày HĐ</label><input id="hddrNgayHD" type="text" placeholder="dd/mm/yyyy" style="width:100%;padding:.3rem .4rem;border:1px solid #cbd5e1;border-radius:5px;font-size:.82em"></div>
+            <div><label style="font-size:.75em;color:#64748b;font-weight:600">Số HĐ</label><input id="hddrSoHD" type="text" style="width:100%;padding:.3rem .4rem;border:1px solid #cbd5e1;border-radius:5px;font-size:.82em"></div>
+            <div><label style="font-size:.75em;color:#64748b;font-weight:600">Mã KH</label><input id="hddrMaKH" type="text" style="width:100%;padding:.3rem .4rem;border:1px solid #cbd5e1;border-radius:5px;font-size:.82em"></div>
+            <div><label style="font-size:.75em;color:#64748b;font-weight:600">Tên khách hàng</label><input id="hddrTenKH" type="text" style="width:100%;padding:.3rem .4rem;border:1px solid #cbd5e1;border-radius:5px;font-size:.82em"></div>
+            <div><label style="font-size:.75em;color:#64748b;font-weight:600">Loại HĐ</label><input id="hddrLoaiHD" type="text" placeholder="khách lẻ / hợp đồng..." style="width:100%;padding:.3rem .4rem;border:1px solid #cbd5e1;border-radius:5px;font-size:.82em"></div>
+            <div><label style="font-size:.75em;color:#64748b;font-weight:600">Số tiền</label><input id="hddrSoTien" type="text" style="width:100%;padding:.3rem .4rem;border:1px solid #cbd5e1;border-radius:5px;font-size:.82em"></div>
+            <div><label style="font-size:.75em;color:#64748b;font-weight:600">Số tiền VAT</label><input id="hddrSoTienVAT" type="text" style="width:100%;padding:.3rem .4rem;border:1px solid #cbd5e1;border-radius:5px;font-size:.82em"></div>
+            <div><label style="font-size:.75em;color:#64748b;font-weight:600">Thuế VAT (%)</label><input id="hddrThueVAT" type="text" placeholder="8" style="width:100%;padding:.3rem .4rem;border:1px solid #cbd5e1;border-radius:5px;font-size:.82em"></div>
+            <div style="grid-column:span 2"><label style="font-size:.75em;color:#64748b;font-weight:600">Diễn giải</label><input id="hddrDienGiai" type="text" style="width:100%;padding:.3rem .4rem;border:1px solid #cbd5e1;border-radius:5px;font-size:.82em"></div>
+            <div style="grid-column:span 2"><label style="font-size:.75em;color:#64748b;font-weight:600">Ghi chú</label><input id="hddrGhiChu" type="text" style="width:100%;padding:.3rem .4rem;border:1px solid #cbd5e1;border-radius:5px;font-size:.82em"></div>
+          </div>
+          <div style="display:flex;gap:.5rem;margin-top:.6rem">
+            <button onclick="saveHddr()" style="background:#2563eb;color:#fff;border:none;border-radius:5px;padding:.35rem .9rem;cursor:pointer;font-size:.82em;font-weight:600">💾 Lưu</button>
+            <button onclick="closeHddrForm()" style="background:#e2e8f0;color:#334155;border:none;border-radius:5px;padding:.35rem .9rem;cursor:pointer;font-size:.82em;font-weight:600">Hủy</button>
+            <span id="hddrFormStatus" style="font-size:.8em;align-self:center"></span>
+          </div>
+        </div>
+
+        <div id="mttHddrEmpty" class="empty-state" style="display:none">
+          <div class="big-icon">🧾</div>
+          <p>Chưa có hóa đơn đầu ra nào<br>Nhấn <strong>➕ Thêm hóa đơn</strong> để tạo mới</p>
+        </div>
+
+        <div id="mttHddrTableWrap" style="display:none;overflow-x:auto;border:1px solid #e2e8f0;border-radius:8px;max-height:60vh;overflow-y:auto">
+          <table style="width:100%;border-collapse:collapse;font-size:.83em">
+            <thead>
+              <tr style="background:#1e3a5f;color:#fff;position:sticky;top:0">
+                <th style="padding:.5rem .75rem;text-align:left;white-space:nowrap">Ngày HĐ</th>
+                <th style="padding:.5rem .75rem;text-align:right;white-space:nowrap">Số HĐ</th>
+                <th style="padding:.5rem .75rem;text-align:left;white-space:nowrap">Mã KH</th>
+                <th style="padding:.5rem .75rem;text-align:left">Khách hàng</th>
+                <th style="padding:.5rem .75rem;text-align:left;white-space:nowrap">Loại HĐ</th>
+                <th style="padding:.5rem .75rem;text-align:right;white-space:nowrap">Số tiền</th>
+                <th style="padding:.5rem .75rem;text-align:right;white-space:nowrap">VAT</th>
+                <th style="padding:.5rem .75rem;text-align:left">Ghi chú</th>
+                <th style="padding:.5rem .75rem;text-align:center;white-space:nowrap">Thao tác</th>
+              </tr>
+            </thead>
+            <tbody id="mttHddrBody"></tbody>
+          </table>
+        </div>
       </div>
     </div>
 
@@ -2296,11 +2361,20 @@
       _mttActive = tab;
       document.getElementById('mttTabCu').classList.toggle('active', tab === 'cu');
       document.getElementById('mttTabMoi').classList.toggle('active', tab === 'moi');
+      document.getElementById('mttTabHddr').classList.toggle('active', tab === 'hddr');
       document.getElementById('mttTabHist').classList.toggle('active', tab === 'hist');
-      document.getElementById('mttResults').style.display = tab === 'hist' ? 'none' : 'block';
-      document.getElementById('mttSummary').style.display = tab === 'hist' ? 'none' : 'flex';
+      // Nhan, 2026-09-14: "Hóa đơn đầu ra" và "Lịch sử tải" không liên quan
+      // gì tới bảng KH Cũ/Mới hay bộ lọc Tháng/Map CT -- ẩn hết, chỉ hiện
+      // đúng panel tương ứng.
+      const isCuMoi = tab === 'cu' || tab === 'moi';
+      document.getElementById('mttEmpty').style.display = 'none';
+      document.getElementById('mttResults').style.display = isCuMoi ? 'block' : 'none';
+      document.getElementById('mttSummary').style.display = isCuMoi ? 'flex' : 'none';
+      document.getElementById('mttMonthFilterWrap').style.display = isCuMoi ? 'flex' : 'none';
       document.getElementById('mttHistPanel').style.display = tab === 'hist' ? 'block' : 'none';
+      document.getElementById('mttHddrPanel').style.display = tab === 'hddr' ? 'block' : 'none';
       if (tab === 'hist') renderMttHistory();
+      else if (tab === 'hddr') loadHddr();
       else renderMttTable();
     }
 
@@ -2427,13 +2501,11 @@
       if (!hasCu && !hasMoi) {
         document.getElementById('mttEmpty').style.display = 'block';
         document.getElementById('mttResults').style.display = 'none';
-        document.getElementById('mttSubTabs').style.display = 'none';
         document.getElementById('mttSummary').style.display = 'none';
         return;
       }
       document.getElementById('mttEmpty').style.display = 'none';
       document.getElementById('mttResults').style.display = 'block';
-      document.getElementById('mttSubTabs').style.display = 'flex';
 
       // Month filter
       populateMttMonthFilter(allRows);
@@ -2594,7 +2666,6 @@
       document.getElementById('mttEmpty').style.display = 'block';
       document.getElementById('mttResults').style.display = 'none';
       document.getElementById('mttSummary').style.display = 'none';
-      document.getElementById('mttSubTabs').style.display = 'none';
     }
 
     function renderMttHistory() {
@@ -2614,6 +2685,138 @@
       _mttHist = [];
       try { lsRemove(LS_MTT_HIST); } catch(e) {}
       renderMttHistory();
+    }
+
+    // ── Nhan, 2026-09-14: Hóa đơn đầu ra (sub-tab nhúng trong MTT) ──
+    // Dùng chung store.hoa_don_dau_ra (server-side, theo công ty đang chọn)
+    // với trang riêng /hoa-don-dau-ra -- ở đây chỉ gọi API JSON để không
+    // phải rời trang Đầu Ra.
+    let _hddrRows = [];
+    let _hddrLoaded = false;
+
+    async function loadHddr(force) {
+      if (_hddrLoaded && !force) { renderHddrTable(); return; }
+      try {
+        const res = await fetch('/hoa-don-dau-ra/api/list');
+        const json = await res.json();
+        _hddrRows = (json.ok && json.rows) ? json.rows : [];
+        _hddrLoaded = true;
+        renderHddrTable();
+      } catch(e) {
+        document.getElementById('mttHddrEmpty').style.display = 'block';
+        document.getElementById('mttHddrEmpty').querySelector('p').innerHTML = '❌ Không tải được dữ liệu (lỗi mạng)';
+        document.getElementById('mttHddrTableWrap').style.display = 'none';
+      }
+    }
+
+    function renderHddrTable() {
+      const q = (document.getElementById('mttHddrSearch').value || '').trim().toLowerCase();
+      let rows = _hddrRows;
+      if (q) {
+        rows = rows.filter(r => [r.soHD, r.tenKhachHang, r.maKH, r.dienGiai].some(v => v && String(v).toLowerCase().includes(q)));
+      }
+      const fmt = n => Math.round(Number(n)||0).toLocaleString('vi');
+      const tong = rows.reduce((s,r) => s + (Number(r.soTien)||0), 0);
+      document.getElementById('mttHddrMeta').textContent = `· ${rows.length} hóa đơn · Tổng: ${fmt(tong)}đ`;
+      if (!rows.length) {
+        document.getElementById('mttHddrEmpty').style.display = 'block';
+        document.getElementById('mttHddrEmpty').querySelector('p').innerHTML = 'Chưa có hóa đơn đầu ra nào<br>Nhấn <strong>➕ Thêm hóa đơn</strong> để tạo mới';
+        document.getElementById('mttHddrTableWrap').style.display = 'none';
+        return;
+      }
+      document.getElementById('mttHddrEmpty').style.display = 'none';
+      document.getElementById('mttHddrTableWrap').style.display = 'block';
+      const tbody = document.getElementById('mttHddrBody');
+      tbody.innerHTML = rows.map((r,i) => `
+        <tr style="background:${i%2?'#f8fafc':'#fff'}">
+          <td style="padding:.4rem .75rem;white-space:nowrap">${r.ngayHD||''}</td>
+          <td style="padding:.4rem .75rem;text-align:right;font-weight:600">${r.soHD||''}</td>
+          <td style="padding:.4rem .75rem">${r.maKH||''}</td>
+          <td style="padding:.4rem .75rem">${r.tenKhachHang||''}</td>
+          <td style="padding:.4rem .75rem;font-size:.82em;color:#64748b">${r.loaiHD||''}</td>
+          <td style="padding:.4rem .75rem;text-align:right;color:#15803d;font-weight:600">${fmt(r.soTien)}</td>
+          <td style="padding:.4rem .75rem;text-align:right;color:#0369a1">${fmt(r.soTienVAT)}${r.thueVAT?` <span style="color:#94a3b8;font-size:.85em">(${r.thueVAT}%)</span>`:''}</td>
+          <td style="padding:.4rem .75rem;color:#64748b;font-size:.82em">${r.ghiChu||''}</td>
+          <td style="padding:.4rem .75rem;text-align:center;white-space:nowrap">
+            <button onclick="editHddr(${r.id})" style="background:#6366f1;color:#fff;border:none;border-radius:4px;padding:.2rem .5rem;cursor:pointer;font-size:.78em;margin-right:.25rem">Sửa</button>
+            <button onclick="deleteHddr(${r.id})" style="background:#ef4444;color:#fff;border:none;border-radius:4px;padding:.2rem .5rem;cursor:pointer;font-size:.78em">Xóa</button>
+          </td>
+        </tr>`).join('');
+    }
+
+    function openHddrForm(row) {
+      document.getElementById('mttHddrForm').style.display = 'block';
+      document.getElementById('hddrEditId').value = row ? row.id : '';
+      document.getElementById('hddrNgayHD').value = row ? (row.ngayHD||'') : '';
+      document.getElementById('hddrSoHD').value = row ? (row.soHD||'') : '';
+      document.getElementById('hddrMaKH').value = row ? (row.maKH||'') : '';
+      document.getElementById('hddrTenKH').value = row ? (row.tenKhachHang||'') : '';
+      document.getElementById('hddrLoaiHD').value = row ? (row.loaiHD||'') : '';
+      document.getElementById('hddrSoTien').value = row ? (row.soTien||'') : '';
+      document.getElementById('hddrSoTienVAT').value = row ? (row.soTienVAT||'') : '';
+      document.getElementById('hddrThueVAT').value = row ? (row.thueVAT||'') : '';
+      document.getElementById('hddrDienGiai').value = row ? (row.dienGiai||'') : '';
+      document.getElementById('hddrGhiChu').value = row ? (row.ghiChu||'') : '';
+      document.getElementById('hddrFormStatus').textContent = '';
+      document.getElementById('mttHddrForm').scrollIntoView({behavior:'smooth', block:'nearest'});
+    }
+
+    function closeHddrForm() {
+      document.getElementById('mttHddrForm').style.display = 'none';
+    }
+
+    function editHddr(id) {
+      const row = _hddrRows.find(r => r.id === id);
+      if (row) openHddrForm(row);
+    }
+
+    async function saveHddr() {
+      const id = document.getElementById('hddrEditId').value;
+      const payload = {
+        ngayHD: document.getElementById('hddrNgayHD').value.trim(),
+        soHD: document.getElementById('hddrSoHD').value.trim(),
+        maKH: document.getElementById('hddrMaKH').value.trim(),
+        tenKhachHang: document.getElementById('hddrTenKH').value.trim(),
+        loaiHD: document.getElementById('hddrLoaiHD').value.trim(),
+        soTien: document.getElementById('hddrSoTien').value.trim(),
+        soTienVAT: document.getElementById('hddrSoTienVAT').value.trim(),
+        thueVAT: document.getElementById('hddrThueVAT').value.trim(),
+        dienGiai: document.getElementById('hddrDienGiai').value.trim(),
+        ghiChu: document.getElementById('hddrGhiChu').value.trim(),
+      };
+      if (!payload.soHD) { document.getElementById('hddrFormStatus').textContent = '⚠️ Nhập Số HĐ'; return; }
+      const st = document.getElementById('hddrFormStatus');
+      st.textContent = '⏳ Đang lưu...';
+      const url = id ? `/hoa-don-dau-ra/api/sua/${id}` : '/hoa-don-dau-ra/api/them';
+      try {
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams(payload).toString(),
+        });
+        const json = await res.json();
+        if (json.ok) {
+          st.textContent = '✅ Đã lưu';
+          closeHddrForm();
+          await loadHddr(true);
+        } else {
+          st.textContent = '❌ ' + (json.error || 'Lỗi khi lưu');
+        }
+      } catch(e) {
+        st.textContent = '❌ Lỗi mạng: ' + e.message;
+      }
+    }
+
+    async function deleteHddr(id) {
+      if (!confirm('Xóa hóa đơn đầu ra này?')) return;
+      try {
+        const res = await fetch(`/hoa-don-dau-ra/api/xoa/${id}`, { method: 'POST' });
+        const json = await res.json();
+        if (json.ok) await loadHddr(true);
+        else alert('❌ ' + (json.error || 'Lỗi khi xóa'));
+      } catch(e) {
+        alert('❌ Lỗi mạng: ' + e.message);
+      }
     }
 
     // ── Fetch các đợt NH trả Momo về cho Đối soát ngày ──
