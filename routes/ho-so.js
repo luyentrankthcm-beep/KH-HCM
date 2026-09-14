@@ -4,6 +4,7 @@
 // tóm tắt, hồ sơ liên quan.
 const express = require("express");
 const multer = require("multer");
+const XLSX = require("xlsx");
 const { load, save, nextId } = require("../store");
 const { requireLogin, requireAdmin, requireDataEntry } = require("../middleware/auth");
 const { getCompany } = require("../utils/companies");
@@ -788,12 +789,73 @@ router.post("/ho-so/chung-tu/:id/xoa", requireAdmin, (req, res) => {
   res.redirect("/ho-so/chung-tu?success=Đã+xóa");
 });
 
+// Nhan, 2026-09-14: "cac gian Ma NCC se gop chung hien thi ngay thang ma
+// cong trinh ngay nao hay dien giai va so hoa don... 1 ncc roi liet ke cac
+// cai lien quan khi toi nhan vao roi hien bang giua cac thong tin lien
+// quan" -- parse chuoi "Ma nha cung cap" dang TEN dinh lien MA_SO_THUE
+// (vd "GIGAMALL0313114291", "Lotte Nha Trang0304741634-011") khong co dau
+// phan cach, de tach ten rieng phuc vu nhom/hien thi.
+function parseNccString(raw) {
+  const s = (raw || "").trim();
+  const m = s.match(/^(.*?)(\d{6,}[\d-]*)$/);
+  if (m && m[1].trim()) return { tenNCC: m[1].trim(), maSoThueNCC: m[2].trim() };
+  return { tenNCC: s, maSoThueNCC: "" };
+}
+
+// Doi serial ngay Excel (vd 46235) sang chuoi dd/mm/yyyy.
+function excelSerialToDateStr(serial) {
+  const n = Number(serial);
+  if (!n || isNaN(n)) return "";
+  try {
+    const d = XLSX.SSF.parse_date_code(n);
+    if (!d || !d.y) return "";
+    const pad = (x) => String(x).padStart(2, "0");
+    return `${pad(d.d)}/${pad(d.m)}/${d.y}`;
+  } catch (e) {
+    return "";
+  }
+}
+
 router.get("/ho-so/tien-thue", (req, res) => {
   const store = load();
-  const rows = (store.ho_so_tien_thue || []).slice().sort((a,b) => (b.thang||'').localeCompare(a.thang||''));
+  const activeCompany = getCompany(req);
+  // Loc theo cong ty: ban cu khong co truong company -> van hien cho ca 2
+  // ben (giu nguyen hanh vi cu, tranh mat du lieu da nhap tay truoc day).
+  const allRows = (store.ho_so_tien_thue || []).filter(
+    (r) => !r.company || r.company === activeCompany
+  );
+  const rows = allRows.slice().sort((a, b) => (b.thang || "").localeCompare(a.thang || ""));
+
+  // Nhom cac dong co Ma NCC (tu import Excel "So chi tiet mua hang") lai
+  // theo tung NCC -- 1 dong tong hop / NCC, nhan vao xem chi tiet. Dong nhap
+  // tay (khong co maNCC) van hien rieng le o bang ben duoi nhu truoc gio.
+  const groupMap = new Map();
+  rows.forEach((r) => {
+    if (!r.maNCC) return;
+    if (!groupMap.has(r.maNCC)) {
+      groupMap.set(r.maNCC, {
+        maNCC: r.maNCC,
+        tenNCC: r.tenNCC || r.maNCC,
+        maSoThueNCC: r.maSoThueNCC || "",
+        rows: [],
+        tongTien: 0,
+      });
+    }
+    const g = groupMap.get(r.maNCC);
+    g.rows.push(r);
+    g.tongTien += Number(String(r.soTien || "").replace(/[.,\s]/g, "")) || 0;
+  });
+  const groupsNcc = Array.from(groupMap.values()).sort((a, b) =>
+    a.tenNCC.localeCompare(b.tenNCC)
+  );
+  groupsNcc.forEach((g) => g.rows.sort((a, b) => (b.thang || "").localeCompare(a.thang || "")));
+
+  const rowsManual = rows.filter((r) => !r.maNCC);
+
   res.render("ho-so-tien-thue", {
     userName: req.session.userName,
-    rows,
+    rows: rowsManual,
+    groupsNcc,
     error: req.query.error || null,
     success: req.query.success || null,
   });
@@ -805,6 +867,7 @@ router.post("/ho-so/tien-thue/them", requireAdmin, (req, res) => {
   const { thang, gian, soHoaDon, soTien, linkFile, ghiChu } = req.body;
   store.ho_so_tien_thue.push({
     id: nextId(store),
+    company: getCompany(req),
     thang: (thang||"").trim(),
     gian: (gian||"").trim(),
     soHoaDon: (soHoaDon||"").trim(),
@@ -822,6 +885,92 @@ router.post("/ho-so/tien-thue/:id/xoa", requireAdmin, (req, res) => {
   store.ho_so_tien_thue = (store.ho_so_tien_thue||[]).filter(r=>String(r.id)!==req.params.id);
   save(store);
   res.redirect("/ho-so/tien-thue?success=Đã+xóa");
+});
+
+// Nhan, 2026-09-14: "xay nut tai file len + nhap luon file nay" -- import
+// file Excel "SO CHI TIET MUA HANG" (xuat tu Misa/phan mem ke toan), loc
+// rieng cac dong Ma hang = "TIEN THUE", gan company = cong ty dang active
+// luc bam nut import. Chong nhap trung: dedupe theo "So chung tu" (cot noi
+// bo, on dinh hon so hoa don vi 1 so hoa don co the co nhieu dong).
+router.post("/ho-so/tien-thue/nhap-excel", requireAdmin, uploadMem.single("file"), (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: "Vui lòng chọn file Excel." });
+    const wb = XLSX.read(req.file.buffer, { type: "buffer" });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const data = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
+
+    // Tim dong tieu de bang cach do cell "Mã hàng" (khong cung cung index 3,
+    // phong khi file xuat co so dong tieu de/khoang trang khac nhau).
+    let headerIdx = -1;
+    for (let i = 0; i < Math.min(data.length, 10); i++) {
+      if ((data[i] || []).some((c) => String(c).trim() === "Mã hàng")) { headerIdx = i; break; }
+    }
+    if (headerIdx === -1) {
+      return res.status(400).json({ error: "Không tìm thấy dòng tiêu đề (cột 'Mã hàng') trong file. Vui lòng kiểm tra đúng file 'SỔ CHI TIẾT MUA HÀNG'." });
+    }
+    const header = data[headerIdx];
+    const idx = {};
+    header.forEach((h, i) => { idx[String(h).trim()] = i; });
+
+    const need = ["Ngày hóa đơn", "Số hóa đơn", "Mã nhà cung cấp", "Mã hàng", "Giá trị mua", "Mã công trình", "Tên công trình", "Số chứng từ"];
+    const missing = need.filter((k) => idx[k] === undefined);
+    if (missing.length) {
+      return res.status(400).json({ error: "File thiếu cột: " + missing.join(", ") });
+    }
+
+    const dataRows = data.slice(headerIdx + 1).filter((r) => (r || []).some((c) => c !== ""));
+    const tienThueRows = dataRows.filter((r) => String(r[idx["Mã hàng"]] || "").trim() === "TIỀN THUÊ");
+
+    const store = load();
+    if (!store.ho_so_tien_thue) store.ho_so_tien_thue = [];
+    const existingChungTu = new Set(store.ho_so_tien_thue.map((r) => r.soChungTu).filter(Boolean));
+    const activeCompany = getCompany(req);
+
+    let added = 0, skipped = 0;
+    tienThueRows.forEach((r) => {
+      const soChungTu = String(r[idx["Số chứng từ"]] || "").trim();
+      if (soChungTu && existingChungTu.has(soChungTu)) { skipped++; return; }
+
+      const maNCCRaw = String(r[idx["Mã nhà cung cấp"]] || "").trim();
+      const { tenNCC, maSoThueNCC } = parseNccString(maNCCRaw);
+      const maCongTrinh = String(r[idx["Mã công trình"]] || "").trim();
+      const tenCongTrinh = String(r[idx["Tên công trình"]] || "").trim();
+      const soHoaDon = String(r[idx["Số hóa đơn"]] || "").trim();
+      const ngayHoaDon = excelSerialToDateStr(r[idx["Ngày hóa đơn"]]) ||
+        (idx["Ngày chứng từ"] !== undefined ? excelSerialToDateStr(r[idx["Ngày chứng từ"]]) : "");
+      const giaTriMua = Number(r[idx["Giá trị mua"]]) || 0;
+      const soTien = giaTriMua ? giaTriMua.toLocaleString("vi-VN") : "";
+      let thang = "";
+      const dm = ngayHoaDon.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+      if (dm) thang = dm[2] + "/" + dm[3];
+
+      store.ho_so_tien_thue.push({
+        id: nextId(store),
+        company: activeCompany,
+        thang,
+        gian: tenCongTrinh || maCongTrinh || "",
+        maCongTrinh,
+        tenCongTrinh,
+        soHoaDon,
+        soChungTu,
+        soTien,
+        maNCC: maNCCRaw,
+        tenNCC,
+        maSoThueNCC,
+        ngayHoaDon,
+        linkFile: "",
+        ghiChu: "",
+        createdAt: new Date().toISOString(),
+      });
+      if (soChungTu) existingChungTu.add(soChungTu);
+      added++;
+    });
+
+    save(store);
+    res.json({ success: true, added, skipped, total: tienThueRows.length });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 // Nhan, 2026-09-12: "cho toi chỗ tải link gg drive của hợp đồng á xong rồi

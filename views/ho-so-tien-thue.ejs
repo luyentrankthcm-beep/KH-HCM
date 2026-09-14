@@ -30,6 +30,21 @@
     #hopDongReviewPanel { display:none; background:#fffbeb; border:1px solid #fde68a; border-radius:8px; padding:1rem 1.25rem; margin-bottom:1.25rem; }
     #hopDongReviewPanel h3 { margin:0 0 .4rem; font-size:.9rem; color:#92400e; }
     #hopDongReviewPanel .form-row input, #hopDongReviewPanel .form-row textarea { padding:.35rem .55rem; border:1px solid #cbd5e1; border-radius:4px; font-size:.85em; font-family:inherit; }
+    .upload-box { background:#f0fdf4; border:1px solid #bbf7d0; border-radius:8px; padding:1rem 1.25rem; margin-bottom:1.25rem; display:flex; align-items:center; gap:.75rem; flex-wrap:wrap; }
+    .upload-box h3 { margin:0; font-size:.92rem; color:#166534; flex:1 1 260px; min-width:220px; }
+    .upload-box small { display:block; font-weight:400; color:#64748b; margin-top:.15rem; }
+    .btn-upload { background:#16a34a; color:#fff; border:none; border-radius:5px; padding:.45rem 1rem; cursor:pointer; font-weight:600; font-size:.85em; white-space:nowrap; }
+    .btn-upload:disabled { background:#94a3b8; cursor:not-allowed; }
+    .ncc-section { margin-bottom:1.5rem; }
+    .ncc-section h2 { font-size:1rem; color:#1e3a5f; margin:0 0 .6rem; }
+    .ncc-row { cursor:pointer; }
+    .ncc-row:hover td { background:#dceeff !important; }
+    .ncc-badge { background:#e0f2fe; color:#0369a1; border-radius:10px; padding:.1rem .55rem; font-size:.8em; font-weight:600; }
+    .modal-overlay { display:none; position:fixed; inset:0; background:rgba(15,23,42,.55); z-index:50; align-items:flex-start; justify-content:center; padding:4vh 1rem; overflow-y:auto; }
+    .modal-box { background:#fff; border-radius:10px; padding:1.25rem 1.5rem; max-width:900px; width:100%; max-height:90vh; overflow-y:auto; }
+    .modal-box h3 { margin:0 0 .2rem; color:#1e3a5f; }
+    .modal-box .modal-sub { color:#64748b; font-size:.85em; margin-bottom:.9rem; }
+    .modal-close { float:right; background:none; border:none; font-size:1.3em; cursor:pointer; color:#64748b; line-height:1; }
   </style>
 </head>
 <body>
@@ -47,6 +62,16 @@
 
     <% if (typeof error !== 'undefined' && error) { %><div class="alert-error"><%= error %></div><% } %>
     <% if (typeof success !== 'undefined' && success) { %><div class="alert-success"><%= success %></div><% } %>
+
+    <!-- Upload file "Sổ chi tiết mua hàng" -> tự lọc dòng TIỀN THUÊ, gộp theo Mã NCC -->
+    <div class="upload-box">
+      <h3>⬆️ Tải file lên
+        <small>File Excel "SỔ CHI TIẾT MUA HÀNG" — hệ thống tự lọc dòng Mã hàng = TIỀN THUÊ và gộp theo Mã NCC. Tải lại nhiều lần không bị trùng.</small>
+      </h3>
+      <input type="file" id="tienThueExcelInput" accept=".xlsx,.xls" style="font-size:.85em;" />
+      <button type="button" class="btn-upload" id="btnUploadExcel">⬆️ Tải &amp; nhập</button>
+      <span id="uploadMsg" style="font-size:.85em;"></span>
+    </div>
 
     <!-- Add form -->
     <div class="add-form">
@@ -139,8 +164,39 @@
       <span id="hopDongReviewMsg" style="margin-left:.75rem;font-size:.85em;"></span>
     </div>
 
+    <% if (typeof groupsNcc !== 'undefined' && groupsNcc.length > 0) { %>
+    <div class="ncc-section">
+      <h2>🏢 Tiền thuê theo Nhà cung cấp (từ file nhập)</h2>
+      <div style="overflow-x:auto;">
+        <table class="doc-table">
+          <thead>
+            <tr>
+              <th style="width:36px;">#</th>
+              <th>Nhà cung cấp</th>
+              <th style="width:150px;">Mã số thuế</th>
+              <th style="width:110px;">Số dòng</th>
+              <th style="width:160px;">Tổng tiền thuê</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% groupsNcc.forEach(function(g, i) { %>
+            <tr class="ncc-row" onclick="openNccModal('<%= g.maNCC.replace(/'/g, "\\'") %>')">
+              <td style="color:#bbb;font-size:.78em;"><%= i+1 %></td>
+              <td style="font-weight:700;color:#1e3a5f;"><%= g.tenNCC %></td>
+              <td style="font-size:.85em;color:#555;"><%= g.maSoThueNCC || '—' %></td>
+              <td><span class="ncc-badge"><%= g.rows.length %> dòng</span></td>
+              <td class="tien"><%= g.tongTien.toLocaleString('vi-VN') %> đ</td>
+            </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      </div>
+      <p style="color:#888;font-size:.82em;margin-top:.5rem;">Bấm vào 1 dòng để xem chi tiết các gian/tháng/hóa đơn liên quan. <strong><%= groupsNcc.length %></strong> nhà cung cấp.</p>
+    </div>
+    <% } %>
+
     <% if (rows.length === 0) { %>
-    <p style="color:#888;">Chưa có dữ liệu. Thêm tiền thuê ở trên.</p>
+    <p style="color:#888;">Chưa có dữ liệu nhập tay. Thêm tiền thuê ở trên.</p>
     <% } else { %>
     <div style="overflow-x:auto;">
       <table class="doc-table">
@@ -180,11 +236,107 @@
         </tbody>
       </table>
     </div>
-    <p style="color:#888;font-size:.82em;margin-top:.5rem;"><strong><%= rows.length %></strong> bản ghi</p>
+    <p style="color:#888;font-size:.82em;margin-top:.5rem;"><strong><%= rows.length %></strong> bản ghi nhập tay</p>
     <% } %>
   </main>
 
+  <!-- Modal chi tiết theo NCC -->
+  <div class="modal-overlay" id="nccModalOverlay">
+    <div class="modal-box">
+      <button type="button" class="modal-close" onclick="closeNccModal()">×</button>
+      <h3 id="nccModalTitle"></h3>
+      <div class="modal-sub" id="nccModalSub"></div>
+      <div style="overflow-x:auto;">
+        <table class="doc-table">
+          <thead>
+            <tr>
+              <th style="width:90px;">Tháng</th>
+              <th style="width:110px;">Ngày HĐ</th>
+              <th>Mã công trình</th>
+              <th>Tên công trình / diễn giải</th>
+              <th style="width:120px;">Số hóa đơn</th>
+              <th style="width:140px;">Số tiền</th>
+            </tr>
+          </thead>
+          <tbody id="nccModalBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
   <script>
+    var NCC_GROUPS = <%- JSON.stringify(groupsNcc || []) %>;
+
+    function openNccModal(maNCC) {
+      var g = NCC_GROUPS.find(function (x) { return x.maNCC === maNCC; });
+      if (!g) return;
+      document.getElementById('nccModalTitle').textContent = g.tenNCC;
+      document.getElementById('nccModalSub').textContent =
+        (g.maSoThueNCC ? 'MST: ' + g.maSoThueNCC + ' · ' : '') +
+        g.rows.length + ' dòng · Tổng: ' + g.tongTien.toLocaleString('vi-VN') + ' đ';
+      var body = document.getElementById('nccModalBody');
+      body.innerHTML = g.rows.map(function (r) {
+        return '<tr>' +
+          '<td style="font-weight:700;color:#1e3a5f;white-space:nowrap;">' + (r.thang || '—') + '</td>' +
+          '<td style="font-size:.85em;">' + (r.ngayHoaDon || '—') + '</td>' +
+          '<td style="font-size:.85em;">' + (r.maCongTrinh || '—') + '</td>' +
+          '<td>' + (r.tenCongTrinh || r.ghiChu || '—') + '</td>' +
+          '<td style="font-size:.85em;">' + (r.soHoaDon || '—') + '</td>' +
+          '<td class="tien">' + (r.soTien || '—') + '</td>' +
+          '</tr>';
+      }).join('');
+      document.getElementById('nccModalOverlay').style.display = 'flex';
+    }
+
+    function closeNccModal() {
+      document.getElementById('nccModalOverlay').style.display = 'none';
+    }
+    document.getElementById('nccModalOverlay').addEventListener('click', function (e) {
+      if (e.target === this) closeNccModal();
+    });
+
+    (function () {
+      var fileInput = document.getElementById('tienThueExcelInput');
+      var btnUpload = document.getElementById('btnUploadExcel');
+      var uploadMsg = document.getElementById('uploadMsg');
+
+      btnUpload.addEventListener('click', function () {
+        var file = fileInput.files && fileInput.files[0];
+        if (!file) {
+          uploadMsg.style.color = '#dc2626';
+          uploadMsg.textContent = 'Vui lòng chọn file Excel trước.';
+          return;
+        }
+        var fd = new FormData();
+        fd.append('file', file);
+        btnUpload.disabled = true;
+        btnUpload.textContent = '⏳ Đang xử lý...';
+        uploadMsg.style.color = '#475569';
+        uploadMsg.textContent = 'Đang đọc file...';
+
+        fetch('/ho-so/tien-thue/nhap-excel', { method: 'POST', body: fd })
+          .then(function (r) { return r.json(); })
+          .then(function (data) {
+            btnUpload.disabled = false;
+            btnUpload.textContent = '⬆️ Tải & nhập';
+            if (!data || !data.success) {
+              uploadMsg.style.color = '#dc2626';
+              uploadMsg.textContent = (data && data.error) || 'Nhập thất bại.';
+              return;
+            }
+            uploadMsg.style.color = '#15803d';
+            uploadMsg.textContent = '✅ Đã thêm ' + data.added + ' dòng, bỏ qua ' + data.skipped + ' dòng trùng (tổng ' + data.total + ' dòng TIỀN THUÊ trong file).';
+            setTimeout(function () { location.reload(); }, 1400);
+          })
+          .catch(function (err) {
+            btnUpload.disabled = false;
+            btnUpload.textContent = '⬆️ Tải & nhập';
+            uploadMsg.style.color = '#dc2626';
+            uploadMsg.textContent = 'Lỗi kết nối: ' + err.message;
+          });
+      });
+    })();
+
     (function () {
       var btnDoc = document.getElementById('btnDocHopDong');
       var linkInput = document.getElementById('tienThueLinkInput');
