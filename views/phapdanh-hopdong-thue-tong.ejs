@@ -16,7 +16,8 @@
     <p class="muted" style="margin-bottom:14px;">
       Tô nền <span style="background:#fdf1e0; padding:1px 6px; border-radius:3px;">cam</span> = hợp đồng hết hạn
       TRONG THÁNG NÀY, <span style="background:#fdeceb; padding:1px 6px; border-radius:3px;">đỏ</span> = hợp đồng ĐÃ
-      HẾT HẠN (so với ngày hệ thống hôm nay). Gian chưa có ngày hết hạn rõ ràng trên sheet (thời hạn ghi dạng tự do,
+      HẾT HẠN (so với ngày hệ thống hôm nay), <span style="background:#eceff3; opacity:.7; padding:1px 6px; border-radius:3px;">xám mờ</span> =
+      hợp đồng ĐÃ CHẤM DỨT trước hạn (tự đánh dấu trong chi tiết gian, ví dụ hủy sớm do lỗ). Gian chưa có ngày hết hạn rõ ràng trên sheet (thời hạn ghi dạng tự do,
       hoặc để trống) sẽ không tô màu -- chị xem cột "Thời hạn thuê" để tự kiểm tra thêm.
       <strong>Bấm vào dòng bất kỳ</strong> để xem chi tiết và chỉnh sửa.
     </p>
@@ -68,7 +69,8 @@
           <tbody>
             <% rows.forEach(function(r) {
               var rowStyle = 'cursor:pointer;';
-              if (r.trangThaiMau === 'het_han') rowStyle += 'background:#fdeceb;';
+              if (r.trangThaiMau === 'cham_dut') rowStyle += 'background:#eceff3; opacity:.6;';
+              else if (r.trangThaiMau === 'het_han') rowStyle += 'background:#fdeceb;';
               else if (r.trangThaiMau === 'het_han_thang_nay') rowStyle += 'background:#fdf1e0;';
             %>
             <tr style="<%= rowStyle %>" onclick="openGianModal('<%= r.id %>')" title="Bấm để xem chi tiết">
@@ -80,6 +82,7 @@
               <td style="text-align:right;"><%= r.tienThueThang ? Number(r.tienThueThang).toLocaleString('vi-VN') + ' đ' : '' %></td>
               <td style="white-space:pre-line;">
                 <%= r.thoiHanThueRaw %>
+                <% if (r.trangThaiMau === 'cham_dut') { %><span class="badge" style="background:#64748b; color:#fff; margin-left:6px;">⛔ Đã chấm dứt HĐ</span><% } %>
                 <% if (r.trangThaiMau === 'het_han') { %><span class="badge badge-chi" style="margin-left:6px;">Đã hết hạn</span><% } %>
                 <% if (r.trangThaiMau === 'het_han_thang_nay') { %><span class="badge badge-warn" style="margin-left:6px;">Hết hạn tháng này</span><% } %>
               </td>
@@ -148,6 +151,10 @@
             <span style="font-size:13px; color:#555;">Thời hạn kết thúc</span>
             <input type="date" id="f_thoiHanKetThuc" name="thoiHanKetThuc" style="width:100%; margin-top:3px;" />
           </label>
+          <label style="grid-column:1/-1; display:flex; align-items:center; gap:8px; background:#f8fafc; border:1px solid #e5e7eb; border-radius:6px; padding:8px 10px;">
+            <input type="checkbox" id="f_daChamDut" style="width:16px; height:16px; margin:0;" />
+            <span style="font-size:13px; color:#334155;">⛔ Đã chấm dứt hợp đồng trước hạn (ví dụ: hủy sớm do lỗ) — hàng vẫn giữ trong danh sách, chỉ tô mờ + cảnh báo</span>
+          </label>
           <label style="grid-column:1/-1;">
             <span style="font-size:13px; color:#555;">Ghi chú</span>
             <textarea id="f_ghiChu" name="ghiChu" rows="3" style="width:100%; margin-top:3px;"></textarea>
@@ -197,6 +204,7 @@
       document.getElementById('f_thoiHanThueRaw').value = row.thoiHanThueRaw || '';
       document.getElementById('f_ghiChu').value = row.ghiChu || '';
       document.getElementById('f_linkHopDong').value = row.linkHopDong || '';
+      document.getElementById('f_daChamDut').checked = !!row.daChamDut;
 
       document.getElementById('saveMsg').style.display = 'none';
       document.getElementById('docHopDongSection').style.display = 'none';
@@ -217,6 +225,7 @@
       ['f_tenNoiBo','f_maCongTrinh','f_mstKhachHang','f_tenKhachHang','f_hinhThucThue',
        'f_tienThueThang','f_thoiHanBatDau','f_thoiHanKetThuc','f_thoiHanThueRaw',
        'f_ghiChu','f_linkHopDong'].forEach(id => { document.getElementById(id).value = ''; });
+      document.getElementById('f_daChamDut').checked = false;
 
       document.getElementById('saveMsg').style.display = 'none';
       document.getElementById('docHopDongSection').style.display = 'none';
@@ -238,6 +247,10 @@
     function saveGian() {
       const form = document.getElementById('gianModalForm');
       const data = new FormData(form);
+      // Checkbox khong co "name" (co tinh, de tu kiem soat gia tri gui len
+      // thay vi phu thuoc hanh vi checkbox mac dinh cua FormData -- checkbox
+      // KHONG tick se bi FormData bo qua hoan toan, khong gui gia tri "false").
+      data.append('daChamDut', document.getElementById('f_daChamDut').checked ? 'true' : 'false');
       const msgEl = document.getElementById('saveMsg');
       msgEl.style.display = 'block';
       msgEl.style.color = '#555';

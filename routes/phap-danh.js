@@ -1575,6 +1575,12 @@ const HOP_DONG_THUE_TONG_SHEETS = [
 // dd/mm/yyyy") -- gian chua ro thoi han (con lai phan lon o MTD MB) se KHONG
 // bi to mau, dung y "khong doan" da noi trong yeu cau.
 function computeTrangThaiThueTong(r, todayStr) {
+  // Nhan, 2026-09-14: "có những hợp đồng mình hủy trước thời hạn do lỗ ...
+  // chấm dứt hợp đồng ... tô nền mờ nhạt ... vẫn để ... cảnh báo chấm dứt" --
+  // gian bi danh dau daChamDut (chu dong huy truoc han, KHONG phai tu nhien
+  // het han) uu tien HON het_han/het_han_thang_nay, hien mo nhat + canh bao
+  // rieng thay vi mau do/cam (khac ly do voi het han thong thuong).
+  if (r.daChamDut) return "cham_dut";
   if (!r.ngayHetHanThue) return "";
   if (r.ngayHetHanThue < todayStr) return "het_han";
   if (r.ngayHetHanThue.slice(0, 7) === todayStr.slice(0, 7)) return "het_han_thang_nay";
@@ -1831,6 +1837,7 @@ module.exports = router;
 // dd/mm/yyyy") -- gian chua ro thoi han (con lai phan lon o MTD MB) se KHONG
 // bi to mau, dung y "khong doan" da noi trong yeu cau.
 function computeTrangThaiThueTong(r, todayStr) {
+    if (r.daChamDut) return "cham_dut";
     if (!r.ngayHetHanThue) return "";
     if (r.ngayHetHanThue < todayStr) return "het_han";
     if (r.ngayHetHanThue.slice(0, 7) === todayStr.slice(0, 7)) return "het_han_thang_nay";
@@ -2122,6 +2129,10 @@ router.post("/phap-danh/hop-dong-thue-gian-tong/:id/cap-nhat", requireAdmin, (re
   if (req.body.thoiHanKetThuc !== undefined) r.ngayHetHanThue = r.thoiHanKetThuc;
   const amt = Number(String(r.tienThueThang||'').replace(/[.,\s]/g,''));
   if (!isNaN(amt)) r.tienThueThang = amt;
+  // Nhan, 2026-09-14: "chấm dứt hợp đồng ... tô nền mờ nhạt ... vẫn để" --
+  // checkbox gui tu client dang chuoi 'true'/'false' (khong phai checkbox
+  // form mac dinh) nen so sanh chuoi, khong dung truthy cua string 'false'.
+  if (req.body.daChamDut !== undefined) r.daChamDut = req.body.daChamDut === 'true';
   save(store);
   res.json({ success: true });
 });
@@ -2158,6 +2169,7 @@ router.post("/phap-danh/hop-dong-thue-gian-tong/them", requireAdmin, (req, res) 
     ghiChu: "",
     linkHopDong: "",
     trangThaiRaw: "",
+    daChamDut: false,
   };
   const fields = ['tenNoiBo','maCongTrinh','mstKhachHang','tenKhachHang','hinhThucThue',
     'tienThueThang','thoiHanBatDau','thoiHanKetThuc','thoiHanThueRaw','ghiChu','linkHopDong'];
@@ -2166,6 +2178,7 @@ router.post("/phap-danh/hop-dong-thue-gian-tong/them", requireAdmin, (req, res) 
   if (req.body.thoiHanKetThuc !== undefined) r.ngayHetHanThue = r.thoiHanKetThuc;
   const amt = Number(String(r.tienThueThang||'').replace(/[.,\s]/g,''));
   r.tienThueThang = isNaN(amt) ? 0 : amt;
+  if (req.body.daChamDut !== undefined) r.daChamDut = req.body.daChamDut === 'true';
 
   store.phap_danh_hop_dong_thue_tong.push(r);
   save(store);
