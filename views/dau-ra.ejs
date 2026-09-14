@@ -3253,10 +3253,11 @@
             const gDisp0 = getGianDisp(dt, maCT, ctData0[maCT]);
             const tienHD0 = parseFloat((hd.tienHD||'0').toString().replace(/[^0-9.-]/g,''))||0;
             const key = maCT+'|'+soHD;
-            if(!invoiceGroups[key]) invoiceGroups[key] = {dt:0, tienHDs:[], dates:[]};
+            if(!invoiceGroups[key]) invoiceGroups[key] = {dt:0, tienHDs:[], dates:[], manuals:[]};
             invoiceGroups[key].dt += gDisp0.dt;
             invoiceGroups[key].tienHDs.push(tienHD0);
             invoiceGroups[key].dates.push(dt);
+            invoiceGroups[key].manuals.push(!!hd._manual);
           });
         });
         // Luyen, 2026-09-10: "nếu xuất hóa đơn này cộng trừ cấn trừ qua lại
@@ -3267,9 +3268,22 @@
         // tiền (không tự chia) thì tổng = đúng số đó (không cộng dồn); chỉ
         // cộng dồn khi các ngày có số tiền KHÁC nhau (đã tự chia theo tỷ lệ,
         // như nút "Map MTT" tự làm).
+        // Nhan, 2026-09-14: BUG -- "Go Trà Vinh HĐ 15710 tổng 240k, autoMap
+        // chia 2 ngày ĐÚNG 120k/120k (2 ngày NH thu bằng nhau), nhưng vì 2 giá
+        // trị tienHD sau khi chia lại TRÙNG NHAU (đều 120k), check "uniq<=1"
+        // ở trên tưởng nhầm là 'nhập tay trùng lặp' nên KHÔNG cộng dồn, lấy
+        // total=120k thay vì 240k -- Chênh sai +60k dù NH/HĐ hiển thị bằng
+        // nhau từng ngày. Chỉ áp dụng heuristic "không cộng dồn" khi MỌI dòng
+        // trong nhóm đều do tay gõ (_manual) -- autoMap (Map MTT) luôn phải
+        // cộng dồn vì đó chắc chắn là các phần chia, dù tình cờ bằng nhau.
         Object.values(invoiceGroups).forEach(g => {
-          const uniq = [...new Set(g.tienHDs.filter(v=>v>0))];
-          g.tienHD = uniq.length <= 1 ? (uniq[0]||0) : g.tienHDs.reduce((s,v)=>s+v,0);
+          const allManual = g.manuals.length > 0 && g.manuals.every(Boolean);
+          if (allManual) {
+            const uniq = [...new Set(g.tienHDs.filter(v=>v>0))];
+            g.tienHD = uniq.length <= 1 ? (uniq[0]||0) : g.tienHDs.reduce((s,v)=>s+v,0);
+          } else {
+            g.tienHD = g.tienHDs.reduce((s,v)=>s+v,0);
+          }
         });
 
         // Helper: render one date block
@@ -3924,17 +3938,26 @@
           const gDisp0 = getVnpayGianDisp(dt, maCT, ctData0[maCT]);
           const tienHD0 = parseFloat((hd.tienHD||'0').toString().replace(/[^0-9.-]/g,''))||0;
           const key = maCT+'|'+soHD;
-          if(!invoiceGroups[key]) invoiceGroups[key] = {dt:0, tienHDs:[], dates:[]};
+          if(!invoiceGroups[key]) invoiceGroups[key] = {dt:0, tienHDs:[], dates:[], manuals:[]};
           invoiceGroups[key].dt += gDisp0.dt;
           invoiceGroups[key].tienHDs.push(tienHD0);
           invoiceGroups[key].dates.push(dt);
+          invoiceGroups[key].manuals.push(!!hd._manual);
         });
       });
       // Xem ghi chú tương ứng ở renderZaloDoiSoat: nếu mọi ngày trong nhóm
       // ghi CÙNG 1 số tiền hóa đơn (không tự chia) thì không cộng dồn nhân đôi.
+      // Nhan, 2026-09-14: chỉ dedupe khi CẢ NHÓM đều do tay gõ (_manual) --
+      // autoMap chia tỷ lệ luôn phải cộng dồn dù các phần tình cờ bằng nhau
+      // (xem ghi chú BUG ở renderZaloDoiSoat).
       Object.values(invoiceGroups).forEach(g => {
-        const uniq = [...new Set(g.tienHDs.filter(v=>v>0))];
-        g.tienHD = uniq.length <= 1 ? (uniq[0]||0) : g.tienHDs.reduce((s,v)=>s+v,0);
+        const allManual = g.manuals.length > 0 && g.manuals.every(Boolean);
+        if (allManual) {
+          const uniq = [...new Set(g.tienHDs.filter(v=>v>0))];
+          g.tienHD = uniq.length <= 1 ? (uniq[0]||0) : g.tienHDs.reduce((s,v)=>s+v,0);
+        } else {
+          g.tienHD = g.tienHDs.reduce((s,v)=>s+v,0);
+        }
       });
 
       const renderDateBlock = date => {
@@ -4448,17 +4471,26 @@
           const gDisp0 = getPayooGianDisp(dt, maCT, ctData0[maCT]);
           const tienHD0 = parseFloat((hd.tienHD||'0').toString().replace(/[^0-9.-]/g,''))||0;
           const key = maCT+'|'+soHD;
-          if(!invoiceGroups[key]) invoiceGroups[key] = {dt:0, tienHDs:[], dates:[]};
+          if(!invoiceGroups[key]) invoiceGroups[key] = {dt:0, tienHDs:[], dates:[], manuals:[]};
           invoiceGroups[key].dt += gDisp0.dt;
           invoiceGroups[key].tienHDs.push(tienHD0);
           invoiceGroups[key].dates.push(dt);
+          invoiceGroups[key].manuals.push(!!hd._manual);
         });
       });
       // Xem ghi chú tương ứng ở renderZaloDoiSoat: nếu mọi ngày trong nhóm
       // ghi CÙNG 1 số tiền hóa đơn (không tự chia) thì không cộng dồn nhân đôi.
+      // Nhan, 2026-09-14: chỉ dedupe khi CẢ NHÓM đều do tay gõ (_manual) --
+      // autoMap chia tỷ lệ luôn phải cộng dồn dù các phần tình cờ bằng nhau
+      // (xem ghi chú BUG ở renderZaloDoiSoat).
       Object.values(invoiceGroups).forEach(g => {
-        const uniq = [...new Set(g.tienHDs.filter(v=>v>0))];
-        g.tienHD = uniq.length <= 1 ? (uniq[0]||0) : g.tienHDs.reduce((s,v)=>s+v,0);
+        const allManual = g.manuals.length > 0 && g.manuals.every(Boolean);
+        if (allManual) {
+          const uniq = [...new Set(g.tienHDs.filter(v=>v>0))];
+          g.tienHD = uniq.length <= 1 ? (uniq[0]||0) : g.tienHDs.reduce((s,v)=>s+v,0);
+        } else {
+          g.tienHD = g.tienHDs.reduce((s,v)=>s+v,0);
+        }
       });
 
       const renderDateBlock = date => {
@@ -5828,15 +5860,28 @@
           const gDisp0 = getVietQrGianDisp(dt+'|'+maCT, ctData0[maCT].amount);
           const tienHD0 = parseFloat((hd.tienHD||'0').toString().replace(/[^0-9.-]/g,''))||0;
           const key = maCT+'|'+soHD;
-          if(!invoiceGroups[key]) invoiceGroups[key] = {dt:0, tienHDs:[], dates:[]};
+          if(!invoiceGroups[key]) invoiceGroups[key] = {dt:0, tienHDs:[], dates:[], manuals:[]};
           invoiceGroups[key].dt += gDisp0.amt;
           invoiceGroups[key].tienHDs.push(tienHD0);
           invoiceGroups[key].dates.push(dt);
+          invoiceGroups[key].manuals.push(!!hd._manual);
         });
       });
+      // Nhan, 2026-09-14: chỉ dedupe (lấy 1 giá trị, không cộng dồn) khi CẢ
+      // NHÓM đều do tay gõ (_manual) -- autoMapMttVietQr chia tỷ lệ theo NH
+      // từng ngày luôn phải CỘNG DỒN để ra đúng tổng hóa đơn, dù các phần chia
+      // tình cờ bằng nhau (vd 240k chia đều 2 ngày = 120k/120k) -- trước đây
+      // "uniq<=1" tưởng nhầm 2 giá trị bằng nhau là "nhập tay trùng lặp" nên
+      // không cộng dồn, khiến Chênh sai (vd Go Trà Vinh báo lệch +60k dù NH
+      // và HĐ hiển thị bằng nhau từng ngày).
       Object.values(invoiceGroups).forEach(g => {
-        const uniq = [...new Set(g.tienHDs.filter(v=>v>0))];
-        g.tienHD = uniq.length <= 1 ? (uniq[0]||0) : g.tienHDs.reduce((s,v)=>s+v,0);
+        const allManual = g.manuals.length > 0 && g.manuals.every(Boolean);
+        if (allManual) {
+          const uniq = [...new Set(g.tienHDs.filter(v=>v>0))];
+          g.tienHD = uniq.length <= 1 ? (uniq[0]||0) : g.tienHDs.reduce((s,v)=>s+v,0);
+        } else {
+          g.tienHD = g.tienHDs.reduce((s,v)=>s+v,0);
+        }
       });
 
       const renderDateBlock = date => {
