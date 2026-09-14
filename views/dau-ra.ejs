@@ -2602,12 +2602,33 @@
 
     function closeMttCtMapModal() { document.getElementById('mttCtMapModal').classList.remove('open'); }
 
+    // Nhan, 2026-09-14: "GIGAMALL PVD PHCM tôi map xong rồi nè ... tôi map
+    // đúng rồi mà" -- map Mã điểm → Mã CT xong (đúng) nhưng bảng Đối soát
+    // ngày Viet QR KHÔNG tự cập nhật, vì "🧾 Map MTT → Viet QR" là 1 nút
+    // BẤM TAY riêng ở từng ngân hàng, không tự chạy lại khi lưu Map CT. Chị
+    // phải nhớ quay lại từng tab ngân hàng bấm lại nút đó thì hóa đơn mới
+    // "chảy" vào bảng đối soát -- dễ quên/nhầm là đã xong. Sửa: sau khi lưu
+    // Map CT (dòng lẻ hoặc lưu tất cả), TỰ ĐỘNG chạy lại autoMapMttVietQr()
+    // cho MỌI ngân hàng Viet QR của công ty đang chọn (silent = không hiện
+    // alert từng cái, chỉ báo 1 dòng gộp), để không phải nhớ bấm lại thủ công.
+    function resyncAllVietQrAutoMap() {
+      let totalFilled = 0, banksRun = 0;
+      VIETQR_BANKS.forEach(bank => {
+        try {
+          const r = autoMapMttVietQr(bank, true);
+          if (r) { banksRun++; totalFilled += r.filled; }
+        } catch(e) { /* khong de 1 ngan hang loi lam hong ca luot dong bo */ }
+      });
+      return { banksRun, totalFilled };
+    }
+
     function saveMttCtMapRow(input) {
       const md = input.dataset.md;
       const kh = input.dataset.kh || _mttActive;
       if (md && kh) { if (!_mttCtMap[kh]) _mttCtMap[kh] = {}; _mttCtMap[kh][md] = input.value.trim(); }
       try { lsSet(LS_MTT_CT_MAP, JSON.stringify(_mttCtMap)); } catch(e) {}
       renderMttTable();
+      resyncAllVietQrAutoMap();
     }
 
     function saveMttCtMap(closeModal) {
@@ -2617,7 +2638,9 @@
       });
       try { lsSet(LS_MTT_CT_MAP, JSON.stringify(_mttCtMap)); } catch(e) {}
       renderMttTable();
+      const { banksRun, totalFilled } = resyncAllVietQrAutoMap();
       if (closeModal) closeMttCtMapModal();
+      if (banksRun) alert(`✅ Đã lưu Map CT và tự đồng bộ ${banksRun} ngân hàng Viet QR (${totalFilled} ô hóa đơn được điền/cập nhật).`);
     }
 
     function exportMttCtMap() {
@@ -6467,10 +6490,15 @@
     // gross theo _vietqrTxn (đã áp dụng "ngân hàng làm chuẩn") và lọc dịch
     // vụ thu hộ theo "vietqr"/tên ngân hàng — CHƯA xác nhận chính xác text
     // MTT dùng cho Viet QR, cần Luyen kiểm tra lại nếu không ra kết quả.
-    function autoMapMttVietQr(bank) {
+    // Nhan, 2026-09-14: them tham so silent (mac dinh false, GIU NGUYEN hanh
+    // vi cu khi bam nut tay tung ngan hang) -- khi silent=true (goi tu
+    // resyncAllVietQrAutoMap() sau khi luu Map CT) se KHONG hien alert cho
+    // tung ngan hang rieng le, va tra ve {filled, skipped} de goi noi gop
+    // lai thanh 1 thong bao duy nhat (thay vi 4 popup alert lien tiep).
+    function autoMapMttVietQr(bank, silent) {
       const khKey = COMPANY === 'kh_cu' ? 'cu' : 'moi';
       const mttRows = khKey === 'cu' ? _mttCu : _mttMoi;
-      if (!mttRows.length) { alert('Chưa có dữ liệu MTT. Vui lòng tải file MTT trước.'); return; }
+      if (!mttRows.length) { if(!silent) alert('Chưa có dữ liệu MTT. Vui lòng tải file MTT trước.'); return null; }
       // Luyen, 2026-09-11: "chỗ hóa đơn á có chỗ dịch vụ thu hộ là 7020 là
       // của 7020 á" -- xac nhan tren du lieu that: MTT ghi "Dịch vụ thu hộ"
       // dang "POSH+JP MB (7020) 29,30,31" (khong ghi ten/ma ngan hang day
@@ -6513,7 +6541,7 @@
         return (low.includes('vietqr') || low.includes('viet qr')) &&
           !Object.entries(VIETQR_TAG_PATTERN).some(([b,p]) => b!==bank && p.test(s));
       });
-      if (!vqMtt.length) { alert('Không tìm thấy hóa đơn MTT nào khớp Viet QR / '+VIETQR_BANK_LABEL[bank]+'.\nKiểm tra lại cột "Dịch vụ thu hộ" trong MTT (có thể chưa đúng từ khóa lọc, báo lại để chỉnh).'); return; }
+      if (!vqMtt.length) { if(!silent) alert('Không tìm thấy hóa đơn MTT nào khớp Viet QR / '+VIETQR_BANK_LABEL[bank]+'.\nKiểm tra lại cột "Dịch vụ thu hộ" trong MTT (có thể chưa đúng từ khóa lọc, báo lại để chỉnh).'); return null; }
 
       const maDiemToMaCT = _mttCtMap[khKey] || {};
       const parseDays = s => { const m = /(\d+(?:\s*,\s*\d+)*)\s*$/.exec(s||''); if(!m) return []; return m[1].split(',').map(x=>parseInt(x.trim(),10)).filter(n=>!isNaN(n)); };
@@ -6564,7 +6592,8 @@
 
       try { lsSet(lsVietqrHDKey(bank), JSON.stringify(_vietqrHD[bank])); } catch(e){}
       renderVietQrDoiSoat(bank);
-      alert(`✅ Map xong: ${filled} ô hóa đơn (tự chia tỷ lệ / cộng dồn nếu gộp nhiều ngày) · Bỏ qua ${skipped} ô đã tự nhập tay`);
+      if (!silent) alert(`✅ Map xong: ${filled} ô hóa đơn (tự chia tỷ lệ / cộng dồn nếu gộp nhiều ngày) · Bỏ qua ${skipped} ô đã tự nhập tay`);
+      return { filled, skipped };
     }
 
     // Init Zalo Pay + VNPay + Payoo + Viet QR
