@@ -1603,6 +1603,25 @@ function monthOverlapsThueTong(r, thang) {
   return bd <= monthEnd && hh >= monthStart;
 }
 
+// Nhan, 2026-09-14: "cho tôi cột số thứ tự ... bộ lọc ở trên là còn hoạt
+// động hay lọc tên khách hàng" -- them 2 bo loc moi: q (tim theo Ten khach
+// hang, khong phan biet hoa/thuong) va trangThai (Tat ca / Con hoat dong /
+// Da het han / Da cham dut). Ap dung SAU khi tinh trangThaiMau (trangThai
+// phu thuoc gia tri nay), va ap dung DONG BO len ca counts (giong ly do da
+// ghi chu thich o duoi) de so tren nut chon sheet luon khop voi bang ben
+// duoi dang hien.
+function applyGianExtraFilters(rows, q, trangThai) {
+  let out = rows;
+  if (q) {
+    const qLow = q.trim().toLowerCase();
+    if (qLow) out = out.filter((r) => (r.tenKhachHang || "").toLowerCase().includes(qLow));
+  }
+  if (trangThai === "hoat_dong") out = out.filter((r) => !r.trangThaiMau);
+  else if (trangThai === "het_han") out = out.filter((r) => r.trangThaiMau === "het_han" || r.trangThaiMau === "het_han_thang_nay");
+  else if (trangThai === "cham_dut") out = out.filter((r) => r.trangThaiMau === "cham_dut");
+  return out;
+}
+
 router.get("/phap-danh/hop-dong-thue-gian-tong", (req, res) => {
   const store = load();
   ensureShape(store);
@@ -1613,6 +1632,8 @@ router.get("/phap-danh/hop-dong-thue-gian-tong", (req, res) => {
   const sheetInfo = HOP_DONG_THUE_TONG_SHEETS.find((s) => s.key === sheetParam);
   const todayStr = new Date().toISOString().slice(0, 10);
   const thangFilter = resolveThangFilter(req);
+  const qFilter = (req.query.q || "").trim();
+  const trangThaiFilter = ["hoat_dong", "het_han", "cham_dut"].includes(req.query.trangThai) ? req.query.trangThai : "";
 
   let rows = store.phap_danh_hop_dong_thue_tong.filter(
     (r) => r.sheetKey === sheetInfo.storeKey && (r.congTy === activeCompany || r.congTy === "ca_2")
@@ -1621,6 +1642,7 @@ router.get("/phap-danh/hop-dong-thue-gian-tong", (req, res) => {
   rows.forEach((r) => {
     r.trangThaiMau = computeTrangThaiThueTong(r, todayStr);
   });
+  rows = applyGianExtraFilters(rows, qFilter, trangThaiFilter);
 
   // Nhan, 2026-08-13 (lan 3): "có 5 mà sao đếm ra 6 vậy" -- truoc do counts
   // tren cac nut chon sheet la TONG so gian (khong loc theo thang) trong khi
@@ -1633,6 +1655,8 @@ router.get("/phap-danh/hop-dong-thue-gian-tong", (req, res) => {
       (r) => r.sheetKey === s.storeKey && (r.congTy === activeCompany || r.congTy === "ca_2")
     );
     if (thangFilter) sheetRows = sheetRows.filter((r) => monthOverlapsThueTong(r, thangFilter));
+    sheetRows.forEach((r) => { r.trangThaiMau = computeTrangThaiThueTong(r, todayStr); });
+    sheetRows = applyGianExtraFilters(sheetRows, qFilter, trangThaiFilter);
     counts[s.key] = sheetRows.length;
   });
 
@@ -1643,6 +1667,8 @@ router.get("/phap-danh/hop-dong-thue-gian-tong", (req, res) => {
     sheetParam,
     counts,
     thangFilter,
+    qFilter,
+    trangThaiFilter,
     error: req.query.error || null,
     success: req.query.success || null,
   });

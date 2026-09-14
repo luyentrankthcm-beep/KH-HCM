@@ -47,14 +47,29 @@
         <label style="font-size:13px;">Xem hợp đồng còn hiệu lực trong tháng
           <input type="month" name="thang" value="<%= thangFilter %>" style="margin-left:6px;" />
         </label>
-        <button type="submit" class="btn btn-secondary">Lọc theo tháng</button>
+        <label style="font-size:13px;">Trạng thái
+          <select name="trangThai" style="margin-left:6px;">
+            <option value="" <%= trangThaiFilter === '' ? 'selected' : '' %>>Tất cả</option>
+            <option value="hoat_dong" <%= trangThaiFilter === 'hoat_dong' ? 'selected' : '' %>>Còn hoạt động</option>
+            <option value="het_han" <%= trangThaiFilter === 'het_han' ? 'selected' : '' %>>Đã hết hạn</option>
+            <option value="cham_dut" <%= trangThaiFilter === 'cham_dut' ? 'selected' : '' %>>Đã chấm dứt</option>
+          </select>
+        </label>
+        <label style="font-size:13px;">Tên khách hàng
+          <input type="text" name="q" value="<%= qFilter %>" placeholder="Nhập tên khách hàng..." style="margin-left:6px; width:220px;" />
+        </label>
+        <button type="submit" class="btn btn-secondary">Lọc</button>
         <a class="link-btn" href="/phap-danh/hop-dong-thue-gian-tong?sheet=<%= sheetParam %>&thang=all">Xem tất cả các tháng</a>
+        <% if (qFilter || trangThaiFilter) { %>
+          <a class="link-btn" href="/phap-danh/hop-dong-thue-gian-tong?sheet=<%= sheetParam %>&thang=<%= thangFilter || 'all' %>">✕ Xóa lọc trạng thái/tên KH</a>
+        <% } %>
       </form>
 
       <div class="table-scroll">
         <table class="table">
           <thead>
             <tr>
+              <th>STT</th>
               <th>Tên nội bộ</th>
               <th>Mã công trình</th>
               <th>MST khách hàng</th>
@@ -67,13 +82,14 @@
             </tr>
           </thead>
           <tbody>
-            <% rows.forEach(function(r) {
+            <% rows.forEach(function(r, idx) {
               var rowStyle = 'cursor:pointer;';
               if (r.trangThaiMau === 'cham_dut') rowStyle += 'background:#eceff3; opacity:.6;';
               else if (r.trangThaiMau === 'het_han') rowStyle += 'background:#fdeceb;';
               else if (r.trangThaiMau === 'het_han_thang_nay') rowStyle += 'background:#fdf1e0;';
             %>
             <tr style="<%= rowStyle %>" onclick="openGianModal('<%= r.id %>')" title="Bấm để xem chi tiết">
+              <td><%= idx + 1 %></td>
               <td><%= r.tenNoiBo || '(không có)' %></td>
               <td><%= r.maCongTrinh || '(không có)' %></td>
               <td><%= r.mstKhachHang %></td>
@@ -99,7 +115,7 @@
             </tr>
             <% }) %>
             <% if (rows.length === 0) { %>
-            <tr><td colspan="9" class="muted">Chưa có gian nào ở tab này cho công ty đang chọn.</td></tr>
+            <tr><td colspan="10" class="muted">Không có gian nào khớp bộ lọc hiện tại.</td></tr>
             <% } %>
           </tbody>
         </table>
