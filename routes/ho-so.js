@@ -843,7 +843,12 @@ router.get("/ho-so/tien-thue", (req, res) => {
     }
     const g = groupMap.get(r.maNCC);
     g.rows.push(r);
-    g.tongTien += Number(String(r.soTien || "").replace(/[.,\s]/g, "")) || 0;
+    // Uu tien tong cong (da gom thue GTGT) neu co (du lieu import moi), fallback
+    // ve so tien truoc thue cho du lieu cu chua co truong nay.
+    const tongRow = r.soTienTongRaw !== undefined
+      ? r.soTienTongRaw
+      : (r.soTienRaw !== undefined ? r.soTienRaw : Number(String(r.soTien || "").replace(/[.,\s]/g, "")) || 0);
+    g.tongTien += Number(tongRow) || 0;
   });
   const groupsNcc = Array.from(groupMap.values()).sort((a, b) =>
     a.tenNCC.localeCompare(b.tenNCC)
@@ -912,7 +917,7 @@ router.post("/ho-so/tien-thue/nhap-excel", requireAdmin, uploadMem.single("file"
     const idx = {};
     header.forEach((h, i) => { idx[String(h).trim()] = i; });
 
-    const need = ["Ngày hóa đơn", "Số hóa đơn", "Mã nhà cung cấp", "Mã hàng", "Giá trị mua", "Mã công trình", "Tên công trình", "Số chứng từ"];
+    const need = ["Ngày hóa đơn", "Số hóa đơn", "Mã nhà cung cấp", "Mã hàng", "Tên hàng", "Giá trị mua", "Thuế GTGT", "Mã công trình", "Tên công trình", "Số chứng từ"];
     const missing = need.filter((k) => idx[k] === undefined);
     if (missing.length) {
       return res.status(400).json({ error: "File thiếu cột: " + missing.join(", ") });
@@ -957,6 +962,15 @@ router.post("/ho-so/tien-thue/nhap-excel", requireAdmin, uploadMem.single("file"
       const ngayHoaDon = excelSerialToDateStr(r[idx["Ngày hóa đơn"]]) ||
         (idx["Ngày chứng từ"] !== undefined ? excelSerialToDateStr(r[idx["Ngày chứng từ"]]) : "");
       const soTien = giaTriMua ? giaTriMua.toLocaleString("vi-VN") : "";
+      // Nhan, 2026-09-14: "cho cai dien giai... so tien truoc thue, so tien
+      // thue va so tien tong" -- "Ten hang" trong file thuong la "TIEN THUE"
+      // (giu nguyen lam fallback), nhung doi khi co dien giai chi tiet hon
+      // (vd "DOANH THU PHAN CHIA... KY 07.2026...") thi lay dung dien giai do.
+      // Tong = Gia tri mua (truoc thue) + Thue GTGT.
+      const dienGiaiRaw = String(r[idx["Tên hàng"]] || "").trim();
+      const dienGiai = dienGiaiRaw || "Tiền thuê";
+      const thueGtgt = Number(r[idx["Thuế GTGT"]]) || 0;
+      const tongCong = giaTriMua + thueGtgt;
       let thang = "";
       const dm = ngayHoaDon.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
       if (dm) thang = dm[2] + "/" + dm[3];
@@ -968,10 +982,15 @@ router.post("/ho-so/tien-thue/nhap-excel", requireAdmin, uploadMem.single("file"
         gian: tenCongTrinh || maCongTrinh || "",
         maCongTrinh,
         tenCongTrinh,
+        dienGiai,
         soHoaDon,
         soChungTu,
         soTien,
         soTienRaw: giaTriMua,
+        thueGtgt: thueGtgt ? thueGtgt.toLocaleString("vi-VN") : "",
+        thueGtgtRaw: thueGtgt,
+        soTienTong: tongCong ? tongCong.toLocaleString("vi-VN") : "",
+        soTienTongRaw: tongCong,
         maNCC: maNCCRaw,
         tenNCC,
         maSoThueNCC,

@@ -175,7 +175,7 @@
               <th>Nhà cung cấp</th>
               <th style="width:150px;">Mã số thuế</th>
               <th style="width:110px;">Số dòng</th>
-              <th style="width:160px;">Tổng tiền thuê</th>
+              <th style="width:170px;">Tổng cộng (gồm thuế)</th>
             </tr>
           </thead>
           <tbody>
@@ -250,12 +250,14 @@
         <table class="doc-table">
           <thead>
             <tr>
-              <th style="width:90px;">Tháng</th>
-              <th style="width:110px;">Ngày HĐ</th>
+              <th style="width:85px;">Tháng</th>
+              <th style="width:105px;">Ngày HĐ</th>
               <th>Mã công trình</th>
-              <th>Tên công trình / diễn giải</th>
-              <th style="width:120px;">Số hóa đơn</th>
-              <th style="width:140px;">Số tiền</th>
+              <th>Diễn giải</th>
+              <th style="width:110px;">Số hóa đơn</th>
+              <th style="width:130px;">Trước thuế</th>
+              <th style="width:110px;">Thuế GTGT</th>
+              <th style="width:140px;">Tổng cộng</th>
             </tr>
           </thead>
           <tbody id="nccModalBody"></tbody>
@@ -273,16 +275,18 @@
       document.getElementById('nccModalTitle').textContent = g.tenNCC;
       document.getElementById('nccModalSub').textContent =
         (g.maSoThueNCC ? 'MST: ' + g.maSoThueNCC + ' · ' : '') +
-        g.rows.length + ' dòng · Tổng: ' + g.tongTien.toLocaleString('vi-VN') + ' đ';
+        g.rows.length + ' dòng · Tổng cộng (đã gồm thuế): ' + g.tongTien.toLocaleString('vi-VN') + ' đ';
       var body = document.getElementById('nccModalBody');
       body.innerHTML = g.rows.map(function (r) {
         return '<tr>' +
           '<td style="font-weight:700;color:#1e3a5f;white-space:nowrap;">' + (r.thang || '—') + '</td>' +
           '<td style="font-size:.85em;">' + (r.ngayHoaDon || '—') + '</td>' +
           '<td style="font-size:.85em;">' + (r.maCongTrinh || '—') + '</td>' +
-          '<td>' + (r.tenCongTrinh || r.ghiChu || '—') + '</td>' +
+          '<td>' + (r.dienGiai || r.tenCongTrinh || r.ghiChu || '—') + '</td>' +
           '<td style="font-size:.85em;">' + (r.soHoaDon || '—') + '</td>' +
           '<td class="tien">' + (r.soTien || '—') + '</td>' +
+          '<td style="font-size:.85em;color:#b45309;">' + (r.thueGtgt || '—') + '</td>' +
+          '<td class="tien" style="font-weight:700;">' + (r.soTienTong || r.soTien || '—') + '</td>' +
           '</tr>';
       }).join('');
       document.getElementById('nccModalOverlay').style.display = 'flex';
