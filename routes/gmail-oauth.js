@@ -73,4 +73,27 @@ router.get("/gmail/callback", requireAdmin, async (req, res) => {
   }
 });
 
+// Nhan, 2026-09-15: "toi lien ket voi 2 gg drive lan a" -- endpoint tam de
+// kiem tra CHINH XAC tai khoan Google nao dang duoc he thong dung (chi 1 tai
+// khoan duy nhat, xem ghi chu dau file utils/gmailApi.js), giup phan biet
+// voi cac tai khoan khac ma Nhan co the da chia se file nham.
+router.get("/gmail/whoami", requireAdmin, async (req, res) => {
+  try {
+    const store = load();
+    const token = await gmailApi.getValidAccessToken(store);
+    save(store);
+    // Dung Gmail API "users/me/profile" (scope gmail.readonly da co san) thay
+    // vi userinfo endpoint (can them scope "email"/"openid" chua xin) de lay
+    // dia chi email cua tai khoan dang ket noi.
+    const resp = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/profile", {
+      headers: { Authorization: "Bearer " + token },
+    });
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(JSON.stringify(data));
+    res.json({ success: true, email: data.emailAddress });
+  } catch (e) {
+    res.json({ success: false, error: e.message });
+  }
+});
+
 module.exports = router;
