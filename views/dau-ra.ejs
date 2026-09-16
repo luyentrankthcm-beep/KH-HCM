@@ -2649,8 +2649,23 @@
       const label   = khKey === 'cu' ? '989' : '705';
       const khMap   = _mttCtMap[khKey] || {};
       const all = [...new Set(srcRows.map(r => r.maDiem).filter(Boolean))].sort();
-      const aoa = [['Mã điểm HT Misa', 'KH', 'Mã công trình']];
-      all.forEach(md => aoa.push([md, label, khMap[md] || '']));
+      // Nhan, 2026-09-16: "note thêm chỗ dịch vụ là gì đi, với lại CSE á cái
+      // nào có chữ đó của dịch vụ nào thì thêm vô" -- 1 Mã điểm HT Misa (kể
+      // cả loại có hậu tố "- CSE") có thể xuất hiện ở NHIỀU dịch vụ khác
+      // nhau (Momo, Zalo Mini App...) và mỗi dịch vụ có thể cần map về mã
+      // công trình KHÁC NHAU (vd AEON BÌNH DƯƠNG qua Momo -> mã không chia
+      // sẻ, qua Zalo -> mã chia sẻ) -- gom danh sách dịch vụ xuất hiện cho
+      // từng mã điểm để chị đối chiếu khi cập nhật mã. Cột "Dịch vụ" để CUỐI
+      // bảng (không chen giữa) để không phá vị trí cột 0/2 mà importMttCtMap
+      // đang đọc theo index cố định.
+      const dichVuByMaDiem = {};
+      srcRows.forEach(r => {
+        if (!r.maDiem) return;
+        if (!dichVuByMaDiem[r.maDiem]) dichVuByMaDiem[r.maDiem] = new Set();
+        if (r.dichVu) dichVuByMaDiem[r.maDiem].add(r.dichVu);
+      });
+      const aoa = [['Mã điểm HT Misa', 'KH', 'Mã công trình', 'Dịch vụ']];
+      all.forEach(md => aoa.push([md, label, khMap[md] || '', [...(dichVuByMaDiem[md] || [])].sort().join(', ')]));
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), `Map CT ${label}`);
       XLSX.writeFile(wb, `MTT_CT_Map_${label}.xlsx`);
