@@ -7,6 +7,8 @@ const multer = require("multer");
 const XLSX = require("xlsx");
 const { load, save, nextId } = require("../store");
 const { requireLogin, requireAdmin, requireDataEntry } = require("../middleware/auth");
+const { normText } = require("../utils/momoReconcile");
+const { applyRenameBatch } = require("../utils/renameMaCongTrinh");
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
@@ -302,6 +304,90 @@ router.post("/danh-muc/:slug/xoa-het", requireAdmin, (req, res) => {
   const label = company === "kh_moi" ? "KH Mới" : "KH Cũ";
   const deleted = before - store[storeKey].length;
   res.redirect(`/danh-muc/${req.params.slug}?company=${company}&success=` + encodeURIComponent(`[${label}] Đã xóa ${deleted} mục từ Excel.`));
+});
+
+// Nhan, 2026-09-16: "các mã công trình bị thay đổi hết rồi ... cho tôi cái
+// xuất xuống ... thêm nút cập nhật mã công trình" -- GET tai file mau (da
+// dien san Ma cong trinh CU + Ten hien tai) de Nhan dien cot "Ma cong trinh
+// MOI" roi tai len lai o route ben duoi.
+router.get("/danh-muc/ma-cong-trinh/mau-doi-ma", requireLogin, (req, res) => {
+  const page = PAGES["ma-cong-trinh"];
+  const company = req.query.company === "kh_moi" ? "kh_moi" : "kh_cu";
+  const storeKey = getStoreKey(page, company);
+  const store = load();
+  ensureList(store, storeKey);
+  const rows = store[storeKey];
+
+  const aoa = [["STT", "Mã công trình (cũ)", "Tên công trình", "Mã công trình mới (điền vào đây)"]];
+  rows.forEach((r, i) => aoa.push([i + 1, r.ma, r.ten || "", ""]));
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws["!cols"] = [{ wch: 6 }, { wch: 26 }, { wch: 36 }, { wch: 30 }];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Doi ma cong trinh");
+  const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
+  const label = company === "kh_moi" ? "KH_Moi" : "KH_Cu";
+  res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+  res.setHeader("Content-Disposition", `attachment; filename="Mau_doi_ma_cong_trinh_${label}.xlsx"`);
+  res.send(buf);
+});
+
+// POST /danh-muc/ma-cong-trinh/doi-ma -- doc file da dien cot "Ma moi", doi
+// ma o Danh muc NAY va CASCADE sang tat ca noi khac dang luu maCongTrinh
+// (xem utils/renameMaCongTrinh.js). Thao tac rui ro cao (sua nhieu bang du
+// lieu cung luc) nen yeu cau quyen Admin, giong nhu xoa-het.
+router.post("/danh-muc/ma-cong-trinh/doi-ma", requireAdmin, upload.single("file"), (req, res) => {
+  const company = req.body.company === "kh_moi" ? "kh_moi" : "kh_cu";
+  const redirectBase = `/danh-muc/ma-cong-trinh?company=${company}`;
+  if (!req.file) {
+    return res.redirect(redirectBase + "&error=" + encodeURIComponent("Chưa chọn file."));
+  }
+  let mappings;
+  try {
+    const wb = XLSX.read(req.file.buffer, { type: "buffer" });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const aoa = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
+
+    let headerRowIdx = -1, oldCol = -1, newCol = -1;
+    for (let r = 0; r < Math.min(aoa.length, 8); r++) {
+      const row = aoa[r] || [];
+      let oc = -1, nc = -1;
+      row.forEach((v, c) => {
+        const s = normText(String(v || ""));
+        if (!s.includes("ma cong trinh")) return;
+        if (s.includes("moi")) nc = c;
+        else oc = c;
+      });
+      if (oc !== -1 && nc !== -1) { headerRowIdx = r; oldCol = oc; newCol = nc; break; }
+    }
+    if (headerRowIdx < 0) { oldCol = 1; newCol = 3; headerRowIdx = 0; } // fallback: dung dung format file mau
+
+    mappings = [];
+    for (let i = headerRowIdx + 1; i < aoa.length; i++) {
+      const row = aoa[i] || [];
+      const oldCode = String(row[oldCol] || "").trim();
+      const newCode = String(row[newCol] || "").trim();
+      if (!oldCode || !newCode) continue;
+      mappings.push({ oldCode, newCode });
+    }
+  } catch (e) {
+    return res.redirect(redirectBase + "&error=" + encodeURIComponent("Lỗi đọc file Excel: " + e.message));
+  }
+  if (mappings.length === 0) {
+    return res.redirect(redirectBase + "&error=" + encodeURIComponent("Không có dòng nào điền mã công trình mới trong file."));
+  }
+
+  const store = load();
+  const result = applyRenameBatch(store, company, mappings);
+  save(store);
+
+  const label = company === "kh_moi" ? "KH Mới" : "KH Cũ";
+  const storesTouched = Object.keys(result.totalCounts).length;
+  let msg = `[${label}] Đã đổi ${result.applied.length}/${mappings.length} mã công trình, cập nhật ${storesTouched} bảng dữ liệu (tổng ${Object.values(result.totalCounts).reduce((s, v) => s + v, 0)} lượt sửa).`;
+  if (result.skipped.length) msg += ` Bỏ qua ${result.skipped.length} dòng (${result.skipped.slice(0, 2).join(" ")}${result.skipped.length > 2 ? "..." : ""}).`;
+  if (result.warnings.length) msg += ` Có ${result.warnings.length} cảnh báo trùng mã (${result.warnings.slice(0, 2).join(" ")}${result.warnings.length > 2 ? "..." : ""}).`;
+  msg += ` Lưu ý: các bảng đối soát Zalo/VNPay/Payoo/VietQR đã lưu tay trước đó trên trang Đầu Ra (lưu trong trình duyệt) KHÔNG tự đổi được -- cần map/lưu tay lại nếu vẫn thấy mã cũ.`;
+
+  res.redirect(redirectBase + "&success=" + encodeURIComponent(msg));
 });
 
 module.exports = router;

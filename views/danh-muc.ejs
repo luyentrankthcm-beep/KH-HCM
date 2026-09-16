@@ -55,6 +55,35 @@
       <% } %>
     </section>
 
+    <% if (slug === 'ma-cong-trinh') { %>
+    <!-- Cap nhat (doi) ma cong trinh hang loat -->
+    <section class="panel" style="margin-bottom:16px;">
+      <div class="panel-head">
+        <h2>&#128260; Cập nhật mã công trình</h2>
+        <button type="button" class="btn btn-secondary" onclick="toggleDoiMaPanel()">Cập nhật mã công trình</button>
+      </div>
+      <div id="doiMaPanel" style="display:none;padding-top:10px;">
+        <ol style="font-size:13px;line-height:1.8;margin:0 0 12px 18px;color:var(--muted);">
+          <li>Tải file mẫu bên dưới — đã có sẵn <strong>Mã công trình (cũ)</strong> + Tên hiện tại của <strong><%= company === 'kh_moi' ? 'KH Mới' : 'KH Cũ' %></strong>.</li>
+          <li>Điền cột <strong>"Mã công trình mới"</strong> cho những dòng cần đổi (bỏ trống dòng không đổi).</li>
+          <li>Tải file đã điền lên — hệ thống tự đổi mã ở Danh mục này VÀ ở tất cả nơi khác đang lưu mã cũ (Hợp đồng thuê, Doanh thu chia sẻ theo điểm, Map cửa hàng, đối soát Momo/Zalo/VNPay/Payoo/VietQR...), giữ nguyên tên công trình.</li>
+        </ol>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px;">
+          <a class="btn btn-secondary" href="/danh-muc/ma-cong-trinh/mau-doi-ma?company=<%= company %>">&#11015;&#65039; 1. Tải file mẫu (<%= rows.length %> mục)</a>
+          <form method="POST" action="/danh-muc/ma-cong-trinh/doi-ma" enctype="multipart/form-data" style="display:flex;gap:10px;align-items:center;"
+            onsubmit="return confirm('Xác nhận đổi mã công trình theo file đã tải lên?\n\nThao tác này sẽ cập nhật dữ liệu ở nhiều nơi trong hệ thống (hợp đồng thuê, doanh thu chia sẻ, đối soát...) và không thể tự động hoàn tác.')">
+            <input type="hidden" name="company" value="<%= company %>" />
+            <input type="file" name="file" accept=".xlsx,.xls" required />
+            <button type="submit" class="btn btn-primary">2. Tải lên &amp; Đổi mã</button>
+          </form>
+        </div>
+        <div style="font-size:12px;color:#8a6d00;background:#fff8e1;border-radius:6px;padding:10px 12px;">
+          &#9888;&#65039; Có 2 chỗ hệ thống <strong>không tự đổi được</strong>: (1) các bảng đối soát Zalo/VNPay/Payoo/VietQR trên trang <strong>Đầu Ra</strong> đã map/lưu tay trước đó — lưu trong trình duyệt của bạn, không phải trên server; (2) map "Mã CT theo điểm" ở tab MTT trang Đầu Ra. Nếu sau khi đổi mã mà các trang đó vẫn hiện mã cũ, cần vào lại map/lưu tay theo mã mới.
+        </div>
+      </div>
+    </section>
+    <% } %>
+
     <!-- Form them moi -->
     <section class="panel" style="margin-bottom:16px;">
       <div class="panel-head"><h2>+ Thêm mới</h2></div>
@@ -154,6 +183,10 @@
   </main>
 
   <script>
+    function toggleDoiMaPanel() {
+      var el = document.getElementById('doiMaPanel');
+      if (el) el.style.display = (el.style.display === 'none' || !el.style.display) ? 'block' : 'none';
+    }
     function openEditRow(id, ma, ten, ghiChu) {
       // Dong tat ca hang sua dang mo
       document.querySelectorAll('[id^="editRow_"]').forEach(function(r) { r.style.display = 'none'; });
