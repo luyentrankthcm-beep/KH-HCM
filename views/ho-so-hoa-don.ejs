@@ -422,7 +422,8 @@
       var g = GROUPS[gi];
       var val = function(id) { var el = document.getElementById(id + gi); return el ? el.value : ''; };
       var body = {
-        tenNCC: g.tenDayDuNCC || g.nccShort,
+        tenNCC: g.nccShort,
+        tenDayDuNCC: g.tenDayDuNCC || '',
         daiDien: val('themHdDaiDien'),
         chucVu: val('themHdChucVu'),
         soHopDong: val('themHdSoHD'),

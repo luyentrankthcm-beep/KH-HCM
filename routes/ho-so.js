@@ -291,8 +291,13 @@ router.get("/ho-so/hoa-don-ncc", (req, res) => {
     g.hopDong = hdNccList.filter((hd) => {
       const hdShort = normForMatch(hd.tenNCC || "");
       const hdFull = normForMatch(hd.tenDayDuNCC || "");
-      return (shortNorm.length >= 3 && (hdShort.includes(shortNorm) || shortNorm.includes(hdShort))) ||
-             (fullNorm.length >= 5 && (hdFull.includes(fullNorm) || fullNorm.includes(hdFull)));
+      // Nhan, 2026-09-17: bug cu -- "".includes(x) luon false nhung x.includes("")
+      // luon TRUE, nen hop dong thieu tenDayDuNCC/tenNCC (vd hop dong vua them
+      // thu cong qua "+ Thêm hợp đồng NCC") se KHOP NHAM voi MOI NCC khac co
+      // fullNorm/shortNorm >= do dai toi thieu. Them dieu kien do dai > 0 cho
+      // ca 2 ve de chi khop khi CA HAI ben deu co ten thuc su.
+      return (shortNorm.length >= 3 && hdShort.length > 0 && (hdShort.includes(shortNorm) || shortNorm.includes(hdShort))) ||
+             (fullNorm.length >= 5 && hdFull.length > 0 && (hdFull.includes(fullNorm) || fullNorm.includes(hdFull)));
     });
     g.chungTu = (nccChungTuMap[key] || {}).chungTu || "";
     g.ghiChuNCC = (nccChungTuMap[key] || {}).ghiChu || "";
@@ -416,13 +421,17 @@ router.post("/ho-so/hoa-don-ncc/ncc/:nccKey/them-hop-dong", requireAdmin, (req, 
     const store = load();
     if (!store.phap_danh_hop_dong_ncc) store.phap_danh_hop_dong_ncc = [];
     const activeCompany = getCompany(req);
-    const { tenNCC, daiDien, chucVu, linkHopDong, soHopDong, ngayKy } = req.body;
+    const { tenNCC, tenDayDuNCC, daiDien, chucVu, linkHopDong, soHopDong, ngayKy } = req.body;
     const ten = (tenNCC || req.params.nccKey || "").trim();
     if (!ten) return res.status(400).json({ error: "Thiếu tên NCC." });
     const rec = {
       id: nextId(store, "phap_danh_hop_dong_ncc_seq") || Date.now(),
+      // Nhan, 2026-09-17: luu CA tenNCC (ten ngan, dung khop voi nccShort) LAN
+      // tenDayDuNCC (ten day du neu co) -- logic khop hop dong (normForMatch)
+      // dung ca 2 truong nay, thieu 1 trong 2 co the lam khop nham/khong khop
+      // duoc voi chinh NCC vua them.
       tenNCC: ten,
-      tenDayDuNCC: "",
+      tenDayDuNCC: (tenDayDuNCC || "").trim(),
       congTy: activeCompany,
       daiDien: (daiDien || "").trim(),
       chucVu: (chucVu || "").trim(),
@@ -486,8 +495,13 @@ router.post("/ho-so/hoa-don-ncc/xuat-chung-tu", requireLogin, express.json(), as
     const matchedHopDong = hdNccList.find((hd) => {
       const hdShort = normForMatch(hd.tenNCC || "");
       const hdFull = normForMatch(hd.tenDayDuNCC || "");
-      return (shortNorm.length >= 3 && (hdShort.includes(shortNorm) || shortNorm.includes(hdShort))) ||
-             (fullNorm.length >= 5 && (hdFull.includes(fullNorm) || fullNorm.includes(hdFull)));
+      // Nhan, 2026-09-17: bug cu -- "".includes(x) luon false nhung x.includes("")
+      // luon TRUE, nen hop dong thieu tenDayDuNCC/tenNCC (vd hop dong vua them
+      // thu cong qua "+ Thêm hợp đồng NCC") se KHOP NHAM voi MOI NCC khac co
+      // fullNorm/shortNorm >= do dai toi thieu. Them dieu kien do dai > 0 cho
+      // ca 2 ve de chi khop khi CA HAI ben deu co ten thuc su.
+      return (shortNorm.length >= 3 && hdShort.length > 0 && (hdShort.includes(shortNorm) || shortNorm.includes(hdShort))) ||
+             (fullNorm.length >= 5 && hdFull.length > 0 && (hdFull.includes(fullNorm) || fullNorm.includes(hdFull)));
     });
 
     // Nhan, 2026-09-17: "Đại diện" (Ben A) CHI lay tu Hop dong NCC da map/them
