@@ -225,7 +225,6 @@ function buildHddvLookup(store, activeCompany) {
 // tha de trong con hon dien SAI ten/so tien cua NCC khac).
 function pickHddvCandidate(candidates, nccShort) {
   if (!candidates || !candidates.length) return null;
-  if (candidates.length === 1) return candidates[0];
   const shortNorm = normForMatch(nccShort);
   if (shortNorm.length >= 3) {
     const match = candidates.find((c) => {
@@ -234,6 +233,12 @@ function pickHddvCandidate(candidates, nccShort) {
     });
     if (match) return match;
   }
+  // Nhan, 2026-09-17: phat hien them qua case CGV -- CHI 1 ung vien trung so
+  // HD KHONG co nghia la dung ("CGV" trung so HD voi hoa don cua NCC hoan
+  // toan khac ten "Kubo"/"HANG GIA DUNG TONG HOP" khong lien quan gi rap
+  // chieu phim). Truoc day cho 1 ung vien la nhan luon -- gio BAT BUOC ten
+  // phai lien quan (dung nhu truong hop nhieu ung vien), du chi co 1 cai,
+  // de tranh dien nham hoan toan mot NCC khac chi vi trung so hoa don.
   return null;
 }
 
