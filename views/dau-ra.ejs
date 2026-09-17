@@ -3224,6 +3224,7 @@
                 gross,
                 phi,
                 net: gross - phi,
+                ok: true, // đánh dấu row này đã qua filter "Thành công"
               };
             });
 
@@ -3428,9 +3429,12 @@
         const selMonth = (document.getElementById('zaloFilterMonth')||{}).value || '';
 
         // Build byDate from BaoCaoPhi (FUNZONE only)
+        // Lọc bỏ data cũ chưa có flag ok (upload trước khi có filter Thành công)
         const byDate = {};
-        let nFunzone=0, nOther=0, nNoMatch=0;
+        let nFunzone=0, nOther=0, nNoMatch=0, nSkipOld=0;
         _zaloFee.forEach(r => {
+          // Row cũ (không có flag ok) mà phi=0 → khả năng cao là "chưa thành công"
+          if(!r.ok && r.phi===0 && r.gross>0){ nSkipOld++; return; }
           const isFunzone = r.maDiem==='FUNZONE1' || (r.dienThu||'').toUpperCase().includes('FUNZONE');
           if(!isFunzone){ nOther++; return; }
           nFunzone++;

@@ -140,37 +140,13 @@
                 <%= r.createdAt ? new Date(r.createdAt).toLocaleDateString('vi-VN') : '—' %>
               </td>
               <td style="text-align:center;">
-                <!-- Nut sua (inline form) -->
                 <button type="button" class="link-btn"
-                  onclick="openEditRow(<%= r.id %>, <%- JSON.stringify(r.ma||'') %>, <%- JSON.stringify(r.ten||'') %>, <%- JSON.stringify(r.ghiChu||'') %>)"
-                  style="margin-right:8px;">Sửa</button>
-                <!-- Nut xoa -->
+                  onclick="openEditModal(<%= r.id %>, <%- JSON.stringify(r.ma||'') %>, <%- JSON.stringify(r.ten||'') %>, <%- JSON.stringify(r.ghiChu||'') %>)"
+                  style="margin-right:8px;font-weight:600;">✏️ Sửa</button>
                 <form method="POST" action="/danh-muc/<%= slug %>/xoa/<%= r.id %>" style="display:inline;"
                   onsubmit="return confirm('Xóa mã &quot;<%= r.ma %>&quot;?')">
                   <input type="hidden" name="company" value="<%= company %>" />
                   <button type="submit" class="link-btn" style="color:var(--color-chi);">Xóa</button>
-                </form>
-              </td>
-            </tr>
-            <!-- Hang sua (an/hien) -->
-            <tr id="editRow_<%= r.id %>" style="display:none;background:var(--bg-hover,rgba(0,120,212,0.06));">
-              <td colspan="5">
-                <form method="POST" action="/danh-muc/<%= slug %>/sua/<%= r.id %>" style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;padding:8px 0;">
-                  <input type="hidden" name="company" value="<%= company %>" />
-                  <div>
-                    <label style="display:block;font-size:12px;color:var(--muted);margin-bottom:3px;"><%= page.colLabel %> *</label>
-                    <input type="text" name="ma" id="editMa_<%= r.id %>" required style="min-width:160px;" />
-                  </div>
-                  <div>
-                    <label style="display:block;font-size:12px;color:var(--muted);margin-bottom:3px;">Tên / Diễn giải</label>
-                    <input type="text" name="ten" id="editTen_<%= r.id %>" style="min-width:220px;" />
-                  </div>
-                  <div>
-                    <label style="display:block;font-size:12px;color:var(--muted);margin-bottom:3px;">Ghi chú</label>
-                    <input type="text" name="ghiChu" id="editGhiChu_<%= r.id %>" style="min-width:180px;" />
-                  </div>
-                  <button type="submit" class="btn btn-primary">Lưu</button>
-                  <button type="button" class="btn btn-secondary" onclick="closeEditRow(<%= r.id %>)">Hủy</button>
                 </form>
               </td>
             </tr>
@@ -182,26 +158,60 @@
     </section>
   </main>
 
+  <!-- Modal sửa mục -->
+  <div id="editModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;align-items:center;justify-content:center;">
+    <div style="background:#fff;border-radius:10px;padding:28px 32px;min-width:360px;max-width:520px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,.25);position:relative;">
+      <h3 style="margin:0 0 20px;font-size:1.1rem;">✏️ Sửa mục</h3>
+      <form id="editModalForm" method="POST" action="">
+        <input type="hidden" name="company" value="<%= company %>" />
+        <div style="margin-bottom:14px;">
+          <label style="display:block;font-size:12px;color:#666;margin-bottom:4px;"><%= page.colLabel %> <span style="color:red">*</span></label>
+          <input type="text" name="ma" id="modalMa" required
+            style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid #ccc;border-radius:6px;font-size:14px;" />
+        </div>
+        <div style="margin-bottom:14px;">
+          <label style="display:block;font-size:12px;color:#666;margin-bottom:4px;">Tên / Diễn giải</label>
+          <input type="text" name="ten" id="modalTen"
+            style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid #ccc;border-radius:6px;font-size:14px;" />
+        </div>
+        <div style="margin-bottom:20px;">
+          <label style="display:block;font-size:12px;color:#666;margin-bottom:4px;">Ghi chú</label>
+          <input type="text" name="ghiChu" id="modalGhiChu"
+            style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid #ccc;border-radius:6px;font-size:14px;" />
+        </div>
+        <div style="display:flex;gap:10px;justify-content:flex-end;">
+          <button type="button" onclick="closeEditModal()"
+            style="padding:8px 20px;border:1px solid #ccc;border-radius:6px;background:#f5f5f5;cursor:pointer;font-size:14px;">Hủy</button>
+          <button type="submit"
+            style="padding:8px 20px;border:none;border-radius:6px;background:#1565c0;color:#fff;cursor:pointer;font-size:14px;font-weight:600;">💾 Lưu</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <script>
     function toggleDoiMaPanel() {
       var el = document.getElementById('doiMaPanel');
       if (el) el.style.display = (el.style.display === 'none' || !el.style.display) ? 'block' : 'none';
     }
-    function openEditRow(id, ma, ten, ghiChu) {
-      // Dong tat ca hang sua dang mo
-      document.querySelectorAll('[id^="editRow_"]').forEach(function(r) { r.style.display = 'none'; });
-      var row = document.getElementById('editRow_' + id);
-      if (!row) return;
-      document.getElementById('editMa_' + id).value = ma;
-      document.getElementById('editTen_' + id).value = ten;
-      document.getElementById('editGhiChu_' + id).value = ghiChu;
-      row.style.display = '';
-      document.getElementById('editMa_' + id).focus();
+    function openEditModal(id, ma, ten, ghiChu) {
+      document.getElementById('editModalForm').action = '/danh-muc/<%= slug %>/sua/' + id;
+      document.getElementById('modalMa').value = ma;
+      document.getElementById('modalTen').value = ten;
+      document.getElementById('modalGhiChu').value = ghiChu || '';
+      var m = document.getElementById('editModal');
+      m.style.display = 'flex';
+      setTimeout(function(){ document.getElementById('modalMa').focus(); document.getElementById('modalMa').select(); }, 50);
     }
-    function closeEditRow(id) {
-      var row = document.getElementById('editRow_' + id);
-      if (row) row.style.display = 'none';
+    function closeEditModal() {
+      document.getElementById('editModal').style.display = 'none';
     }
+    document.getElementById('editModal').addEventListener('click', function(e) {
+      if (e.target === this) closeEditModal();
+    });
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape') closeEditModal();
+    });
   </script>
   <%- include('partials/scroll-restore') %>
 </body>
