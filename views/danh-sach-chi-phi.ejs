@@ -53,6 +53,11 @@
       </label>
       <input type="text" name="q" value="<%= q %>" placeholder="Tìm diễn giải, NCC, số HĐ, UNC..."
              style="width:250px;font-size:13px;" />
+      <label style="display:flex;align-items:center;gap:6px;font-size:13px;">
+        <input type="text" id="gianFilterInput" placeholder="Lọc theo Gian..." oninput="onGianFilterInput()"
+               style="width:150px;font-size:13px;" />
+        <span id="gianFilterStatus" style="font-size:11px;color:#1565c0;white-space:nowrap;"></span>
+      </label>
       <select name="hachToan" id="hachToanSelect" onchange="saveHachToanFilter(this.value);this.form.submit();" style="font-size:13px;">
         <option value="" <%= hachToanFilter === '' ? 'selected' : '' %>>Tất cả HT</option>
         <option value="0" <%= hachToanFilter === '0' ? 'selected' : '' %>>Chưa hạch toán</option>
@@ -108,6 +113,7 @@
             <% rows.forEach(function(r) { %>
             <tr class="dsch-row"
                 id="dsch-tr-<%= r.id %>"
+                data-gian="<%= r.gian || '' %>"
                 style="<%= r.daHachToan ? 'background:rgba(56,142,60,0.07);' : '' %>"
                 onclick="openDschModal(<%= r.id %>)">
               <td style="white-space:nowrap;color:var(--muted);">
@@ -217,6 +223,36 @@
   var _dschMap = {};
   _dschRows.forEach(function(r){ _dschMap[r.id] = r; });
   var _dschCurrentId = null;
+
+  // ---- Loc theo Gian (tu dong, khong can bam nut, debounce 3s) ----
+  var _gianFilterTimer = null;
+  function _normGianText(s) {
+    return String(s || '')
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[̀-ͯ]/g, '')
+      .replace(/đ/g, 'd');
+  }
+  function onGianFilterInput() {
+    var status = document.getElementById('gianFilterStatus');
+    if (status) status.textContent = 'đang gõ...';
+    if (_gianFilterTimer) clearTimeout(_gianFilterTimer);
+    _gianFilterTimer = setTimeout(applyGianFilter, 3000);
+  }
+  function applyGianFilter() {
+    var input = document.getElementById('gianFilterInput');
+    var q = _normGianText(input ? input.value : '');
+    var trs = document.querySelectorAll('tr.dsch-row');
+    var shown = 0;
+    trs.forEach(function(tr) {
+      var gianText = tr.getAttribute('data-gian') || '';
+      var match = !q || _normGianText(gianText).indexOf(q) !== -1;
+      tr.style.display = match ? '' : 'none';
+      if (match) shown++;
+    });
+    var status = document.getElementById('gianFilterStatus');
+    if (status) status.textContent = q ? (shown + ' dòng khớp') : '';
+  }
 
   function fmt(v) { return v || '—'; }
   function fmtMoney(v) { return v ? Number(v).toLocaleString('vi-VN') + ' đ' : '—'; }
