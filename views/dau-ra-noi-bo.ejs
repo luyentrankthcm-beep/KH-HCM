@@ -5,33 +5,117 @@
   <title>Đầu Ra – Nội Bộ – K&H</title>
   <style>
     .tab-bar { display:flex; gap:0; border-bottom:2px solid #1e3a5f; margin-bottom:1.25rem; }
-    .tab-btn { padding:.5rem 1.25rem; font-weight:600; font-size:.88em; cursor:pointer; border:none; background:#e8f0fe; color:#1e3a5f; border-radius:6px 6px 0 0; margin-right:3px; }
+    .tab-btn { padding:.5rem 1.25rem; font-weight:600; font-size:.88em; cursor:pointer; border:none; background:#e8f0fe; color:#1e3a5f; border-radius:6px 6px 0 0; margin-right:3px; text-decoration:none; display:inline-block; }
     .tab-btn.active { background:#1e3a5f; color:#fff; }
     .tab-btn:hover:not(.active) { background:#c7d7f8; }
     .tab-panel { display:none; }
     .tab-panel.active { display:block; }
+
+    /* KVC styles */
+    .kvc-toolbar { display:flex; align-items:center; gap:.6rem; flex-wrap:wrap; margin-bottom:1rem; }
+    .kvc-toolbar select, .kvc-toolbar input { padding:.35rem .6rem; border:1px solid #cbd5e1; border-radius:6px; font-size:.85em; }
+    .btn-update-all { background:#1e3a5f; color:#fff; border:none; border-radius:6px; padding:.4rem 1rem; font-size:.85em; font-weight:600; cursor:pointer; white-space:nowrap; }
+    .btn-update-all:hover { background:#2563eb; }
+    .btn-update-all:disabled { background:#94a3b8; cursor:not-allowed; }
+    .btn-link { display:inline-flex; align-items:center; gap:3px; background:#eff6ff; color:#2563eb; border:1px solid #bfdbfe; border-radius:4px; padding:.2rem .5rem; font-size:.78em; font-weight:600; text-decoration:none; white-space:nowrap; }
+    .btn-link:hover { background:#dbeafe; }
+    .btn-row-update { background:none; border:1px solid #e2e8f0; border-radius:4px; color:#64748b; cursor:pointer; font-size:.78em; padding:.2rem .5rem; white-space:nowrap; }
+    .btn-row-update:hover { border-color:#2563eb; color:#2563eb; }
+
+    .kvc-table { width:100%; border-collapse:collapse; font-size:.86em; }
+    .kvc-table th { background:#1e3a5f; color:#fff; padding:.5rem .6rem; text-align:left; white-space:nowrap; position:sticky; top:0; z-index:5; }
+    .kvc-table th.right { text-align:right; }
+    .kvc-table td { padding:.45rem .6rem; border-bottom:1px solid #e2e8f0; vertical-align:middle; }
+    .kvc-table tbody tr:hover td { background:#f8fafc; }
+    .kvc-table tfoot td { background:#f1f5f9; font-weight:700; border-top:2px solid #1e3a5f; }
+    .kvc-table .num { text-align:right; font-variant-numeric:tabular-nums; }
+    .kvc-table .num.money { color:#15803d; font-weight:600; }
+    .kvc-table .num.empty { color:#cbd5e1; font-style:italic; }
+
+    .badge-kh { display:inline-block; border-radius:10px; padding:.1rem .45rem; font-size:.75em; font-weight:700; }
+    .badge-moi { background:#dcfce7; color:#166534; }
+    .badge-cu { background:#dbeafe; color:#1e40af; }
+
+    .last-updated { font-size:.72em; color:#94a3b8; }
+    .status-dot { display:inline-block; width:7px; height:7px; border-radius:50%; margin-right:4px; }
+    .dot-ok { background:#22c55e; }
+    .dot-empty { background:#e2e8f0; }
+    .dot-loading { background:#f59e0b; animation:pulse .8s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+    /* Detail modal */
+    .modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.4); z-index:100; align-items:center; justify-content:center; }
+    .modal-overlay.open { display:flex; }
+    .modal-box { background:#fff; border-radius:12px; padding:1.5rem; max-width:680px; width:95%; max-height:85vh; overflow-y:auto; box-shadow:0 10px 40px rgba(0,0,0,.2); }
+    .modal-title { font-size:1rem; font-weight:700; color:#1e3a5f; margin-bottom:1rem; }
+    .modal-table { width:100%; border-collapse:collapse; font-size:.84em; }
+    .modal-table th { background:#e8f0fe; color:#1e3a5f; padding:.4rem .6rem; text-align:right; }
+    .modal-table th:first-child { text-align:left; }
+    .modal-table td { padding:.38rem .6rem; border-bottom:1px solid #f1f5f9; text-align:right; }
+    .modal-table td:first-child { text-align:left; font-weight:600; }
+    .btn-close-modal { float:right; background:none; border:none; font-size:1.2rem; cursor:pointer; color:#64748b; }
   </style>
 </head>
 <body>
   <%- include('partials/nav') %>
-  <main class="container" style="padding-top:1.5rem">
+  <main class="container" style="padding-top:1.5rem; max-width:1300px;">
 
-    <h1 style="font-size:1.4rem;font-weight:700;margin-bottom:.5rem">Đầu Ra – Nội Bộ</h1>
+    <h1 style="font-size:1.4rem;font-weight:700;margin-bottom:.75rem">Đầu Ra – Nội Bộ</h1>
 
     <div class="tab-bar">
-      <button class="tab-btn active" id="tab_btn_nb1" onclick="switchTabNB('nb1')">📋 Tab 1</button>
+      <button class="tab-btn active" id="tab_btn_nb1" onclick="switchTabNB('nb1')">🏪 KVC MN</button>
       <button class="tab-btn" id="tab_btn_nb2" onclick="switchTabNB('nb2')">📋 Tab 2</button>
     </div>
 
+    <!-- ===== TAB 1: KVC MN ===== -->
     <div id="tab_nb1" class="tab-panel active">
-      <div style="padding:3rem;text-align:center;color:#94a3b8">
-        <div style="font-size:3rem;margin-bottom:1rem">🏗️</div>
-        <p style="font-size:1rem;font-weight:600">Trang Đầu Ra – Nội Bộ</p>
-        <p style="font-size:.88em;margin-top:.5rem">Dùng để theo dõi các giao dịch nội bộ giữa các gian / công trình.</p>
-        <p style="font-size:.82em;color:#cbd5e1;margin-top:1rem">Luyến cho biết cần hiển thị dữ liệu gì ở đây để mình thiết lập tiếp nhé.</p>
+
+      <!-- Toolbar -->
+      <div class="kvc-toolbar">
+        <label style="font-size:.85em;font-weight:600;color:#475569;">Tháng:</label>
+        <select id="kvc_month" onchange="renderKvcTable()">
+          <option value="1">Tháng 1</option><option value="2">Tháng 2</option>
+          <option value="3">Tháng 3</option><option value="4">Tháng 4</option>
+          <option value="5">Tháng 5</option><option value="6">Tháng 6</option>
+          <option value="7">Tháng 7</option><option value="8">Tháng 8</option>
+          <option value="9" selected>Tháng 9</option><option value="10">Tháng 10</option>
+          <option value="11">Tháng 11</option><option value="12">Tháng 12</option>
+        </select>
+        <select id="kvc_year" onchange="renderKvcTable()">
+          <option value="2025">2025</option>
+          <option value="2026" selected>2026</option>
+        </select>
+        <button class="btn-update-all" id="btn_update_all" onclick="updateAllKvc()">🔄 Cập nhật tất cả</button>
+        <span id="kvc_status" style="font-size:.8em;color:#64748b;"></span>
       </div>
+
+      <!-- Table -->
+      <div style="overflow-x:auto;border-radius:10px;box-shadow:0 2px 12px rgba(0,0,0,.07);">
+        <table class="kvc-table" id="kvc_main_table">
+          <thead>
+            <tr>
+              <th style="width:30px;">#</th>
+              <th style="width:45px;">KH</th>
+              <th>Mã công trình</th>
+              <th style="width:60px;text-align:center;">Báo cáo</th>
+              <th class="right" style="min-width:130px;">Tiền mặt (đ)</th>
+              <th class="right" style="min-width:130px;">Chuyển khoản (đ)</th>
+              <th class="right" style="min-width:130px;">DT khác (đ)</th>
+              <th class="right" style="min-width:130px;">Tổng DT (đ)</th>
+              <th style="width:90px;text-align:center;">Cập nhật</th>
+            </tr>
+          </thead>
+          <tbody id="kvc_tbody"></tbody>
+          <tfoot id="kvc_tfoot"></tfoot>
+        </table>
+      </div>
+
+      <p style="font-size:.76em;color:#94a3b8;margin-top:.6rem;">
+        💾 Dữ liệu lưu tạm trong trình duyệt. Nhấn <strong>Cập nhật</strong> để tải mới từ báo cáo.
+      </p>
     </div>
 
+    <!-- ===== TAB 2 ===== -->
     <div id="tab_nb2" class="tab-panel">
       <div style="padding:3rem;text-align:center;color:#94a3b8">
         <div style="font-size:3rem;margin-bottom:1rem">📂</div>
@@ -40,13 +124,237 @@
     </div>
 
   </main>
+
+  <!-- Detail Modal -->
+  <div class="modal-overlay" id="detail_modal" onclick="closeModal(event)">
+    <div class="modal-box">
+      <button class="btn-close-modal" onclick="document.getElementById('detail_modal').classList.remove('open')">✕</button>
+      <div class="modal-title" id="modal_title">Chi tiết</div>
+      <div id="modal_body"></div>
+    </div>
+  </div>
+
   <script>
-    function switchTabNB(id) {
-      document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
-      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-      document.getElementById('tab_' + id).classList.add('active');
-      document.getElementById('tab_btn_' + id).classList.add('active');
+  // ============================================================
+  // DATA: 15 gian KVC MN
+  // ============================================================
+  const KVC_GIAN = [
+    { id:'farm_lottebt', kh:'mới', maCT:'FARM MN LOTTE MART PHAN THIẾT',       khFull:'LOTTE VIỆT NAM - CHI NHÁNH BÌNH THUẬN',        link:'https://docs.google.com/spreadsheets/d/1fiFGmerqMGjKW8oxJBfN_KXVn7c7rbIOszzuZIavHLc/edit?usp=sharing' },
+    { id:'tutu_lottegv', kh:'cũ',  maCT:'TUTU MN LOTTE MART GÒ VẤP',           khFull:'LOTTE VIỆT NAM - CHI NHÁNH GÒ VẤP',            link:'https://docs.google.com/spreadsheets/d/1F3ATisma35uHIdhlKAckd16GlmTGMvRE_QwH4N16H0M/edit?usp=sharing' },
+    { id:'tutu_aeontp',  kh:'cũ',  maCT:'TUTU MN AEON MALL TÂN PHÚ',           khFull:'AEON VIỆT NAM - AEON TÂN PHÚ',                 link:'https://docs.google.com/spreadsheets/d/1jGG9Po3WnsntEeXC53uHUUxi-5bcKx-jPuPWhN68Qps/edit?usp=sharing' },
+    { id:'tutu_aeonbt',  kh:'cũ',  maCT:'TUTU MN AEON MALL BÌNH TÂN',          khFull:'AEON HỒ CHÍ MINH - CSE',                       link:'https://docs.google.com/spreadsheets/d/1Lts3GeoeozWrPlprGzANK_ksmd6h4XMnl5xMUMM_OL4/edit?usp=sharing' },
+    { id:'tutu_aeonbd',  kh:'cũ',  maCT:'TUTU MN AEON MALL BÌNH DƯƠNG',        khFull:'AEON BÌNH DƯƠNG',                               link:'https://docs.google.com/spreadsheets/d/15brZmUqEYuuEkbp7AgQSAEKmbgMiNqey6CIScGO97cs/edit?usp=sharing' },
+    { id:'tutu_estella', kh:'mới', maCT:'TUTU MN ESTELLA',                     khFull:'LIÊN DOANH ESTELLA - CSE',                     link:'https://docs.google.com/spreadsheets/d/1cegFodLAXbtYdITdfGGd8m0weoOUVP6RgwGPScb9JMo/edit?usp=sharing' },
+    { id:'tutu_aeontan', kh:'mới', maCT:'TUTU MN AEON MALL TÂN AN',            khFull:'AEON TÂN AN',                                  link:'https://docs.google.com/spreadsheets/d/1SGtQ0Kvnvidr4ipxSP-AY5uwGwFEEoOrwFhawJP2scI/edit?usp=sharing' },
+    { id:'fz_lottebt',   kh:'cũ',  maCT:'FZ MN NHÀ BÓNG LOTTE MART VŨNG TÀU', khFull:'LOTTE VIỆT NAM - CHI NHÁNH BÀ RỊA VŨNG TÀU',  link:'https://docs.google.com/spreadsheets/d/1Be1E0pBJlYATKpogjqMTyHbhMcOg3Rbca7qoUlvHBWk/edit?usp=sharing' },
+    { id:'fz_scvivo',    kh:'cũ',  maCT:'FZ MN ADV SC VIVO',                   khFull:'SC VIVO (PHỨC HỢP THƯƠNG MẠI VIETSIN)',        link:'https://docs.google.com/spreadsheets/d/1lQMEpf1OhVOEROY5kzM_cWp77fZgUl92cVn0A78SGvw/edit?usp=sharing' },
+    { id:'fz_aeontan',   kh:'mới', maCT:'FZ MN VR AEON MALL TÂN AN',           khFull:'AEON TÂN AN',                                  link:'https://docs.google.com/spreadsheets/d/1Ej4iwtbLGu-WgHkjTjdIDZPz02lL4KLRE9ANYzpMP9c/edit?usp=sharing' },
+    { id:'ev_ghostbr',   kh:'cũ',  maCT:'EVMN GHOST MN GO BÀ RỊA',            khFull:'GO BÀ RỊA (VIỆT- NHẬT TẠI BÀ RỊA)',           link:'https://docs.google.com/spreadsheets/d/1JwtV9Mg-LS_3xIuuzSuc0aE4x23riepFiomt7q0HAPU/edit?usp=sharing' },
+    { id:'ev_fzgoan',    kh:'cũ',  maCT:'EVMN FZ ADV GO AN LẠC',              khFull:'GO AN LẠC (SIÊU THỊ AN LẠC)',                  link:'https://docs.google.com/spreadsheets/d/1bdU9XExnBp8aMLTj9rAAXS1G3_Xi6m2jI3y0SqQN80s/edit?usp=sharing' },
+    { id:'fz_scvivo2',   kh:'cũ',  maCT:'FZ MN VR SC VIVO',                   khFull:'SC VIVO (PHỨC HỢP THƯƠNG MẠI VIETSIN) - CSE', link:'https://docs.google.com/spreadsheets/d/1ZaNpXiOrtpnHHZXdMZEFmBKw1eooAPmXqqls0N0Uap0/edit?usp=sharing' },
+    { id:'pinball_amtp', kh:'cũ',  maCT:'PINBALL MN AMTP',                    khFull:'AEON VIỆT NAM - AEON TÂN PHÚ',                 link:'https://docs.google.com/spreadsheets/d/1r-huBGhhy_K_nOyHr0iz4Rd3Bkfw0vyTDQEZbT_PrOo/edit?usp=sharing' },
+  ];
+
+  // ============================================================
+  // STORAGE HELPERS
+  // ============================================================
+  function storageKey(id, month, year) {
+    return 'kvc_' + id + '_' + year + '_' + month;
+  }
+  function loadData(id, month, year) {
+    try {
+      const raw = localStorage.getItem(storageKey(id, month, year));
+      return raw ? JSON.parse(raw) : null;
+    } catch(e) { return null; }
+  }
+  function saveData(id, month, year, data) {
+    try {
+      localStorage.setItem(storageKey(id, month, year), JSON.stringify(data));
+    } catch(e) {}
+  }
+
+  // ============================================================
+  // FORMAT
+  // ============================================================
+  function fmtMoney(val) {
+    if (val === null || val === undefined || val === '' || isNaN(Number(val))) return '<span class="empty">—</span>';
+    const n = Number(val);
+    if (n === 0) return '<span style="color:#94a3b8">0</span>';
+    return n.toLocaleString('vi-VN');
+  }
+
+  // ============================================================
+  // RENDER TABLE
+  // ============================================================
+  function getMonthYear() {
+    return {
+      month: parseInt(document.getElementById('kvc_month').value),
+      year: parseInt(document.getElementById('kvc_year').value)
+    };
+  }
+
+  function renderKvcTable() {
+    const {month, year} = getMonthYear();
+    const tbody = document.getElementById('kvc_tbody');
+    const tfoot = document.getElementById('kvc_tfoot');
+    let totalTM = 0, totalCK = 0, totalKhac = 0;
+    let hasAnyData = false;
+
+    tbody.innerHTML = KVC_GIAN.map((g, i) => {
+      const d = loadData(g.id, month, year);
+      const hasTM = d && (d.tienMat !== null && d.tienMat !== undefined && d.tienMat !== '');
+      const hasCK = d && (d.chuyenKhoan !== null && d.chuyenKhoan !== undefined && d.chuyenKhoan !== '');
+      const hasKhac = d && (d.dtKhac !== null && d.dtKhac !== undefined && d.dtKhac !== '');
+
+      const tm = hasTM ? Number(d.tienMat) : null;
+      const ck = hasCK ? Number(d.chuyenKhoan) : null;
+      const khac = hasKhac ? Number(d.dtKhac) : 0;
+      const tong = (tm !== null || ck !== null) ? (tm||0) + (ck||0) + (khac||0) : null;
+
+      if (tm !== null) { totalTM += tm; hasAnyData = true; }
+      if (ck !== null) { totalCK += ck; hasAnyData = true; }
+      totalKhac += khac;
+
+      const hasDot = (tm !== null || ck !== null) ? 'dot-ok' : 'dot-empty';
+      const updatedTxt = d && d.updatedAt ? '<br><span class="last-updated">' + d.updatedAt + '</span>' : '';
+      const hasDetail = d && d.daily && d.daily.length > 0;
+
+      return `<tr>
+        <td style="color:#94a3b8;font-size:.8em;">${i+1}</td>
+        <td><span class="badge-kh badge-${g.kh==='mới'?'moi':'cu'}">${g.kh}</span></td>
+        <td>
+          <span class="status-dot ${hasDot}"></span>
+          <strong>${g.maCT}</strong>
+          <br><span style="font-size:.75em;color:#94a3b8;">${g.khFull}</span>
+        </td>
+        <td style="text-align:center;">
+          <a href="${g.link}" target="_blank" class="btn-link" title="Mở báo cáo">📊</a>
+        </td>
+        <td class="num ${tm!==null?'money':'empty'}" ${hasDetail?`onclick="showDetail('${g.id}','${month}','${year}')" style="cursor:pointer" title="Xem chi tiết ngày"`:''}>
+          ${fmtMoney(tm)}
+        </td>
+        <td class="num ${ck!==null?'money':'empty'}" ${hasDetail?`onclick="showDetail('${g.id}','${month}','${year}')" style="cursor:pointer" title="Xem chi tiết ngày"`:''}>
+          ${fmtMoney(ck)}
+        </td>
+        <td class="num ${khac?'money':'empty'}">${fmtMoney(khac||null)}</td>
+        <td class="num ${tong!==null?'money':'empty'}">${fmtMoney(tong)}</td>
+        <td style="text-align:center;">
+          <button class="btn-row-update" onclick="updateOneKvc('${g.id}',${i})" id="upd_${g.id}">🔄 Cập nhật</button>
+          ${updatedTxt}
+        </td>
+      </tr>`;
+    }).join('');
+
+    // Footer totals
+    const totalTong = totalTM + totalCK + totalKhac;
+    tfoot.innerHTML = `<tr>
+      <td colspan="4" style="font-weight:700;color:#1e3a5f;font-size:.88em;">TỔNG CỘNG</td>
+      <td class="num money">${hasAnyData ? totalTM.toLocaleString('vi-VN') : '—'}</td>
+      <td class="num money">${hasAnyData ? totalCK.toLocaleString('vi-VN') : '—'}</td>
+      <td class="num money">${totalKhac ? totalKhac.toLocaleString('vi-VN') : '—'}</td>
+      <td class="num money">${hasAnyData ? totalTong.toLocaleString('vi-VN') : '—'}</td>
+      <td></td>
+    </tr>`;
+  }
+
+  // ============================================================
+  // UPDATE FUNCTIONS (placeholder — user will guide logic)
+  // ============================================================
+  async function updateOneKvc(id, idx) {
+    const {month, year} = getMonthYear();
+    const btn = document.getElementById('upd_' + id);
+    if (btn) { btn.textContent = '⏳...'; btn.disabled = true; }
+
+    // TODO: mỗi gian sẽ có logic riêng để đọc từ Google Sheets
+    // Tạm thời: mở link để nhập tay
+    const g = KVC_GIAN.find(x => x.id === id);
+    if (g) {
+      const tm = prompt(`[${g.maCT}] Tháng ${month}/${year}\nNhập Tiền mặt (bỏ trống nếu chưa có):`);
+      if (tm === null) { if(btn){btn.textContent='🔄 Cập nhật';btn.disabled=false;} return; }
+      const ck = prompt(`[${g.maCT}] Tháng ${month}/${year}\nNhập Chuyển khoản (bỏ trống nếu chưa có):`);
+      if (ck === null) { if(btn){btn.textContent='🔄 Cập nhật';btn.disabled=false;} return; }
+      const khac = prompt(`[${g.maCT}] Doanh thu khác (bỏ trống nếu không có):`);
+
+      const now = new Date().toLocaleDateString('vi-VN', {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
+      const cleanNum = s => s ? Number(String(s).replace(/[.,\s]/g,'')) || 0 : 0;
+      saveData(id, month, year, {
+        tienMat: tm !== '' ? cleanNum(tm) : null,
+        chuyenKhoan: ck !== '' ? cleanNum(ck) : null,
+        dtKhac: khac !== '' ? cleanNum(khac) : 0,
+        updatedAt: now,
+        daily: []
+      });
     }
+
+    if (btn) { btn.textContent = '🔄 Cập nhật'; btn.disabled = false; }
+    renderKvcTable();
+  }
+
+  async function updateAllKvc() {
+    const {month, year} = getMonthYear();
+    const btn = document.getElementById('btn_update_all');
+    btn.disabled = true;
+    btn.textContent = '⏳ Đang cập nhật...';
+    document.getElementById('kvc_status').textContent = '';
+
+    // Gọi lần lượt từng gian
+    // TODO: khi đã có logic tự động, thay thế vòng lặp này
+    alert('Chức năng cập nhật tự động sẽ được bổ sung.\nHiện tại hãy nhấn "Cập nhật" từng gian một.');
+
+    btn.disabled = false;
+    btn.textContent = '🔄 Cập nhật tất cả';
+  }
+
+  // ============================================================
+  // DETAIL MODAL
+  // ============================================================
+  function showDetail(id, month, year) {
+    const g = KVC_GIAN.find(x => x.id === id);
+    const d = loadData(id, month, year);
+    if (!g || !d) return;
+
+    document.getElementById('modal_title').textContent = g.maCT + ' — Tháng ' + month + '/' + year;
+
+    let html = '';
+    if (d.daily && d.daily.length > 0) {
+      html = `<table class="modal-table"><thead><tr>
+        <th>Ngày</th><th>Tiền mặt</th><th>Chuyển khoản</th><th>DT khác</th><th>Tổng</th>
+      </tr></thead><tbody>` +
+      d.daily.map(r => `<tr>
+        <td>${r.ngay}</td>
+        <td>${r.tienMat ? Number(r.tienMat).toLocaleString('vi-VN') : '—'}</td>
+        <td>${r.chuyenKhoan ? Number(r.chuyenKhoan).toLocaleString('vi-VN') : '—'}</td>
+        <td>${r.dtKhac ? Number(r.dtKhac).toLocaleString('vi-VN') : '—'}</td>
+        <td><strong>${((r.tienMat||0)+(r.chuyenKhoan||0)+(r.dtKhac||0)).toLocaleString('vi-VN')}</strong></td>
+      </tr>`).join('') +
+      '</tbody></table>';
+    } else {
+      html = `<p style="color:#94a3b8;text-align:center;padding:2rem;">Chưa có dữ liệu theo ngày cho gian này.</p>
+      <p style="text-align:center;"><a href="${g.link}" target="_blank" class="btn-link" style="font-size:.9em;">📊 Mở báo cáo Google Sheets</a></p>`;
+    }
+
+    document.getElementById('modal_body').innerHTML = html;
+    document.getElementById('detail_modal').classList.add('open');
+  }
+
+  function closeModal(e) {
+    if (e.target === document.getElementById('detail_modal')) {
+      document.getElementById('detail_modal').classList.remove('open');
+    }
+  }
+
+  // ============================================================
+  // TAB SWITCH
+  // ============================================================
+  function switchTabNB(id) {
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById('tab_' + id).classList.add('active');
+    document.getElementById('tab_btn_' + id).classList.add('active');
+  }
+
+  // Init
+  renderKvcTable();
   </script>
   <%- include('partials/scroll-restore') %>
 </body>

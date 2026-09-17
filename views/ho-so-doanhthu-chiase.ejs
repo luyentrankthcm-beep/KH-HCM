@@ -32,7 +32,7 @@
     <h1 class="page-title">Hồ Sơ</h1>
 
     <div class="tab-bar">
-      <a href="/ho-so/hoa-don-ncc" class="tab-btn">📄 Hóa Đơn NCC</a>
+      <% if (activeCompany !== 'kh_moi') { %><a href="/ho-so/hoa-don-ncc" class="tab-btn">📄 Hóa Đơn NCC</a><% } %>
       <a href="/ho-so/phi-cang-phu-quoc" class="tab-btn">🚢 Phí Cảng Phú Quốc</a>
       <a href="/ho-so/doanh-thu-chia-se" class="tab-btn active">📊 Doanh Thu Chia Sẻ</a>
       <a href="/ho-so/tien-thue" class="tab-btn">🏠 Tiền Thuê</a>

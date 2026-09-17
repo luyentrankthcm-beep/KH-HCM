@@ -304,9 +304,11 @@ function enrichRow(r, hddvLookup, store) {
 }
 
 router.get("/ho-so/hoa-don-ncc", (req, res) => {
+  const activeCompany = getCompany(req);
+  // KH Mới không dùng trang Hóa Đơn NCC → redirect về trang chính
+  if (activeCompany === 'kh_moi') return res.redirect('/');
   const store = load();
   ensureHoSo(store);
-  const activeCompany = getCompany(req);
   const thangFilter = req.query.thang || "";
   const hddvLookup = buildHddvLookup(store, activeCompany);
 

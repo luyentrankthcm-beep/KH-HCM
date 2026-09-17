@@ -839,18 +839,23 @@
         <button onclick="document.getElementById('ctMapModal').classList.remove('open')" style="border:none;background:none;font-size:1.2rem;cursor:pointer;color:#64748b">✕</button>
       </div>
       <div class="modal-body">
-        <p style="font-size:.8em;color:#64748b;margin:0 0 .75rem">Gán mã công trình cho từng gian. Mã sẽ hiện trong bảng Pivot và Đối soát ngày.</p>
+        <p style="font-size:.8em;color:#64748b;margin:0 0 .75rem">Gán mã công trình cho từng gian. Một gian có thể có nhiều kỳ (thời gian khác nhau → mã CT khác nhau).</p>
         <datalist id="ctCodeList"></datalist>
-        <table class="ct-map-table">
+        <div style="overflow-x:auto">
+        <table class="ct-map-table" style="min-width:600px">
           <thead>
             <tr>
               <th>Tên gian (Momo)</th>
               <th>Mã công trình</th>
-              <th style="text-align:center">DT Chia sẻ?</th>
+              <th style="text-align:center">Từ tháng</th>
+              <th style="text-align:center">Đến tháng</th>
+              <th style="text-align:center">CS?</th>
+              <th style="text-align:center;width:32px"></th>
             </tr>
           </thead>
           <tbody id="ctMapBody"></tbody>
         </table>
+        </div>
       </div>
       <div class="modal-footer">
         <button class="btn-cancel" onclick="document.getElementById('ctMapModal').classList.remove('open')">Hủy</button>
@@ -1121,7 +1126,7 @@
     let _dates = [];
     let _gians = [];
     let _history = []; // [{fileName, uploadedAt, added, skipped, fmt}]
-    let _ctMap   = {}; // { [gian]: { maCT, isChiaSe } }
+    let _ctMap   = {}; // { [gian]: [{ maCT, isChiaSe, fromDate, toDate }] } — each gian may have multiple date-ranged entries
     let _ctCodes = []; // ['CT001', 'CT002', ...]
     let _hdData  = {}; // { [`${date}|${gian}`]: { soHD, soTienHD, tienNH } }
     let _bankMomoPayments = []; // [{ payDate:"DD-MM-YYYY", amount, fromDate, toDate }]
@@ -1135,6 +1140,43 @@
     function saveHistory() { try { lsSet(LS_HISTORY, JSON.stringify(_history)); } catch(e){} }
     function saveCtMap()   { try { lsSet(LS_CT_MAP, JSON.stringify(_ctMap)); lsSet(LS_CT_CODES, JSON.stringify(_ctCodes)); } catch(e){} }
     function saveHdData()  { try { lsSet(LS_HD_DATA, JSON.stringify(_hdData)); } catch(e){} }
+
+    // Migrate old _ctMap format { [gian]: { maCT, isChiaSe } } → new { [gian]: [{ maCT, isChiaSe, fromDate, toDate }] }
+    function migrateCtMap(raw) {
+      if (!raw || typeof raw !== 'object') return {};
+      const out = {};
+      for (const [gian, val] of Object.entries(raw)) {
+        if (Array.isArray(val)) {
+          out[gian] = val; // already new format
+        } else if (val && typeof val === 'object' && val.maCT) {
+          out[gian] = [{ maCT: val.maCT, isChiaSe: !!val.isChiaSe, fromDate: '', toDate: '' }];
+        }
+      }
+      return out;
+    }
+
+    // Get the maCT entry for a gian on a given transaction date (DD-MM-YYYY).
+    // Returns { maCT, isChiaSe } or { maCT: null, isChiaSe: false } if no match.
+    function getCtForDate(gian, date) {
+      const entries = _ctMap[gian];
+      if (!entries || !entries.length) return { maCT: null, isChiaSe: false };
+      // Convert transaction date DD-MM-YYYY → YYYY-MM for comparison
+      let txMonth = null;
+      if (date) {
+        const parts = date.split('-');
+        if (parts.length === 3) txMonth = parts[2] + '-' + parts[1]; // YYYY-MM
+      }
+      for (const e of entries) {
+        if (!txMonth) return e; // no date context: return first
+        if (e.fromDate && txMonth < e.fromDate) continue;
+        if (e.toDate   && txMonth > e.toDate)   continue;
+        return e; // found a matching range
+      }
+      // No range matched — fall back to first entry with no date restriction
+      const fallback = entries.find(e => !e.fromDate && !e.toDate);
+      return fallback || { maCT: null, isChiaSe: false };
+    }
+
     function loadStored() {
       try {
         const r  = localStorage.getItem(LS_ROWS);
@@ -1144,7 +1186,7 @@
         const hd = localStorage.getItem(LS_HD_DATA);
         if (r)  _rows    = JSON.parse(r);
         if (h)  _history = JSON.parse(h);
-        if (m)  _ctMap   = JSON.parse(m);
+        if (m)  _ctMap   = migrateCtMap(JSON.parse(m));
         if (c)  _ctCodes = JSON.parse(c);
         if (hd) _hdData  = JSON.parse(hd);
       } catch(e) { _rows = []; _history = []; }
@@ -1191,7 +1233,7 @@
       const dateGroups = {};
       _rows.forEach(r => {
         if (!dateGroups[r.date]) dateGroups[r.date] = new Set();
-        const maCT = (_ctMap[r.gian] || {}).maCT || r.gian;
+        const maCT = getCtForDate(r.gian, r.date).maCT || r.gian;
         dateGroups[r.date].add(maCT); // groupKey = maCT || gian
       });
 
@@ -1604,8 +1646,11 @@
           rowTotal += v;
           return `<td>${fmt(v)}</td>`;
         }).join('');
-        const ct = _ctMap[g] || {};
-        const ctLabel = ct.maCT ? `<br><span class="ct-badge">${ct.maCT}</span>${ct.isChiaSe ? '<span class="ct-chiase-badge">CS</span>' : ''}` : '';
+        // For pivot display: collect all distinct maCT entries for this gian
+        const ctEntries = Array.isArray(_ctMap[g]) ? _ctMap[g].filter(e => e.maCT) : [];
+        const ctLabel = ctEntries.length
+          ? '<br>' + ctEntries.map(e => `<span class="ct-badge">${e.maCT}</span>${e.isChiaSe ? '<span class="ct-chiase-badge">CS</span>' : ''}${e.fromDate||e.toDate ? `<span style="font-size:.7em;color:#94a3b8;margin-left:.2rem">(${e.fromDate||''}→${e.toDate||''})</span>` : ''}`).join(' ')
+          : '';
         html += `<tr><td>${g}${ctLabel}</td>${cells}<td class="total-col cell-val">${rowTotal.toLocaleString('vi')}</td></tr>`;
       });
       tbody.innerHTML = html || '<tr><td colspan="99" style="text-align:center;color:#94a3b8;padding:1rem">Không có gian nào khớp</td></tr>';
@@ -1673,39 +1718,81 @@
     // ── Map CT Modal ──
     function openCtMapModal() {
       if (!_gians.length) { alert('Chưa có dữ liệu gian. Vui lòng tải file Momo trước.'); return; }
-      // Populate datalist
-      const dl = document.getElementById('ctCodeList');
-      dl.innerHTML = _ctCodes.map(c => `<option value="${c}">`).join('');
-      // Build rows
-      const tbody = document.getElementById('ctMapBody');
-      tbody.innerHTML = _gians.map(g => {
-        const m = _ctMap[g] || {};
-        return `<tr>
-          <td style="font-weight:600;color:#1e3a5f">${g}</td>
-          <td><input class="ct-input" data-gian="${g}" list="ctCodeList" value="${m.maCT||''}" placeholder="Vd: CT2025001"></td>
-          <td style="text-align:center"><input type="checkbox" data-gian="${g}" class="ct-chiase" ${m.isChiaSe?'checked':''}></td>
-        </tr>`;
-      }).join('');
+      document.getElementById('ctCodeList').innerHTML = _ctCodes.map(c => `<option value="${c}">`).join('');
+      renderCtMapBody();
       document.getElementById('ctMapModal').classList.add('open');
     }
 
-    function saveCtMapModal() {
-      const inputs  = document.querySelectorAll('#ctMapBody .ct-input');
-      const checks  = document.querySelectorAll('#ctMapBody .ct-chiase');
-      inputs.forEach((inp, i) => {
-        const gian    = inp.dataset.gian;
-        const maCT    = inp.value.trim().toUpperCase();
-        const isChiaSe = checks[i].checked;
-        if (maCT) {
-          _ctMap[gian] = { maCT, isChiaSe };
-          if (!_ctCodes.includes(maCT)) _ctCodes.push(maCT);
-        } else {
-          delete _ctMap[gian];
-        }
+    function renderCtMapBody() {
+      const tbody = document.getElementById('ctMapBody');
+      let html = '';
+      _gians.forEach((g, gi) => {
+        const entries = (Array.isArray(_ctMap[g]) && _ctMap[g].length)
+          ? _ctMap[g]
+          : [{ maCT: '', isChiaSe: false, fromDate: '', toDate: '' }];
+        const bg = gi % 2 === 0 ? '#f8fafc' : '#fff';
+        entries.forEach((e, i) => {
+          const esc = g.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+          html += `<tr style="background:${bg}" data-gian="${g}">
+            <td style="font-size:.83em;padding:.3rem .5rem;vertical-align:middle">
+              ${i === 0
+                ? `<strong style="color:#1e3a5f">${g}</strong>
+                   <button onclick="addCtRow('${esc}')" style="display:inline-block;margin-left:.4rem;font-size:.7em;padding:.1rem .35rem;border:1px dashed #6366f1;border-radius:3px;background:#eef2ff;color:#6366f1;cursor:pointer">+ kỳ</button>`
+                : `<span style="color:#94a3b8;padding-left:.8rem">↳</span>`}
+            </td>
+            <td><input class="ct-input" list="ctCodeList" value="${e.maCT||''}" placeholder="CT2025001" style="width:130px"></td>
+            <td><input type="month" class="ct-from" value="${e.fromDate||''}" style="font-size:.82em;padding:.2rem .3rem"></td>
+            <td><input type="month" class="ct-to"   value="${e.toDate||''}"   style="font-size:.82em;padding:.2rem .3rem"></td>
+            <td style="text-align:center"><input type="checkbox" class="ct-chiase" ${e.isChiaSe?'checked':''}></td>
+            <td style="text-align:center"><button onclick="this.closest('tr').remove()" style="border:none;background:none;color:#ef4444;cursor:pointer;font-size:.95rem;padding:.1rem .3rem" title="Xóa kỳ này">🗑</button></td>
+          </tr>`;
+        });
       });
+      tbody.innerHTML = html;
+    }
+
+    function addCtRow(gian) {
+      const tbody = document.getElementById('ctMapBody');
+      const allRows = [...tbody.querySelectorAll('tr')];
+      // Find last row belonging to this gian
+      const gianRows = allRows.filter(r => r.dataset.gian === gian);
+      if (!gianRows.length) return;
+      const lastRow = gianRows[gianRows.length - 1];
+      const esc = gian.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+      const bg = lastRow.style.background || '#fff';
+      const newRow = document.createElement('tr');
+      newRow.dataset.gian = gian;
+      newRow.style.background = bg;
+      newRow.innerHTML = `
+        <td style="font-size:.83em;padding:.3rem .5rem;vertical-align:middle"><span style="color:#94a3b8;padding-left:.8rem">↳</span></td>
+        <td><input class="ct-input" list="ctCodeList" value="" placeholder="CT2025001" style="width:130px"></td>
+        <td><input type="month" class="ct-from" value="" style="font-size:.82em;padding:.2rem .3rem"></td>
+        <td><input type="month" class="ct-to"   value="" style="font-size:.82em;padding:.2rem .3rem"></td>
+        <td style="text-align:center"><input type="checkbox" class="ct-chiase"></td>
+        <td style="text-align:center"><button onclick="this.closest('tr').remove()" style="border:none;background:none;color:#ef4444;cursor:pointer;font-size:.95rem;padding:.1rem .3rem" title="Xóa kỳ này">🗑</button></td>`;
+      lastRow.insertAdjacentElement('afterend', newRow);
+    }
+
+    function saveCtMapModal() {
+      // Collect all rows from the modal table
+      const tbody = document.getElementById('ctMapBody');
+      const newMap = {};
+      [...tbody.querySelectorAll('tr[data-gian]')].forEach(row => {
+        const gian    = row.dataset.gian;
+        const maCT    = (row.querySelector('.ct-input')?.value || '').trim().toUpperCase();
+        const fromDate = row.querySelector('.ct-from')?.value || '';
+        const toDate   = row.querySelector('.ct-to')?.value   || '';
+        const isChiaSe = row.querySelector('.ct-chiase')?.checked || false;
+        if (!maCT) return; // skip empty rows
+        if (!newMap[gian]) newMap[gian] = [];
+        newMap[gian].push({ maCT, isChiaSe, fromDate, toDate });
+        if (!_ctCodes.includes(maCT)) _ctCodes.push(maCT);
+      });
+      // Replace _ctMap but keep gians that were cleared (delete key)
+      _ctMap = newMap;
       saveCtMap();
       document.getElementById('ctMapModal').classList.remove('open');
-      renderPivot(); // re-render with CT labels
+      renderPivot();
       renderDoiSoatNgay();
     }
 
@@ -1734,7 +1821,7 @@
       const byDate = {};
       _rows.forEach(r => {
         if (!byDate[r.date]) byDate[r.date] = {};
-        const maCT = (_ctMap[r.gian] || {}).maCT;
+        const maCT = getCtForDate(r.gian, r.date).maCT;
         const gKey = maCT || r.gian; // group by maCT if mapped, else raw gian
         if (!byDate[r.date][gKey]) byDate[r.date][gKey] = { amount: 0, fee: 0, maCT: maCT || null, gians: [] };
         const rate = r.feeRate != null ? r.feeRate : (COMPANY === 'kh_cu' ? 0.011 : 0.01);
@@ -2153,7 +2240,7 @@
       const byDate = {};
       _rows.forEach(r => {
         if (!byDate[r.date]) byDate[r.date] = {};
-        const maCT = (_ctMap[r.gian] || {}).maCT;
+        const maCT = getCtForDate(r.gian, r.date).maCT;
         const gKey = maCT || r.gian;
         if (!byDate[r.date][gKey]) byDate[r.date][gKey] = { amount: 0, fee: 0, maCT: maCT || null, gians: [] };
         const rate = r.feeRate != null ? r.feeRate : (COMPANY === 'kh_cu' ? 0.011 : 0.01);
