@@ -198,6 +198,31 @@
     </div>
   </div>
 
+  <!-- Xuat chung tu mau modal -->
+  <div class="inv-edit-modal" id="ctMauModal">
+    <div class="inv-edit-box" style="width:min(620px,95vw);">
+      <h3>📄 Xuất chứng từ mẫu — <span id="ctMauNccName"></span></h3>
+      <label>Loại chứng từ</label>
+      <div style="display:flex;gap:1rem;flex-wrap:wrap;margin:.3rem 0 .8rem;">
+        <label style="font-weight:400;display:flex;align-items:center;gap:.3rem;"><input type="radio" name="ctMauLoai" value="giao-nhan" checked /> Biên bản giao nhận</label>
+        <label style="font-weight:400;display:flex;align-items:center;gap:.3rem;"><input type="radio" name="ctMauLoai" value="nghiem-thu" /> Biên bản nghiệm thu</label>
+        <label style="font-weight:400;display:flex;align-items:center;gap:.3rem;"><input type="radio" name="ctMauLoai" value="bang-ke" /> Bảng kê hóa đơn</label>
+      </div>
+      <div style="display:flex;gap:.75rem;align-items:center;flex-wrap:wrap;margin-bottom:.5rem;">
+        <label style="font-weight:400;display:flex;align-items:center;gap:.3rem;"><input type="checkbox" id="ctMauChonTatCa" onchange="ctMauToggleAll(this.checked)" /> Chọn tất cả</label>
+        <label style="font-weight:600;font-size:.85em;">Theo tháng:</label>
+        <select id="ctMauThang" onchange="ctMauFilterThang(this.value)" style="padding:.25rem .5rem;border-radius:4px;border:1px solid #cbd5e1;">
+          <option value="">— tất cả hóa đơn —</option>
+        </select>
+      </div>
+      <div id="ctMauInvList" style="max-height:280px;overflow-y:auto;border:1px solid #e2e8f0;border-radius:6px;padding:.5rem .75rem;"></div>
+      <div class="edit-actions">
+        <button type="button" class="btn-cancel" onclick="closeCtMauModal()">Hủy</button>
+        <button type="button" class="btn-save" style="background:#7c3aed;color:#fff;border:none;border-radius:5px;padding:.4rem 1rem;cursor:pointer;font-weight:600;" onclick="submitXuatChungTu()">Xuất Word</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     // Group data embedded from server
     var GROUPS = <%- JSON.stringify(groups.map(function(g){ return {
@@ -338,8 +363,9 @@
       html += '<textarea id="ctInput" rows="3" placeholder="VD: Biên bản nghiệm thu tháng 8: https://drive.google.com/...\nBáo giá số 001: https://...">' + escHtml(g.chungTu) + '</textarea>';
       html += '<label style="font-size:.82em;font-weight:600;color:#475569;">Ghi chú</label>';
       html += '<input type="text" id="ctGhiChu" value="' + escAttr(g.ghiChuNCC) + '" placeholder="Ghi chú thêm về NCC này..." />';
-      html += '<div style="display:flex;align-items:center;">';
+      html += '<div style="display:flex;align-items:center;gap:.5rem;">';
       html += '<button class="btn-save-ct" onclick="saveChungTu(' + gi + ')">💾 Lưu chứng từ</button>';
+      html += '<button class="btn-save-ct" style="background:#7c3aed;" onclick="openXuatChungTuModal(' + gi + ')">📄 Xuất chứng từ mẫu</button>';
       html += '<span class="save-ok" id="saveOk">✓ Đã lưu</span>';
       html += '</div>';
       html += '</div>';
@@ -362,6 +388,69 @@
         var ok = document.getElementById('saveOk');
         if (ok) { ok.style.display = 'inline'; setTimeout(function(){ ok.style.display='none'; }, 2000); }
       });
+    }
+
+    // ── Xuat chung tu mau (Bien ban giao nhan / nghiem thu / Bang ke) ──────
+    var ctMauGi = -1;
+    function openXuatChungTuModal(gi) {
+      ctMauGi = gi;
+      var g = GROUPS[gi];
+      document.getElementById('ctMauNccName').textContent = g.nccShort;
+      document.querySelector('input[name="ctMauLoai"][value="giao-nhan"]').checked = true;
+      document.getElementById('ctMauChonTatCa').checked = false;
+
+      // Thang co san (tu ngay hoa don), moi nhat truoc
+      var thangs = [...new Set(g.invoices.map(function(r){ return r.ngay ? r.ngay.slice(0,7) : ''; }).filter(Boolean))].sort().reverse();
+      var thangSel = document.getElementById('ctMauThang');
+      thangSel.innerHTML = '<option value="">— tất cả hóa đơn —</option>' +
+        thangs.map(function(t){ return '<option value="'+t+'">Tháng '+t.split('-')[1]+'/'+t.split('-')[0]+'</option>'; }).join('');
+
+      var list = document.getElementById('ctMauInvList');
+      list.innerHTML = g.invoices.map(function(r, ii) {
+        var ngayFmt = r.ngay ? r.ngay.split('-').reverse().join('/') : '(chưa rõ ngày)';
+        return '<label style="display:flex;align-items:center;gap:.5rem;padding:.25rem 0;font-weight:400;font-size:.88em;border-bottom:1px solid #f1f5f9;">' +
+          '<input type="checkbox" class="ctMauInvCb" data-drive-id="' + (r.driveId||'') + '" data-thang="' + (r.ngay?r.ngay.slice(0,7):'') + '" />' +
+          '<span class="tag-so">' + (r.soHoaDon||'—') + '</span>' +
+          '<span style="color:#888;">' + ngayFmt + '</span>' +
+          '<span style="flex:1;color:#475569;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + (r.noiDung||'') + '</span>' +
+          '</label>';
+      }).join('') || '<p style="color:#94a3b8;font-size:.85em;">Không có hóa đơn nào.</p>';
+
+      document.getElementById('ctMauModal').classList.add('open');
+    }
+    function closeCtMauModal() { document.getElementById('ctMauModal').classList.remove('open'); }
+    function ctMauToggleAll(checked) {
+      document.querySelectorAll('.ctMauInvCb').forEach(function(cb){ cb.checked = checked; });
+    }
+    function ctMauFilterThang(thang) {
+      document.getElementById('ctMauChonTatCa').checked = false;
+      document.querySelectorAll('.ctMauInvCb').forEach(function(cb){
+        cb.checked = thang ? (cb.dataset.thang === thang) : false;
+      });
+    }
+    function submitXuatChungTu() {
+      var g = GROUPS[ctMauGi];
+      var loai = document.querySelector('input[name="ctMauLoai"]:checked').value;
+      var driveIds = Array.from(document.querySelectorAll('.ctMauInvCb:checked')).map(function(cb){ return cb.dataset.driveId; }).filter(Boolean);
+      if (!driveIds.length) { alert('Chưa chọn hóa đơn nào.'); return; }
+      fetch('/ho-so/hoa-don-ncc/xuat-chung-tu', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nccKey: g.nccShort.toLowerCase(), loai: loai, driveIds: driveIds })
+      }).then(function(r) {
+        if (!r.ok) return r.json().then(function(j){ throw new Error(j.error || ('Lỗi ' + r.status)); });
+        var cd = r.headers.get('Content-Disposition') || '';
+        var m = cd.match(/filename="([^"]+)"/);
+        var fname = m ? m[1] : 'chung-tu.docx';
+        return r.blob().then(function(blob){ return { blob: blob, fname: fname }; });
+      }).then(function(res) {
+        var url = URL.createObjectURL(res.blob);
+        var a = document.createElement('a');
+        a.href = url; a.download = res.fname;
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        closeCtMauModal();
+      }).catch(function(err) { alert('Lỗi: ' + err.message); });
     }
 
     function closeDetail() {

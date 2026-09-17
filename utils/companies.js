@@ -10,18 +10,32 @@
 // Luu lua chon cong ty dang xem trong cookie-session (giong cach userId/
 // userName da luu) -- moi nguoi dung (moi may) co the dang xem 1 cong ty
 // khac nhau cung luc, khong anh huong nguoi khac.
+// Nhan, 2026-09-16: them daiDien/chucVu/diaChiNhanHang (Ben B) de dien tu
+// dong vao cac chung tu mau (Bien ban giao nhan/nghiem thu) o trang Ho So >
+// Hoa Don NCC (xem utils/chungTuNccDoc.js) -- hien de rong vi Nhan chua cung
+// cap, cac cho dung se tu hien gach cham de vien tay cho den khi dien vao day.
+// Nhan, 2026-09-17: gui mau "BIEN BAN GIAO NHAN" that (Ben B = CONG TY TNHH
+// DICH VU VA GIAI TRI K&H) co day du Dai dien/Chuc vu/Dia chi nhan hang -->
+// dien vao day cho kh_cu (dung ten cong ty nay). KH Moi (CONG TY TNHH GIAI
+// TRI K&H) van de rong, Nhan chua cung cap.
 const COMPANIES = {
   kh_cu: {
     key: "kh_cu",
     label: "KH Cũ",
     shortLabel: "Cũ",
     fullName: "CÔNG TY TNHH DỊCH VỤ VÀ GIẢI TRÍ K&H",
+    daiDien: "Ông Nguyễn Văn Kiên",
+    chucVu: "Giám Đốc",
+    diaChiNhanHang: "Thôn Mai Nội, Xã Sóc Sơn, TP Hà Nội",
   },
   kh_moi: {
     key: "kh_moi",
     label: "KH Mới",
     shortLabel: "Mới",
     fullName: "CÔNG TY TNHH GIẢI TRÍ K&H",
+    daiDien: "",
+    chucVu: "",
+    diaChiNhanHang: "",
   },
 };
 

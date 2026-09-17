@@ -7,8 +7,11 @@ const multer = require("multer");
 const XLSX = require("xlsx");
 const { load, save, nextId } = require("../store");
 const { requireLogin, requireAdmin, requireDataEntry } = require("../middleware/auth");
-const { getCompany } = require("../utils/companies");
+const { getCompany, COMPANIES } = require("../utils/companies");
 const driveApi = require("../utils/driveApi");
+const { Packer } = require("docx");
+const AdmZip = require("adm-zip");
+const { buildBienBanGiaoNhan, buildBienBanNghiemThu, buildBangKeHoaDon } = require("../utils/chungTuNccDoc");
 
 const uploadMem = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
 
@@ -374,6 +377,99 @@ router.post("/ho-so/hoa-don-ncc/ncc/:nccKey/luu-chungtu", requireAdmin, (req, re
   save(store);
   const qs = req.body.thang ? "?thang=" + encodeURIComponent(req.body.thang) : "";
   res.json({ ok: true });
+});
+
+// Nhan, 2026-09-16: "cho tôi thêm 1 chỗ xuất chứng từ mẫu ... biên bản giao
+// nhận hay biên bản nghiệm thu hay bảng kê hóa đơn" -- sinh file Word cho 1
+// hoặc nhiều hóa đơn đã CHỌN của 1 NCC. Quyết định theo AskUserQuestion:
+//  - Giao nhận/Nghiệm thu: chọn NHIỀU hóa đơn -> mỗi hóa đơn 1 file .docx
+//    riêng (vì mỗi biên bản chỉ có đúng 1 ngày = ngày hóa đơn), nén ZIP nếu
+//    >1 file; chỉ 1 hóa đơn thì trả thẳng .docx.
+//  - Bảng kê hóa đơn: luôn 1 file .docx dù chọn bao nhiêu hóa đơn.
+//  - Tên hàng hóa lấy nguyên "Nội dung" đã có (không tách ĐVT/SL).
+//  - Info Bên A (NCC): lấy tenDayDuNCC; địa chỉ/điện thoại/đại diện/chức vụ
+//    CHỈ điền nếu tìm thấy hợp đồng NCC khớp có sẵn field đó, không thì để
+//    trống (gạch chấm) cho Nhan viết tay.
+//  - Info Bên B (K&H): lấy từ utils/companies.js (đang để trống chờ Nhan
+//    cung cấp, xem ghi chú trong file đó).
+router.post("/ho-so/hoa-don-ncc/xuat-chung-tu", requireLogin, express.json(), async (req, res) => {
+  try {
+    const store = load();
+    ensureHoSo(store);
+    const activeCompany = getCompany(req);
+    const nccKey = String(req.body.nccKey || "").toLowerCase().trim();
+    const loai = String(req.body.loai || "").trim(); // 'giao-nhan' | 'nghiem-thu' | 'bang-ke'
+    const driveIds = Array.isArray(req.body.driveIds) ? req.body.driveIds.map(String) : [];
+    if (!nccKey) return res.status(400).json({ error: "Thiếu nccKey." });
+    if (!driveIds.length) return res.status(400).json({ error: "Chưa chọn hóa đơn nào." });
+    if (!["giao-nhan", "nghiem-thu", "bang-ke"].includes(loai)) return res.status(400).json({ error: "Loại chứng từ không hợp lệ." });
+
+    const hddvLookup = buildHddvLookup(store);
+    const allForCompany = store.ho_so_hoa_don.filter((r) => !r.company || r.company === activeCompany);
+    const rows = allForCompany.map((r) => enrichRow(r, hddvLookup, store));
+    const nccRows = rows.filter((r) => r.nccShort.toLowerCase() === nccKey);
+    if (!nccRows.length) return res.status(404).json({ error: "Không tìm thấy NCC." });
+    const invoices = nccRows.filter((r) => driveIds.includes(String(r.driveId)));
+    if (!invoices.length) return res.status(404).json({ error: "Không tìm thấy hóa đơn đã chọn." });
+
+    const nccShort = nccRows[0].nccShort;
+    const tenDayDuNCC = nccRows.find((r) => r.tenDayDuNCC)?.tenDayDuNCC || "";
+
+    // Do hop dong NCC khop de lay so HD (nghiem thu) + cac truong dia chi/dai
+    // dien/chuc vu/dien thoai NEU CO san trong ho so hop dong.
+    const hdNccList = store.phap_danh_hop_dong_ncc || [];
+    const shortNorm = normForMatch(nccShort);
+    const fullNorm = normForMatch(tenDayDuNCC);
+    const matchedHopDong = hdNccList.find((hd) => {
+      const hdShort = normForMatch(hd.tenNCC || "");
+      const hdFull = normForMatch(hd.tenDayDuNCC || "");
+      return (shortNorm.length >= 3 && (hdShort.includes(shortNorm) || shortNorm.includes(hdShort))) ||
+             (fullNorm.length >= 5 && (hdFull.includes(fullNorm) || fullNorm.includes(hdFull)));
+    });
+
+    const ncc = {
+      nccShort,
+      tenDayDuNCC,
+      diaChi: matchedHopDong && matchedHopDong.diaChi ? matchedHopDong.diaChi : "",
+      dienThoai: matchedHopDong && matchedHopDong.dienThoai ? matchedHopDong.dienThoai : "",
+      daiDien: matchedHopDong && matchedHopDong.daiDien ? matchedHopDong.daiDien : "",
+      chucVu: matchedHopDong && matchedHopDong.chucVu ? matchedHopDong.chucVu : "",
+    };
+    const company = COMPANIES[activeCompany] || COMPANIES.kh_cu;
+    const safeName = (nccShort || "NCC").replace(/[^a-zA-Z0-9À-ỹ_-]+/g, "_");
+
+    if (loai === "bang-ke") {
+      const doc = buildBangKeHoaDon({ ncc, invoices, company });
+      const buf = await Packer.toBuffer(doc);
+      res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
+      res.setHeader("Content-Disposition", `attachment; filename="BangKeHoaDon_${safeName}.docx"`);
+      return res.send(buf);
+    }
+
+    const buildOne = loai === "giao-nhan"
+      ? (inv) => buildBienBanGiaoNhan({ ncc, invoice: inv, company })
+      : (inv) => buildBienBanNghiemThu({ ncc, invoice: inv, company, hopDong: matchedHopDong });
+    const labelPrefix = loai === "giao-nhan" ? "BienBanGiaoNhan" : "BienBanNghiemThu";
+
+    if (invoices.length === 1) {
+      const buf = await Packer.toBuffer(buildOne(invoices[0]));
+      res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
+      res.setHeader("Content-Disposition", `attachment; filename="${labelPrefix}_${safeName}_${invoices[0].soHoaDon || ""}.docx"`);
+      return res.send(buf);
+    }
+
+    const zip = new AdmZip();
+    for (const inv of invoices) {
+      const buf = await Packer.toBuffer(buildOne(inv));
+      const fname = `${labelPrefix}_${safeName}_${(inv.soHoaDon || "khong-so").replace(/[^a-zA-Z0-9_-]+/g, "_")}.docx`;
+      zip.addFile(fname, buf);
+    }
+    res.setHeader("Content-Type", "application/zip");
+    res.setHeader("Content-Disposition", `attachment; filename="${labelPrefix}_${safeName}.zip"`);
+    return res.send(zip.toBuffer());
+  } catch (e) {
+    res.status(500).json({ error: "Lỗi tạo chứng từ: " + e.message });
+  }
 });
 
 // ─── Phí Cảng Phú Quốc ────────────────────────────────────────────────────
