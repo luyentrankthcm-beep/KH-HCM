@@ -529,6 +529,9 @@ router.post("/ho-so/hoa-don-ncc/xuat-chung-tu", requireLogin, express.json(), as
     const company = COMPANIES[activeCompany] || COMPANIES.kh_cu;
     const safeName = (nccShort || "NCC").replace(/[^a-zA-Z0-9À-ỹ_-]+/g, "_");
 
+    // TAM: debug header de kiem tra matchedHopDong (se xoa).
+    res.setHeader("X-Debug-Matched", encodeURIComponent(JSON.stringify({ nccShort, tenDayDuNCC, matchedId: matchedHopDong ? matchedHopDong.id : null, matchedTenNCC: matchedHopDong ? matchedHopDong.tenNCC : null, daiDien: matchedHopDong ? matchedHopDong.daiDien : null })));
+
     if (loai === "bang-ke") {
       const doc = buildBangKeHoaDon({ ncc, invoices, company });
       const buf = await Packer.toBuffer(doc);
