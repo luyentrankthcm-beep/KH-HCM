@@ -239,6 +239,7 @@
         hoSoLienQuan: r.hoSoLienQuan||''
       };}),
       hopDong: (g.hopDong||[]).map(function(hd){ return {
+        id: hd.id||'',
         soHopDong: hd.soHopDong||'',
         noiDung: hd.noiDung||'',
         ngayKy: hd.ngayKy||'',
@@ -339,7 +340,22 @@
           if (hd.ngayHetHan) html += 'Hết hạn: <strong>' + hd.ngayHetHan + '</strong>';
           if (hd.baoHanHD) html += ' <span style="color:' + (hd.baoHanHD==='quá hạn'?'#dc2626':'#16a34a') + ';font-size:.8em;">(' + hd.baoHanHD + ')</span>';
           html += '</div>';
-          if (hd.daiDien) html += '<div style="font-size:.82em;color:#475569;margin-top:.15rem;">Đại diện: <strong>' + hd.daiDien + '</strong>' + (hd.chucVu ? ' (' + hd.chucVu + ')' : '') + '</div>';
+          if (hd.daiDien) {
+            html += '<div style="font-size:.82em;color:#475569;margin-top:.15rem;">Đại diện: <strong>' + hd.daiDien + '</strong>' + (hd.chucVu ? ' (' + hd.chucVu + ')' : '') + ' <a href="javascript:void(0)" onclick="toggleSuaHopDong(' + gi + ',\'' + hd.id + '\')" style="font-size:.9em;">✏️ Sửa</a></div>';
+          } else {
+            html += '<div style="font-size:.82em;color:#dc2626;margin-top:.15rem;">⚠️ Chưa có Đại diện/Chức vụ — cần bổ sung để in đúng Biên bản <a href="javascript:void(0)" onclick="toggleSuaHopDong(' + gi + ',\'' + hd.id + '\')" style="color:#dc2626;">✏️ Bổ sung</a></div>';
+          }
+          html += '<div id="suaHdForm' + gi + '_' + hd.id + '" style="display:none;margin-top:.5rem;padding:.65rem;border:1px dashed #94a3b8;border-radius:8px;background:#f8fafc;">';
+          html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;margin-bottom:.5rem;">';
+          html += '<div><label style="display:block;font-size:.78em;font-weight:600;color:#475569;margin-bottom:.15rem;">Đại diện</label><input type="text" id="suaHdDaiDien' + gi + '_' + hd.id + '" value="' + escAttr(hd.daiDien) + '" placeholder="VD: Ông Nguyễn Văn A" style="width:100%;box-sizing:border-box;padding:.35rem .5rem;border:1px solid #cbd5e1;border-radius:5px;" /></div>';
+          html += '<div><label style="display:block;font-size:.78em;font-weight:600;color:#475569;margin-bottom:.15rem;">Chức vụ</label><input type="text" id="suaHdChucVu' + gi + '_' + hd.id + '" value="' + escAttr(hd.chucVu) + '" placeholder="VD: Giám Đốc" style="width:100%;box-sizing:border-box;padding:.35rem .5rem;border:1px solid #cbd5e1;border-radius:5px;" /></div>';
+          html += '</div>';
+          html += '<div style="display:flex;gap:.5rem;align-items:center;">';
+          html += '<button type="button" class="btn-save-ct" onclick="submitSuaHopDong(' + gi + ',\'' + hd.id + '\')">💾 Lưu</button>';
+          html += '<button type="button" class="btn-cancel" onclick="toggleSuaHopDong(' + gi + ',\'' + hd.id + '\')">Hủy</button>';
+          html += '<span class="save-ok" id="suaHdOk' + gi + '_' + hd.id + '">✓ Đã lưu</span>';
+          html += '</div>';
+          html += '</div>';
           if (hd.linkHopDong) html += '<a href="' + hd.linkHopDong + '" target="_blank" class="hd-link">🔗 Xem hợp đồng</a>';
           // Chi tiet (phu luc only — bien ban da tach ra rieng, dedup theo soHopDong)
           var bb = (hd.chiTiet||[]).filter(function(c){ return isBienBanItem(c.soHopDong, c.noiDung, c.phanLoaiHD); });
@@ -441,6 +457,36 @@
           soHopDong: hd.soHopDong || '', noiDung: hd.noiDung || '', ngayKy: hd.ngayKy || '',
           ngayHetHan: hd.ngayHetHan || '', baoHanHD: '', giaTriHopDong: hd.giaTriHopDong || 0,
           linkHopDong: hd.linkHopDong || '', daiDien: hd.daiDien || '', chucVu: hd.chucVu || '', chiTiet: []
+        });
+        openDetail(gi);
+      }).catch(function(e) { alert('Lỗi kết nối: ' + e.message); });
+    }
+
+    // ── Sua hop dong NCC da match nhung thieu Dai dien/Chuc vu ──────────────
+    function toggleSuaHopDong(gi, id) {
+      var f = document.getElementById('suaHdForm' + gi + '_' + id);
+      if (f) f.style.display = (f.style.display === 'none' || !f.style.display) ? 'block' : 'none';
+    }
+
+    function submitSuaHopDong(gi, id) {
+      var val = function(prefix) { var el = document.getElementById(prefix + gi + '_' + id); return el ? el.value : ''; };
+      var body = {
+        daiDien: val('suaHdDaiDien'),
+        chucVu: val('suaHdChucVu'),
+      };
+      fetch('/ho-so/hoa-don-ncc/hop-dong/' + encodeURIComponent(id) + '/sua', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(body)
+      }).then(function(r) { return r.json(); }).then(function(data) {
+        if (data.error) { alert('Lỗi: ' + data.error); return; }
+        var hd = data.hopDong || {};
+        var g = GROUPS[gi];
+        g.hopDong.forEach(function(existing) {
+          if (String(existing.id) === String(id)) {
+            existing.daiDien = hd.daiDien || '';
+            existing.chucVu = hd.chucVu || '';
+          }
         });
         openDetail(gi);
       }).catch(function(e) { alert('Lỗi kết nối: ' + e.message); });

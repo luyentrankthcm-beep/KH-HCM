@@ -508,6 +508,32 @@ router.post("/ho-so/hoa-don-ncc/ncc/:nccKey/them-hop-dong", requireAdmin, (req, 
   }
 });
 
+// Nhan, 2026-09-17: "tên đại diện trên hợp đồng có nè sao in ra không có á
+// ... còn không hiện cảnh báo chưa có" -- hop dong NCC da MATCH duoc (hien
+// the o hd-card) nhung thieu daiDien/chucVu (vd tao truoc khi co field nay,
+// hoac nhap thieu) thi khong co cach nao sua lai ngay tai Ho So (chi co the
+// XOA roi THEM lai, mat het du lieu khac). Them route sua-tai-cho 1 ban ghi
+// hop dong da ton tai theo id, tra JSON de client cap nhat UI khong reload.
+router.post("/ho-so/hoa-don-ncc/hop-dong/:id/sua", requireAdmin, (req, res) => {
+  try {
+    const store = load();
+    if (!store.phap_danh_hop_dong_ncc) store.phap_danh_hop_dong_ncc = [];
+    const rec = store.phap_danh_hop_dong_ncc.find((r) => String(r.id) === String(req.params.id));
+    if (!rec) return res.status(404).json({ error: "Không tìm thấy hợp đồng." });
+    const { daiDien, chucVu, linkHopDong, soHopDong, ngayKy } = req.body;
+    rec.daiDien = (daiDien || "").trim();
+    rec.chucVu = (chucVu || "").trim();
+    if (linkHopDong !== undefined) rec.linkHopDong = (linkHopDong || "").trim();
+    if (soHopDong !== undefined) rec.soHopDong = (soHopDong || "").trim();
+    if (ngayKy !== undefined) rec.ngayKy = ngayKy || "";
+    rec.updatedAt = new Date().toISOString();
+    save(store);
+    res.json({ ok: true, hopDong: rec });
+  } catch (e) {
+    res.status(500).json({ error: "Lỗi cập nhật hợp đồng: " + e.message });
+  }
+});
+
 // Nhan, 2026-09-16: "cho tôi thêm 1 chỗ xuất chứng từ mẫu ... biên bản giao
 // nhận hay biên bản nghiệm thu hay bảng kê hóa đơn" -- sinh file Word cho 1
 // hoặc nhiều hóa đơn đã CHỌN của 1 NCC. Quyết định theo AskUserQuestion:
