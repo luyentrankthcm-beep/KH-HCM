@@ -181,20 +181,60 @@ function normSoHD(s) {
 
 // Luyen, 2026-08-25: tu dong dien Ten NCC va Tong tien tu bang hoa_don_dau_vao
 // (doi chieu theo so hoa don tu ten file). Luu ca key goc lan key bo so 0 dau.
-function buildHddvLookup(store) {
-  const lookup = {}; // soHoaDon (raw + normalized) -> { tenNCC, tongTien }
+//
+// Nhan, 2026-09-17: BUG -- so hoa don (vd "107") la so NHO, rat de TRUNG giua
+// nhieu NCC khac nhau khong lien quan gi (vd hoa don 107 cua "Ngoc Ha Foods",
+// "Khanh Thao" VA "CONG TY TNHH CNM" trung nhau). Ban cu gop CA 3 lai thanh 1
+// (chi lay tenNCC cua ban ghi dau tien gap, CONG DON ca 3 tongTien lai) ->
+// hien sai ten NCC + sai so tien cho hoa don that. Sua: nhom theo CA (so hoa
+// don, ten NCC da chuan hoa) de khong gop nham; lookup[soHoaDon] tra ve MANG
+// cac NCC trung so, de enrichRow tu chon dung theo ten NCC cua chinh file do
+// (xem pickHddvCandidate).
+function buildHddvLookup(store, activeCompany) {
+  const lookup = {}; // soHoaDon (raw + normalized) -> [{ tenNCC, tongTien, dienGiai }, ...]
+  const grouped = {}; // "soHoaDon||tenNCCChuanHoa" -> candidate (de gop nhieu dong CUNG 1 hoa don that)
   (store.hoa_don_dau_vao || []).forEach((r) => {
+    if (activeCompany && r.congTy && r.congTy !== activeCompany) return;
     const no = String(r.soHoaDon || "").trim();
     if (!no) return;
     const noNorm = normSoHD(no);
-    [no, noNorm].forEach((k) => {
-      if (!lookup[k]) lookup[k] = { tenNCC: r.tenNCC || "", tongTien: 0, dienGiai: r.dienGiai || r.tenHangHoaMisa || "" };
-      lookup[k].tongTien += r.soTien || 0;
-      if (!lookup[k].dienGiai && (r.dienGiai || r.tenHangHoaMisa))
-        lookup[k].dienGiai = r.dienGiai || r.tenHangHoaMisa || "";
+    const nccNorm = normForMatch(r.tenNCC || "");
+    // Nhan, 2026-09-17: bug cu -- khi so HD KHONG co so 0 dau (vd "107", rat
+    // pho bien), no===noNorm nen forEach lap 2 LAN TREN CUNG 1 KEY, cong
+    // tongTien HAI LAN cho cung 1 hoa don (sai gap doi so tien). Dung Set de
+    // chi giu key duy nhat.
+    [...new Set([no, noNorm])].forEach((k) => {
+      const gkey = k + "||" + nccNorm;
+      if (!grouped[gkey]) {
+        grouped[gkey] = { tenNCC: r.tenNCC || "", tongTien: 0, dienGiai: r.dienGiai || r.tenHangHoaMisa || "" };
+        if (!lookup[k]) lookup[k] = [];
+        lookup[k].push(grouped[gkey]);
+      }
+      grouped[gkey].tongTien += r.soTien || 0;
+      if (!grouped[gkey].dienGiai && (r.dienGiai || r.tenHangHoaMisa))
+        grouped[gkey].dienGiai = r.dienGiai || r.tenHangHoaMisa || "";
     });
   });
   return lookup;
+}
+
+// Trong so cac ban ghi hoa_don_dau_vao trung SO HOA DON, chon dung ban ghi
+// theo ten NCC lay tu chinh ten file (vd "KhanhThao"). Chi 1 ung vien thi lay
+// luon (khong can khop ten, giu hanh vi cu cho truong hop khong trung). Nhieu
+// ung vien ma KHONG chac chan cai nao dung thi tra null (KHONG tu dien bua --
+// tha de trong con hon dien SAI ten/so tien cua NCC khac).
+function pickHddvCandidate(candidates, nccShort) {
+  if (!candidates || !candidates.length) return null;
+  if (candidates.length === 1) return candidates[0];
+  const shortNorm = normForMatch(nccShort);
+  if (shortNorm.length >= 3) {
+    const match = candidates.find((c) => {
+      const cNorm = normForMatch(c.tenNCC);
+      return cNorm.length > 0 && (cNorm.includes(shortNorm) || shortNorm.includes(cNorm));
+    });
+    if (match) return match;
+  }
+  return null;
 }
 
 // Fallback: dò tên đầy đủ NCC từ danh sách NCC (chi_phi_ncc_list) khi số HĐ
@@ -235,9 +275,10 @@ function lookupNccNameFallback(nccShort, store) {
 
 function enrichRow(r, hddvLookup, store) {
   const parsed = parseInvoiceFileName(r.fileName || "");
-  const inv = hddvLookup && parsed.soHoaDon
+  const candidates = hddvLookup && parsed.soHoaDon
     ? (hddvLookup[parsed.soHoaDon] || hddvLookup[normSoHD(parsed.soHoaDon)])
     : null;
+  const inv = candidates ? pickHddvCandidate(candidates, parsed.ncc) : null;
   const autoTenFromHD = inv ? inv.tenNCC : "";
   const autoTenFromNCC = !autoTenFromHD ? lookupNccNameFallback(parsed.ncc, store) : "";
   const autoTen = autoTenFromHD || autoTenFromNCC;
@@ -262,7 +303,7 @@ router.get("/ho-so/hoa-don-ncc", (req, res) => {
   ensureHoSo(store);
   const activeCompany = getCompany(req);
   const thangFilter = req.query.thang || "";
-  const hddvLookup = buildHddvLookup(store);
+  const hddvLookup = buildHddvLookup(store, activeCompany);
 
   // Loc theo cong ty: ban cu khong co truong company -> thuoc kh_cu
   const allForCompany = store.ho_so_hoa_don.filter(
@@ -337,7 +378,7 @@ router.get("/v2/ho-so/hoa-don-ncc", (req, res) => {
   ensureHoSo(store);
   const activeCompany = getCompany(req);
   const thangFilter = req.query.thang || "";
-  const hddvLookup = buildHddvLookup(store);
+  const hddvLookup = buildHddvLookup(store, activeCompany);
 
   const allForCompany = store.ho_so_hoa_don.filter(
     (r) => !r.company || r.company === activeCompany
@@ -487,7 +528,7 @@ router.post("/ho-so/hoa-don-ncc/xuat-chung-tu", requireLogin, express.json(), as
     if (!driveIds.length) return res.status(400).json({ error: "Chưa chọn hóa đơn nào." });
     if (!["giao-nhan", "nghiem-thu", "bang-ke"].includes(loai)) return res.status(400).json({ error: "Loại chứng từ không hợp lệ." });
 
-    const hddvLookup = buildHddvLookup(store);
+    const hddvLookup = buildHddvLookup(store, activeCompany);
     const allForCompany = store.ho_so_hoa_don.filter((r) => !r.company || r.company === activeCompany);
     const rows = allForCompany.map((r) => enrichRow(r, hddvLookup, store));
     const nccRows = rows.filter((r) => r.nccShort.toLowerCase() === nccKey);
