@@ -472,6 +472,25 @@ router.post("/ho-so/hoa-don-ncc/xuat-chung-tu", requireLogin, express.json(), as
   }
 });
 
+// TAM: debug xem raw text PDF hoa don de viet regex trich xuat (se xoa sau).
+router.get("/ho-so/_debug/pdf-text/:driveId", requireAdmin, async (req, res) => {
+  try {
+    const store = load();
+    const gmailApi = require("../utils/gmailApi");
+    const accessToken = await gmailApi.getValidAccessToken(store);
+    const dlResp = await fetch(`https://www.googleapis.com/drive/v3/files/${req.params.driveId}?alt=media`, {
+      headers: { Authorization: "Bearer " + accessToken },
+    });
+    if (!dlResp.ok) throw new Error("Drive loi " + dlResp.status + ": " + (await dlResp.text()).slice(0, 300));
+    const buf = Buffer.from(await dlResp.arrayBuffer());
+    const pdfParse = require("pdf-parse");
+    const data = await pdfParse(buf);
+    res.type("text/plain").send(data.text || "(khong co text)");
+  } catch (e) {
+    res.status(500).send("Loi: " + e.message);
+  }
+});
+
 // ─── Phí Cảng Phú Quốc ────────────────────────────────────────────────────
 router.get("/ho-so/phi-cang-phu-quoc", (req, res) => {
   const store = load();
