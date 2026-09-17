@@ -140,8 +140,11 @@
                 <%= r.createdAt ? new Date(r.createdAt).toLocaleDateString('vi-VN') : '—' %>
               </td>
               <td style="text-align:center;">
-                <button type="button" class="link-btn"
-                  onclick="openEditModal(<%= r.id %>, <%- JSON.stringify(r.ma||'') %>, <%- JSON.stringify(r.ten||'') %>, <%- JSON.stringify(r.ghiChu||'') %>)"
+                <button type="button" class="link-btn" onclick="openEditModal(this)"
+                  data-id="<%= r.id %>"
+                  data-ma="<%= (r.ma||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;') %>"
+                  data-ten="<%= (r.ten||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;') %>"
+                  data-ghichu="<%= (r.ghiChu||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;') %>"
                   style="margin-right:8px;font-weight:600;">✏️ Sửa</button>
                 <form method="POST" action="/danh-muc/<%= slug %>/xoa/<%= r.id %>" style="display:inline;"
                   onsubmit="return confirm('Xóa mã &quot;<%= r.ma %>&quot;?')">
@@ -194,11 +197,15 @@
       var el = document.getElementById('doiMaPanel');
       if (el) el.style.display = (el.style.display === 'none' || !el.style.display) ? 'block' : 'none';
     }
-    function openEditModal(id, ma, ten, ghiChu) {
+    function openEditModal(btn) {
+      var id = btn.dataset.id;
+      var ma = btn.dataset.ma || '';
+      var ten = btn.dataset.ten || '';
+      var ghiChu = btn.dataset.ghichu || '';
       document.getElementById('editModalForm').action = '/danh-muc/<%= slug %>/sua/' + id;
       document.getElementById('modalMa').value = ma;
       document.getElementById('modalTen').value = ten;
-      document.getElementById('modalGhiChu').value = ghiChu || '';
+      document.getElementById('modalGhiChu').value = ghiChu;
       var m = document.getElementById('editModal');
       m.style.display = 'flex';
       setTimeout(function(){ document.getElementById('modalMa').focus(); document.getElementById('modalMa').select(); }, 50);
