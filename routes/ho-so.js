@@ -451,6 +451,17 @@ router.post("/ho-so/hoa-don-ncc/ncc/:nccKey/them-hop-dong", requireAdmin, (req, 
   }
 });
 
+// TAM: debug tim id ban ghi hop dong NCC theo tu khoa (de don dep du lieu test,
+// se xoa sau).
+router.get("/ho-so/_debug/find-hopdong", requireAdmin, (req, res) => {
+  const store = load();
+  const q = String(req.query.q || "").toLowerCase();
+  const matches = (store.phap_danh_hop_dong_ncc || []).filter((r) =>
+    JSON.stringify(r).toLowerCase().includes(q)
+  );
+  res.json(matches);
+});
+
 // Nhan, 2026-09-16: "cho tôi thêm 1 chỗ xuất chứng từ mẫu ... biên bản giao
 // nhận hay biên bản nghiệm thu hay bảng kê hóa đơn" -- sinh file Word cho 1
 // hoặc nhiều hóa đơn đã CHỌN của 1 NCC. Quyết định theo AskUserQuestion:
