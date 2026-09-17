@@ -201,7 +201,18 @@ function buildHddvLookup(store) {
 // không khớp trong hoa_don_dau_vao. Chuẩn hoá bằng cách bỏ ký tự đặc biệt,
 // lowercase rồi kiểm tra nccShort có nằm trong tên NCC không.
 function normForMatch(s) {
-  return String(s || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+  // Nhan, 2026-09-17: bug cu -- chi lowercase roi xoa ky tu khong phai a-z0-9
+  // se XOA LUON ca chu co dau (vd "ả" khong thuoc [a-z0-9] nen bi xoa thang,
+  // KHONG chuyen ve "a"), lam 2 ten khac nhau bi trung lam do trung cac phan
+  // con lai sau khi xoa dau ngau nhien (vd "Khanh Thảo" -> "khanhtho" thay vi
+  // "khanhthao"), gay khop NHAM hop dong. Chuan hoa dung cach: NFD + bo dau
+  // (combining marks) + doi "đ" -> "d" TRUOC khi xoa ky tu con lai.
+  return String(s || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/đ/g, "d")
+    .replace(/[^a-z0-9]/g, "");
 }
 function lookupNccNameFallback(nccShort, store) {
   const shortNorm = normForMatch(nccShort);
@@ -451,17 +462,6 @@ router.post("/ho-so/hoa-don-ncc/ncc/:nccKey/them-hop-dong", requireAdmin, (req, 
   }
 });
 
-// TAM: debug tim id ban ghi hop dong NCC theo tu khoa (de don dep du lieu test,
-// se xoa sau).
-router.get("/ho-so/_debug/find-hopdong", requireAdmin, (req, res) => {
-  const store = load();
-  const q = String(req.query.q || "").toLowerCase();
-  const matches = (store.phap_danh_hop_dong_ncc || []).filter((r) =>
-    JSON.stringify(r).toLowerCase().includes(q)
-  );
-  res.json(matches);
-});
-
 // Nhan, 2026-09-16: "cho tôi thêm 1 chỗ xuất chứng từ mẫu ... biên bản giao
 // nhận hay biên bản nghiệm thu hay bảng kê hóa đơn" -- sinh file Word cho 1
 // hoặc nhiều hóa đơn đã CHỌN của 1 NCC. Quyết định theo AskUserQuestion:
@@ -528,9 +528,6 @@ router.post("/ho-so/hoa-don-ncc/xuat-chung-tu", requireLogin, express.json(), as
     };
     const company = COMPANIES[activeCompany] || COMPANIES.kh_cu;
     const safeName = (nccShort || "NCC").replace(/[^a-zA-Z0-9À-ỹ_-]+/g, "_");
-
-    // TAM: debug header de kiem tra matchedHopDong (se xoa).
-    res.setHeader("X-Debug-Matched", encodeURIComponent(JSON.stringify({ nccShort, tenDayDuNCC, matchedId: matchedHopDong ? matchedHopDong.id : null, matchedTenNCC: matchedHopDong ? matchedHopDong.tenNCC : null, daiDien: matchedHopDong ? matchedHopDong.daiDien : null })));
 
     if (loai === "bang-ke") {
       const doc = buildBangKeHoaDon({ ncc, invoices, company });
