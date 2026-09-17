@@ -303,27 +303,6 @@ function enrichRow(r, hddvLookup, store) {
   };
 }
 
-// TAM: debug xem CGV bi loi ten tu dau (se xoa sau).
-router.get("/ho-so/_debug/ncc-trace", requireAdmin, (req, res) => {
-  const store = load();
-  ensureHoSo(store);
-  const activeCompany = getCompany(req);
-  const nccShort = String(req.query.ncc || "");
-  const hddvLookup = buildHddvLookup(store, activeCompany);
-  const parsed = { ncc: nccShort, soHoaDon: String(req.query.soHd || "") };
-  const candidates = hddvLookup[parsed.soHoaDon] || hddvLookup[normSoHD(parsed.soHoaDon)] || [];
-  const picked = pickHddvCandidate(candidates, parsed.ncc);
-  const fallback = lookupNccNameFallback(nccShort, store);
-  res.json({
-    nccShort,
-    soHoaDon: parsed.soHoaDon,
-    candidatesCount: candidates.length,
-    candidates,
-    picked,
-    lookupNccNameFallback_result: fallback,
-  });
-});
-
 router.get("/ho-so/hoa-don-ncc", (req, res) => {
   const store = load();
   ensureHoSo(store);
