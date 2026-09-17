@@ -10,6 +10,10 @@ router.get("/dau-ra", (req, res) => {
   res.render("dau-ra", { userName: req.session.userName || req.session.user || "" });
 });
 
+router.get("/dau-ra-noi-bo", (req, res) => {
+  res.render("dau-ra-noi-bo", { userName: req.session.userName || req.session.user || "" });
+});
+
 // ── KV store cho trang "Đầu Ra" ──────────────────────────────────────────
 // Chi Nhan, 2026-09-10: trang nay truoc gio luu Momo/MTT/Zalo rows... bang
 // localStorage CUA TRINH DUYET -- Luyen bao mo web o 2 may/tai khoan khac

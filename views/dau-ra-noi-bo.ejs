@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <%- include('partials/head') %>
+  <title>Đầu Ra – Nội Bộ – K&H</title>
+  <style>
+    .tab-bar { display:flex; gap:0; border-bottom:2px solid #1e3a5f; margin-bottom:1.25rem; }
+    .tab-btn { padding:.5rem 1.25rem; font-weight:600; font-size:.88em; cursor:pointer; border:none; background:#e8f0fe; color:#1e3a5f; border-radius:6px 6px 0 0; margin-right:3px; }
+    .tab-btn.active { background:#1e3a5f; color:#fff; }
+    .tab-btn:hover:not(.active) { background:#c7d7f8; }
+    .tab-panel { display:none; }
+    .tab-panel.active { display:block; }
+  </style>
+</head>
+<body>
+  <%- include('partials/nav') %>
+  <main class="container" style="padding-top:1.5rem">
+
+    <h1 style="font-size:1.4rem;font-weight:700;margin-bottom:.5rem">Đầu Ra – Nội Bộ</h1>
+
+    <div class="tab-bar">
+      <button class="tab-btn active" id="tab_btn_nb1" onclick="switchTabNB('nb1')">📋 Tab 1</button>
+      <button class="tab-btn" id="tab_btn_nb2" onclick="switchTabNB('nb2')">📋 Tab 2</button>
+    </div>
+
+    <div id="tab_nb1" class="tab-panel active">
+      <div style="padding:3rem;text-align:center;color:#94a3b8">
+        <div style="font-size:3rem;margin-bottom:1rem">🏗️</div>
+        <p style="font-size:1rem;font-weight:600">Trang Đầu Ra – Nội Bộ</p>
+        <p style="font-size:.88em;margin-top:.5rem">Dùng để theo dõi các giao dịch nội bộ giữa các gian / công trình.</p>
+        <p style="font-size:.82em;color:#cbd5e1;margin-top:1rem">Luyến cho biết cần hiển thị dữ liệu gì ở đây để mình thiết lập tiếp nhé.</p>
+      </div>
+    </div>
+
+    <div id="tab_nb2" class="tab-panel">
+      <div style="padding:3rem;text-align:center;color:#94a3b8">
+        <div style="font-size:3rem;margin-bottom:1rem">📂</div>
+        <p style="font-size:.88em">Chưa có nội dung</p>
+      </div>
+    </div>
+
+  </main>
+  <script>
+    function switchTabNB(id) {
+      document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.getElementById('tab_' + id).classList.add('active');
+      document.getElementById('tab_btn_' + id).classList.add('active');
+    }
+  </script>
+  <%- include('partials/scroll-restore') %>
+</body>
+</html>
