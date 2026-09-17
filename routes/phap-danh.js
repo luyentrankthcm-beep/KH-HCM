@@ -1102,6 +1102,12 @@ function ensureNccDefaults(row) {
       khuVuc: "",
       chiTiet: [],
       ghiChu: "",
+      // Nhan, 2026-09-17: them de dien "Đại diện"/"Chức vụ" Bên A vao Bien Ban
+      // (xem utils/chungTuNccDoc.js) -- CHI dung khi hop dong NCC da map hoac
+      // duoc them thu cong tu trang Ho So > Hoa Don NCC (nut "+ Thêm hợp đồng
+      // NCC"), khong tu doan/lay tu noi khac.
+      daiDien: "",
+      chucVu: "",
     },
     row
   );
@@ -1366,7 +1372,7 @@ router.post("/phap-danh/hop-dong-ncc", requireAdmin, (req, res) => {
   ensureShape(store);
   const activeCompany = getCompany(req);
   try {
-    const { tenNCC, tenTrenHD, noiDung, hangHoaMua, phanLoaiHD, soHopDong, ngayKy, ngayHetHan, giaTriHopDong, linkHopDong, ghiChu } = req.body;
+    const { tenNCC, tenTrenHD, noiDung, hangHoaMua, phanLoaiHD, soHopDong, ngayKy, ngayHetHan, giaTriHopDong, linkHopDong, ghiChu, daiDien, chucVu } = req.body;
     if (!tenNCC || !tenNCC.trim()) throw new Error("Thiếu Tên NCC.");
     const amt = giaTriHopDong ? Number(String(giaTriHopDong).replace(/[^\d]/g, "")) : 0;
     store.phap_danh_hop_dong_ncc.push({
@@ -1384,6 +1390,8 @@ router.post("/phap-danh/hop-dong-ncc", requireAdmin, (req, res) => {
       linkHopDong: (linkHopDong || "").trim(),
       chiTiet: [],
       ghiChu: (ghiChu || "").trim(),
+      daiDien: (daiDien || "").trim(),
+      chucVu: (chucVu || "").trim(),
       createdAt: new Date().toISOString(),
       source: "nhap tay",
     });

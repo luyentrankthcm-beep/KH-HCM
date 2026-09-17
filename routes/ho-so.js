@@ -12,6 +12,30 @@ const driveApi = require("../utils/driveApi");
 const { Packer } = require("docx");
 const AdmZip = require("adm-zip");
 const { buildBienBanGiaoNhan, buildBienBanNghiemThu, buildBangKeHoaDon } = require("../utils/chungTuNccDoc");
+const { extractHoaDonPdfInfo } = require("../utils/hoaDonPdf");
+
+// Nhan, 2026-09-17: tai file PDF hoa don tren Drive va trich xuat dia chi/
+// dien thoai Ben A + bang hang hoa chi tiet (xem utils/hoaDonPdf.js). Loi bat
+// ky buoc nao (Drive tra loi, khong parse duoc PDF, bang hang hoa khong
+// khop...) deu tra ve null, KHONG throw -- de cho goi noi lam viec fallback
+// ve 1 dong noi dung rut gon nhu cu, khong bao gio lam sap export.
+async function fetchInvoicePdfExtract(store, driveId) {
+  if (!driveId) return null;
+  try {
+    const gmailApi = require("../utils/gmailApi");
+    const accessToken = await gmailApi.getValidAccessToken(store);
+    const dlResp = await fetch(`https://www.googleapis.com/drive/v3/files/${driveId}?alt=media`, {
+      headers: { Authorization: "Bearer " + accessToken },
+    });
+    if (!dlResp.ok) return null;
+    const buf = Buffer.from(await dlResp.arrayBuffer());
+    const pdfParse = require("pdf-parse");
+    const data = await pdfParse(buf);
+    return extractHoaDonPdfInfo(data.text || "");
+  } catch (e) {
+    return null;
+  }
+}
 
 const uploadMem = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
 
@@ -379,6 +403,45 @@ router.post("/ho-so/hoa-don-ncc/ncc/:nccKey/luu-chungtu", requireAdmin, (req, re
   res.json({ ok: true });
 });
 
+// Nhan, 2026-09-17: "nếu đúng tên ncc á thì map còn không thì cho tôi nút
+// thêm rồi tôi sẽ hiện ra 1 cái khung á nó sẽ có thông tin hợp đồng á thì đó
+// tôi gắn link gg drive xong bạn lấy tên người đại diện ra từ hợp đồng" --
+// khi 1 NCC o trang Ho So > Hoa Don NCC CHUA map duoc hop dong nao (khong
+// trung ten voi phap_danh_hop_dong_ncc), cho phep them thang 1 ban ghi hop
+// dong NCC (Dai dien/Chuc vu + link Google Drive) ngay tai modal, khong can
+// qua trang Phap Danh > Hop Dong NCC rieng. Tra JSON de client cap nhat
+// ngay khong can reload trang.
+router.post("/ho-so/hoa-don-ncc/ncc/:nccKey/them-hop-dong", requireAdmin, (req, res) => {
+  try {
+    const store = load();
+    if (!store.phap_danh_hop_dong_ncc) store.phap_danh_hop_dong_ncc = [];
+    const activeCompany = getCompany(req);
+    const { tenNCC, daiDien, chucVu, linkHopDong, soHopDong, ngayKy } = req.body;
+    const ten = (tenNCC || req.params.nccKey || "").trim();
+    if (!ten) return res.status(400).json({ error: "Thiếu tên NCC." });
+    const rec = {
+      id: nextId(store, "phap_danh_hop_dong_ncc_seq") || Date.now(),
+      tenNCC: ten,
+      tenDayDuNCC: "",
+      congTy: activeCompany,
+      daiDien: (daiDien || "").trim(),
+      chucVu: (chucVu || "").trim(),
+      linkHopDong: (linkHopDong || "").trim(),
+      soHopDong: (soHopDong || "").trim(),
+      ngayKy: ngayKy || "",
+      chiTiet: [],
+      ghiChu: "",
+      createdAt: new Date().toISOString(),
+      source: "them tu Ho So Hoa Don NCC",
+    };
+    store.phap_danh_hop_dong_ncc.push(rec);
+    save(store);
+    res.json({ ok: true, hopDong: rec });
+  } catch (e) {
+    res.status(500).json({ error: "Lỗi lưu hợp đồng: " + e.message });
+  }
+});
+
 // Nhan, 2026-09-16: "cho tôi thêm 1 chỗ xuất chứng từ mẫu ... biên bản giao
 // nhận hay biên bản nghiệm thu hay bảng kê hóa đơn" -- sinh file Word cho 1
 // hoặc nhiều hóa đơn đã CHỌN của 1 NCC. Quyết định theo AskUserQuestion:
@@ -427,11 +490,14 @@ router.post("/ho-so/hoa-don-ncc/xuat-chung-tu", requireLogin, express.json(), as
              (fullNorm.length >= 5 && (hdFull.includes(fullNorm) || fullNorm.includes(hdFull)));
     });
 
+    // Nhan, 2026-09-17: "Đại diện" (Ben A) CHI lay tu Hop dong NCC da map/them
+    // (khong doan), con "Địa chỉ"/"Điện thoại" lay TRUC TIEP tu file PDF hoa
+    // don (xem fetchInvoicePdfExtract ben duoi), khong lay tu Hop dong nua.
     const ncc = {
       nccShort,
       tenDayDuNCC,
-      diaChi: matchedHopDong && matchedHopDong.diaChi ? matchedHopDong.diaChi : "",
-      dienThoai: matchedHopDong && matchedHopDong.dienThoai ? matchedHopDong.dienThoai : "",
+      diaChi: "",
+      dienThoai: "",
       daiDien: matchedHopDong && matchedHopDong.daiDien ? matchedHopDong.daiDien : "",
       chucVu: matchedHopDong && matchedHopDong.chucVu ? matchedHopDong.chucVu : "",
     };
@@ -444,6 +510,19 @@ router.post("/ho-so/hoa-don-ncc/xuat-chung-tu", requireLogin, express.json(), as
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
       res.setHeader("Content-Disposition", `attachment; filename="BangKeHoaDon_${safeName}.docx"`);
       return res.send(buf);
+    }
+
+    // Giao nhan / Nghiem thu: doc tung file PDF hoa don da chon de lay dia
+    // chi/dien thoai NCC (dung chung cho ca nhom, lay tu hoa don dau tien
+    // trich xuat thanh cong) + bang hang hoa chi tiet rieng cho tung hoa don.
+    for (const inv of invoices) {
+      const extract = await fetchInvoicePdfExtract(store, inv.driveId);
+      if (extract) {
+        if (extract.items && extract.items.length) inv.pdfItems = extract.items;
+        if (extract.tongCong) inv.pdfTongCong = extract.tongCong;
+        if (!ncc.diaChi && extract.diaChi) ncc.diaChi = extract.diaChi;
+        if (!ncc.dienThoai && extract.dienThoai) ncc.dienThoai = extract.dienThoai;
+      }
     }
 
     const buildOne = loai === "giao-nhan"
@@ -469,25 +548,6 @@ router.post("/ho-so/hoa-don-ncc/xuat-chung-tu", requireLogin, express.json(), as
     return res.send(zip.toBuffer());
   } catch (e) {
     res.status(500).json({ error: "Lỗi tạo chứng từ: " + e.message });
-  }
-});
-
-// TAM: debug xem raw text PDF hoa don de viet regex trich xuat (se xoa sau).
-router.get("/ho-so/_debug/pdf-text/:driveId", requireAdmin, async (req, res) => {
-  try {
-    const store = load();
-    const gmailApi = require("../utils/gmailApi");
-    const accessToken = await gmailApi.getValidAccessToken(store);
-    const dlResp = await fetch(`https://www.googleapis.com/drive/v3/files/${req.params.driveId}?alt=media`, {
-      headers: { Authorization: "Bearer " + accessToken },
-    });
-    if (!dlResp.ok) throw new Error("Drive loi " + dlResp.status + ": " + (await dlResp.text()).slice(0, 300));
-    const buf = Buffer.from(await dlResp.arrayBuffer());
-    const pdfParse = require("pdf-parse");
-    const data = await pdfParse(buf);
-    res.type("text/plain").send(data.text || "(khong co text)");
-  } catch (e) {
-    res.status(500).send("Loi: " + e.message);
   }
 });
 

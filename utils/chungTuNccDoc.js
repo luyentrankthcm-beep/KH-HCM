@@ -124,14 +124,21 @@ function buildSignatureBlock(labelA, labelB) {
   });
 }
 
-// items: [{ten, dvt, soLuong}]
-function buildGoodsTable(items) {
+// Nhan, 2026-09-17: "hóa đơn 115 có nhiều hàng hóa lắm mà 1 cái là 1 dòng cho
+// tôi nhá đvt số lượng và cả thành tiền và cả tổng cho tôi" -- them cot DON
+// GIA / THANH TIEN + dong TONG CONG. items: [{ten, dvt, soLuong, donGia,
+// thanhTien}] (donGia/thanhTien co the rong neu khong trich xuat duoc tu PDF
+// hoa don -- van hien dong, chi de trong 2 cot do). tongCong: chuoi da format
+// san (vd "4.960.000"), rong thi khong hien dong tong.
+function buildGoodsTable(items, tongCong) {
+  const cols = ["STT", "TÊN HÀNG HÓA / DỊCH VỤ", "ĐVT", "SỐ LƯỢNG", "ĐƠN GIÁ", "THÀNH TIỀN"];
+  const widths = [6, 34, 10, 12, 18, 20];
   const headerRow = new TableRow({
     tableHeader: true,
-    children: ["STT", "TÊN HÀNG HÓA / DỊCH VỤ", "ĐVT", "SỐ LƯỢNG"].map((h, i) =>
+    children: cols.map((h, i) =>
       new TableCell({
         borders: THIN_BORDER,
-        width: { size: i === 0 ? 8 : i === 1 ? 56 : 18, type: WidthType.PERCENTAGE },
+        width: { size: widths[i], type: WidthType.PERCENTAGE },
         shading: { fill: "DCE6F1" },
         children: [p(h, { bold: true, align: AlignmentType.CENTER, after: 0 })],
       })
@@ -144,10 +151,31 @@ function buildGoodsTable(items) {
         new TableCell({ borders: THIN_BORDER, children: [p(it.ten || "", { after: 0 })] }),
         new TableCell({ borders: THIN_BORDER, children: [p(it.dvt || "", { align: AlignmentType.CENTER, after: 0 })] }),
         new TableCell({ borders: THIN_BORDER, children: [p(it.soLuong != null ? String(it.soLuong) : "", { align: AlignmentType.CENTER, after: 0 })] }),
+        new TableCell({ borders: THIN_BORDER, children: [p(it.donGia != null ? String(it.donGia) : "", { align: AlignmentType.RIGHT, after: 0 })] }),
+        new TableCell({ borders: THIN_BORDER, children: [p(it.thanhTien != null ? String(it.thanhTien) : "", { align: AlignmentType.RIGHT, after: 0 })] }),
       ],
     })
   );
-  return new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, borders: THIN_BORDER, rows: [headerRow, ...rows] });
+  const totalRow = tongCong
+    ? new TableRow({
+        children: [
+          new TableCell({
+            borders: THIN_BORDER,
+            columnSpan: 5,
+            children: [p("TỔNG CỘNG", { bold: true, align: AlignmentType.RIGHT, after: 0 })],
+          }),
+          new TableCell({
+            borders: THIN_BORDER,
+            children: [p(String(tongCong), { bold: true, align: AlignmentType.RIGHT, after: 0 })],
+          }),
+        ],
+      })
+    : null;
+  return new Table({
+    width: { size: 100, type: WidthType.PERCENTAGE },
+    borders: THIN_BORDER,
+    rows: totalRow ? [headerRow, ...rows, totalRow] : [headerRow, ...rows],
+  });
 }
 
 // bangKeRows: [{stt, soHD, ngay, noiDung, tongTien}]
@@ -214,7 +242,10 @@ function buildBienBanGiaoNhan({ ncc, invoice, company }) {
     ...companyPartyLines(company),
     p(""),
     p("Hôm nay, ngày " + d + " tháng " + m + " năm " + y + ", hai bên chúng tôi tiến hành giao nhận hàng hóa theo Hóa đơn số " + (invoice.soHoaDon || "") + ", chi tiết như sau:", { after: 150 }),
-    buildGoodsTable([{ ten: invoice.noiDung || "", dvt: "", soLuong: "" }]),
+    buildGoodsTable(
+      invoice.pdfItems && invoice.pdfItems.length ? invoice.pdfItems : [{ ten: invoice.noiDung || "", dvt: "", soLuong: "" }],
+      invoice.pdfTongCong || ""
+    ),
     p(""),
     p("Bên B xác nhận Bên A đã giao cho Bên B đúng chủng loại và đủ số lượng hàng hóa như trên. Hai bên đồng ý, thống nhất ký tên. Biên bản được lập thành 02 bản, mỗi bên giữ 01 bản có giá trị pháp lý như nhau.", { after: 400 }),
     buildSignatureBlock(),
@@ -247,7 +278,10 @@ function buildBienBanNghiemThu({ ncc, invoice, company, hopDong }) {
     ...companyPartyLines(company),
     p(""),
     p("Hôm nay, ngày " + d + " tháng " + m + " năm " + y + ", hai bên tiến hành nghiệm thu hàng hóa/dịch vụ " + hopDongLine + ", chi tiết như sau:", { after: 150 }),
-    buildGoodsTable([{ ten: invoice.noiDung || "", dvt: "", soLuong: "" }]),
+    buildGoodsTable(
+      invoice.pdfItems && invoice.pdfItems.length ? invoice.pdfItems : [{ ten: invoice.noiDung || "", dvt: "", soLuong: "" }],
+      invoice.pdfTongCong || ""
+    ),
     p(""),
     p("Bên B xác nhận đã nghiệm thu hàng hóa/dịch vụ do Bên A cung cấp, đảm bảo đúng chất lượng, chủng loại, số lượng theo hợp đồng/hóa đơn đã nêu trên. Hai bên thống nhất ký tên xác nhận. Biên bản được lập thành 02 bản, mỗi bên giữ 01 bản có giá trị pháp lý như nhau.", { after: 400 }),
     buildSignatureBlock(),
