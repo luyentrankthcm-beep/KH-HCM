@@ -120,8 +120,22 @@ router.post("/ho-so/hoa-don-ncc/bulk-upsert", express.json(), (req, res) => {
     const driveId  = String(f.driveId  || "").trim();
     const fileName = String(f.fileName || "").trim();
     if (!driveId || !fileName) { skipped++; return; }
-    if (existingIds.has(driveId)) { skipped++; return; }
-    store.ho_so_hoa_don.push({ driveId, fileName, company, addedAt: new Date().toISOString() });
+    if (existingIds.has(driveId)) {
+      // Update metadata nếu có trường mới mà record cũ còn thiếu
+      const existing = store.ho_so_hoa_don.find(r => r.driveId === driveId);
+      if (existing) {
+        if (f.tenDayDuNCC && !existing.tenDayDuNCC) existing.tenDayDuNCC = String(f.tenDayDuNCC).trim();
+        if (f.tongTien    && !existing.tongTien)    existing.tongTien    = String(f.tongTien).trim();
+        if (f.noiDung     && !existing.noiDung)     existing.noiDung     = String(f.noiDung).trim();
+      }
+      skipped++; return;
+    }
+    store.ho_so_hoa_don.push({
+      driveId, fileName, company, addedAt: new Date().toISOString(),
+      tenDayDuNCC: String(f.tenDayDuNCC || "").trim(),
+      tongTien:    String(f.tongTien    || "").trim(),
+      noiDung:     String(f.noiDung     || "").trim(),
+    });
     existingIds.add(driveId);
     added++;
   });
