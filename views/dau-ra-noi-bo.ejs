@@ -51,6 +51,9 @@
     .modal-header-right { display:flex; align-items:center; gap:.5rem; }
     .btn-close-modal { background:rgba(255,255,255,.15); border:none; color:#fff; font-size:1.1rem; cursor:pointer; width:30px; height:30px; border-radius:50%; display:flex; align-items:center; justify-content:center; }
     .btn-close-modal:hover { background:rgba(255,255,255,.3); }
+    .btn-fetch { background:#16a34a; color:#fff; border:none; border-radius:6px; padding:.3rem .8rem; font-size:.8em; font-weight:700; cursor:pointer; white-space:nowrap; }
+    .btn-fetch:hover { background:#15803d; }
+    .btn-fetch:disabled { background:#6b7280; cursor:not-allowed; }
     .modal-body { padding:1rem 1.25rem; }
     .modal-link { font-size:.78em; color:#93c5fd; text-decoration:none; }
     .modal-link:hover { color:#fff; text-decoration:underline; }
@@ -156,6 +159,9 @@
           <a id="modal_sheet_link" href="#" target="_blank" class="modal-link">📊 Mở báo cáo Google Sheets ↗</a>
         </div>
         <div class="modal-header-right">
+          <button id="btn_fetch_sheets" class="btn-fetch" onclick="fetchFromSheets()" title="Tự động lấy TM & CK từ Google Sheets báo cáo">
+            🔄 Lấy từ GG Sheets
+          </button>
           <button class="btn-close-modal" onclick="closeDetailModal()">✕</button>
         </div>
       </div>
@@ -496,7 +502,113 @@
     document.getElementById('tab_btn_' + id).classList.add('active');
   }
 
-  // Init
+  // ============================================================
+  // FETCH FROM GOOGLE SHEETS
+  // ============================================================
+  async function fetchFromSheets() {
+    if (!_currentModalId) return;
+    const btn = document.getElementById('btn_fetch_sheets');
+    btn.disabled = true;
+    btn.textContent = '⏳ Đang lấy...';
+
+    try {
+      const url = `/api/dau-ra/sheets-daily?gianId=${_currentModalId}&month=${_currentModalMonth}&year=${_currentModalYear}`;
+      const resp = await fetch(url);
+      const result = await resp.json();
+
+      if (!result.ok) {
+        if (result.needAuth) {
+          alert('⚠️ Chưa kết nối Google.\n\nVào trang Chi Phí → bấm "Kết nối Gmail" để xác thực, sau đó thử lại.');
+        } else {
+          alert('Lỗi: ' + result.error);
+        }
+        return;
+      }
+
+      const { daily, tab, tmCol, ckCol } = result;
+      if (!daily || daily.length === 0) {
+        alert(`Không tìm thấy dữ liệu tháng ${_currentModalMonth}/${_currentModalYear} trong sheet "${tab}".\n(TM cột ${tmCol}, CK cột ${ckCol})`);
+        return;
+      }
+
+      // Điền vào các input trong modal
+      const tbl = document.getElementById('day_tbl');
+      if (!tbl) return;
+
+      // Map ngay → data
+      const dataMap = {};
+      daily.forEach(r => { dataMap[r.ngay] = r; });
+
+      let filled = 0;
+      tbl.querySelectorAll('tbody tr').forEach(row => {
+        const inputs = row.querySelectorAll('input.day-input');
+        if (inputs.length < 3) return;
+        const ngay = inputs[0].dataset.ngay;
+        const r = dataMap[ngay];
+        if (!r) return;
+
+        if (r.tienMat !== null && r.tienMat !== undefined) {
+          inputs[0].value = r.tienMat;
+          // Trigger update
+          const ev = new Event('input');
+          inputs[0].dispatchEvent(ev);
+          filled++;
+        }
+        if (r.chuyenKhoan !== null && r.chuyenKhoan !== undefined) {
+          inputs[1].value = r.chuyenKhoan;
+          const ev = new Event('input');
+          inputs[1].dispatchEvent(ev);
+        }
+      });
+
+      updateFooterTotals();
+      updateModalPreview();
+      btn.textContent = `✅ Đã lấy ${filled} ngày`;
+      setTimeout(() => { btn.textContent = '🔄 Lấy từ GG Sheets'; btn.disabled = false; }, 2500);
+    } catch(e) {
+      alert('Lỗi kết nối: ' + e.message);
+      btn.textContent = '🔄 Lấy từ GG Sheets';
+      btn.disabled = false;
+    }
+  }
+
+  // ============================================================
+  // SERVER KV SYNC — đồng bộ dữ liệu lên server để dùng nhiều máy
+  // ============================================================
+  async function serverSave(key, value) {
+    try {
+      await fetch('/api/dau-ra/kv', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ key, value })
+      });
+    } catch(e) { /* silent */ }
+  }
+
+  async function serverLoadAll() {
+    try {
+      const resp = await fetch('/api/dau-ra/kv-all');
+      const result = await resp.json();
+      if (result.ok && result.data) {
+        // Chỉ load các key của noi-bo (bắt đầu bằng "kvc_")
+        Object.keys(result.data).forEach(k => {
+          if (k.startsWith('kvc_')) {
+            try { localStorage.setItem(k, JSON.stringify(result.data[k])); } catch(e) {}
+          }
+        });
+      }
+    } catch(e) { /* silent */ }
+  }
+
+  // Override saveData để cũng sync lên server
+  const _origSaveData = saveData;
+  function saveData(id, month, year, data) {
+    _origSaveData(id, month, year, data);
+    serverSave(storageKey(id, month, year), data);
+  }
+
+  // Init: load từ server trước, rồi render
+  serverLoadAll().then(() => renderKvcTable());
+  // fallback nếu server chậm
   renderKvcTable();
   </script>
   <%- include('partials/scroll-restore') %>

@@ -3,6 +3,95 @@ const router = express.Router();
 const { requireLogin } = require("../middleware/auth");
 const { load, save } = require("../store");
 const { getCompany } = require("../utils/companies");
+const gmailApi = require("../utils/gmailApi");
+
+// ── Cấu hình từng gian: spreadsheetId, tab, vị trí cột (0-based) ──────────
+// dateCol = cột ngày (A=0), tmCol = Tiền Mặt, ckCol = Chuyển Khoản/Momo
+// Eco Farm: tab TỔNG, TM=BA(52), CK=AZ(51/Momo)
+// TUTU/FZ/EV phần lớn: tab VÉ, TM=AI(34), CK=AJ(35)
+// Tân Phú: tab VÉ, nhiều cột SP hơn → TM=AN(39), CK=AO(40)
+// Estella: tab "BÁO CÁO", TM=AI(34), CK=AJ(35)
+const GIAN_SHEETS_CONFIG = {
+  farm_lottebt: { sheetId:'1fiFGmerqMGjKW8oxJBfN_KXVn7c7rbIOszzuZIavHLc', tab:'TỔNG',    dateCol:0, tmCol:52, ckCol:51 },
+  tutu_lottegv: { sheetId:'1F3ATisma35uHIdhlKAckd16GlmTGMvRE_QwH4N16H0M',  tab:'VÉ',      dateCol:0, tmCol:34, ckCol:35 },
+  tutu_aeontp:  { sheetId:'1jGG9Po3WnsntEeXC53uHUUxi-5bcKx-jPuPWhN68Qps',  tab:'VÉ',      dateCol:0, tmCol:39, ckCol:40 },
+  tutu_aeonbt:  { sheetId:'1Lts3GeoeozWrPlprGzANK_ksmd6h4XMnl5xMUMM_OL4',  tab:'VÉ',      dateCol:0, tmCol:34, ckCol:35 },
+  tutu_aeonbd:  { sheetId:'15brZmUqEYuuEkbp7AgQSAEKmbgMiNqey6CIScGO97cs',  tab:'VÉ',      dateCol:0, tmCol:34, ckCol:35 },
+  tutu_estella: { sheetId:'1cegFodLAXbtYdITdfGGd8m0weoOUVP6RgwGPScb9JMo',  tab:'BÁO CÁO', dateCol:0, tmCol:34, ckCol:35 },
+  tutu_aeontan: { sheetId:'1SGtQ0Kvnvidr4ipxSP-AY5uwGwFEEoOrwFhawJP2scI',  tab:'VÉ',      dateCol:0, tmCol:34, ckCol:35 },
+  fz_lottebt:   { sheetId:'1Be1E0pBJlYATKpogjqMTyHbhMcOg3Rbca7qoUlvHBWk',  tab:'VÉ',      dateCol:0, tmCol:34, ckCol:35 },
+  fz_scvivo:    { sheetId:'1lQMEpf1OhVOEROY5kzM_cWp77fZgUl92cVn0A78SGvw',  tab:'VÉ',      dateCol:0, tmCol:34, ckCol:35 },
+  fz_aeontan:   { sheetId:'1Ej4iwtbLGu-WgHkjTjdIDZPz02lL4KLRE9ANYzpMP9c',  tab:'VÉ',      dateCol:0, tmCol:34, ckCol:35 },
+  ev_ghostbr:   { sheetId:'1JwtV9Mg-LS_3xIuuzSuc0aE4x23riepFiomt7q0HAPU',  tab:'VÉ',      dateCol:0, tmCol:34, ckCol:35 },
+  ev_fzgoan:    { sheetId:'1bdU9XExnBp8aMLTj9rAAXS1G3_Xi6m2jI3y0SqQN80s',  tab:'VÉ',      dateCol:0, tmCol:34, ckCol:35 },
+  fz_scvivo2:   { sheetId:'1ZaNpXiOrtpnHHZXdMZEFmBKw1eooAPmXqqls0N0Uap0',  tab:'VÉ',      dateCol:0, tmCol:34, ckCol:35 },
+  pinball_amtp: { sheetId:'1r-huBGhhy_K_nOyHr0iz4Rd3Bkfw0vyTDQEZbT_PrOo',  tab:'VÉ',      dateCol:0, tmCol:34, ckCol:35 },
+};
+
+function colIdxToLetter(n) {
+  let s = ''; n++;
+  while (n > 0) { n--; s = String.fromCharCode(65 + (n % 26)) + s; n = Math.floor(n / 26); }
+  return s;
+}
+
+// Route: fetch dữ liệu TM/CK từng ngày từ Google Sheets
+router.get('/api/dau-ra/sheets-daily', requireLogin, async (req, res) => {
+  const { gianId, month, year } = req.query;
+  const cfg = GIAN_SHEETS_CONFIG[gianId];
+  if (!cfg) return res.json({ ok:false, error:'Chưa cấu hình cột cho gian: ' + gianId });
+
+  const store = load();
+  if (!store.gmail_oauth || !store.gmail_oauth.refresh_token) {
+    return res.json({ ok:false, needAuth:true, error:'Chưa kết nối Google. Vào trang Chi Phí → bấm "Kết nối Gmail" để xác thực.' });
+  }
+
+  try {
+    const accessToken = await gmailApi.getValidAccessToken(store);
+    save(store);
+
+    const mm   = String(month).padStart(2,'0');
+    const yyyy = String(year);
+    const maxColLetter = colIdxToLetter(Math.max(cfg.tmCol, cfg.ckCol));
+    const range = `${cfg.tab}!A:${maxColLetter}`;
+    const url   = `https://sheets.googleapis.com/v4/spreadsheets/${cfg.sheetId}/values/${encodeURIComponent(range)}?valueRenderOption=FORMATTED_VALUE`;
+
+    const resp = await fetch(url, { headers:{ Authorization:'Bearer ' + accessToken } });
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      const msg = err.error?.message || resp.statusText;
+      return res.json({ ok:false, error:'Google Sheets lỗi: ' + msg });
+    }
+
+    const data = await resp.json();
+    const rows = data.values || [];
+
+    // Lọc hàng theo tháng/năm: ô dateCol phải chứa "/MM/YYYY" (dd/mm/yyyy)
+    const suffix = `/${mm}/${yyyy}`;
+    const parseNum = s => {
+      if (s === undefined || s === null || s === '') return null;
+      const n = Number(String(s).replace(/[.\s]/g,'').replace(',','.'));
+      return isNaN(n) || n === 0 ? null : Math.round(n);
+    };
+
+    const daily = [];
+    rows.forEach(row => {
+      const dateCell = String(row[cfg.dateCol] || '');
+      if (!dateCell.includes(suffix)) return;
+      const day = dateCell.split('/')[0].trim().replace(/\D/g,'');
+      if (!day || isNaN(+day)) return;
+      const ngay = day.padStart(2,'0') + '/' + mm;
+      const tm = parseNum(row[cfg.tmCol]);
+      const ck = parseNum(row[cfg.ckCol]);
+      if (tm !== null || ck !== null) {
+        daily.push({ ngay, tienMat:tm, chuyenKhoan:ck, dtKhac:0 });
+      }
+    });
+
+    res.json({ ok:true, daily, tab:cfg.tab, tmCol:colIdxToLetter(cfg.tmCol), ckCol:colIdxToLetter(cfg.ckCol) });
+  } catch(err) {
+    res.json({ ok:false, error:err.message });
+  }
+});
 
 router.use(requireLogin);
 
