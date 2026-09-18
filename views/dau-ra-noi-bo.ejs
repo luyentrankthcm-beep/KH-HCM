@@ -211,6 +211,8 @@
 
   function saveData(id, month, year, data) {
     try { localStorage.setItem(storageKey(id,month,year), JSON.stringify(data)); } catch(e) {}
+    // Sync lên server để dùng nhiều máy
+    serverSave(storageKey(id, month, year), data);
   }
 
   function fmtMoney(val) {
@@ -599,17 +601,9 @@
     } catch(e) { /* silent */ }
   }
 
-  // Override saveData để cũng sync lên server
-  const _origSaveData = saveData;
-  function saveData(id, month, year, data) {
-    _origSaveData(id, month, year, data);
-    serverSave(storageKey(id, month, year), data);
-  }
-
   // Init: load từ server trước, rồi render
   serverLoadAll().then(() => renderKvcTable());
-  // fallback nếu server chậm
-  renderKvcTable();
+  renderKvcTable(); // render ngay bằng localStorage, server sync đè sau
   </script>
   <%- include('partials/scroll-restore') %>
 </body>
