@@ -34,6 +34,53 @@ function colIdxToLetter(n) {
   return s;
 }
 
+// ── Helper: parse CSV đơn giản (không cần thư viện ngoài) ────────────────────
+// Xử lý dấu nháy kép, dấu phẩy, xuống dòng trong field
+function parseCSVtoRows(csvText) {
+  const rows = [];
+  let row = [], cur = '', inQ = false;
+  for (let i = 0; i < csvText.length; i++) {
+    const ch = csvText[i];
+    if (inQ) {
+      if (ch === '"' && csvText[i+1] === '"') { cur += '"'; i++; }
+      else if (ch === '"') { inQ = false; }
+      else { cur += ch; }
+    } else {
+      if (ch === '"') { inQ = true; }
+      else if (ch === ',') { row.push(cur); cur = ''; }
+      else if (ch === '\n') { row.push(cur); rows.push(row); row = []; cur = ''; }
+      else if (ch !== '\r') { cur += ch; }
+    }
+  }
+  if (cur || row.length) { row.push(cur); rows.push(row); }
+  return rows;
+}
+
+// ── Helper: lấy GID của tab theo tên từ HTML sheet ───────────────────────────
+// Chi Nhan, 2026-09-21: Sheets API bị chặn (project 831383732136 chưa bật) →
+// dùng Drive export CSV (drive.readonly đã được bật) thay thế. Cần GID của tab.
+async function resolveTabGid(sheetId, tabName, accessToken) {
+  try {
+    const resp = await fetch(`https://docs.google.com/spreadsheets/d/${sheetId}/edit`, {
+      headers: { Authorization: 'Bearer ' + accessToken },
+      redirect: 'follow',
+    });
+    if (!resp.ok) return null;
+    const html = await resp.text();
+    // Tìm pattern: "name":"<tabName>","index":\d+,"sheetId":\d+
+    // hoặc "sheetId":\d+,"title":"<tabName>"
+    // Google Sheets HTML nhúng data trong bootstrapData dạng JSON escaped
+    const escaped = tabName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    // Dạng 1: "name":"VÉ",...,"sheetId":12345
+    let m = html.match(new RegExp('"name":"' + escaped + '"[^}]{0,200}?"sheetId":(\\d+)'));
+    if (m) return m[1];
+    // Dạng 2: "sheetId":12345,...,"name":"VÉ"
+    m = html.match(new RegExp('"sheetId":(\\d+)[^}]{0,200}?"name":"' + escaped + '"'));
+    if (m) return m[1];
+    return null;
+  } catch { return null; }
+}
+
 // Route: fetch dữ liệu TM/CK từng ngày từ Google Sheets
 router.get('/api/dau-ra/sheets-daily', requireLogin, async (req, res) => {
   const { gianId, month, year } = req.query;
@@ -52,18 +99,54 @@ router.get('/api/dau-ra/sheets-daily', requireLogin, async (req, res) => {
     const mm   = String(month).padStart(2,'0');
     const yyyy = String(year);
     const maxColLetter = colIdxToLetter(Math.max(cfg.tmCol, cfg.ckCol));
-    const range = `${cfg.tab}!A:${maxColLetter}`;
-    const url   = `https://sheets.googleapis.com/v4/spreadsheets/${cfg.sheetId}/values/${encodeURIComponent(range)}?valueRenderOption=FORMATTED_VALUE`;
 
-    const resp = await fetch(url, { headers:{ Authorization:'Bearer ' + accessToken } });
-    if (!resp.ok) {
-      const err = await resp.json().catch(() => ({}));
-      const msg = err.error?.message || resp.statusText;
-      return res.json({ ok:false, error:'Google Sheets lỗi: ' + msg });
+    let rows = null;
+    let fetchMethod = 'sheets-api';
+
+    // ── Cách 1: Sheets API v4 (ưu tiên) ──────────────────────────────────────
+    try {
+      const range = `${cfg.tab}!A:${maxColLetter}`;
+      const url   = `https://sheets.googleapis.com/v4/spreadsheets/${cfg.sheetId}/values/${encodeURIComponent(range)}?valueRenderOption=FORMATTED_VALUE`;
+      const resp  = await fetch(url, { headers:{ Authorization:'Bearer ' + accessToken } });
+      if (resp.ok) {
+        const data = await resp.json();
+        rows = data.values || [];
+      } else {
+        const err = await resp.json().catch(() => ({}));
+        const msg = err.error?.message || '';
+        // Nếu lỗi KHÔNG phải "API not enabled" → trả lỗi ngay
+        if (!/disabled|not been used/i.test(msg)) {
+          return res.json({ ok:false, error:'Google Sheets lỗi: ' + msg });
+        }
+        // else: Sheets API chưa bật → thử fallback bên dưới
+      }
+    } catch (_) { /* mạng lỗi → thử fallback */ }
+
+    // ── Cách 2: Export CSV qua Drive (fallback khi Sheets API chưa bật) ───────
+    // Drive API (drive.readonly) đã được bật → dùng URL export CSV của Google
+    // Cần GID của tab: resolve từ HTML sheet rồi cache vào cfg.gid
+    if (!rows) {
+      fetchMethod = 'drive-export';
+      let gid = cfg.gid; // đã cache từ lần trước?
+      if (!gid) {
+        gid = await resolveTabGid(cfg.sheetId, cfg.tab, accessToken);
+        if (gid) cfg.gid = gid; // cache để lần sau nhanh hơn
+      }
+      if (!gid) {
+        return res.json({ ok:false, error:'Không thể xác định tab "' + cfg.tab + '". Vui lòng bật Google Sheets API tại https://console.cloud.google.com/apis/api/sheets.googleapis.com/overview?project=831383732136' });
+      }
+      const exportUrl = `https://docs.google.com/spreadsheets/d/${cfg.sheetId}/export?format=csv&gid=${gid}`;
+      const exportResp = await fetch(exportUrl, { headers:{ Authorization:'Bearer ' + accessToken }, redirect:'follow' });
+      if (!exportResp.ok) {
+        return res.json({ ok:false, error:'Drive export lỗi HTTP ' + exportResp.status + '. Kiểm tra quyền truy cập sheet.' });
+      }
+      const csvText = await exportResp.text();
+      // Nếu Google trả về HTML (trang đăng nhập) thay vì CSV
+      if (csvText.trimStart().startsWith('<')) {
+        return res.json({ ok:false, error:'Không đủ quyền đọc sheet. Vào Chi Phí → Kết nối Gmail để xác thực lại.' });
+      }
+      rows = parseCSVtoRows(csvText);
     }
-
-    const data = await resp.json();
-    const rows = data.values || [];
 
     // Lọc hàng theo tháng/năm: ô dateCol phải chứa "/MM/YYYY" (dd/mm/yyyy)
     const suffix = `/${mm}/${yyyy}`;
@@ -87,7 +170,7 @@ router.get('/api/dau-ra/sheets-daily', requireLogin, async (req, res) => {
       }
     });
 
-    res.json({ ok:true, daily, tab:cfg.tab, tmCol:colIdxToLetter(cfg.tmCol), ckCol:colIdxToLetter(cfg.ckCol) });
+    res.json({ ok:true, daily, tab:cfg.tab, tmCol:colIdxToLetter(cfg.tmCol), ckCol:colIdxToLetter(cfg.ckCol), method:fetchMethod });
   } catch(err) {
     res.json({ ok:false, error:err.message });
   }
