@@ -76,10 +76,44 @@ async function fetchSheetCSVbyName(sheetId, tabName, accessToken) {
   return text;
 }
 
+// ── API: Quản lý gian tùy chỉnh ──────────────────────────────────────────────
+router.get('/api/dau-ra/gian-custom', requireLogin, (req, res) => {
+  const store = load();
+  res.json({ ok: true, gians: store.kvc_custom_gians || [] });
+});
+
+router.post('/api/dau-ra/gian-custom', requireLogin, express.json(), (req, res) => {
+  const { id, kh, maCT, khFull, link, sheetId, tab, tmCol, ckCol } = req.body;
+  if (!id || !maCT || !sheetId || !tab) return res.json({ ok: false, error: 'Thiếu thông tin bắt buộc (id, maCT, sheetId, tab)' });
+  const store = load();
+  if (!store.kvc_custom_gians) store.kvc_custom_gians = [];
+  const allIds = [...Object.keys(GIAN_SHEETS_CONFIG), ...store.kvc_custom_gians.map(g => g.id)];
+  if (allIds.includes(id)) return res.json({ ok: false, error: 'ID gian đã tồn tại: ' + id });
+  store.kvc_custom_gians.push({ id, kh: kh || 'mới', maCT, khFull: khFull || '', link: link || '', sheetId, tab, dateCol: 0, tmCol: parseInt(tmCol) || 34, ckCol: parseInt(ckCol) || 35, addedAt: new Date().toISOString() });
+  save(store);
+  res.json({ ok: true });
+});
+
+router.delete('/api/dau-ra/gian-custom/:id', requireLogin, (req, res) => {
+  const store = load();
+  if (!store.kvc_custom_gians) return res.json({ ok: false, error: 'Không có gian tùy chỉnh' });
+  const before = store.kvc_custom_gians.length;
+  store.kvc_custom_gians = store.kvc_custom_gians.filter(g => g.id !== req.params.id);
+  if (store.kvc_custom_gians.length === before) return res.json({ ok: false, error: 'Không tìm thấy gian: ' + req.params.id });
+  save(store);
+  res.json({ ok: true });
+});
+
 // Route: fetch dữ liệu TM/CK từng ngày từ Google Sheets
 router.get('/api/dau-ra/sheets-daily', requireLogin, async (req, res) => {
   const { gianId, month, year } = req.query;
-  const cfg = GIAN_SHEETS_CONFIG[gianId];
+  // Tìm trong hardcoded config trước, rồi trong custom gians
+  let cfg = GIAN_SHEETS_CONFIG[gianId];
+  if (!cfg) {
+    const storeCheck = load();
+    const customGian = (storeCheck.kvc_custom_gians || []).find(g => g.id === gianId);
+    if (customGian) cfg = { sheetId: customGian.sheetId, tab: customGian.tab, dateCol: customGian.dateCol || 0, tmCol: customGian.tmCol, ckCol: customGian.ckCol };
+  }
   if (!cfg) return res.json({ ok:false, error:'Chưa cấu hình cột cho gian: ' + gianId });
 
   const store = load();

@@ -16,6 +16,23 @@
     .btn-update-all { background:#1e3a5f; color:#fff; border:none; border-radius:6px; padding:.4rem 1rem; font-size:.85em; font-weight:600; cursor:pointer; white-space:nowrap; }
     .btn-update-all:hover { background:#2563eb; }
     .btn-update-all:disabled { background:#94a3b8; cursor:not-allowed; }
+    .btn-add-gian { background:#16a34a; color:#fff; border:none; border-radius:6px; padding:.4rem .9rem; font-size:.85em; font-weight:600; cursor:pointer; white-space:nowrap; }
+    .btn-add-gian:hover { background:#15803d; }
+
+    /* ===== ADD GIAN MODAL ===== */
+    .add-gian-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.48); z-index:300; align-items:center; justify-content:center; }
+    .add-gian-overlay.open { display:flex; }
+    .add-gian-box { background:#fff; border-radius:14px; width:96%; max-width:560px; box-shadow:0 12px 48px rgba(0,0,0,.22); overflow:hidden; }
+    .add-gian-head { display:flex; align-items:center; justify-content:space-between; padding:.85rem 1.25rem; background:#16a34a; }
+    .add-gian-head h3 { margin:0; font-size:.95rem; font-weight:700; color:#fff; }
+    .add-gian-body { padding:1.1rem 1.25rem; display:grid; gap:.75rem; }
+    .add-gian-row { display:grid; grid-template-columns:1fr 1fr; gap:.6rem; }
+    .add-gian-row.full { grid-template-columns:1fr; }
+    .add-gian-label { font-size:.78em; color:#475569; font-weight:600; margin-bottom:.2rem; display:block; }
+    .add-gian-input { width:100%; padding:.38rem .6rem; border:1px solid #cbd5e1; border-radius:6px; font-size:.85em; font-family:inherit; box-sizing:border-box; }
+    .add-gian-input:focus { outline:none; border-color:#16a34a; background:#f0fdf4; }
+    .add-gian-hint { font-size:.72em; color:#94a3b8; margin-top:.15rem; }
+    .add-gian-foot { display:flex; justify-content:flex-end; gap:.6rem; padding:.85rem 1.25rem; border-top:1px solid #e2e8f0; background:#f8fafc; }
     .btn-link { display:inline-flex; align-items:center; gap:3px; background:#eff6ff; color:#2563eb; border:1px solid #bfdbfe; border-radius:4px; padding:.2rem .5rem; font-size:.78em; font-weight:600; text-decoration:none; white-space:nowrap; }
     .btn-link:hover { background:#dbeafe; }
     .btn-row-update { background:#1e3a5f; border:none; border-radius:4px; color:#fff; cursor:pointer; font-size:.78em; padding:.28rem .6rem; white-space:nowrap; }
@@ -115,6 +132,9 @@
         <button class="btn-update-all" id="btn_update_all" onclick="updateAllFromSheets()" title="Tự động lấy TM & CK từ Google Sheets cho tất cả gian và lưu lên server">
           🔄 Cập nhật tất cả từ GG Sheets
         </button>
+        <button class="btn-add-gian" onclick="openAddGianModal()" title="Thêm gian mới và map Google Sheets">
+          ➕ Thêm gian mới
+        </button>
         <span id="kvc_status" style="font-size:.8em;color:#64748b;"></span>
       </div>
 
@@ -152,6 +172,69 @@
     </div>
 
   </main>
+
+  <!-- ===== ADD GIAN MODAL ===== -->
+  <div class="add-gian-overlay" id="add_gian_modal">
+    <div class="add-gian-box">
+      <div class="add-gian-head">
+        <h3>➕ Thêm gian mới</h3>
+        <button style="background:rgba(255,255,255,.2);border:none;color:#fff;font-size:1.1rem;cursor:pointer;width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;" onclick="closeAddGianModal()">✕</button>
+      </div>
+      <div class="add-gian-body">
+        <div class="add-gian-row full">
+          <label class="add-gian-label">Tên mã công trình <span style="color:red">*</span></label>
+          <input class="add-gian-input" id="ag_maCT" placeholder="VD: TUTU MN AEON MALL TÂN BÌNH" />
+        </div>
+        <div class="add-gian-row">
+          <div>
+            <label class="add-gian-label">Tên đầy đủ (tên khách hàng)</label>
+            <input class="add-gian-input" id="ag_khFull" placeholder="VD: AEON VIỆT NAM - AEON TÂN BÌNH" />
+          </div>
+          <div>
+            <label class="add-gian-label">Loại KH</label>
+            <select class="add-gian-input" id="ag_kh" style="cursor:pointer;">
+              <option value="mới">Mới</option>
+              <option value="cũ">Cũ</option>
+            </select>
+          </div>
+        </div>
+        <div class="add-gian-row full">
+          <label class="add-gian-label">Link Google Sheets <span style="color:red">*</span></label>
+          <input class="add-gian-input" id="ag_link" placeholder="https://docs.google.com/spreadsheets/d/..." oninput="onAgLinkInput(this)" />
+          <div class="add-gian-hint" id="ag_sheet_id_hint">Nhập link → tự động trích xuất Sheet ID</div>
+        </div>
+        <div class="add-gian-row">
+          <div>
+            <label class="add-gian-label">Tên tab <span style="color:red">*</span></label>
+            <input class="add-gian-input" id="ag_tab" placeholder="VÉ" value="VÉ" />
+            <div class="add-gian-hint">Ví dụ: VÉ, TỔNG, BÁO CÁO</div>
+          </div>
+          <div>
+            <label class="add-gian-label">ID gian (tự tạo)</label>
+            <input class="add-gian-input" id="ag_id" placeholder="tự tạo từ tên" style="color:#64748b;" />
+            <div class="add-gian-hint">Tự động điền, có thể sửa</div>
+          </div>
+        </div>
+        <div class="add-gian-row">
+          <div>
+            <label class="add-gian-label">Cột Tiền Mặt <span style="color:red">*</span></label>
+            <input class="add-gian-input" id="ag_tmCol" placeholder="AI" value="AI" style="text-transform:uppercase;" />
+            <div class="add-gian-hint">Ký tự cột trong Sheet (VD: AI = cột 35)</div>
+          </div>
+          <div>
+            <label class="add-gian-label">Cột CK/Momo <span style="color:red">*</span></label>
+            <input class="add-gian-input" id="ag_ckCol" placeholder="AJ" value="AJ" style="text-transform:uppercase;" />
+            <div class="add-gian-hint">Ký tự cột trong Sheet (VD: AJ = cột 36)</div>
+          </div>
+        </div>
+        <div id="ag_error" style="display:none;color:#dc2626;font-size:.82em;padding:.4rem .6rem;background:#fef2f2;border-radius:6px;"></div>
+      </div>
+      <div class="add-gian-foot">
+        <button style="padding:.45rem 1rem;border:1px solid #e2e8f0;border-radius:7px;background:#f1f5f9;color:#64748b;cursor:pointer;font-size:.88em;" onclick="closeAddGianModal()">Hủy</button>
+        <button style="padding:.45rem 1.2rem;border:none;border-radius:7px;background:#16a34a;color:#fff;font-weight:700;cursor:pointer;font-size:.88em;" id="ag_submit_btn" onclick="submitAddGian()">✅ Thêm gian</button>
+      </div>
+    </div>
+  </div>
 
   <!-- ===== DETAIL MODAL ===== -->
   <div class="modal-overlay" id="detail_modal">
@@ -649,9 +732,140 @@
     } catch(e) { /* silent */ }
   }
 
-  // Init: load từ server trước, rồi render
-  serverLoadAll().then(() => renderKvcTable());
-  renderKvcTable(); // render ngay bằng localStorage, server sync đè sau
+  // ============================================================
+  // THÊM GIAN MỚI
+  // ============================================================
+  function slugifyGianId(str) {
+    const vi = {'à':'a','á':'a','ả':'a','ã':'a','ạ':'a','ă':'a','ắ':'a','ằ':'a','ẵ':'a','ặ':'a','â':'a','ấ':'a','ầ':'a','ẩ':'a','ẫ':'a','ậ':'a','đ':'d','è':'e','é':'e','ẻ':'e','ẽ':'e','ẹ':'e','ê':'e','ế':'e','ề':'e','ể':'e','ễ':'e','ệ':'e','ì':'i','í':'i','ỉ':'i','ĩ':'i','ị':'i','ò':'o','ó':'o','ỏ':'o','õ':'o','ọ':'o','ô':'o','ố':'o','ồ':'o','ổ':'o','ỗ':'o','ộ':'o','ơ':'o','ớ':'o','ờ':'o','ở':'o','ỡ':'o','ợ':'o','ù':'u','ú':'u','ủ':'u','ũ':'u','ụ':'u','ư':'u','ứ':'u','ừ':'u','ử':'u','ữ':'u','ự':'u','ỳ':'y','ý':'y','ỷ':'y','ỹ':'y','ỵ':'y'};
+    let s = str.toLowerCase().replace(/[^ -~]/g, c => vi[c] || '');
+    return s.replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'').substring(0,40);
+  }
+
+  function colLetterToIdx(s) {
+    s = (s||'').toUpperCase().replace(/\s/g,'');
+    if (!s) return 0;
+    let n = 0;
+    for (let i = 0; i < s.length; i++) n = n * 26 + (s.charCodeAt(i) - 64);
+    return n - 1; // 0-based
+  }
+
+  function extractSheetId(url) {
+    const m = url.match(/\/spreadsheets\/d\/([a-zA-Z0-9_-]+)/);
+    return m ? m[1] : '';
+  }
+
+  function onAgLinkInput(inp) {
+    const sheetId = extractSheetId(inp.value || '');
+    const hint = document.getElementById('ag_sheet_id_hint');
+    if (sheetId) {
+      hint.textContent = '✓ Sheet ID: ' + sheetId;
+      hint.style.color = '#16a34a';
+    } else {
+      hint.textContent = 'Nhập link → tự động trích xuất Sheet ID';
+      hint.style.color = '#94a3b8';
+    }
+  }
+
+  document.getElementById('ag_maCT').addEventListener('input', function() {
+    const idEl = document.getElementById('ag_id');
+    idEl.value = slugifyGianId(this.value);
+  });
+
+  function openAddGianModal() {
+    ['ag_maCT','ag_khFull','ag_link','ag_tab','ag_id','ag_tmCol','ag_ckCol'].forEach(id => {
+      const el = document.getElementById(id);
+      if (id === 'ag_tab') el.value = 'VÉ';
+      else if (id === 'ag_tmCol') el.value = 'AI';
+      else if (id === 'ag_ckCol') el.value = 'AJ';
+      else el.value = '';
+    });
+    document.getElementById('ag_kh').value = 'mới';
+    document.getElementById('ag_sheet_id_hint').textContent = 'Nhập link → tự động trích xuất Sheet ID';
+    document.getElementById('ag_sheet_id_hint').style.color = '#94a3b8';
+    document.getElementById('ag_error').style.display = 'none';
+    document.getElementById('add_gian_modal').classList.add('open');
+    setTimeout(() => document.getElementById('ag_maCT').focus(), 60);
+  }
+
+  function closeAddGianModal() {
+    document.getElementById('add_gian_modal').classList.remove('open');
+  }
+
+  document.getElementById('add_gian_modal').addEventListener('click', function(e) {
+    if (e.target === this) closeAddGianModal();
+  });
+
+  async function submitAddGian() {
+    const maCT   = document.getElementById('ag_maCT').value.trim().toUpperCase();
+    const khFull = document.getElementById('ag_khFull').value.trim().toUpperCase();
+    const kh     = document.getElementById('ag_kh').value;
+    const link   = document.getElementById('ag_link').value.trim();
+    const tab    = document.getElementById('ag_tab').value.trim();
+    const id     = document.getElementById('ag_id').value.trim() || slugifyGianId(maCT);
+    const tmLetters = document.getElementById('ag_tmCol').value.trim().toUpperCase();
+    const ckLetters = document.getElementById('ag_ckCol').value.trim().toUpperCase();
+    const sheetId = extractSheetId(link);
+
+    const errEl = document.getElementById('ag_error');
+    const showErr = (msg) => { errEl.textContent = msg; errEl.style.display = 'block'; };
+
+    if (!maCT) return showErr('Vui lòng nhập tên mã công trình.');
+    if (!sheetId) return showErr('Link Google Sheets không hợp lệ hoặc không chứa Sheet ID.');
+    if (!tab) return showErr('Vui lòng nhập tên tab.');
+    if (!tmLetters || !ckLetters) return showErr('Vui lòng nhập ký tự cột TM và CK.');
+    errEl.style.display = 'none';
+
+    const tmCol = colLetterToIdx(tmLetters);
+    const ckCol = colLetterToIdx(ckLetters);
+
+    const btn = document.getElementById('ag_submit_btn');
+    btn.disabled = true;
+    btn.textContent = '⏳ Đang lưu...';
+
+    try {
+      const resp = await fetch('/api/dau-ra/gian-custom', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, kh, maCT, khFull, link, sheetId, tab, tmCol, ckCol })
+      });
+      const result = await resp.json();
+      if (!result.ok) { showErr('Lỗi: ' + result.error); btn.disabled = false; btn.textContent = '✅ Thêm gian'; return; }
+
+      // Thêm vào KVC_GIAN và re-render
+      KVC_GIAN.push({ id, kh, maCT, khFull, link });
+      closeAddGianModal();
+      renderKvcTable();
+      document.getElementById('kvc_status').textContent = `✅ Đã thêm gian: ${maCT}`;
+      setTimeout(() => { document.getElementById('kvc_status').textContent = ''; }, 5000);
+    } catch(e) {
+      showErr('Lỗi kết nối: ' + e.message);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = '✅ Thêm gian';
+    }
+  }
+
+  // ============================================================
+  // LOAD CUSTOM GIANS FROM SERVER
+  // ============================================================
+  async function loadCustomGians() {
+    try {
+      const resp = await fetch('/api/dau-ra/gian-custom');
+      const result = await resp.json();
+      if (result.ok && result.gians && result.gians.length > 0) {
+        const existingIds = new Set(KVC_GIAN.map(g => g.id));
+        result.gians.forEach(g => {
+          if (!existingIds.has(g.id)) {
+            KVC_GIAN.push({ id: g.id, kh: g.kh, maCT: g.maCT, khFull: g.khFull || '', link: g.link || '' });
+          }
+        });
+      }
+    } catch(e) { /* silent */ }
+  }
+
+  // Init: load custom gians + server KV data, rồi render
+  Promise.all([loadCustomGians(), serverLoadAll()]).then(() => renderKvcTable());
+  renderKvcTable(); // render ngay bằng localStorage/KVC_GIAN hiện tại
   </script>
   <%- include('partials/scroll-restore') %>
 </body>
