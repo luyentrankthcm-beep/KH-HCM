@@ -14,10 +14,13 @@ const CLIENT_ID = process.env.GOOGLE_CLIENT_ID || "";
 const CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || "";
 const REDIRECT_URI = process.env.GOOGLE_REDIRECT_URI || "";
 // Luyen, 2026-08-25: them Drive scopes -- readonly de list folder, file de upload
+// Chi Nhan, 2026-09-21: them Sheets scope de doc du lieu TM/CK tu Google Sheets
+// (cot AI/AJ trong tab VE cua tung gian) cho trang Dau Ra Noi Bo.
 const SCOPE = [
   "https://www.googleapis.com/auth/gmail.readonly",
   "https://www.googleapis.com/auth/drive.readonly",
   "https://www.googleapis.com/auth/drive.file",
+  "https://www.googleapis.com/auth/spreadsheets.readonly",
 ].join(" ");
 
 function isConfigured() {
