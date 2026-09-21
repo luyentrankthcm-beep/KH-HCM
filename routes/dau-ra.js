@@ -56,29 +56,24 @@ function parseCSVtoRows(csvText) {
   return rows;
 }
 
-// ── Helper: lấy GID của tab theo tên từ HTML sheet ───────────────────────────
+// ── Helper: fetch CSV từ Google Sheets qua gviz/tq (không cần Sheets API) ────
 // Chi Nhan, 2026-09-21: Sheets API bị chặn (project 831383732136 chưa bật) →
-// dùng Drive export CSV (drive.readonly đã được bật) thay thế. Cần GID của tab.
-async function resolveTabGid(sheetId, tabName, accessToken) {
-  try {
-    const resp = await fetch(`https://docs.google.com/spreadsheets/d/${sheetId}/edit`, {
-      headers: { Authorization: 'Bearer ' + accessToken },
-      redirect: 'follow',
-    });
-    if (!resp.ok) return null;
-    const html = await resp.text();
-    // Tìm pattern: "name":"<tabName>","index":\d+,"sheetId":\d+
-    // hoặc "sheetId":\d+,"title":"<tabName>"
-    // Google Sheets HTML nhúng data trong bootstrapData dạng JSON escaped
-    const escaped = tabName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    // Dạng 1: "name":"VÉ",...,"sheetId":12345
-    let m = html.match(new RegExp('"name":"' + escaped + '"[^}]{0,200}?"sheetId":(\\d+)'));
-    if (m) return m[1];
-    // Dạng 2: "sheetId":12345,...,"name":"VÉ"
-    m = html.match(new RegExp('"sheetId":(\\d+)[^}]{0,200}?"name":"' + escaped + '"'));
-    if (m) return m[1];
-    return null;
-  } catch { return null; }
+// dùng Google Visualization API (gviz/tq) để export CSV theo tên tab trực tiếp.
+// URL: /gviz/tq?tqx=out:csv&sheet={tabName}&headers=0
+// Hỗ trợ OAuth Bearer token với scope drive.readonly.
+async function fetchSheetCSVbyName(sheetId, tabName, accessToken) {
+  const url = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(tabName)}&headers=0`;
+  const resp = await fetch(url, {
+    headers: { Authorization: 'Bearer ' + accessToken },
+    redirect: 'follow',
+  });
+  if (!resp.ok) throw new Error('gviz/tq lỗi HTTP ' + resp.status);
+  const text = await resp.text();
+  // Nếu Google trả về HTML (trang đăng nhập / lỗi) thay vì CSV
+  if (text.trimStart().startsWith('<')) {
+    throw new Error('Không đủ quyền đọc sheet hoặc tên tab sai. Vào Chi Phí → Kết nối Gmail để xác thực lại.');
+  }
+  return text;
 }
 
 // Route: fetch dữ liệu TM/CK từng ngày từ Google Sheets
@@ -122,30 +117,16 @@ router.get('/api/dau-ra/sheets-daily', requireLogin, async (req, res) => {
       }
     } catch (_) { /* mạng lỗi → thử fallback */ }
 
-    // ── Cách 2: Export CSV qua Drive (fallback khi Sheets API chưa bật) ───────
-    // Drive API (drive.readonly) đã được bật → dùng URL export CSV của Google
-    // Cần GID của tab: resolve từ HTML sheet rồi cache vào cfg.gid
+    // ── Cách 2: Google Visualization API (gviz/tq) ─────────────────────────────
+    // Không cần Sheets API. Dùng tên tab trực tiếp. Scope drive.readonly là đủ.
     if (!rows) {
-      fetchMethod = 'drive-export';
-      let gid = cfg.gid; // đã cache từ lần trước?
-      if (!gid) {
-        gid = await resolveTabGid(cfg.sheetId, cfg.tab, accessToken);
-        if (gid) cfg.gid = gid; // cache để lần sau nhanh hơn
+      fetchMethod = 'gviz-tq';
+      try {
+        const csvText = await fetchSheetCSVbyName(cfg.sheetId, cfg.tab, accessToken);
+        rows = parseCSVtoRows(csvText);
+      } catch (e) {
+        return res.json({ ok:false, error:'Lấy dữ liệu Google Sheets thất bại: ' + e.message });
       }
-      if (!gid) {
-        return res.json({ ok:false, error:'Không thể xác định tab "' + cfg.tab + '". Vui lòng bật Google Sheets API tại https://console.cloud.google.com/apis/api/sheets.googleapis.com/overview?project=831383732136' });
-      }
-      const exportUrl = `https://docs.google.com/spreadsheets/d/${cfg.sheetId}/export?format=csv&gid=${gid}`;
-      const exportResp = await fetch(exportUrl, { headers:{ Authorization:'Bearer ' + accessToken }, redirect:'follow' });
-      if (!exportResp.ok) {
-        return res.json({ ok:false, error:'Drive export lỗi HTTP ' + exportResp.status + '. Kiểm tra quyền truy cập sheet.' });
-      }
-      const csvText = await exportResp.text();
-      // Nếu Google trả về HTML (trang đăng nhập) thay vì CSV
-      if (csvText.trimStart().startsWith('<')) {
-        return res.json({ ok:false, error:'Không đủ quyền đọc sheet. Vào Chi Phí → Kết nối Gmail để xác thực lại.' });
-      }
-      rows = parseCSVtoRows(csvText);
     }
 
     // Lọc hàng theo tháng/năm: ô dateCol phải chứa "/MM/YYYY" (dd/mm/yyyy)
