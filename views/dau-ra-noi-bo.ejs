@@ -112,6 +112,9 @@
           <option value="2026" selected>2026</option>
         </select>
         <span style="font-size:.8em;color:#94a3b8;">💡 Nhấn vào gian để nhập số liệu từng ngày</span>
+        <button class="btn-update-all" id="btn_update_all" onclick="updateAllFromSheets()" title="Tự động lấy TM & CK từ Google Sheets cho tất cả gian và lưu lên server">
+          🔄 Cập nhật tất cả từ GG Sheets
+        </button>
         <span id="kvc_status" style="font-size:.8em;color:#64748b;"></span>
       </div>
 
@@ -136,7 +139,7 @@
       </div>
 
       <p style="font-size:.76em;color:#94a3b8;margin-top:.6rem;">
-        💾 Dữ liệu lưu trong trình duyệt. Nhấn vào hàng gian để nhập số liệu từng ngày.
+        💾 Dữ liệu lưu trên server. Nhấn "Cập nhật tất cả từ GG Sheets" để tự động lấy TM/CK cho tất cả gian.
       </p>
     </div>
 
@@ -168,7 +171,8 @@
       <div class="modal-body" id="modal_body"></div>
       <div class="modal-footer">
         <div class="modal-total-preview" id="modal_total_preview"></div>
-        <div style="display:flex;gap:.5rem;">
+        <div style="display:flex;gap:.5rem;align-items:center;">
+          <span id="modal_save_ok" style="display:none;font-size:.82em;color:#16a34a;font-weight:600;">✓ Đã lưu lên server</span>
           <button class="btn-cancel" onclick="closeDetailModal()">Đóng</button>
           <button class="btn-save" onclick="saveDetail()">💾 Lưu</button>
         </div>
@@ -459,11 +463,9 @@
       `Tổng: <strong style="color:#15803d">${tong?tong.toLocaleString('vi-VN'):'—'}</strong>`;
   }
 
-  function saveDetail() {
-    if (!_currentModalId) return;
+  function readDailyFromModal() {
     const tbl = document.getElementById('day_tbl');
-    if (!tbl) return;
-
+    if (!tbl) return [];
     const daily = [];
     tbl.querySelectorAll('tbody tr').forEach(row => {
       const inputs = row.querySelectorAll('input.day-input');
@@ -472,17 +474,22 @@
       const tm   = inputs[0].value !== '' ? Number(inputs[0].value)||0 : null;
       const ck   = inputs[1].value !== '' ? Number(inputs[1].value)||0 : null;
       const khac = inputs[2].value !== '' ? Number(inputs[2].value)||0 : 0;
-      // Chỉ lưu ngày có dữ liệu
       if (tm !== null || ck !== null || khac) {
         daily.push({ ngay, tienMat: tm, chuyenKhoan: ck, dtKhac: khac });
       }
     });
+    return daily;
+  }
 
+  async function saveDetail() {
+    if (!_currentModalId) return;
+    const daily = readDailyFromModal();
     const now = new Date().toLocaleDateString('vi-VN', {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
     saveData(_currentModalId, _currentModalMonth, _currentModalYear, { daily, updatedAt: now });
-
-    closeDetailModal();
     renderKvcTable();
+    // Hiện thông báo "Đã lưu" trong modal (không đóng modal)
+    const okSpan = document.getElementById('modal_save_ok');
+    if (okSpan) { okSpan.style.display = 'inline'; setTimeout(() => { okSpan.style.display = 'none'; }, 3000); }
   }
 
   function closeDetailModal() {
@@ -565,13 +572,54 @@
 
       updateFooterTotals();
       updateModalPreview();
-      btn.textContent = `✅ Đã lấy ${filled} ngày`;
+      // Tự động lưu ngay sau khi lấy từ Sheets
+      await saveDetail();
+      btn.textContent = `✅ Đã lấy & lưu ${filled} ngày`;
       setTimeout(() => { btn.textContent = '🔄 Lấy từ GG Sheets'; btn.disabled = false; }, 2500);
     } catch(e) {
       alert('Lỗi kết nối: ' + e.message);
       btn.textContent = '🔄 Lấy từ GG Sheets';
       btn.disabled = false;
     }
+  }
+
+  // ============================================================
+  // FETCH & SAVE 1 GIAN (không cần mở modal)
+  // ============================================================
+  async function fetchAndSaveGian(gianId, month, year) {
+    const url = `/api/dau-ra/sheets-daily?gianId=${gianId}&month=${month}&year=${year}`;
+    const resp = await fetch(url);
+    const result = await resp.json();
+    if (!result.ok || !result.daily || result.daily.length === 0) return { ok: false, filled: 0 };
+    const now = new Date().toLocaleDateString('vi-VN', {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
+    saveData(gianId, month, year, { daily: result.daily, updatedAt: now, fromSheets: true });
+    return { ok: true, filled: result.daily.length };
+  }
+
+  // ============================================================
+  // CẬP NHẬT TẤT CẢ GIAN TỪ GG SHEETS
+  // ============================================================
+  async function updateAllFromSheets() {
+    const btn = document.getElementById('btn_update_all');
+    const status = document.getElementById('kvc_status');
+    btn.disabled = true;
+    const month = parseInt(document.getElementById('kvc_month').value);
+    const year  = parseInt(document.getElementById('kvc_year').value);
+
+    let ok = 0, fail = 0;
+    for (let i = 0; i < KVC_GIAN.length; i++) {
+      const g = KVC_GIAN[i];
+      status.textContent = `⏳ Đang lấy ${i+1}/${KVC_GIAN.length}: ${g.maCT}…`;
+      try {
+        const res = await fetchAndSaveGian(g.id, month, year);
+        if (res.ok) ok++; else fail++;
+      } catch(e) { fail++; }
+    }
+
+    renderKvcTable();
+    btn.disabled = false;
+    status.textContent = `✅ Hoàn tất: ${ok} gian lấy được, ${fail} gian không có dữ liệu`;
+    setTimeout(() => { status.textContent = ''; }, 8000);
   }
 
   // ============================================================
