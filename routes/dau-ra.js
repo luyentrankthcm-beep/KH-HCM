@@ -271,8 +271,23 @@ router.get('/api/dau-ra/sheets-daily', requireLogin, async (req, res) => {
 
 router.use(requireLogin);
 
+// Nhan, 2026-09-22: "bạn ơi cho tôi mã công trình đầy đủ hk á" -- bang Doi
+// soat ngay (Zalo/VNPay/Payoo) chi hien ma CT NGAN (AEON, FARM, FUNZONE...)
+// suy tu tu khoa ten san pham, KHONG phai Ma CT day du (vd co ~23 chi nhanh
+// AEON khac nhau trong danh muc nen khong the tu dong doan dung chi nhanh
+// nao -- de trong/ngan con hon doan sai). Giai phap: cho DANH SACH GOI Y Ma
+// CT day du (giong allGianSuggestions ben Chi Phi, lay tu
+// phap_danh_hop_dong_thue.maCongTrinh) de Nhan tu chon/go dung khi map Ten
+// SP -> Ma CT (man "Map Tên SP → CT"), thay vi go tay tu do de sai chinh ta.
 router.get("/dau-ra", (req, res) => {
-  res.render("dau-ra", { userName: req.session.userName || req.session.user || "" });
+  const store = load();
+  const maCTSet = new Set();
+  (store.phap_danh_hop_dong_thue || []).forEach((r) => { if (r.maCongTrinh) maCTSet.add(r.maCongTrinh); });
+  const allMaCTSuggestions = [...maCTSet].sort();
+  res.render("dau-ra", {
+    userName: req.session.userName || req.session.user || "",
+    allMaCTSuggestions,
+  });
 });
 
 router.get("/dau-ra-noi-bo", (req, res) => {

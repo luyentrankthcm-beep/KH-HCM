@@ -116,6 +116,13 @@
 </head>
 <body>
   <%- include('partials/nav') %>
+  <!-- Nhan, 2026-09-22: goi y Ma CT DAY DU (vd "AEON BÌNH DƯƠNG - CSE") khi
+       map Ten SP/Diem thu -> Ma CT o man Zalo/VNPay/Payoo, lay tu cung
+       danh muc dung o Chi Phi (phap_danh_hop_dong_thue.maCongTrinh) de
+       tranh go tay sai chinh ta / khac ten voi cho khac. -->
+  <datalist id="dauRaMaCTList">
+    <% (typeof allMaCTSuggestions !== 'undefined' ? allMaCTSuggestions : []).forEach(function(ma){ %><option value="<%- ma %>"></option><% }) %>
+  </datalist>
   <main class="container">
     <h1 class="page-title">Đầu Ra – Doanh Thu</h1>
 
@@ -3937,7 +3944,7 @@
         html += `<tr style="background:${bg}">
           <td style="padding:.3rem .6rem;font-size:.79em">${isMapped?'':' ⏳ '}${sp}${skuTag}</td>
           <td style="padding:.3rem .4rem">
-            <input id="zsp_${i}" data-sp="${esc}" value="${(_zaloSpMap[sp]||'').replace(/"/g,'&quot;')}" placeholder="Mã CT"
+            <input id="zsp_${i}" data-sp="${esc}" value="${(_zaloSpMap[sp]||'').replace(/"/g,'&quot;')}" placeholder="Mã CT" list="dauRaMaCTList"
               style="width:100%;border:1px solid ${borderCol};border-radius:4px;padding:.2rem .35rem;background:${isMapped?'#f0fdf4':'#fff'}"
               onkeydown="if(event.key==='Enter')saveZaloSpMap(this)">
           </td>
@@ -4477,7 +4484,7 @@
         html += `<tr style="background:${bg}">
           <td style="padding:.3rem .6rem;font-size:.85em">${isMapped?'':' ⏳ '}${dt}</td>
           <td style="padding:.3rem .4rem">
-            <input id="vsp_${i}" data-sp="${esc}" value="${(_vnpaySpMap[dt]||'').replace(/"/g,'&quot;')}" placeholder="Mã CT"
+            <input id="vsp_${i}" data-sp="${esc}" value="${(_vnpaySpMap[dt]||'').replace(/"/g,'&quot;')}" placeholder="Mã CT" list="dauRaMaCTList"
               style="width:100%;border:1px solid ${borderCol};border-radius:4px;padding:.2rem .35rem;background:${isMapped?'#f0fdf4':'#fff'}"
               onkeydown="if(event.key==='Enter')saveVnpaySpMap(this)">
           </td>
@@ -5019,7 +5026,7 @@
         html += `<tr style="background:${bg}">
           <td style="padding:.3rem .6rem;font-size:.85em">${isMapped?'':' ⏳ '}${gian}</td>
           <td style="padding:.3rem .4rem">
-            <input id="psp_${i}" data-sp="${esc}" value="${(_payooSpMap[gian]||'').replace(/"/g,'&quot;')}" placeholder="Mã CT"
+            <input id="psp_${i}" data-sp="${esc}" value="${(_payooSpMap[gian]||'').replace(/"/g,'&quot;')}" placeholder="Mã CT" list="dauRaMaCTList"
               style="width:100%;border:1px solid ${borderCol};border-radius:4px;padding:.2rem .35rem;background:${isMapped?'#f0fdf4':'#fff'}"
               onkeydown="if(event.key==='Enter')savePayooSpMap(this)">
           </td>
