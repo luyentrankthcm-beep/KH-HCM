@@ -19,7 +19,7 @@ const GIAN_SHEETS_CONFIG = {
   tutu_aeonbd:  { sheetId:'15brZmUqEYuuEkbp7AgQSAEKmbgMiNqey6CIScGO97cs',  tab:'VÉ',      dateCol:0, tmCol:34, ckCol:35 },
   tutu_estella: { sheetId:'1cegFodLAXbtYdITdfGGd8m0weoOUVP6RgwGPScb9JMo',  tab:'BÁO CÁO', dateCol:0, tmCol:34, ckCol:35, multiplier:1000 },
   tutu_aeontan: { sheetId:'1SGtQ0Kvnvidr4ipxSP-AY5uwGwFEEoOrwFhawJP2scI',  tab:'VÉ',      dateCol:0, tmCol:34, ckCol:35 },
-  fz_lottebt:   { sheetId:'1Be1E0pBJlYATKpogjqMTyHbhMcOg3Rbca7qoUlvHBWk',  tab:'VÉ',      dateCol:0, tmCol:34, ckCol:35 },
+  fz_lottebt:   { sheetId:'1Be1E0pBJlYATKpogjqMTyHbhMcOg3Rbca7qoUlvHBWk',  tab:'TỔNG',    dateCol:0, tmCol:58, ckCol:47, ckCol2:52 }, // BG=TM(nhà bóng+bếp), AV+BA=Momo cả 2
   fz_scvivo:    { sheetId:'1lQMEpf1OhVOEROY5kzM_cWp77fZgUl92cVn0A78SGvw',  tab:'VÉ',      dateCol:0, tmCol:34, ckCol:35 },
   fz_aeontan:   { sheetId:'1Ej4iwtbLGu-WgHkjTjdIDZPz02lL4KLRE9ANYzpMP9c',  tab:'VÉ',      dateCol:0, tmCol:34, ckCol:35 },
   ev_ghostbr:   { sheetId:'1JwtV9Mg-LS_3xIuuzSuc0aE4x23riepFiomt7q0HAPU',  tab:'VÉ',      dateCol:0, tmCol:34, ckCol:35 },
@@ -179,8 +179,14 @@ router.get('/api/dau-ra/sheets-daily', requireLogin, async (req, res) => {
       if (!day || isNaN(+day)) return;
       const ngay = day.padStart(2,'0') + '/' + mm;
       const mul = cfg.multiplier || 1;
-      const tm = parseNum(row[cfg.tmCol]) !== null ? Math.round(parseNum(row[cfg.tmCol]) * mul) : null;
-      const ck = parseNum(row[cfg.ckCol]) !== null ? Math.round(parseNum(row[cfg.ckCol]) * mul) : null;
+      const tmRaw = parseNum(row[cfg.tmCol]);
+      const ckRaw1 = parseNum(row[cfg.ckCol]);
+      const ckRaw2 = cfg.ckCol2 !== undefined ? parseNum(row[cfg.ckCol2]) : null;
+      const tm = tmRaw !== null ? Math.round(tmRaw * mul) : null;
+      // Nếu có ckCol2: cộng cả 2 cột Momo (ví dụ fz_lottebt: AV nhà bóng + BA nhà bếp)
+      const ckCombined = (ckRaw1 !== null || ckRaw2 !== null)
+        ? ((ckRaw1 || 0) + (ckRaw2 || 0)) : null;
+      const ck = ckCombined !== null ? Math.round(ckCombined * mul) : null;
       if (tm !== null || ck !== null) {
         daily.push({ ngay, tienMat:tm, chuyenKhoan:ck, dtKhac:0 });
       }
