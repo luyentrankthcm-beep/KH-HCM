@@ -17,7 +17,7 @@ const GIAN_SHEETS_CONFIG = {
   tutu_aeontp:  { sheetId:'1jGG9Po3WnsntEeXC53uHUUxi-5bcKx-jPuPWhN68Qps',  tab:'VÉ',      dateCol:0, tmCol:39, ckCol:40 },
   tutu_aeonbt:  { sheetId:'1Lts3GeoeozWrPlprGzANK_ksmd6h4XMnl5xMUMM_OL4',  tab:'VÉ',      dateCol:0, tmCol:34, ckCol:35 },
   tutu_aeonbd:  { sheetId:'15brZmUqEYuuEkbp7AgQSAEKmbgMiNqey6CIScGO97cs',  tab:'VÉ',      dateCol:0, tmCol:34, ckCol:35 },
-  tutu_estella: { sheetId:'1cegFodLAXbtYdITdfGGd8m0weoOUVP6RgwGPScb9JMo',  tab:'BÁO CÁO', dateCol:0, tmCol:34, ckCol:35 },
+  tutu_estella: { sheetId:'1cegFodLAXbtYdITdfGGd8m0weoOUVP6RgwGPScb9JMo',  tab:'BÁO CÁO', dateCol:0, tmCol:34, ckCol:35, multiplier:1000 },
   tutu_aeontan: { sheetId:'1SGtQ0Kvnvidr4ipxSP-AY5uwGwFEEoOrwFhawJP2scI',  tab:'VÉ',      dateCol:0, tmCol:34, ckCol:35 },
   fz_lottebt:   { sheetId:'1Be1E0pBJlYATKpogjqMTyHbhMcOg3Rbca7qoUlvHBWk',  tab:'VÉ',      dateCol:0, tmCol:34, ckCol:35 },
   fz_scvivo:    { sheetId:'1lQMEpf1OhVOEROY5kzM_cWp77fZgUl92cVn0A78SGvw',  tab:'VÉ',      dateCol:0, tmCol:34, ckCol:35 },
@@ -178,8 +178,9 @@ router.get('/api/dau-ra/sheets-daily', requireLogin, async (req, res) => {
       const day = dateCell.split('/')[0].trim().replace(/\D/g,'');
       if (!day || isNaN(+day)) return;
       const ngay = day.padStart(2,'0') + '/' + mm;
-      const tm = parseNum(row[cfg.tmCol]);
-      const ck = parseNum(row[cfg.ckCol]);
+      const mul = cfg.multiplier || 1;
+      const tm = parseNum(row[cfg.tmCol]) !== null ? Math.round(parseNum(row[cfg.tmCol]) * mul) : null;
+      const ck = parseNum(row[cfg.ckCol]) !== null ? Math.round(parseNum(row[cfg.ckCol]) * mul) : null;
       if (tm !== null || ck !== null) {
         daily.push({ ngay, tienMat:tm, chuyenKhoan:ck, dtKhac:0 });
       }
