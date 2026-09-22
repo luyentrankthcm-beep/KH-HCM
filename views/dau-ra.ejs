@@ -3935,14 +3935,33 @@
       // (ngắn, không dấu, không khoảng trắng, vd "AMTP", "farmPT-CT") khiến
       // Luyen thấy lạ. Đánh dấu rõ dòng nào là Sku bằng nhãn xanh để phân biệt.
       const looksLikeSku = s => !/\s/.test(s) && s.length <= 24;
+      // Nhan, 2026-09-22: "300HP Sku cho tên sp chi tiết cho nó đi" -- dong
+      // Sku (vd "300HP") khong tu no biet la san pham gi, kho map dung Ma
+      // CT. Do 1 don hang luu CA tenSP LAN sku chung (packZaloOrder), dò
+      // nguoc qua _zaloOrders de tim (toi da 3) ten san pham DAY DU tung
+      // gan voi sku nay tu truoc gio, hien lam goi y ngay duoi ma Sku.
+      const skuExamples = {};
+      Object.values(_zaloOrders).forEach(val => {
+        const u = unpackZaloOrder(val);
+        if (u.sku && u.tenSP) {
+          if (!skuExamples[u.sku]) skuExamples[u.sku] = [];
+          if (skuExamples[u.sku].length < 3 && skuExamples[u.sku].indexOf(u.tenSP) === -1) skuExamples[u.sku].push(u.tenSP);
+        }
+      });
+      const escHtml = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
       tenSPs.forEach((sp, i) => {
         const isMapped = !!_zaloSpMap[sp];
         const bg = isMapped ? (i%2?'#f0fdf4':'#dcfce7') : (i%2?'#fff':'#fffbeb');
         const borderCol = isMapped ? '#86efac' : '#cbd5e1';
         const esc = sp.replace(/'/g,"&#39;").replace(/"/g,'&quot;');
-        const skuTag = looksLikeSku(sp) ? ' <span style="background:#dbeafe;color:#1d4ed8;font-size:.72em;font-weight:700;padding:.05rem .35rem;border-radius:4px;vertical-align:middle">Sku</span>' : '';
+        const isSku = looksLikeSku(sp);
+        const skuTag = isSku ? ' <span style="background:#dbeafe;color:#1d4ed8;font-size:.72em;font-weight:700;padding:.05rem .35rem;border-radius:4px;vertical-align:middle">Sku</span>' : '';
+        const examples = isSku ? (skuExamples[sp]||[]) : [];
+        const skuHint = examples.length
+          ? `<div style="font-size:.78em;color:#64748b;margin-top:2px">${examples.map(escHtml).join(' · ')}</div>`
+          : (isSku ? '<div style="font-size:.78em;color:#cbd5e1;margin-top:2px;font-style:italic">(chưa thấy tên sản phẩm nào cho Sku này)</div>' : '');
         html += `<tr style="background:${bg}">
-          <td style="padding:.3rem .6rem;font-size:.79em">${isMapped?'':' ⏳ '}${sp}${skuTag}</td>
+          <td style="padding:.3rem .6rem;font-size:.79em">${isMapped?'':' ⏳ '}${sp}${skuTag}${skuHint}</td>
           <td style="padding:.3rem .4rem">
             <input id="zsp_${i}" data-sp="${esc}" value="${(_zaloSpMap[sp]||'').replace(/"/g,'&quot;')}" placeholder="Mã CT" list="dauRaMaCTList"
               style="width:100%;border:1px solid ${borderCol};border-radius:4px;padding:.2rem .35rem;background:${isMapped?'#f0fdf4':'#fff'}"
