@@ -305,13 +305,37 @@ router.get("/dau-ra-noi-bo", (req, res) => {
 // them buoc: (1) luc tai trang, keo du lieu server ve ghi de vao localStorage
 // TRUOC khi cac ham cu doc localStorage nhu binh thuong; (2) moi lan cac ham
 // cu ghi vao localStorage thi ALSO gui 1 ban len server qua route POST /kv.
+// ── Helper: build _zaloSpMap seed từ zvp_online_product_map (server-side) ──────
+// Gọi khi kh_cu không có zalo_sp_map_kh_cu để tránh Railway mất data khi restart.
+// CSE products: maCT = maCongTrinh + " - CSE", non-CSE: maCT = maCongTrinh.
+function buildZaloSpMapSeed(store) {
+  const zvpMap = store.zvp_online_product_map || {};
+  const seed = {};
+  Object.entries(zvpMap).forEach(([tenSP, info]) => {
+    const maCT = (info.maCongTrinh || '').trim();
+    if (maCT) seed[tenSP] = info.isCse ? maCT + ' - CSE' : maCT;
+  });
+  return seed;
+}
+
 router.get("/api/dau-ra/kv-all", (req, res) => {
   try {
     const store = load();
     const company = getCompany(req);
     if (!store.dau_ra_kv) store.dau_ra_kv = { kh_cu: {}, kh_moi: {} };
     if (!store.dau_ra_kv[company]) store.dau_ra_kv[company] = {};
-    res.json({ ok: true, data: store.dau_ra_kv[company] });
+    const kvCo = store.dau_ra_kv[company];
+    // Seed zalo_sp_map nếu chưa có (Railway restart hoặc cài mới)
+    // Chỉ seed khi key hoàn toàn không tồn tại (không ghi đè data user đã lưu)
+    const spMapKey = `zalo_sp_map_${company}`;
+    if (!kvCo[spMapKey]) {
+      const seed = buildZaloSpMapSeed(store);
+      if (Object.keys(seed).length > 0) {
+        kvCo[spMapKey] = JSON.stringify(seed);
+        save(store); // lưu seed xuống file để các request sau không cần seed lại
+      }
+    }
+    res.json({ ok: true, data: kvCo });
   } catch (err) {
     res.json({ ok: false, error: err.message });
   }
