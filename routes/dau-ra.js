@@ -20,12 +20,14 @@ const GIAN_SHEETS_CONFIG = {
   tutu_estella: { sheetId:'1cegFodLAXbtYdITdfGGd8m0weoOUVP6RgwGPScb9JMo',  tab:'BÁO CÁO', dateCol:0, tmCol:34, ckCol:35, multiplier:1000 },
   tutu_aeontan: { sheetId:'1SGtQ0Kvnvidr4ipxSP-AY5uwGwFEEoOrwFhawJP2scI',  tab:'VÉ',      dateCol:0, tmCol:34, ckCol:35 },
   fz_lottebt:   { sheetId:'1Be1E0pBJlYATKpogjqMTyHbhMcOg3Rbca7qoUlvHBWk',  tab:'TỔNG',    dateCol:0, tmCol:58, ckCol:47, ckCol2:52 }, // BG=TM(nhà bóng+bếp), AV+BA=Momo cả 2
-  fz_scvivo:    { sheetId:'1lQMEpf1OhVOEROY5kzM_cWp77fZgUl92cVn0A78SGvw',  tab:'VÉ',      dateCol:0, tmCol:34, ckCol:35 },
-  fz_aeontan:   { sheetId:'1Ej4iwtbLGu-WgHkjTjdIDZPz02lL4KLRE9ANYzpMP9c',  tab:'VÉ',      dateCol:0, tmCol:34, ckCol:35 },
-  ev_ghostbr:   { sheetId:'1JwtV9Mg-LS_3xIuuzSuc0aE4x23riepFiomt7q0HAPU',  tab:'VÉ',      dateCol:0, tmCol:34, ckCol:35 },
-  ev_fzgoan:    { sheetId:'1bdU9XExnBp8aMLTj9rAAXS1G3_Xi6m2jI3y0SqQN80s',  tab:'VÉ',      dateCol:0, tmCol:34, ckCol:35 },
-  fz_scvivo2:   { sheetId:'1ZaNpXiOrtpnHHZXdMZEFmBKw1eooAPmXqqls0N0Uap0',  tab:'VÉ',      dateCol:0, tmCol:34, ckCol:35 },
-  pinball_amtp: { sheetId:'1r-huBGhhy_K_nOyHr0iz4Rd3Bkfw0vyTDQEZbT_PrOo',  tab:'VÉ',      dateCol:0, tmCol:34, ckCol:35 },
+  fz_scvivo:    { sheetId:'1lQMEpf1OhVOEROY5kzM_cWp77fZgUl92cVn0A78SGvw',  tab:'TỔNG',    dateCol:0, tmCol:58, tmCol2:63, ckCol:57, ckCol2:61 }, // BG+BL=TM(nhà bóng+bếp), BF+BJ=Momo cả 2
+  fz_aeontan:   { sheetId:'1Ej4iwtbLGu-WgHkjTjdIDZPz02lL4KLRE9ANYzpMP9c',  tab:'VÉ',                  dateCol:0, tmCol:9,  ckCol:8  }, // VR Tân An: J=TM, I=CK
+  ev_ghostbr:   { sheetId:'1JwtV9Mg-LS_3xIuuzSuc0aE4x23riepFiomt7q0HAPU',  tab:'BÁO CÁO TỔNG THÁNG {M}',    dateCol:0, tmCol:44, ckCol:45, ckCol2:46,
+                  // gviz không tìm được tab bằng tên tiếng Việt phức tạp → dùng GID theo từng tháng
+                  gidMap: { '7': 729775129, '8': 276666945, '9': 1907810456 } }, // Ghost Bà Rịa: AS=TM, AT+AU=CK
+  ev_fzgoan:    { sheetId:'1bdU9XExnBp8aMLTj9rAAXS1G3_Xi6m2jI3y0SqQN80s',  tab:'Bảng báo cáo hàng ngày',     dateCol:0, tmCol:38, ckCol:37 }, // ADV Go An Lạc: AM=TM, AL=Momo
+  fz_scvivo2:   { sheetId:'1ZaNpXiOrtpnHHZXdMZEFmBKw1eooAPmXqqls0N0Uap0',  tab:'VÉ',                  dateCol:0, tmCol:9,  ckCol:8  }, // VR SC Vivo: J=TM, I=CK
+  pinball_amtp: { sheetId:'1r-huBGhhy_K_nOyHr0iz4Rd3Bkfw0vyTDQEZbT_PrOo',  tab:'BC tiền tháng {M}',  dateCol:0, tmCol:4,  ckCol:5  }, // Pinball: E=TM, F=CK, tab thay đổi theo tháng
 };
 
 function colIdxToLetter(n) {
@@ -56,24 +58,30 @@ function parseCSVtoRows(csvText) {
   return rows;
 }
 
-// ── Helper: fetch CSV từ Google Sheets qua gviz/tq (không cần Sheets API) ────
-// Chi Nhan, 2026-09-21: Sheets API bị chặn (project 831383732136 chưa bật) →
-// dùng Google Visualization API (gviz/tq) để export CSV theo tên tab trực tiếp.
-// URL: /gviz/tq?tqx=out:csv&sheet={tabName}&headers=0
-// Hỗ trợ OAuth Bearer token với scope drive.readonly.
-async function fetchSheetCSVbyName(sheetId, tabName, accessToken) {
-  const url = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(tabName)}&headers=0`;
+// ── Helper: fetch CSV từ Google Sheets qua gviz/tq ───────────────────────────
+async function _fetchGvizCSV(url, accessToken) {
   const resp = await fetch(url, {
     headers: { Authorization: 'Bearer ' + accessToken },
     redirect: 'follow',
   });
   if (!resp.ok) throw new Error('gviz/tq lỗi HTTP ' + resp.status);
   const text = await resp.text();
-  // Nếu Google trả về HTML (trang đăng nhập / lỗi) thay vì CSV
   if (text.trimStart().startsWith('<')) {
     throw new Error('Không đủ quyền đọc sheet hoặc tên tab sai. Vào Chi Phí → Kết nối Gmail để xác thực lại.');
   }
   return text;
+}
+
+// Fetch bằng tên tab (có thể thất bại nếu tên tab có ký tự đặc biệt)
+async function fetchSheetCSVbyName(sheetId, tabName, accessToken) {
+  const url = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(tabName)}&headers=0`;
+  return _fetchGvizCSV(url, accessToken);
+}
+
+// Fetch bằng GID (đáng tin cậy hơn cho tab có tên tiếng Việt phức tạp)
+async function fetchSheetCSVbyGid(sheetId, gid, accessToken) {
+  const url = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv&gid=${gid}&headers=0`;
+  return _fetchGvizCSV(url, accessToken);
 }
 
 // ── API: Quản lý gian tùy chỉnh ──────────────────────────────────────────────
@@ -104,6 +112,25 @@ router.delete('/api/dau-ra/gian-custom/:id', requireLogin, (req, res) => {
   res.json({ ok: true });
 });
 
+// Route: lấy danh sách tab + GID của một spreadsheet (để debug/cấu hình)
+router.get('/api/dau-ra/sheet-info', requireLogin, async (req, res) => {
+  const { sheetId } = req.query;
+  if (!sheetId) return res.json({ ok:false, error:'Cần tham số sheetId' });
+  const store = load();
+  if (!store.gmail_oauth?.refresh_token) return res.json({ ok:false, error:'Chưa xác thực Google' });
+  try {
+    const accessToken = await gmailApi.getValidAccessToken(store);
+    save(store);
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}?fields=sheets.properties(title,sheetId)`;
+    const resp = await fetch(url, { headers:{ Authorization:'Bearer ' + accessToken } });
+    const data = await resp.json();
+    if (!resp.ok) return res.json({ ok:false, error: data.error?.message || 'Lỗi không xác định' });
+    res.json({ ok:true, sheets: (data.sheets || []).map(s => ({ title: s.properties.title, gid: s.properties.sheetId })) });
+  } catch(e) {
+    res.json({ ok:false, error: e.message });
+  }
+});
+
 // Route: fetch dữ liệu TM/CK từng ngày từ Google Sheets
 router.get('/api/dau-ra/sheets-daily', requireLogin, async (req, res) => {
   const { gianId, month, year } = req.query;
@@ -127,14 +154,17 @@ router.get('/api/dau-ra/sheets-daily', requireLogin, async (req, res) => {
 
     const mm   = String(month).padStart(2,'0');
     const yyyy = String(year);
-    const maxColLetter = colIdxToLetter(Math.max(cfg.tmCol, cfg.ckCol));
+    // Hỗ trợ tab name động: {M} = tháng không có số 0, {MM} = tháng có số 0
+    const tabName = cfg.tab.replace('{MM}', mm).replace('{M}', String(+month));
+    const maxColLetter = colIdxToLetter(Math.max(cfg.tmCol, cfg.tmCol2 ?? 0, cfg.ckCol, cfg.ckCol2 ?? 0));
 
     let rows = null;
     let fetchMethod = 'sheets-api';
 
     // ── Cách 1: Sheets API v4 (ưu tiên) ──────────────────────────────────────
     try {
-      const range = `${cfg.tab}!A:${maxColLetter}`;
+      // Dùng dấu nháy đơn quanh tab name để Sheets API xử lý đúng khi tab có dấu cách/tiếng Việt
+      const range = `'${tabName}'!A:${maxColLetter}`;
       const url   = `https://sheets.googleapis.com/v4/spreadsheets/${cfg.sheetId}/values/${encodeURIComponent(range)}?valueRenderOption=FORMATTED_VALUE`;
       const resp  = await fetch(url, { headers:{ Authorization:'Bearer ' + accessToken } });
       if (resp.ok) {
@@ -152,37 +182,78 @@ router.get('/api/dau-ra/sheets-daily', requireLogin, async (req, res) => {
     } catch (_) { /* mạng lỗi → thử fallback */ }
 
     // ── Cách 2: Google Visualization API (gviz/tq) ─────────────────────────────
-    // Không cần Sheets API. Dùng tên tab trực tiếp. Scope drive.readonly là đủ.
-    if (!rows) {
+    // Không cần Sheets API. Dùng GID (nếu có) hoặc tên tab. Scope drive.readonly là đủ.
+    // Fallback khi: Sheets API bị chặn (!rows) hoặc trả về rỗng (rows.length < 2)
+    if (!rows || rows.length < 2) {
       fetchMethod = 'gviz-tq';
       try {
-        const csvText = await fetchSheetCSVbyName(cfg.sheetId, cfg.tab, accessToken);
+        let csvText;
+        // Ưu tiên: gidMap[month] > cfg.gid > tên tab
+        // gidMap dùng cho sheet có tab đặt tên theo tháng (gviz fail khi tên có tiếng Việt phức tạp)
+        const monthGid = cfg.gidMap ? cfg.gidMap[String(+month)] : undefined;
+        const effectiveGid = monthGid !== undefined ? monthGid : cfg.gid;
+        if (effectiveGid !== undefined) {
+          csvText = await fetchSheetCSVbyGid(cfg.sheetId, effectiveGid, accessToken);
+        } else {
+          csvText = await fetchSheetCSVbyName(cfg.sheetId, tabName, accessToken);
+        }
         rows = parseCSVtoRows(csvText);
       } catch (e) {
         return res.json({ ok:false, error:'Lấy dữ liệu Google Sheets thất bại: ' + e.message });
       }
     }
 
-    // Lọc hàng theo tháng/năm: ô dateCol phải chứa "/MM/YYYY" (dd/mm/yyyy)
-    const suffix = `/${mm}/${yyyy}`;
+    // Lọc hàng theo tháng/năm — hỗ trợ nhiều format ngày khác nhau:
+    //   "01/09/2026" (chuẩn)  |  "1/9/2026" (không padding)  |  "1/9" (không năm, chỉ ngày/tháng)
+    const mNum = String(+month);  // tháng không padding, vd "9"
+    const matchDate = dateCell => {
+      if (!dateCell) return false;
+      const s = dateCell.trim();
+      if (s.includes(`/${mm}/${yyyy}`)) return true;   // 01/09/2026
+      if (s.includes(`/${mNum}/${yyyy}`)) return true; // 1/9/2026
+      // Format không có năm: "d/m" hoặc "dd/m" — chỉ khớp nếu đúng tháng
+      if (/^\d{1,2}\/\d{1,2}$/.test(s)) {
+        return s.split('/')[1] === mNum || s.split('/')[1] === mm;
+      }
+      return false;
+    };
+    // parseNum: xử lý số tiếng Việt: "4.560.000 đ", "102.550.000", "1,5"
+    // Xóa mọi ký tự không phải số/dấu phẩy/dấu chấm/dấu trừ (bao gồm "đ", khoảng trắng)
     const parseNum = s => {
       if (s === undefined || s === null || s === '') return null;
-      const n = Number(String(s).replace(/[.\s]/g,'').replace(',','.'));
+      const cleaned = String(s).replace(/[^0-9,.\-]/g, '').replace(/\./g, '').replace(',', '.');
+      const n = Number(cleaned);
       return isNaN(n) || n === 0 ? null : Math.round(n);
     };
+
+    // Debug mode: trả về 5 rows đầu để kiểm tra column indices
+    if (req.query.debug === '1') {
+      const sample = rows.slice(0, 10).map((row, i) => ({
+        rowIdx: i,
+        dateCol: row[cfg.dateCol],
+        tmCol: row[cfg.tmCol],
+        ckCol: row[cfg.ckCol],
+        cols: row.slice(Math.max(0, cfg.tmCol-2), cfg.tmCol+5),
+      }));
+      return res.json({ ok:true, tab:tabName, sample, totalRows:rows.length });
+    }
 
     const daily = [];
     rows.forEach(row => {
       const dateCell = String(row[cfg.dateCol] || '');
-      if (!dateCell.includes(suffix)) return;
-      const day = dateCell.split('/')[0].trim().replace(/\D/g,'');
+      if (!matchDate(dateCell)) return;
+      const day = dateCell.trim().split('/')[0].replace(/\D/g,'');
       if (!day || isNaN(+day)) return;
       const ngay = day.padStart(2,'0') + '/' + mm;
       const mul = cfg.multiplier || 1;
-      const tmRaw = parseNum(row[cfg.tmCol]);
+      const tmRaw1 = parseNum(row[cfg.tmCol]);
+      const tmRaw2 = cfg.tmCol2 !== undefined ? parseNum(row[cfg.tmCol2]) : null;
       const ckRaw1 = parseNum(row[cfg.ckCol]);
       const ckRaw2 = cfg.ckCol2 !== undefined ? parseNum(row[cfg.ckCol2]) : null;
-      const tm = tmRaw !== null ? Math.round(tmRaw * mul) : null;
+      // Nếu có tmCol2: cộng TM cả 2 khu (ví dụ fz_scvivo: BG nhà bóng + BL nhà bếp)
+      const tmCombined = (tmRaw1 !== null || tmRaw2 !== null)
+        ? ((tmRaw1 || 0) + (tmRaw2 || 0)) : null;
+      const tm = tmCombined !== null ? Math.round(tmCombined * mul) : null;
       // Nếu có ckCol2: cộng cả 2 cột Momo (ví dụ fz_lottebt: AV nhà bóng + BA nhà bếp)
       const ckCombined = (ckRaw1 !== null || ckRaw2 !== null)
         ? ((ckRaw1 || 0) + (ckRaw2 || 0)) : null;
@@ -192,7 +263,7 @@ router.get('/api/dau-ra/sheets-daily', requireLogin, async (req, res) => {
       }
     });
 
-    res.json({ ok:true, daily, tab:cfg.tab, tmCol:colIdxToLetter(cfg.tmCol), ckCol:colIdxToLetter(cfg.ckCol), method:fetchMethod });
+    res.json({ ok:true, daily, tab:tabName, tmCol:colIdxToLetter(cfg.tmCol), ckCol:colIdxToLetter(cfg.ckCol), method:fetchMethod });
   } catch(err) {
     res.json({ ok:false, error:err.message });
   }
