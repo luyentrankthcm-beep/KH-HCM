@@ -291,15 +291,24 @@
   // ============================================================
   function storageKey(id, month, year) { return 'kvc_' + id + '_' + year + '_' + month; }
 
+  // Cache server KV vào memory (dùng khi localStorage bị đầy)
+  let _serverKvcCache = {};
+
   function loadData(id, month, year) {
-    try { const r = localStorage.getItem(storageKey(id,month,year)); return r ? JSON.parse(r) : null; }
-    catch(e) { return null; }
+    const k = storageKey(id, month, year);
+    // 1. Thử localStorage trước
+    try { const r = localStorage.getItem(k); if (r) return JSON.parse(r); } catch(e) {}
+    // 2. Fallback về server cache trong memory
+    return _serverKvcCache[k] || null;
   }
 
   function saveData(id, month, year, data) {
-    try { localStorage.setItem(storageKey(id,month,year), JSON.stringify(data)); } catch(e) {}
+    const k = storageKey(id, month, year);
+    // Lưu vào memory cache ngay lập tức
+    _serverKvcCache[k] = data;
+    try { localStorage.setItem(k, JSON.stringify(data)); } catch(e) {}
     // Sync lên server để dùng nhiều máy
-    serverSave(storageKey(id, month, year), data);
+    serverSave(k, data);
   }
 
   function fmtMoney(val) {
@@ -722,9 +731,11 @@
       const resp = await fetch('/api/dau-ra/kv-all');
       const result = await resp.json();
       if (result.ok && result.data) {
-        // Chỉ load các key của noi-bo (bắt đầu bằng "kvc_")
+        // Load vào memory cache TRƯỚC (không bị giới hạn localStorage)
         Object.keys(result.data).forEach(k => {
           if (k.startsWith('kvc_')) {
+            _serverKvcCache[k] = result.data[k];
+            // Cố gắng ghi vào localStorage nếu còn chỗ
             try { localStorage.setItem(k, JSON.stringify(result.data[k])); } catch(e) {}
           }
         });
@@ -867,9 +878,9 @@
     } catch(e) { /* silent */ }
   }
 
-  // Init: load custom gians + server KV data, rồi render
+  // Init: load custom gians + server KV data vào memory, rồi render
+  // Không render trước vì cần server data để hiển thị đúng khi localStorage đầy
   Promise.all([loadCustomGians(), serverLoadAll()]).then(() => renderKvcTable());
-  renderKvcTable(); // render ngay bằng localStorage/KVC_GIAN hiện tại
   </script>
   <%- include('partials/scroll-restore') %>
 </body>
