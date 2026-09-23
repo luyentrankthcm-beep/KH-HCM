@@ -3624,6 +3624,41 @@
             : ([...new Set(g.tienHDs.filter(v=>v>0))][0] || 0);
         });
 
+        // Luyen, 2026-09-23: "thêm cơ chế nếu xuất chung cộng lại khớp thì
+        // tách theo số trên đối soát từng ngày hiển thị hóa đơn đó đi cho nó
+        // bằng nhau không cần chỉnh sửa mỗi lần" -- tự động ghép các ngày
+        // CHƯA nhập soHD vào nhóm hóa đơn đã biết nếu tổng DT cả nhóm khớp
+        // tienHD (lệch <2%). Ví dụ: IPH 3 ngày 18-19-20/09 tổng 1.990.000 =
+        // HĐ 3659 nhập 1 lần ngày 20 → 18 và 19 tự ghép vào nhóm, chênh = 0.
+        const autoGroupMap = {}; // "date|maCT" -> groupKey (cho ngày auto-ghép)
+        // Đánh dấu các ngày đã có soHD tường minh
+        Object.entries(invoiceGroups).forEach(([key,g]) => {
+          const maCT = key.substring(0, key.indexOf('|'));
+          g.dates.forEach(dt => { autoGroupMap[dt+'|'+maCT] = key; });
+        });
+        // Thử mở rộng từng nhóm sang các ngày cùng maCT chưa gán soHD
+        Object.entries(invoiceGroups).forEach(([key,g]) => {
+          if(!g.tienHD || g.tienHD <= 0) return;
+          const maCT = key.substring(0, key.indexOf('|'));
+          const grpMonths = new Set(g.dates.map(dt => { const p=dt.split('-'); return p[1]+'-'+p[2]; }));
+          const groupDateSet = new Set(g.dates);
+          const unassigned = allDates.filter(dt => {
+            if(!byDate[dt]?.[maCT]) return false;
+            if(groupDateSet.has(dt) || autoGroupMap[dt+'|'+maCT]) return false;
+            if((_zaloHD[dt+'|'+maCT]?.soHD||'').trim()) return false;
+            const p = dt.split('-');
+            return grpMonths.has(p[1]+'-'+p[2]);
+          });
+          if(!unassigned.length) return;
+          const extraDT = unassigned.reduce((s,dt) => s + getGianDisp(dt, maCT, byDate[dt][maCT]).dt, 0);
+          const newTotal = g.dt + extraDT;
+          const tol2 = Math.max(1000, g.tienHD * 0.02);
+          if(Math.abs(newTotal - g.tienHD) <= tol2) {
+            unassigned.forEach(dt => { g.dates.push(dt); autoGroupMap[dt+'|'+maCT] = key; });
+            g.dt = newTotal;
+          }
+        });
+
         // Helper: render one date block
         const renderDateBlock = date => {
           const ctData = byDate[date];
@@ -3672,13 +3707,13 @@
             // ngày thay vì để mỗi ngày lệch dương/âm riêng do chia tỷ lệ
             // không tròn số.
             const soHDNow = (hd.soHD||'').trim();
-            const grp = soHDNow ? invoiceGroups[maCT+'|'+soHDNow] : null;
-            // Luyen, 2026-09-10: hóa đơn gộp nhiều ngày (vd "3271, 3272" cùng
-            // 1 tổng tiền ghi trên MỌI ngày nó che phủ) -- chia đều phần tiền
-            // hóa đơn theo TỶ LỆ DT từng ngày trong nhóm rồi mới so, thay vì
-            // so mỗi ngày với TOÀN BỘ số tiền hóa đơn (tính trùng, ra số vô
-            // nghĩa dương/âm ngược nhau). Tự động cấn về ~0 khi tổng khớp,
-            // và hiện đúng phần lệch thật (chia đều) khi tổng KHÔNG khớp.
+            // Luyen, 2026-09-23: auto-ghép ngày chưa nhập soHD vào nhóm HĐ
+            const autoGrpKey = !soHDNow ? (autoGroupMap[hdKey]||null) : null;
+            const grp = soHDNow
+              ? invoiceGroups[maCT+'|'+soHDNow]
+              : (autoGrpKey ? invoiceGroups[autoGrpKey] : null);
+            const autoSoHD = autoGrpKey ? autoGrpKey.substring(maCT.length+1) : null;
+            // Luyen, 2026-09-10: hóa đơn gộp nhiều ngày -- chia theo tỷ lệ DT
             const chenh = (grp && grp.dates.length > 1 && grp.tienHD)
               ? (gDisp.dt - grp.tienHD * (grp.dt > 0 ? (gDisp.dt / grp.dt) : (1 / grp.dates.length)))
               : (tienHD ? (gDisp.dt - tienHD) : null);
@@ -3688,10 +3723,16 @@
             const escKey = hdKey.replace(/'/g,"\\'");
             const soHDDisplay = hd.soHD
               ? '<span style="font-size:.8em;cursor:pointer" onclick="zHDEdit(this,\''+escKey+'\',\'soHD\')">'+hd.soHD+' ✏️</span>'
-              : '<span style="color:#94a3b8;font-size:.75em;cursor:pointer" onclick="zHDEdit(this,\''+escKey+'\',\'soHD\')">…</span>';
+              : autoSoHD
+                ? '<span style="font-size:.78em;color:#6366f1;cursor:default" title="Tự ghép – tổng '+fmtN(grp.tienHD)+'đ khớp HĐ '+autoSoHD+'">'+autoSoHD+' 🔗</span>'
+                : '<span style="color:#94a3b8;font-size:.75em;cursor:pointer" onclick="zHDEdit(this,\''+escKey+'\',\'soHD\')">…</span>';
+            // Tiền HĐ hiển thị: nếu auto-ghép thì tính phần theo tỷ lệ DT ngày đó
+            const autoTienHD = (autoSoHD && grp && grp.dt > 0) ? Math.round(grp.tienHD * gDisp.dt / grp.dt) : 0;
             const tienHDDisplay = hd.tienHD
               ? '<span style="font-size:.8em;cursor:pointer;color:#15803d" onclick="zHDEdit(this,\''+escKey+'\',\'tienHD\')">'+hd.tienHD+' ✏️</span>'
-              : '<span style="color:#94a3b8;font-size:.75em;cursor:pointer" onclick="zHDEdit(this,\''+escKey+'\',\'tienHD\')">…</span>';
+              : autoTienHD
+                ? '<span style="font-size:.78em;color:#6366f1;cursor:default" title="Tỷ lệ theo DT ngày">~'+fmtN(autoTienHD)+'</span>'
+                : '<span style="color:#94a3b8;font-size:.75em;cursor:pointer" onclick="zHDEdit(this,\''+escKey+'\',\'tienHD\')">…</span>';
             // Luyen, 2026-09-10: "chưa xác định thêm có thể xóa với nếu tôi
             // thêm mã công trình thì map vào công trình đó luôn nếu có ở
             // trên còn không thì hiện dưới" -- Map đã tự gộp vào gian có sẵn
