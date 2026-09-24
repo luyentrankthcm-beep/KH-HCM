@@ -1919,6 +1919,7 @@ router.get("/phap-danh/unc-tien-thue", (req, res) => {
   res.render("phapdanh-unc-tien-thue", {
     title: "UNC Tiền Thuê",
     activeCompany: store.activeCompany || 'kh_cu',
+    COMPANIES,
     groupsKhCu,
     groupsKhMoi,
     userName: req.session && req.session.userName,
