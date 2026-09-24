@@ -1856,6 +1856,17 @@ router.post("/phap-danh/hop-dong-thue-gian-tong/cap-nhat-tu-sheet", requireAdmin
   }
 });
 
+// Luyen, 2026-09-24: "thêm 1 tab dưới pháp nhân hợp đồng thuê gian là UNC tiền thuê"
+router.get("/phap-danh/unc-tien-thue", (req, res) => {
+  const store = req.app.locals.store;
+  res.render("phapdanh-unc-tien-thue", {
+    title: "UNC Tiền Thuê",
+    activeCompany: store.activeCompany || 'kh_cu',
+    success: req.query.success,
+    error: req.query.error,
+  });
+});
+
 module.exports = router;
 // Luyen, 2026-08-01: "từ cái hợp đồng thuê gian á nó sẽ có tên đối tác ký hợp
 // đồng với mình từ cái tên đó bạn map với lại hóa đơn đầu vào" -- trang moi
