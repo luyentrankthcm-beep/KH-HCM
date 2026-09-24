@@ -1857,11 +1857,69 @@ router.post("/phap-danh/hop-dong-thue-gian-tong/cap-nhat-tu-sheet", requireAdmin
 });
 
 // Luyen, 2026-09-24: "thêm 1 tab dưới pháp nhân hợp đồng thuê gian là UNC tiền thuê"
+// Luyen, 2026-09-24: "tách ra thành 2 loại 1 là kh mới 2 là kh cũ ... chia ra theo NCC
+// mã số thuế mã NCC ở trong danh mục ncc ... hiển thị tên ncc với mst và mã ncc trước"
 router.get("/phap-danh/unc-tien-thue", (req, res) => {
   const store = req.app.locals.store;
+  const allRows = store.ho_so_tien_thue || [];
+
+  // Build NCC lookup from danh mục NCC (ma = MST, ten = tên đầy đủ)
+  const nccLookup = new Map();
+  (store.danh_muc_ma_nha_cung_cap_moi || []).forEach((n) => {
+    if (n.ma) nccLookup.set(String(n.ma).trim(), { ma: String(n.ma).trim(), ten: n.ten || "" });
+  });
+  (store.danh_muc_ma_nha_cung_cap_cu || []).forEach((n) => {
+    if (n.ma) nccLookup.set(String(n.ma).trim(), { ma: String(n.ma).trim(), ten: n.ten || "" });
+  });
+  (store.danh_muc_ma_nha_cung_cap || []).forEach((n) => {
+    if (n.ma) nccLookup.set(String(n.ma).trim(), { ma: String(n.ma).trim(), ten: n.ten || "" });
+  });
+  (store.chi_phi_ncc_list || []).forEach((n) => {
+    if (n.maNCC && !nccLookup.has(String(n.maNCC).trim())) {
+      nccLookup.set(String(n.maNCC).trim(), { ma: String(n.maNCC).trim(), ten: n.tenNCC || "" });
+    }
+  });
+
+  function buildGroups(rows) {
+    const groupMap = new Map();
+    rows.forEach((r) => {
+      const key = r.maNCC || r.tenNCC || "(Không rõ NCC)";
+      if (!groupMap.has(key)) {
+        const mst = r.maSoThueNCC || "";
+        const dmNcc = mst ? nccLookup.get(mst) : null;
+        groupMap.set(key, {
+          maNCC: key,
+          tenNCC: (dmNcc && dmNcc.ten) || r.tenNCC || key,
+          maSoThueNCC: mst,
+          maDanhMuc: dmNcc ? dmNcc.ma : "",
+          rows: [],
+          tongTien: 0,
+        });
+      }
+      const g = groupMap.get(key);
+      g.rows.push(r);
+      const amt = r.soTienTongRaw !== undefined ? Number(r.soTienTongRaw) : (r.soTienRaw !== undefined ? Number(r.soTienRaw) : 0);
+      g.tongTien += amt || 0;
+    });
+    return Array.from(groupMap.values()).sort((a, b) => a.tenNCC.localeCompare(b.tenNCC, 'vi'));
+  }
+
+  const rowsKhCu  = allRows.filter((r) => !r.company || r.company === 'kh_cu');
+  const rowsKhMoi = allRows.filter((r) => r.company === 'kh_moi');
+
+  const groupsKhCu  = buildGroups(rowsKhCu);
+  const groupsKhMoi = buildGroups(rowsKhMoi);
+
+  // Sort rows inside each group by thang desc
+  [...groupsKhCu, ...groupsKhMoi].forEach((g) => {
+    g.rows.sort((a, b) => (b.thang || "").localeCompare(a.thang || ""));
+  });
+
   res.render("phapdanh-unc-tien-thue", {
     title: "UNC Tiền Thuê",
     activeCompany: store.activeCompany || 'kh_cu',
+    groupsKhCu,
+    groupsKhMoi,
     success: req.query.success,
     error: req.query.error,
   });
