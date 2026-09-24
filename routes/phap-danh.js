@@ -1925,10 +1925,16 @@ router.get("/phap-danh/unc-tien-thue", (req, res) => {
     userName: req.session && req.session.userName,
     success: req.query.success,
     error: req.query.error,
+  }, function(err, html) {
+    if (err) {
+      console.error("[unc-tien-thue] RENDER ERROR:", err.message, err.stack);
+      return res.status(500).send("UNC Tiền Thuê render lỗi: " + err.message + "<br><pre>" + err.stack + "</pre>");
+    }
+    res.send(html);
   });
   } catch(e) {
-    console.error("[unc-tien-thue] ERROR:", e.message, e.stack);
-    res.status(500).send("UNC Tiền Thuê lỗi: " + e.message + "<br><pre>" + e.stack + "</pre>");
+    console.error("[unc-tien-thue] ROUTE ERROR:", e.message, e.stack);
+    res.status(500).send("UNC Tiền Thuê route lỗi: " + e.message + "<br><pre>" + e.stack + "</pre>");
   }
 });
 
