@@ -1860,7 +1860,7 @@ router.post("/phap-danh/hop-dong-thue-gian-tong/cap-nhat-tu-sheet", requireAdmin
 // Luyen, 2026-09-24: "tách ra thành 2 loại 1 là kh mới 2 là kh cũ ... chia ra theo NCC
 // mã số thuế mã NCC ở trong danh mục ncc ... hiển thị tên ncc với mst và mã ncc trước"
 router.get("/phap-danh/unc-tien-thue", (req, res) => {
-  const store = req.app.locals.store;
+  const store = load();
   const allRows = store.ho_so_tien_thue || [];
 
   // Build NCC lookup from danh mục NCC (ma = MST, ten = tên đầy đủ)
@@ -1920,6 +1920,7 @@ router.get("/phap-danh/unc-tien-thue", (req, res) => {
     activeCompany: store.activeCompany || 'kh_cu',
     groupsKhCu,
     groupsKhMoi,
+    userName: req.session && req.session.userName,
     success: req.query.success,
     error: req.query.error,
   });
