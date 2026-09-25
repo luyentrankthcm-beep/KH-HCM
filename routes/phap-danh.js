@@ -2137,11 +2137,11 @@ router.get("/phap-danh/unc-tien-thue", (req, res) => {
     { ma:'TTAMBD',  ten:'TUTU MN AEON MALL BÌNH DƯƠNG',        tenNCC:'CHI NHÁNH CÔNG TY TNHH AEONMALL VIỆT NAM TẠI BÌNH DƯƠNG',                                                      tenNccKey:'AE BD',            congTrinh:'AEON BÌNH DƯƠNG' },
     { ma:'TTLMGV',  ten:'TUTU MN LOTTE MART GÒ VẤP',           tenNCC:'CÔNG TY CỔ PHẦN TRUNG TÂM THƯƠNG MẠI LOTTE VIỆT NAM',                                                          tenNccKey:'LOTTE VIỆT NAM',   congTrinh:'LOTTE VIỆT NAM - CHI NHÁNH GÒ VẤP' },
     { ma:'TTAMTP',  ten:'TUTU MN AEON MALL TÂN PHÚ',           tenNCC:'CÔNG TY TNHH AEON VIỆT NAM',                                                                                   tenNccKey:'AE TÂN PHÚ',       congTrinh:'AEON VIỆT NAM - AEON TÂN PHÚ' },
-    { ma:'TTAMBT',  ten:'TUTU MN AEON MALL BÌNH TÂN',          tenNCC:'CHI NHÁNH CÔNG TY TNHH AEONMALL VIỆT NAM TẠI THÀNH PHỐ HỒ CHÍ MINH',                                         tenNccKey:'AE BÌNH TÂN',      congTrinh:'AEON HỒ CHÍ MINH - CSE' },
+    { ma:'TTAMBT',  ten:'TUTU MN AEON MALL BÌNH TÂN',          tenNCC:'CHI NHÁNH CÔNG TY TNHH AEONMALL VIỆT NAM TẠI THÀNH PHỐ HỒ CHÍ MINH',                                         tenNccKey:'AE BÌNH TÂN',      congTrinh:'AEON HỒ CHÍ MINH - CSE',      tienThueKy: 33000000 },
     { ma:'FZVRBD',  ten:'FZ MN VR AEON MALL BÌNH DƯƠNG',       tenNCC:'CHI NHÁNH CÔNG TY TNHH AEONMALL VIỆT NAM TẠI BÌNH DƯƠNG',                                                      tenNccKey:'AE BD',            congTrinh:'AEON BÌNH DƯƠNG' },
     { ma:'FZNBVT',  ten:'FZ MN NHÀ BÓNG LOTTE MART VŨNG TÀU', tenNCC:'CÔNG TY CỔ PHẦN TRUNG TÂM THƯƠNG MẠI LOTTE VIỆT NAM - CHI NHÁNH BÀ RỊA VŨNG TÀU',                           tenNccKey:'LOTTE VŨNG TÀU',   congTrinh:'LOTTE VIỆT NAM - CHI NHÁNH BÀ RỊA VŨNG TÀU' },
     { ma:'FZFFVV',  ten:'FZ MN FUNFEST SC VIVO',                tenNCC:'CÔNG TY CỔ PHẦN PHÁT TRIỂN KHU PHỨC HỢP THƯƠNG MẠI VIETSIN',                                                   tenNccKey:'VIETSIN VIVO',     congTrinh:'SC VIVO (PHỨC HỢP THƯƠNG MẠI VIETSIN) - CSE' },
-    { ma:'FZADVVV', ten:'FZ MN ADV SC VIVO',                    tenNCC:'CÔNG TY CỔ PHẦN PHÁT TRIỂN KHU PHỨC HỢP THƯƠNG MẠI VIETSIN',                                                   tenNccKey:'VIETSIN VIVO',     congTrinh:'SC VIVO (PHỨC HỢP THƯƠNG MẠI VIETSIN)' },
+    { ma:'FZADVVV', ten:'FZ MN ADV SC VIVO',                    tenNCC:'CÔNG TY CỔ PHẦN PHÁT TRIỂN KHU PHỨC HỢP THƯƠNG MẠI VIETSIN',                                                   tenNccKey:'VIETSIN VIVO',     congTrinh:'SC VIVO (PHỨC HỢP THƯƠNG MẠI VIETSIN)',      tienThueKy: 14850000 },
     { ma:'FZADVTP', ten:'FZ MN ADV AEON MALL TÂN PHÚ',         tenNCC:'CÔNG TY TNHH AEON VIỆT NAM',                                                                                   tenNccKey:'AE TÂN PHÚ',       congTrinh:'AEON VIỆT NAM - AEON TÂN PHÚ' },
     { ma:'EVGHBD',  ten:'EVMN GHOST MN AEON MALL BÌNH DƯƠNG',  tenNCC:'CHI NHÁNH CÔNG TY TNHH AEONMALL VIỆT NAM TẠI BÌNH DƯƠNG',                                                      tenNccKey:'AE BD',            congTrinh:'AEON BÌNH DƯƠNG - CSE' },
     { ma:'EVSNTP',  ten:'EV MN SNOW MN AEON MALL TÂN PHÚ',     tenNCC:'CÔNG TY TNHH AEON VIỆT NAM',                                                                                   tenNccKey:'AE TÂN PHÚ',       congTrinh:'AEON VIỆT NAM - AEON TÂN PHÚ' },
@@ -2176,7 +2176,16 @@ router.get("/phap-danh/unc-tien-thue", (req, res) => {
       const dg = (r.dienGiai || '').toLowerCase();
       return dg.includes('thuê') || dg.includes('thue');
     });
-    kvcCuGroupMap.get(key).gianList.push({ ...g, mst, maCTFound: g.congTrinh || '', tienThueInvoices: candidateTTCu });
+    // Filter by tienThueKy if set (amount-based per-gian matching from contract data)
+    let gianInvoicesCu = candidateTTCu;
+    if (g.tienThueKy && g.tienThueKy > 0) {
+      const tol = g.tienThueKy * 0.12; // 12% tolerance to handle VAT rounding
+      gianInvoicesCu = candidateTTCu.filter(r => {
+        const inv = parseFloat(String(r.soTienTong || '0').replace(/[^0-9.-]/g, ''));
+        return Math.abs(inv - g.tienThueKy) <= tol;
+      });
+    }
+    kvcCuGroupMap.get(key).gianList.push({ ...g, mst, maCTFound: g.congTrinh || '', tienThueInvoices: gianInvoicesCu });
   });
   const kvcCuGroups = Array.from(kvcCuGroupMap.values())
     .sort((a, b) => a.tenNCC.localeCompare(b.tenNCC, 'vi'));
