@@ -3,19 +3,28 @@
 <head>
   <%- include('partials/head') %>
   <style>
-    .unc-section { margin-bottom: 2.5rem; }
-    .unc-section-title {
-      font-size: 1.1rem; font-weight: 700; padding: .5rem 1rem;
-      border-radius: 8px 8px 0 0; margin-bottom: 0;
+    /* ---- Tab bar ---- */
+    .tab-bar {
+      display: flex; gap: 0; border-bottom: 2px solid #e2e8f0; margin-bottom: 1.5rem;
     }
-    .section-kh-cu  .unc-section-title { background: #1e3a5f; color: #fff; }
-    .section-kh-moi .unc-section-title { background: #065f46; color: #fff; }
-    .ncc-card {
-      border: 1px solid #e2e8f0; border-radius: 0 0 8px 8px;
-      margin-bottom: 1rem; overflow: hidden;
+    .tab-btn {
+      padding: .6rem 1.5rem; font-size: .97rem; font-weight: 600;
+      border: none; background: none; cursor: pointer; color: #64748b;
+      border-bottom: 3px solid transparent; margin-bottom: -2px;
+      border-radius: 6px 6px 0 0; transition: color .15s, border-color .15s;
     }
-    .section-kh-cu  .ncc-card { border-top: 3px solid #1e3a5f; border-radius: 8px; }
-    .section-kh-moi .ncc-card { border-top: 3px solid #065f46; border-radius: 8px; }
+    .tab-btn:hover { color: #1e3a5f; background: #f8fafc; }
+    .tab-btn.active-cu    { color: #1e3a5f; border-bottom-color: #1e3a5f; background: #f0f4f8; }
+    .tab-btn.active-moi   { color: #065f46; border-bottom-color: #065f46; background: #f0fdf4; }
+    .tab-btn.active-kvccu { color: #78350f; border-bottom-color: #78350f; background: #fefce8; }
+    .tab-btn.active-kvcmoi{ color: #6b21a8; border-bottom-color: #6b21a8; background: #faf5ff; }
+    .tab-pane { display: none; }
+    .tab-pane.active { display: block; }
+
+    /* ---- NCC cards ---- */
+    .ncc-card { border: 1px solid #e2e8f0; border-radius: 8px; margin-bottom: .75rem; overflow: hidden; }
+    .section-kh-cu  .ncc-card { border-top: 3px solid #1e3a5f; }
+    .section-kh-moi .ncc-card { border-top: 3px solid #065f46; }
     .ncc-header {
       display: flex; align-items: center; gap: 1rem;
       padding: .75rem 1rem; background: #f8fafc; cursor: pointer;
@@ -45,14 +54,14 @@
       background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;
       padding: .6rem 1rem; margin-bottom: 1rem; font-size: .88rem;
     }
-    .summary-bar strong { color: #1e3a5f; }
+    .section-kh-cu  .summary-bar strong { color: #1e3a5f; }
     .section-kh-moi .summary-bar strong { color: #065f46; }
   </style>
 </head>
 <body>
 <%- include('partials/nav') %>
 <div style="max-width:1300px;margin:2rem auto;padding:0 1rem">
-  <h2 style="font-size:1.3rem;font-weight:700;color:#1e3a5f;margin-bottom:1.5rem">UNC Tiền Thuê</h2>
+  <h2 style="font-size:1.3rem;font-weight:700;color:#1e3a5f;margin-bottom:1.25rem">UNC Tiền Thuê</h2>
 
   <% if (typeof success !== 'undefined' && success) { %>
     <div style="background:#d1fae5;border:1px solid #6ee7b7;border-radius:8px;padding:.75rem 1rem;margin-bottom:1rem;color:#065f46">✅ <%= success %></div>
@@ -68,9 +77,24 @@
     }
   %>
 
-  <!-- ========== KH CŨ ========== -->
-  <div class="unc-section section-kh-cu">
-    <div class="unc-section-title">🏢 KH Cũ — <%= groupsKhCu.length %> NCC</div>
+  <!-- Tab bar -->
+  <div class="tab-bar">
+    <button class="tab-btn active-cu" onclick="switchTab('cu', this)">
+      🏢 KH Cũ &nbsp;<span style="background:#1e3a5f;color:#fff;border-radius:12px;padding:1px 8px;font-size:.8rem"><%= groupsKhCu.length %> NCC</span>
+    </button>
+    <button class="tab-btn" onclick="switchTab('moi', this)">
+      🌿 KH Mới &nbsp;<span style="background:#065f46;color:#fff;border-radius:12px;padding:1px 8px;font-size:.8rem"><%= groupsKhMoi.length %> NCC</span>
+    </button>
+    <button class="tab-btn" onclick="switchTab('kvccu', this)">
+      🏦 KVC-MTD KH Cũ &nbsp;<span style="background:#78350f;color:#fff;border-radius:12px;padding:1px 8px;font-size:.8rem"><%= kvcCuGroups ? kvcCuGroups.reduce((s,g)=>s+g.gianList.length,0) : 0 %> gian</span>
+    </button>
+    <button class="tab-btn" onclick="switchTab('kvcmoi', this)">
+      🏦 KVC-MTD KH Mới &nbsp;<span style="background:#7c3aed;color:#fff;border-radius:12px;padding:1px 8px;font-size:.8rem"><%= kvcMoiGroups ? kvcMoiGroups.reduce((s,g)=>s+g.gianList.length,0) : 0 %> gian</span>
+    </button>
+  </div>
+
+  <!-- ========== TAB KH CŨ ========== -->
+  <div id="tab-cu" class="tab-pane active section-kh-cu">
     <% if (groupsKhCu.length === 0) { %>
       <div class="empty-note">Chưa có dữ liệu tiền thuê KH Cũ.</div>
     <% } else {
@@ -81,8 +105,8 @@
       <span>Tổng hóa đơn: <strong><%= groupsKhCu.reduce((s,g)=>s+g.rows.length,0) %></strong></span>
       <span>Tổng tiền: <strong><%= fmtVnd(tongKhCu) %></strong></span>
     </div>
-    <% groupsKhCu.forEach(function(g, gi) { %>
-    <div class="ncc-card" style="margin-bottom:.75rem">
+    <% groupsKhCu.forEach(function(g) { %>
+    <div class="ncc-card">
       <div class="ncc-header" onclick="toggleNcc(this)">
         <span class="ncc-toggle">▶</span>
         <span class="ncc-name"><%= g.tenNCC %></span>
@@ -95,18 +119,10 @@
       </div>
       <div class="ncc-body">
         <table class="ncc-table">
-          <thead>
-            <tr>
-              <th>Tháng</th>
-              <th>Gian</th>
-              <th>Số HĐ</th>
-              <th>Ngày HĐ</th>
-              <th>Diễn giải</th>
-              <th class="text-right">Tiền trước thuế</th>
-              <th class="text-right">Thuế GTGT</th>
-              <th class="text-right">Tổng cộng</th>
-            </tr>
-          </thead>
+          <thead><tr>
+            <th>Tháng</th><th>Gian</th><th>Số HĐ</th><th>Ngày HĐ</th><th>Diễn giải</th>
+            <th class="text-right">Tiền trước thuế</th><th class="text-right">Thuế GTGT</th><th class="text-right">Tổng cộng</th>
+          </tr></thead>
           <tbody>
             <% g.rows.forEach(function(r) { %>
             <tr>
@@ -128,9 +144,8 @@
     <% } %>
   </div>
 
-  <!-- ========== KH MỚI ========== -->
-  <div class="unc-section section-kh-moi">
-    <div class="unc-section-title">🌿 KH Mới — <%= groupsKhMoi.length %> NCC</div>
+  <!-- ========== TAB KH MỚI ========== -->
+  <div id="tab-moi" class="tab-pane section-kh-moi">
     <% if (groupsKhMoi.length === 0) { %>
       <div class="empty-note">Chưa có dữ liệu tiền thuê KH Mới.</div>
     <% } else {
@@ -141,8 +156,8 @@
       <span>Tổng hóa đơn: <strong><%= groupsKhMoi.reduce((s,g)=>s+g.rows.length,0) %></strong></span>
       <span>Tổng tiền: <strong><%= fmtVnd(tongKhMoi) %></strong></span>
     </div>
-    <% groupsKhMoi.forEach(function(g, gi) { %>
-    <div class="ncc-card" style="margin-bottom:.75rem">
+    <% groupsKhMoi.forEach(function(g) { %>
+    <div class="ncc-card">
       <div class="ncc-header" onclick="toggleNcc(this)">
         <span class="ncc-toggle">▶</span>
         <span class="ncc-name"><%= g.tenNCC %></span>
@@ -155,18 +170,10 @@
       </div>
       <div class="ncc-body">
         <table class="ncc-table">
-          <thead>
-            <tr>
-              <th>Tháng</th>
-              <th>Gian</th>
-              <th>Số HĐ</th>
-              <th>Ngày HĐ</th>
-              <th>Diễn giải</th>
-              <th class="text-right">Tiền trước thuế</th>
-              <th class="text-right">Thuế GTGT</th>
-              <th class="text-right">Tổng cộng</th>
-            </tr>
-          </thead>
+          <thead><tr>
+            <th>Tháng</th><th>Gian</th><th>Số HĐ</th><th>Ngày HĐ</th><th>Diễn giải</th>
+            <th class="text-right">Tiền trước thuế</th><th class="text-right">Thuế GTGT</th><th class="text-right">Tổng cộng</th>
+          </tr></thead>
           <tbody>
             <% g.rows.forEach(function(r) { %>
             <tr>
@@ -189,14 +196,195 @@
   </div>
 
 </div>
-<%- include('partials/footer') %>
+
+  <!-- ========== TAB KVC-MTD KH CŨ ========== -->
+  <div id="tab-kvccu" class="tab-pane">
+    <% if (!kvcCuGroups || kvcCuGroups.length === 0) { %>
+      <div class="empty-note">Chưa có dữ liệu KVC-MTD KH Cũ.</div>
+    <% } else { %>
+    <div class="summary-bar" style="background:#fefce8;border-color:#fcd34d">
+      <span>Tổng NCC: <strong style="color:#78350f"><%= kvcCuGroups.length %></strong></span>
+      <span>Tổng gian: <strong style="color:#78350f"><%= kvcCuGroups.reduce((s,g)=>s+g.gianList.length,0) %></strong></span>
+    </div>
+    <% kvcCuGroups.forEach(function(g) { %>
+    <div class="ncc-card" style="border-top:3px solid #92400e">
+      <div class="ncc-header" onclick="toggleNcc(this)" style="background:#fefce8">
+        <span class="ncc-toggle" style="color:#92400e">▶</span>
+        <span class="ncc-name" style="color:#78350f"><%= g.tenNCC %></span>
+        <div class="ncc-meta">
+          <% if (g.mst) { %><span>MST: <b><%= g.mst %></b></span><% } else { %><span style="color:#f59e0b">MST: chưa có</span><% } %>
+          <span><%= g.gianList.length %> gian</span>
+        </div>
+      </div>
+      <div class="ncc-body">
+        <table class="ncc-table">
+          <thead><tr>
+            <th>Mã NB</th>
+            <th>Tên gian nội bộ</th>
+            <th>Tên công trình</th>
+            <th>Ghi chú</th>
+            <th style="width:36px"></th>
+          </tr></thead>
+          <tbody>
+            <% g.gianList.forEach(function(r, ri) {
+              const hd = r.tienThueInvoices || [];
+              const rowId = 'gian-hd-cu-' + g.tenNCC.replace(/[^a-z0-9]/gi,'_') + '_' + ri;
+            %>
+            <tr style="cursor:pointer" onclick="toggleGianHD('<%- rowId %>')">
+              <td style="font-family:monospace;color:#92400e"><%= r.ma %></td>
+              <td style="font-weight:600"><%= r.ten %></td>
+              <td style="color:#64748b;font-size:.82rem"><%= r.maCTFound || '—' %></td>
+              <td style="color:#64748b;font-size:.82rem"><%= r.chuThich || '' %></td>
+              <td style="text-align:center;color:#92400e;font-size:.85rem"><% if (hd.length > 0) { %>
+                <span class="gian-toggle-btn" id="btn-<%- rowId %>">▼ <%= hd.length %></span>
+              <% } else { %><span style="color:#cbd5e1">—</span><% } %></td>
+            </tr>
+            <% if (hd.length > 0) { %>
+            <tr id="<%- rowId %>" style="display:none">
+              <td colspan="5" style="padding:0;background:#fefce8">
+                <table style="width:100%;font-size:.8rem;border-collapse:collapse">
+                  <thead style="background:#fef3c7">
+                    <tr>
+                      <th style="padding:5px 8px;text-align:left;color:#78350f">Tháng</th>
+                      <th style="padding:5px 8px;text-align:left;color:#78350f">Số HĐ</th>
+                      <th style="padding:5px 8px;text-align:left;color:#78350f">Ngày HĐ</th>
+                      <th style="padding:5px 8px;text-align:left;color:#78350f;max-width:340px">Diễn giải</th>
+                      <th style="padding:5px 8px;text-align:right;color:#78350f">Tiền trước thuế</th>
+                      <th style="padding:5px 8px;text-align:right;color:#78350f">Thuế GTGT</th>
+                      <th style="padding:5px 8px;text-align:right;color:#78350f">Tổng cộng</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <% hd.forEach(function(inv) { %>
+                    <tr style="border-top:1px solid #fde68a">
+                      <td style="padding:5px 8px;color:#92400e;font-weight:600"><%= inv.thang || '' %></td>
+                      <td style="padding:5px 8px;font-family:monospace"><%= inv.soHoaDon || '' %></td>
+                      <td style="padding:5px 8px;white-space:nowrap"><%= inv.ngayHoaDon || '' %></td>
+                      <td style="padding:5px 8px;color:#374151;max-width:340px;word-break:break-word"><%= inv.dienGiai || '' %></td>
+                      <td style="padding:5px 8px;text-align:right"><%= inv.soTien || (inv.soTienRaw ? Number(inv.soTienRaw).toLocaleString('vi-VN') : '—') %></td>
+                      <td style="padding:5px 8px;text-align:right"><%= inv.thueGtgt || '—' %></td>
+                      <td style="padding:5px 8px;text-align:right;font-weight:600;color:#78350f"><%= inv.soTienTong || (inv.soTienTongRaw ? Number(inv.soTienTongRaw).toLocaleString('vi-VN') : '—') %></td>
+                    </tr>
+                    <% }); %>
+                  </tbody>
+                </table>
+              </td>
+            </tr>
+            <% } %>
+            <% }); %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <% }); %>
+    <% } %>
+  </div>
+
+  <!-- ========== TAB KVC-MTD KH MỚI ========== -->
+  <div id="tab-kvcmoi" class="tab-pane">
+    <% if (!kvcMoiGroups || kvcMoiGroups.length === 0) { %>
+      <div class="empty-note">Chưa có dữ liệu KVC-MTD KH Mới.</div>
+    <% } else { %>
+    <div class="summary-bar" style="background:#faf5ff;border-color:#d8b4fe">
+      <span>Tổng NCC: <strong style="color:#6b21a8"><%= kvcMoiGroups.length %></strong></span>
+      <span>Tổng gian: <strong style="color:#6b21a8"><%= kvcMoiGroups.reduce((s,g)=>s+g.gianList.length,0) %></strong></span>
+    </div>
+    <% kvcMoiGroups.forEach(function(g) { %>
+    <div class="ncc-card" style="border-top:3px solid #7c3aed">
+      <div class="ncc-header" onclick="toggleNcc(this)" style="background:#faf5ff">
+        <span class="ncc-toggle" style="color:#7c3aed">▶</span>
+        <span class="ncc-name" style="color:#6b21a8"><%= g.tenNCC %></span>
+        <div class="ncc-meta">
+          <% if (g.mst) { %><span>MST: <b><%= g.mst %></b></span><% } else { %><span style="color:#f59e0b">MST: chưa có</span><% } %>
+          <span><%= g.gianList.length %> gian</span>
+        </div>
+      </div>
+      <div class="ncc-body">
+        <table class="ncc-table">
+          <thead><tr>
+            <th>Mã NB</th>
+            <th>Tên gian nội bộ</th>
+            <th>Mã công trình KH Mới</th>
+            <th>Ghi chú</th>
+            <th style="width:36px"></th>
+          </tr></thead>
+          <tbody>
+            <% g.gianList.forEach(function(r, ri) {
+              const hd = r.tienThueInvoices || [];
+              const rowId = 'gian-hd-' + g.tenNCC.replace(/[^a-z0-9]/gi,'_') + '_' + ri;
+            %>
+            <tr style="cursor:pointer" onclick="toggleGianHD('<%- rowId %>')">
+              <td style="font-family:monospace;color:#7c3aed"><%= r.ma %></td>
+              <td style="font-weight:600"><%= r.ten %></td>
+              <td style="color:#64748b;font-size:.82rem"><%= r.maCTFound || '—' %></td>
+              <td style="color:#64748b;font-size:.82rem"><%= r.chuThich || '' %></td>
+              <td style="text-align:center;color:#7c3aed;font-size:.85rem"><% if (hd.length > 0) { %>
+                <span class="gian-toggle-btn" id="btn-<%- rowId %>">▼ <%= hd.length %></span>
+              <% } else { %><span style="color:#cbd5e1">—</span><% } %></td>
+            </tr>
+            <% if (hd.length > 0) { %>
+            <tr id="<%- rowId %>" style="display:none">
+              <td colspan="5" style="padding:0;background:#faf5ff">
+                <table style="width:100%;font-size:.8rem;border-collapse:collapse">
+                  <thead style="background:#ede9fe">
+                    <tr>
+                      <th style="padding:5px 8px;text-align:left;color:#6b21a8">Tháng</th>
+                      <th style="padding:5px 8px;text-align:left;color:#6b21a8">Số HĐ</th>
+                      <th style="padding:5px 8px;text-align:left;color:#6b21a8">Ngày HĐ</th>
+                      <th style="padding:5px 8px;text-align:left;color:#6b21a8;max-width:340px">Diễn giải</th>
+                      <th style="padding:5px 8px;text-align:right;color:#6b21a8">Tiền trước thuế</th>
+                      <th style="padding:5px 8px;text-align:right;color:#6b21a8">Thuế GTGT</th>
+                      <th style="padding:5px 8px;text-align:right;color:#6b21a8">Tổng cộng</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <% hd.forEach(function(inv) { %>
+                    <tr style="border-top:1px solid #e9d5ff">
+                      <td style="padding:5px 8px;color:#7c3aed;font-weight:600"><%= inv.thang || '' %></td>
+                      <td style="padding:5px 8px;font-family:monospace"><%= inv.soHoaDon || '' %></td>
+                      <td style="padding:5px 8px;white-space:nowrap"><%= inv.ngayHoaDon || '' %></td>
+                      <td style="padding:5px 8px;color:#374151;max-width:340px;word-break:break-word"><%= inv.dienGiai || '' %></td>
+                      <td style="padding:5px 8px;text-align:right"><%= inv.soTien || (inv.soTienRaw ? Number(inv.soTienRaw).toLocaleString('vi-VN') : '—') %></td>
+                      <td style="padding:5px 8px;text-align:right"><%= inv.thueGtgt || '—' %></td>
+                      <td style="padding:5px 8px;text-align:right;font-weight:600;color:#6b21a8"><%= inv.soTienTong || (inv.soTienTongRaw ? Number(inv.soTienTongRaw).toLocaleString('vi-VN') : '—') %></td>
+                    </tr>
+                    <% }); %>
+                  </tbody>
+                </table>
+              </td>
+            </tr>
+            <% } %>
+            <% }); %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <% }); %>
+    <% } %>
+  </div>
+
+</div>
 <script>
+function switchTab(tab, btn) {
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.className = 'tab-btn');
+  document.getElementById('tab-' + tab).classList.add('active');
+  btn.classList.add('active-' + tab);
+}
 function toggleNcc(header) {
   const body = header.nextElementSibling;
   const toggle = header.querySelector('.ncc-toggle');
   const isOpen = body.classList.contains('open');
   body.classList.toggle('open', !isOpen);
   toggle.style.transform = isOpen ? '' : 'rotate(90deg)';
+}
+function toggleGianHD(rowId) {
+  const row = document.getElementById(rowId);
+  const btn = document.getElementById('btn-' + rowId);
+  if (!row) return;
+  const isOpen = row.style.display !== 'none';
+  row.style.display = isOpen ? 'none' : 'table-row';
+  if (btn) btn.textContent = (isOpen ? '▼ ' : '▲ ') + btn.textContent.replace(/[▼▲]\s*/,'');
 }
 </script>
 </body>
