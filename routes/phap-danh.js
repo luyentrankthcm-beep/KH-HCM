@@ -2115,43 +2115,48 @@ router.get("/phap-danh/unc-tien-thue", (req, res) => {
   // ---- KVC-MTD KH Cũ: danh sách gian ----
   // Build invoice lookup from KH Cũ records (tenNCC short key → [invoice rows])
   const tenNccKeyToInvoicesCu = new Map();
+  // Also build MST lookup from KH Cũ records (tenNCC short key.UPPER → MST)
+  const tenNccToMstCu = new Map();
   rowsKhCu.forEach((r) => {
     const key = (r.tenNCC || "").trim();
     if (!key) return;
     if (!tenNccKeyToInvoicesCu.has(key)) tenNccKeyToInvoicesCu.set(key, []);
     tenNccKeyToInvoicesCu.get(key).push(r);
+    const mst = (r.maSoThueNCC || "").trim();
+    if (mst) tenNccToMstCu.set(key.toUpperCase(), mst);
   });
 
   // Static gian list — KVC-MTD KH Cũ (from user Excel)
   const KVC_MTD_CU_GIAN = [
-    { ma:'TTAMBD',  ten:'TUTU MN AEON MALL BÌNH DƯƠNG',        tenNCC:'CHI NHÁNH CÔNG TY TNHH AEONMALL VIỆT NAM TẠI BÌNH DƯƠNG',                                                      tenNccKey:'', congTrinh:'AEON BÌNH DƯƠNG' },
-    { ma:'TTLMGV',  ten:'TUTU MN LOTTE MART GÒ VẤP',           tenNCC:'CÔNG TY CỔ PHẦN TRUNG TÂM THƯƠNG MẠI LOTTE VIỆT NAM',                                                          tenNccKey:'', congTrinh:'LOTTE VIỆT NAM - CHI NHÁNH GÒ VẤP' },
-    { ma:'TTAMTP',  ten:'TUTU MN AEON MALL TÂN PHÚ',           tenNCC:'CÔNG TY TNHH AEON VIỆT NAM',                                                                                   tenNccKey:'', congTrinh:'AEON VIỆT NAM - AEON TÂN PHÚ' },
-    { ma:'TTAMBT',  ten:'TUTU MN AEON MALL BÌNH TÂN',          tenNCC:'CHI NHÁNH CÔNG TY TNHH AEONMALL VIỆT NAM TẠI THÀNH PHỐ HỒ CHÍ MINH',                                         tenNccKey:'', congTrinh:'AEON HỒ CHÍ MINH - CSE' },
-    { ma:'FZVRBD',  ten:'FZ MN VR AEON MALL BÌNH DƯƠNG',       tenNCC:'CHI NHÁNH CÔNG TY TNHH AEONMALL VIỆT NAM TẠI BÌNH DƯƠNG',                                                      tenNccKey:'', congTrinh:'AEON BÌNH DƯƠNG' },
-    { ma:'FZNBVT',  ten:'FZ MN NHÀ BÓNG LOTTE MART VŨNG TÀU', tenNCC:'CÔNG TY CỔ PHẦN TRUNG TÂM THƯƠNG MẠI LOTTE VIỆT NAM - CHI NHÁNH BÀ RỊA VŨNG TÀU',                           tenNccKey:'', congTrinh:'LOTTE VIỆT NAM - CHI NHÁNH BÀ RỊA VŨNG TÀU' },
-    { ma:'FZFFVV',  ten:'FZ MN FUNFEST SC VIVO',                tenNCC:'CÔNG TY CỔ PHẦN PHÁT TRIỂN KHU PHỨC HỢP THƯƠNG MẠI VIETSIN',                                                   tenNccKey:'', congTrinh:'SC VIVO (PHỨC HỢP THƯƠNG MẠI VIETSIN) - CSE' },
-    { ma:'FZADVVV', ten:'FZ MN ADV SC VIVO',                    tenNCC:'CÔNG TY CỔ PHẦN PHÁT TRIỂN KHU PHỨC HỢP THƯƠNG MẠI VIETSIN',                                                   tenNccKey:'', congTrinh:'SC VIVO (PHỨC HỢP THƯƠNG MẠI VIETSIN)' },
-    { ma:'FZADVTP', ten:'FZ MN ADV AEON MALL TÂN PHÚ',         tenNCC:'CÔNG TY TNHH AEON VIỆT NAM',                                                                                   tenNccKey:'', congTrinh:'AEON VIỆT NAM - AEON TÂN PHÚ' },
-    { ma:'EVGHBD',  ten:'EVMN GHOST MN AEON MALL BÌNH DƯƠNG',  tenNCC:'CHI NHÁNH CÔNG TY TNHH AEONMALL VIỆT NAM TẠI BÌNH DƯƠNG',                                                      tenNccKey:'', congTrinh:'AEON BÌNH DƯƠNG - CSE' },
-    { ma:'EVSNTP',  ten:'EV MN SNOW MN AEON MALL TÂN PHÚ',     tenNCC:'CÔNG TY TNHH AEON VIỆT NAM',                                                                                   tenNccKey:'', congTrinh:'AEON VIỆT NAM - AEON TÂN PHÚ' },
-    { ma:'EVGHBR',  ten:'EVMN GHOST MN GO BÀ RỊA',             tenNCC:'CHI NHÁNH CÔNG TY CỔ PHẦN BẤT ĐỘNG SẢN VIỆT- NHẬT TẠI BÀ RỊA',                                               tenNccKey:'', congTrinh:'GO BÀ RỊA (VIỆT- NHẬT TẠI BÀ RỊA)' },
-    { ma:'EVSNBD',  ten:'EVMN SNOW AEON MALL BÌNH DƯƠNG',       tenNCC:'CHI NHÁNH CÔNG TY TNHH AEONMALL VIỆT NAM TẠI BÌNH DƯƠNG',                                                      tenNccKey:'', congTrinh:'AEON BÌNH DƯƠNG - CSE' },
-    { ma:'EVADVGAL',ten:'EVENT MN ADV GO AN LẠC',               tenNCC:'CÔNG TY TRÁCH NHIỆM HỮU HẠN THƯƠNG MẠI VÀ DỊCH VỤ SIÊU THỊ AN LẠC',                                         tenNccKey:'', congTrinh:'GO AN LẠC (SIÊU THỊ AN LẠC)' },
-    { ma:'50CMPL',  ten:'POSH MN COOPMART PHÚ LÂM',            tenNCC:'CÔNG TY TNHH MỘT THÀNH VIÊN SÀI GÒN CO.OP PHÚ LÂM',                                                           tenNccKey:'', congTrinh:'COOPMART PHÚ LÂM' },
-    { ma:'50CMBD',  ten:'POSH MN COOPMART BÌNH DƯƠNG',         tenNCC:'CHI NHÁNH LIÊN HIỆP HỢP TÁC XÃ THƯƠNG MẠI TP. HỒ CHÍ MINH - CO.OPMART BÌNH DƯƠNG 2',                        tenNccKey:'', congTrinh:'COOPMART BÌNH DƯƠNG' },
-    { ma:'50VPPQ',  ten:'POSH MN VINPEARL PHÚ QUỐC',           tenNCC:'CHI NHÁNH KIÊN GIANG - CÔNG TY CỔ PHẦN VINPEARL',                                                             tenNccKey:'', congTrinh:'VINWONDER PHÚ QUỐC (CỔ PHẦN VINPEARL)' },
-    { ma:'JPAMBT',  ten:'JP MN AEON MALL BÌNH TÂN',            tenNCC:'CHI NHÁNH CÔNG TY TNHH AEONMALL VIỆT NAM TẠI THÀNH PHỐ HỒ CHÍ MINH',                                         tenNccKey:'', congTrinh:'AEON HỒ CHÍ MINH' },
-    { ma:'JPAMBD',  ten:'JP MN AEON MALL BÌNH DƯƠNG',          tenNCC:'CHI NHÁNH CÔNG TY TNHH AEONMALL VIỆT NAM TẠI BÌNH DƯƠNG',                                                      tenNccKey:'', congTrinh:'AEON BÌNH DƯƠNG' },
-    { ma:'JPVWPQ',  ten:'JP MN VINWONDER PHÚ QUỐC',            tenNCC:'CHI NHÁNH KIÊN GIANG - CÔNG TY CỔ PHẦN VINPEARL',                                                             tenNccKey:'', congTrinh:'VINWONDER PHÚ QUỐC (cổ phần Vinpearl)' },
-    { ma:'JPSBPQ',  ten:'JP MN SÂN BAY PHÚ QUỐC',             tenNCC:'CÔNG TY CỔ PHẦN CẢNG HÀNG KHÔNG MẶT TRỜI- CHI NHÁNH CẢNG HÀNG KHÔNG QUỐC TẾ PHÚ QUỐC SUN GROUP',           tenNccKey:'', congTrinh:'CN CHK QUỐC TẾ PHÚ QUỐC - CSE' },
+    { ma:'TTAMBD',  ten:'TUTU MN AEON MALL BÌNH DƯƠNG',        tenNCC:'CHI NHÁNH CÔNG TY TNHH AEONMALL VIỆT NAM TẠI BÌNH DƯƠNG',                                                      tenNccKey:'AE BD',            congTrinh:'AEON BÌNH DƯƠNG' },
+    { ma:'TTLMGV',  ten:'TUTU MN LOTTE MART GÒ VẤP',           tenNCC:'CÔNG TY CỔ PHẦN TRUNG TÂM THƯƠNG MẠI LOTTE VIỆT NAM',                                                          tenNccKey:'LOTTE VIỆT NAM',   congTrinh:'LOTTE VIỆT NAM - CHI NHÁNH GÒ VẤP' },
+    { ma:'TTAMTP',  ten:'TUTU MN AEON MALL TÂN PHÚ',           tenNCC:'CÔNG TY TNHH AEON VIỆT NAM',                                                                                   tenNccKey:'AE TÂN PHÚ',       congTrinh:'AEON VIỆT NAM - AEON TÂN PHÚ' },
+    { ma:'TTAMBT',  ten:'TUTU MN AEON MALL BÌNH TÂN',          tenNCC:'CHI NHÁNH CÔNG TY TNHH AEONMALL VIỆT NAM TẠI THÀNH PHỐ HỒ CHÍ MINH',                                         tenNccKey:'AE BÌNH TÂN',      congTrinh:'AEON HỒ CHÍ MINH - CSE' },
+    { ma:'FZVRBD',  ten:'FZ MN VR AEON MALL BÌNH DƯƠNG',       tenNCC:'CHI NHÁNH CÔNG TY TNHH AEONMALL VIỆT NAM TẠI BÌNH DƯƠNG',                                                      tenNccKey:'AE BD',            congTrinh:'AEON BÌNH DƯƠNG' },
+    { ma:'FZNBVT',  ten:'FZ MN NHÀ BÓNG LOTTE MART VŨNG TÀU', tenNCC:'CÔNG TY CỔ PHẦN TRUNG TÂM THƯƠNG MẠI LOTTE VIỆT NAM - CHI NHÁNH BÀ RỊA VŨNG TÀU',                           tenNccKey:'LOTTE VŨNG TÀU',   congTrinh:'LOTTE VIỆT NAM - CHI NHÁNH BÀ RỊA VŨNG TÀU' },
+    { ma:'FZFFVV',  ten:'FZ MN FUNFEST SC VIVO',                tenNCC:'CÔNG TY CỔ PHẦN PHÁT TRIỂN KHU PHỨC HỢP THƯƠNG MẠI VIETSIN',                                                   tenNccKey:'VIETSIN VIVO',     congTrinh:'SC VIVO (PHỨC HỢP THƯƠNG MẠI VIETSIN) - CSE' },
+    { ma:'FZADVVV', ten:'FZ MN ADV SC VIVO',                    tenNCC:'CÔNG TY CỔ PHẦN PHÁT TRIỂN KHU PHỨC HỢP THƯƠNG MẠI VIETSIN',                                                   tenNccKey:'VIETSIN VIVO',     congTrinh:'SC VIVO (PHỨC HỢP THƯƠNG MẠI VIETSIN)' },
+    { ma:'FZADVTP', ten:'FZ MN ADV AEON MALL TÂN PHÚ',         tenNCC:'CÔNG TY TNHH AEON VIỆT NAM',                                                                                   tenNccKey:'AE TÂN PHÚ',       congTrinh:'AEON VIỆT NAM - AEON TÂN PHÚ' },
+    { ma:'EVGHBD',  ten:'EVMN GHOST MN AEON MALL BÌNH DƯƠNG',  tenNCC:'CHI NHÁNH CÔNG TY TNHH AEONMALL VIỆT NAM TẠI BÌNH DƯƠNG',                                                      tenNccKey:'AE BD',            congTrinh:'AEON BÌNH DƯƠNG - CSE' },
+    { ma:'EVSNTP',  ten:'EV MN SNOW MN AEON MALL TÂN PHÚ',     tenNCC:'CÔNG TY TNHH AEON VIỆT NAM',                                                                                   tenNccKey:'AE TÂN PHÚ',       congTrinh:'AEON VIỆT NAM - AEON TÂN PHÚ' },
+    { ma:'EVGHBR',  ten:'EVMN GHOST MN GO BÀ RỊA',             tenNCC:'CHI NHÁNH CÔNG TY CỔ PHẦN BẤT ĐỘNG SẢN VIỆT- NHẬT TẠI BÀ RỊA',                                               tenNccKey:'BÀ RỊA',           congTrinh:'GO BÀ RỊA (VIỆT- NHẬT TẠI BÀ RỊA)' },
+    { ma:'EVSNBD',  ten:'EVMN SNOW AEON MALL BÌNH DƯƠNG',       tenNCC:'CHI NHÁNH CÔNG TY TNHH AEONMALL VIỆT NAM TẠI BÌNH DƯƠNG',                                                      tenNccKey:'AE BD',            congTrinh:'AEON BÌNH DƯƠNG - CSE' },
+    { ma:'EVADVGAL',ten:'EVENT MN ADV GO AN LẠC',               tenNCC:'CÔNG TY TRÁCH NHIỆM HỮU HẠN THƯƠNG MẠI VÀ DỊCH VỤ SIÊU THỊ AN LẠC',                                         tenNccKey:'SIÊU THỊ AN LẠC',  congTrinh:'GO AN LẠC (SIÊU THỊ AN LẠC)' },
+    { ma:'50CMPL',  ten:'POSH MN COOPMART PHÚ LÂM',            tenNCC:'CÔNG TY TNHH MỘT THÀNH VIÊN SÀI GÒN CO.OP PHÚ LÂM',                                                           tenNccKey:'CO.OP PHÚ LÂM',    congTrinh:'COOPMART PHÚ LÂM' },
+    { ma:'50CMBD',  ten:'POSH MN COOPMART BÌNH DƯƠNG',         tenNCC:'CHI NHÁNH LIÊN HIỆP HỢP TÁC XÃ THƯƠNG MẠI TP. HỒ CHÍ MINH - CO.OPMART BÌNH DƯƠNG 2',                        tenNccKey:'CO.OP BD',         congTrinh:'COOPMART BÌNH DƯƠNG' },
+    { ma:'50VPPQ',  ten:'POSH MN VINPEARL PHÚ QUỐC',           tenNCC:'CHI NHÁNH KIÊN GIANG - CÔNG TY CỔ PHẦN VINPEARL',                                                             tenNccKey:'PHÚ QUỐC',         congTrinh:'VINWONDER PHÚ QUỐC (CỔ PHẦN VINPEARL)' },
+    { ma:'JPAMBT',  ten:'JP MN AEON MALL BÌNH TÂN',            tenNCC:'CHI NHÁNH CÔNG TY TNHH AEONMALL VIỆT NAM TẠI THÀNH PHỐ HỒ CHÍ MINH',                                         tenNccKey:'AE BÌNH TÂN',      congTrinh:'AEON HỒ CHÍ MINH' },
+    { ma:'JPAMBD',  ten:'JP MN AEON MALL BÌNH DƯƠNG',          tenNCC:'CHI NHÁNH CÔNG TY TNHH AEONMALL VIỆT NAM TẠI BÌNH DƯƠNG',                                                      tenNccKey:'AE BD',            congTrinh:'AEON BÌNH DƯƠNG' },
+    { ma:'JPVWPQ',  ten:'JP MN VINWONDER PHÚ QUỐC',            tenNCC:'CHI NHÁNH KIÊN GIANG - CÔNG TY CỔ PHẦN VINPEARL',                                                             tenNccKey:'PHÚ QUỐC',         congTrinh:'VINWONDER PHÚ QUỐC (cổ phần Vinpearl)' },
+    { ma:'JPSBPQ',  ten:'JP MN SÂN BAY PHÚ QUỐC',             tenNCC:'CÔNG TY CỔ PHẦN CẢNG HÀNG KHÔNG MẶT TRỜI- CHI NHÁNH CẢNG HÀNG KHÔNG QUỐC TẾ PHÚ QUỐC SUN GROUP',           tenNccKey:'CHKQT PHÚ QUỐC',   congTrinh:'CN CHK QUỐC TẾ PHÚ QUỐC - CSE' },
   ];
 
   // Group KVC-MTD KH Cũ gian by NCC
   const kvcCuGroupMap = new Map();
   KVC_MTD_CU_GIAN.forEach((g) => {
     const keyUpper = g.tenNccKey ? g.tenNccKey.toUpperCase() : "";
-    const mstByKey = keyUpper ? (tenNccToMst.get(keyUpper) || "") : "";
+    // Use KH Cũ MST map first, fallback to KH Mới map, then full-name lookup
+    const mstByKey = keyUpper ? (tenNccToMstCu.get(keyUpper) || tenNccToMst.get(keyUpper) || "") : "";
     const mst = mstByKey || lookupMst(g.tenNCC) || "";
     const tenNccDisplay = g.tenNCC || "(Không rõ NCC)";
     const key = tenNccDisplay;
