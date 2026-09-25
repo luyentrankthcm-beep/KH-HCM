@@ -1102,8 +1102,10 @@
     }
     function switchZvpTab(sub) {
       ['zalo','vnpay','payoo'].forEach(s => {
-        document.getElementById('zvp_' + s).classList.toggle('active', s === sub);
-        document.getElementById('zvp_btn_' + s).classList.toggle('active', s === sub);
+        const panel = document.getElementById('zvp_' + s);
+        if (panel) panel.classList.toggle('active', s === sub);
+        const btn = document.getElementById('zvp_btn_' + s);
+        if (btn) btn.classList.toggle('active', s === sub);
       });
       try { localStorage.setItem(LS_ACTIVE_ZVP_SUB, sub); } catch(e) {}
     }
