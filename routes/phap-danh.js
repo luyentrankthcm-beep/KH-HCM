@@ -2181,7 +2181,7 @@ router.get("/phap-danh/unc-tien-thue", (req, res) => {
     if (g.tienThueKy && g.tienThueKy > 0) {
       const tol = g.tienThueKy * 0.12; // 12% tolerance to handle VAT rounding
       gianInvoicesCu = candidateTTCu.filter(r => {
-        const inv = parseFloat(String(r.soTienTong || '0').replace(/[^0-9.-]/g, ''));
+        const inv = parseInt(String(r.soTienTong || '0').replace(/\./g, '').replace(/,/g, '.').replace(/[^0-9]/g, ''), 10);
         return Math.abs(inv - g.tienThueKy) <= tol;
       });
     }
