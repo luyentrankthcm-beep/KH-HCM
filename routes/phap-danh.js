@@ -2165,9 +2165,10 @@ router.get("/phap-danh/unc-tien-thue", (req, res) => {
     }
     if (mst && !kvcCuGroupMap.get(key).mst) kvcCuGroupMap.get(key).mst = mst;
     const allInvoicesCu = g.tenNccKey ? (tenNccKeyToInvoicesCu.get(g.tenNccKey) || []) : [];
+    // KH Cũ dùng nhiều pattern: "Phí thuê...", "TIỀN THUÊ", "tiền thuê...", "thuê vị trí..."
     const candidateTTCu = allInvoicesCu.filter(r => {
       const dg = (r.dienGiai || '').toLowerCase();
-      return dg.includes('tiền thuê') || dg.includes('tien thue');
+      return dg.includes('thuê') || dg.includes('thue');
     });
     kvcCuGroupMap.get(key).gianList.push({ ...g, mst, maCTFound: g.congTrinh || '', tienThueInvoices: candidateTTCu });
   });
