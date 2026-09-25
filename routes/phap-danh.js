@@ -2564,3 +2564,4 @@ router.get("/phap-danh/hop-dong-thue-gian-tong/:id/doc-hop-dong", async (req, re
 module.exports.ensureShape = ensureShape;
 module.exports.ensureThueDefaults = ensureThueDefaults;
 module.exports.computeTrangThaiHD = computeTrangThaiHD;
+// trigger deploy Fri Sep 25 09:24:24 +07 2026
