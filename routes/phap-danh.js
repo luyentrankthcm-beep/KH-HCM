@@ -1856,6 +1856,26 @@ router.post("/phap-danh/hop-dong-thue-gian-tong/cap-nhat-tu-sheet", requireAdmin
   }
 });
 
+// TEMP DEBUG: dump KH Mới record fields + NCC directory
+// ?ncc=SAN+BAY to filter by tenNCC keyword
+router.get("/phap-danh/unc-debug", (req, res) => {
+  const store = load();
+  let rows = (store.ho_so_tien_thue || []).filter(r => r.company === 'kh_moi');
+  const nccFilter = (req.query.ncc || '').trim().toLowerCase();
+  if (nccFilter) {
+    rows = rows.filter(r => (r.tenNCC||'').toLowerCase().includes(nccFilter) || (r.maCongTrinh||'').toLowerCase().includes(nccFilter) || (r.gian||'').toLowerCase().includes(nccFilter));
+  }
+  const sample = (nccFilter ? rows : rows.slice(0, 5)).map(r => ({
+    maNCC: r.maNCC, tenNCC: r.tenNCC, maSoThueNCC: r.maSoThueNCC,
+    maCongTrinh: r.maCongTrinh, tenCongTrinh: r.tenCongTrinh, gian: r.gian,
+    thang: r.thang, soHoaDon: r.soHoaDon, dienGiai: r.dienGiai, soTienTong: r.soTienTong,
+    fields: Object.keys(r).join(', ')
+  }));
+  const nccDir = (store.danh_muc_ma_nha_cung_cap_moi || []).slice(0, 10);
+  const nccDirCu = (store.danh_muc_ma_nha_cung_cap_cu || []).slice(0, 5);
+  res.json({ totalKhMoi: rows.length, nccFilter, sample, nccDir, nccDirCu });
+});
+
 // Luyen, 2026-09-24: "thêm 1 tab dưới pháp nhân hợp đồng thuê gian là UNC tiền thuê"
 // Luyen, 2026-09-24: "tách ra thành 2 loại 1 là kh mới 2 là kh cũ ... chia ra theo NCC
 // mã số thuế mã NCC ở trong danh mục ncc ... hiển thị tên ncc với mst và mã ncc trước"
@@ -1916,12 +1936,189 @@ router.get("/phap-danh/unc-tien-thue", (req, res) => {
     g.rows.sort((a, b) => (b.thang || "").localeCompare(a.thang || ""));
   });
 
+  // ---- KVC-MTD KH Mới: danh sách gian từ file Excel ----
+  // Build lookup from KH Mới records by maCongTrinh → {mst, tenNCC, maNCC}
+  const maCTInfo = new Map(); // maCongTrinh → {mst, tenNCC, maNCC}
+  rowsKhMoi.forEach((r) => {
+    const maCT = (r.maCongTrinh || "").trim().toUpperCase();
+    const mst  = (r.maSoThueNCC || "").trim();
+    if (maCT && !maCTInfo.has(maCT)) {
+      maCTInfo.set(maCT, { mst, tenNCC: r.tenNCC || "", maNCC: r.maNCC || "" });
+    }
+    // Also store with the original case
+    const maCTOrig = (r.maCongTrinh || "").trim();
+    if (maCTOrig && !maCTInfo.has(maCTOrig)) {
+      maCTInfo.set(maCTOrig, { mst, tenNCC: r.tenNCC || "", maNCC: r.maNCC || "" });
+    }
+  });
+
+  // Also build tenNCC lookup as fallback
+  const tenNccToMst = new Map();
+  const tenNccToMaCT = new Map(); // tenNCC.upper → first maCongTrinh seen
+  rowsKhMoi.forEach((r) => {
+    const mst = (r.maSoThueNCC || "").trim();
+    const tenKey = (r.tenNCC || "").trim().toUpperCase();
+    if (mst) {
+      [(r.tenNCC||""), (r.maNCC||"")].forEach(name => {
+        if (name) tenNccToMst.set(name.trim().toUpperCase(), mst);
+      });
+    }
+    // Collect distinct maCongTrinh per tenNCC
+    if (tenKey && r.maCongTrinh) {
+      const maCT = (r.maCongTrinh || "").trim();
+      if (maCT && !tenNccToMaCT.has(tenKey)) tenNccToMaCT.set(tenKey, maCT);
+    }
+  });
+  const nccTenToMst = new Map();
+  (store.danh_muc_ma_nha_cung_cap_moi || []).forEach((n) => {
+    if (n.ten && n.ma) nccTenToMst.set(String(n.ten).trim().toUpperCase(), String(n.ma).trim());
+  });
+
+  // Build invoice list per tenNCC for click-to-expand in KVC-MTD KH Mới tab
+  const tenNccKeyToInvoices = new Map(); // tenNCC (short) → [invoice rows]
+  rowsKhMoi.forEach((r) => {
+    const key = (r.tenNCC || "").trim();
+    if (!key) return;
+    if (!tenNccKeyToInvoices.has(key)) tenNccKeyToInvoices.set(key, []);
+    tenNccKeyToInvoices.get(key).push(r);
+  });
+
+  function lookupByMa(ma) {
+    if (!ma) return null;
+    return maCTInfo.get(ma.trim()) || maCTInfo.get(ma.trim().toUpperCase()) || null;
+  }
+  function lookupMst(tenNCC) {
+    if (!tenNCC) return "";
+    const key = tenNCC.trim().toUpperCase();
+    return tenNccToMst.get(key) || nccTenToMst.get(key) || "";
+  }
+
+  // Static gian list — KVC-MTD KH Mới (from Book1.xlsx Sheet1)
+  // tenNccKey = exact tenNCC short name used in ho_so_tien_thue records (for MST lookup)
+  const KVC_MTD_MOI_GIAN = [
+    { ma:'50AMBT',  ten:'POSH MN AEON MALL BÌNH TÂN',           tenNCC:'CHI NHÁNH CÔNG TY TNHH AEONMALL VIỆT NAM TẠI THÀNH PHỐ HỒ CHÍ MINH', chuThich:'Mới',                      tenNccKey:'AE BÌNH TÂN',          congTrinh:'AEON HỒ CHÍ MINH' },
+    { ma:'50AMTP',  ten:'POSH MN AEON MALL TÂN PHÚ',            tenNCC:'CÔNG TY TNHH AEON VIỆT NAM',                                           chuThich:'Mới',                      tenNccKey:'AE TÂN PHÚ',           congTrinh:'AEON VIỆT NAM',        maCTHopDong:'AM TP PHCM',  tienThueKy:178875000 },
+    { ma:'50BV175', ten:'POSH MN BỆNH VIỆN 175',                 tenNCC:'CÔNG TY TNHH QUẢNG CÁO VẠN THỊNH PHÁT',                               chuThich:'không có tiền thuê',       tenNccKey:'',                     congTrinh:'BỆNH VIỆN 175 (VẠN THỊNH PHÁT)' },
+    { ma:'50BVUB',  ten:'POSH MN BỆNH VIỆN UNG BƯỚU HCM',       tenNCC:'CÔNG TY TNHH JD&M VIỆT NAM',                                          chuThich:'Mới',                      tenNccKey:'JD&M',                 congTrinh:'BỆNH VIỆN UNG BƯỚU (JD&M VIỆT NAM)' },
+    { ma:'50CGVLCT',ten:'POSH MN CGV INTRESSCO LÝ CHÍNH THẮNG', tenNCC:'CÔNG TY TNHH CJ CGV VIỆT NAM - CHI NHÁNH QUẬN 3',                     chuThich:'Mới CSE',                  tenNccKey:'',                     congTrinh:'CGV VIỆT NAM CN QUẬN 3 (CGV INTRESSCO LÝ CHÍNH THẮNG)' },
+    { ma:'50CGVLM', ten:'POSH MN CGV VINCOM LANDMARK',           tenNCC:'CÔNG TY TNHH CJ CGV VIỆT NAM - CHI NHÁNH BÌNH THẠNH 3',               chuThich:'Mới CSE',                  tenNccKey:'',                     congTrinh:'CGV VIỆT NAM CN BÌNH THẠCH 3 - CGV VC LANDMARK - CSE' },
+    { ma:'50CGVPLZ',ten:'POSH MN CGV PEARL PLAZA',               tenNCC:'CÔNG TY TNHH CJ CGV VIỆT NAM - CHI NHÁNH VĂN THÁNH',                  chuThich:'Mới CSE',                  tenNccKey:'',                     congTrinh:'CGV VIỆT NAM CN VĂN THÁNH - CGV PEARL PLAZA - CSE' },
+    { ma:'50CGVPVT',ten:'POSH MN CGV VINCOM PHAN VĂN TRỊ',      tenNCC:'CÔNG TY TNHH CJ CGV VIỆT NAM - CHI NHÁNH GÒ VẤP',                    chuThich:'Mới CSE',                  tenNccKey:'',                     congTrinh:'CGV VIỆT NAM CN GÒ VẤP - CGV VC PHAN VĂN TRỊ - CSE' },
+    { ma:'50ETL',   ten:'POSH MN ESTELLA',                       tenNCC:'CÔNG TY TNHH LIÊN DOANH ESTELLA',                                     chuThich:'Mới',                      tenNccKey:'ESTELLA',              congTrinh:'LIÊN DOANH ESTELLA',   maCTHopDong:'ESTELLA PHN' },
+    { ma:'50GAKDV', ten:'POSH MN GALAXY KINH DƯƠNG VƯƠNG',       tenNCC:'CÔNG TY CỔ PHẦN PHIM THIÊN NGÂN',                                     chuThich:'chung 1 hợp đồng',         tenNccKey:'THIÊN NGÂN',           congTrinh:'PHIM THIÊN NGÂN (GALAXY)', maCTHopDong:'GALAXY KINH DUONG VUONG PHCM' },
+    { ma:'50GAQT',  ten:'POSH MN GALAXY QUANG TRUNG',            tenNCC:'CÔNG TY CỔ PHẦN PHIM THIÊN NGÂN',                                     chuThich:'chung 1 hợp đồng',         tenNccKey:'THIÊN NGÂN',           congTrinh:'PHIM THIÊN NGÂN (GALAXY)', maCTHopDong:'GALAXY QUANG TRUNG PHCM' },
+    { ma:'50GGPVD', ten:'POSH MN GIGA PHẠM VĂN ĐỒNG',           tenNCC:'CÔNG TY CỔ PHẦN ĐẦU TƯ THƯƠNG MẠI DỊCH VỤ GIGAMALL VIỆT NAM',        chuThich:'Mới',                      tenNccKey:'GIGAMALL',             congTrinh:'GIGAMALL VIỆT NAM' },
+    { ma:'50GOAC',  ten:'POSH MN GO ÂU CƠ',                     tenNCC:'CÔNG TY TNHH EB TÂN PHÚ',                                             chuThich:'Mới',                      tenNccKey:'EB TÂN PHÚ',           congTrinh:'GO ÂU CƠ (EB TÂN PHÚ)' },
+    { ma:'50GONTT', ten:'POSH MN GO NGUYỄN THỊ THẬP',           tenNCC:'CÔNG TY TRÁCH NHIỆM HỮU HẠN THƯƠNG MẠI VÀ DỊCH VỤ SIÊU THỊ AN LẠC',  chuThich:'Mới 2 hd',                tenNccKey:'AN LẠC',               congTrinh:'GO AN LẠC (SIÊU THỊ AN LẠC)' },
+    { ma:'50GOTC',  ten:'POSH MN GO TRƯỜNG CHINH',               tenNCC:'CÔNG TY TNHH ĐẦU TƯ BẤT ĐỘNG SẢN NEW PLAN',                          chuThich:'Mới 1 Hđ xuất 2 hóa đơn/tháng', tenNccKey:'TRƯỜNG CHINH',    congTrinh:'GO TRƯỜNG CHINH (NEW PLAN)' },
+    { ma:'50LMNSG', ten:'POSH MN LOTTE MART NAM SÀI GÒN',        tenNCC:'CÔNG TY CỔ PHẦN TRUNG TÂM THƯƠNG MẠI LOTTE VIỆT NAM',                chuThich:'Mới',                      tenNccKey:'LOTTE VIỆT NAM',       congTrinh:'LOTTE VIỆT NAM',       maCTHopDong:'LOTTE Q7 (NSG) PHM' },
+    { ma:'50LMPT',  ten:'POSH MN LOTTE MART PHÚ THỌ',           tenNCC:'CÔNG TY CỔ PHẦN TRUNG TÂM THƯƠNG MẠI LOTTE VIỆT NAM',                chuThich:'Mới',                      tenNccKey:'LOTTE VIỆT NAM',       congTrinh:'LOTTE VIỆT NAM',       maCTHopDong:'LOTTE PHU THO PHCM' },
+    { ma:'50SCPVD', ten:'POSH MN SENSE CITY PHẠM VĂN ĐỒNG',     tenNCC:'CÔNG TY TNHH MTV SÀI GÒN - VĂN ĐỒNG',                               chuThich:'Mới',                      tenNccKey:'SENSE CITY PVĐ',       congTrinh:'SENSE PHẠM VĂN ĐỒNG (SÀI GÒN - VĂN ĐỒNG)' },
+    { ma:'50SCVV',  ten:'POSH MN SC VIVO',                       tenNCC:'CÔNG TY CỔ PHẦN PHÁT TRIỂN KHU PHỨC HỢP THƯƠNG MẠI VIETSIN',         chuThich:'Mới thanh toán 2 lần',     tenNccKey:'VIETSIN VIVO',         congTrinh:'SC VIVO (PHỨC HỢP THƯƠNG MẠI VIETSIN)' },
+    { ma:'50VC3/2', ten:'POSH MN VINCOM 3/2',                    tenNCC:'CHI NHÁNH TẠI THÀNH PHỐ HỒ CHÍ MINH - CÔNG TY TNHH VẬN HÀNH VINCOM RETAIL', chuThich:'chung 1 hợp đồng', tenNccKey:'VC CN HCM',           congTrinh:'CN HỒ CHÍ MINH VẬN HÀNH VINCOM RETAIL', maCTHopDong:'VC 3/2 JP-Posh' },
+    { ma:'50VCGP',  ten:'POSH MN VINCOM GRAND PARK',             tenNCC:'CHI NHÁNH TẠI THÀNH PHỐ HỒ CHÍ MINH - CÔNG TY TNHH VẬN HÀNH VINCOM RETAIL', chuThich:'Mới',              tenNccKey:'VC CN HCM',           congTrinh:'CN HỒ CHÍ MINH VẬN HÀNH VINCOM RETAIL', maCTHopDong:'JP-POSH GRAND PARK' },
+    { ma:'50VCGV',  ten:'POSH MN VINCOM GÒ VẤP',                tenNCC:'CHI NHÁNH TẠI THÀNH PHỐ HỒ CHÍ MINH - CÔNG TY TNHH VẬN HÀNH VINCOM RETAIL', chuThich:'Mới',              tenNccKey:'VC CN HCM',           congTrinh:'CN HỒ CHÍ MINH VẬN HÀNH VINCOM RETAIL', maCTHopDong:'VC GV PHCM' },
+    { ma:'50VCLVV', ten:'POSH MN VINCOM LÊ VĂN VIỆT',           tenNCC:'CHI NHÁNH TẠI THÀNH PHỐ HỒ CHÍ MINH - CÔNG TY TNHH VẬN HÀNH VINCOM RETAIL', chuThich:'Mới',              tenNccKey:'VC CN HCM',           congTrinh:'CN HỒ CHÍ MINH VẬN HÀNH VINCOM RETAIL', maCTHopDong:'VC LVV PHCM' },
+    { ma:'50VHM',   ten:'POSH MN VẠN HẠNH MALL',                tenNCC:'CÔNG TY CỔ PHẦN ĐẦU TƯ XÂY DỰNG BẮC BÌNH',                           chuThich:'Mới 1 Hđ xuất 2 hóa đơn/tháng', tenNccKey:'VẠN HẠNH MALL',  congTrinh:'VẠN HẠNH MALL (XÂY DỰNG BẮC BÌNH)' },
+    { ma:'51AMBD',  ten:'POSH MN AEON MALL BÌNH DƯƠNG',         tenNCC:'CHI NHÁNH CÔNG TY TNHH AEONMALL VIỆT NAM TẠI BÌNH DƯƠNG',             chuThich:'Mới',                      tenNccKey:'AE BD',                congTrinh:'AEON BÌNH DƯƠNG' },
+    { ma:'51CGVBD', ten:'POSH MN CGV BÌNH DƯƠNG SQUARE',        tenNCC:'CÔNG TY TNHH CJ CGV VIỆT NAM - CHI NHÁNH BÌNH DƯƠNG',                 chuThich:'Mới',                      tenNccKey:'',                     congTrinh:'CGV VIỆT NAM - CHI NHÁNH BÌNH DƯƠNG (SQUARE) - CSE' },
+    { ma:'51GODA',  ten:'POSH MN GO DĨ AN',                     tenNCC:'CHI NHÁNH SỐ 2 CÔNG TY CP BẤT ĐỘNG SẢN VIỆT - NHẬT TẠI BÌNH DƯƠNG',  chuThich:'Mới 2 hợp đồng',           tenNccKey:'GO DI AN',             congTrinh:'SỐ 2 CÔNG TY CP BẤT ĐỘNG SẢN VIỆT - NHẬT TẠI BÌNH DƯƠNG' },
+    { ma:'51GOTDM', ten:'POSH MN GO THỦ DẦU MỘT',              tenNCC:'CHI NHÁNH CÔNG TY CP BẤT ĐỘNG SẢN VIỆT - NHẬT TẠI BÌNH DƯƠNG',        chuThich:'Mới',                      tenNccKey:'GO TDM',               congTrinh:'GO THỦ DẦU MỘT (VIỆT - NHẬT TẠI BÌNH DƯƠNG)' },
+    { ma:'52KBGBH', ten:'POSH MN KUBO GO BIÊN HÒA',             tenNCC:'CHI NHÁNH TẠI ĐỒNG NAI - CÔNG TY TNHH MỘT THÀNH VIÊN THƯƠNG MẠI HÀNG GIA DỤNG TỔNG HỢP', chuThich:'Mới', tenNccKey:'KUBO ĐỒNG NAI',       congTrinh:'KUBO GO ĐỒNG NAI (GIA DỤNG TỔNG HỢP)' },
+    { ma:'52VCBH',  ten:'POSH MN VINCOM BIÊN HÒA',              tenNCC:'CHI NHÁNH TẠI TỈNH ĐỒNG NAI - CÔNG TY TNHH VẬN HÀNH VINCOM RETAIL',  chuThich:'Mới 1 hợp đồng',           tenNccKey:'VC CN ĐỒNG NAI',       congTrinh:'CN ĐỒNG NAI VẬN HÀNH VINCOM RETAIL (BIÊN HÒA)' },
+    { ma:'53SBPQ',  ten:'POSH MN SÂN BAY PHÚ QUỐC',            tenNCC:'CÔNG TY TNHH QUẢNG CÁO SÂN BAY',                                      chuThich:'Mới 1 hợp đồng',           tenNccKey:'SÂN BAY',              congTrinh:'QUẢNG CÁO SÂN BAY',   maCTHopDong:'SB PHU QUOC PHN',   tienThueKy:255600000 },
+    { ma:'53SWPQ',  ten:'POSH MN SUNWORLD PHÚ QUỐC',            tenNCC:'CHI NHÁNH CÔNG TY TNHH MẶT TRỜI PHÚ QUỐC TẠI HÒN THƠM',             chuThich:'Mới 1 hợp đồng CSE',       tenNccKey:'SUN H THƠM',           congTrinh:'MẶT TRỜI PHÚ QUỐC TẠI HÒN THƠM - CSE', maCTHopDong:'PQ SUN HTHOM PHCM' },
+    { ma:'55GOBR',  ten:'POSH MN GO BÀ RỊA',                   tenNCC:'CHI NHÁNH CÔNG TY CỔ PHẦN BẤT ĐỘNG SẢN VIỆT - NHẬT TẠI BÀ RỊA',     chuThich:'Mới 2 hợp đồng',           tenNccKey:'GO BÀ RỊA',            congTrinh:'GO BÀ RỊA (VIỆT - NHẬT TẠI BÀ RỊA)' },
+    { ma:'55GOBR',  ten:'POSH MN KUBO BÀ RỊA',                 tenNCC:'CHI NHÁNH BÀ RỊA - CÔNG TY TNHH MỘT THÀNH VIÊN THƯƠNG MẠI HÀNG GIA DỤNG TỔNG HỢP', chuThich:'Mới',      tenNccKey:'KUBO BÀ RỊA',          congTrinh:'KUBO GO BÀ RỊA (HÀNG GIA DỤNG TỔNG HỢP)' },
+    { ma:'55SBCD',  ten:'POSH MN SÂN BAY CÔN ĐẢO',             tenNCC:'CÔNG TY TNHH QUẢNG CÁO SÂN BAY',                                      chuThich:'Mới',                      tenNccKey:'SÂN BAY',              congTrinh:'QUẢNG CÁO SÂN BAY',   maCTHopDong:'CON DAO AIRPORT PHCM', tienThueKy:48510000 },
+    { ma:'56GOBT',  ten:'POSH MN GO BẾN TRE',                  tenNCC:'CHI NHÁNH CÔNG TY CỔ PHẦN BẤT ĐỘNG SẢN VIỆT-NHẬT TẠI BẾN TRE',       chuThich:'Mới 2 hợp đồng',           tenNccKey:'GO BẾN TRE',           congTrinh:'GO BẾN TRE (VIỆT - NHẬT TẠI BẾN TRE)' },
+    { ma:'56SCBT',  ten:'POSH MN SENSE CITY BẾN TRE',           tenNCC:'CÔNG TY TNHH MTV THƯƠNG MẠI SÀI GÒN - BẾN TRE',                      chuThich:'Mới',                      tenNccKey:'SENSE BẾN TRE',        congTrinh:'SENSE BẾN TRE (SÀI GÒN - BẾN TRE)' },
+    { ma:'57GOMT',  ten:'POSH MN GO MỸ THO',                   tenNCC:'CÔNG TY TRÁCH NHIỆM HỮU HẠN MỘT THÀNH VIÊN ĐẦU TƯ PHÁT TRIỂN NGUYỄN KIM TIỀN GIANG', chuThich:'Mới 2 hợp đồng', tenNccKey:'NGUYỄN KIM TIỀN GIANG', congTrinh:'GO MỸ THO (NGUYỄN KIM TIỀN GIANG)' },
+    { ma:'58GOTV',  ten:'POSH MN GO TRÀ VINH',                 tenNCC:'CÔNG TY CỔ PHẦN BẤT ĐỘNG SẢN VÀ SIÊU THỊ BÁN LẺ ĐÔNG DƯƠNG TRÀ VINH', chuThich:'Mới',                    tenNccKey:'GO TRÀ VINH',          congTrinh:'GO TRÀ VINH (BÁN LẺ ĐÔNG DƯƠNG TRÀ VINH)' },
+    { ma:'59CGVXK', ten:'POSH MN CGV VINCOM XUÂN KHÁNH',        tenNCC:'CÔNG TY TNHH CJ CGV VIỆT NAM - CHI NHÁNH CẦN THƠ 3',                 chuThich:'Mới',                      tenNccKey:'',                     congTrinh:'CGV VIỆT NAM - CHI NHÁNH CẦN THƠ (XUÂN KHÁNH) - CSE' },
+    { ma:'59GNOV',  ten:'POSH MN GO CẦN THƠ',                  tenNCC:'CHI NHÁNH CÔNG TY CP BẤT ĐỘNG SẢN VIỆT - NHẬT TẠI CẦN THƠ',          chuThich:'Mới',                      tenNccKey:'GO C THƠ',             congTrinh:'GO CẦN THƠ (VIỆT - NHẬT TẠI CẦN THƠ)' },
+    { ma:'59KBGCT', ten:'POSH MN KUBO GO CẦN THƠ',             tenNCC:'CHI NHÁNH TẠI CẦN THƠ - CÔNG TY TNHH MỘT THÀNH VIÊN THƯƠNG MẠI HÀNG GIA DỤNG TỔNG HỢP', chuThich:'Mới', tenNccKey:'KUBO CẦN THƠ',         congTrinh:'KUBO GO CẦN THƠ (HÀNG GIA DỤNG TỔNG HỢP)' },
+    { ma:'59SBCT',  ten:'POSH MN SÂN BAY CẦN THƠ',             tenNCC:'CÔNG TY TNHH QUẢNG CÁO SÂN BAY',                                      chuThich:'Mới',                      tenNccKey:'SÂN BAY',              congTrinh:'QUẢNG CÁO SÂN BAY',   maCTHopDong:'SB CAN THO PHCM',   tienThueKy:134491500 },
+    { ma:'59SCCT',  ten:'POSH MN SENSE CITY CẦN THƠ',           tenNCC:'CÔNG TY TNHH THƯƠNG MẠI SÀI GÒN CẦN THƠ',                            chuThich:'Mới',                      tenNccKey:'SENSE CITY CT',        congTrinh:'SENSE CẦN THƠ (SÀI GÒN CẦN THƠ)' },
+    { ma:'60GOBMT', ten:'POSH MN GO BUÔN MÊ THUỘT',             tenNCC:'CHI NHÁNH CÔNG TY CỔ PHẦN BẤT ĐỘNG SẢN VIỆT - NHẬT TẠI BUÔN MA THUỘT', chuThich:'Mới',                  tenNccKey:'BMT',                  congTrinh:'GO BUÔN MA THUỘT (VIỆT - NHẬT TẠI BUÔN MA THUỘT)' },
+    { ma:'60KBGBMT',ten:'POSH MN KUBO GO BUÔN MÊ THUỘT',       tenNCC:'CHI NHÁNH CÔNG TY TNHH MỘT THÀNH VIÊN THƯƠNG MẠI HÀNG GIA DỤNG TỔNG HỢP TẠI BUÔN MA THUỘT', chuThich:'Mới', tenNccKey:'KUBO BMT',         congTrinh:'KUBO GO BUÔN MA THUỘT (HÀNG GIA DỤNG TỔNG HỢP)' },
+    { ma:'60YKBMT', ten:'POSH MN YOKIDS',                       tenNCC:'CÔNG TY CỔ PHẦN THƯƠNG MẠI VÀ DỊCH VỤ YOKIDS',                       chuThich:'mới họ giữ tiền',          tenNccKey:'',                     congTrinh:'YOKIDS' },
+    { ma:'61ZCKG',  ten:'POSH MN ZONE C KIÊN GIANG',            tenNCC:'CÔNG TY CỔ PHẦN ĐÔNG HƯNG',                                           chuThich:'Mới',                      tenNccKey:'ĐÔNG HƯNG',            congTrinh:'ZONE C KIEN GIANG - ĐÔNG HƯNG' },
+    { ma:'62SCCM',  ten:'POSH MN SENSE CITY CÀ MAU',            tenNCC:'CÔNG TY TNHH THƯƠNG MẠI DỊCH VỤ SÀI GÒN – CÀ MAU',                  chuThich:'Mới',                      tenNccKey:'SÀI GÒN – CÀ MAU',    congTrinh:'SENSE CÀ MAU (SÀI GÒN - CÀ MAU)' },
+    { ma:'62GOBL',  ten:'POSH MN GO BẠC LIÊU',                 tenNCC:'CHI NHÁNH CÔNG TY CỔ PHẦN BẤT ĐỘNG SẢN VIỆT-NHẬT TẠI BẠC LIÊU',      chuThich:'Mới',                      tenNccKey:'GO BẠC LIÊU',          congTrinh:'GO BẠC LIÊU (VIỆT - NHẬT TẠI BẠC LIÊU)' },
+    { ma:'63LTPT',  ten:'POSH MN LOTTE MART PHAN THIẾT',        tenNCC:'CÔNG TY CỔ PHẦN TRUNG TÂM THƯƠNG MẠI LOTTE VIỆT NAM - CHI NHÁNH BÌNH THUẬN', chuThich:'Mới',             tenNccKey:'LOTTE BÌNH THUẬN',     congTrinh:'LOTTE VIỆT NAM - CHI NHÁNH BÌNH THUẬN', maCTHopDong:'LOTTE PHAN THIET' },
+    { ma:'JPAMBT',  ten:'JP MN AEON MALL BÌNH TÂN',             tenNCC:'',                                                                     chuThich:'mới',                      tenNccKey:'',                     congTrinh:'' },
+    { ma:'JPAMTP',  ten:'JP MN AEON MALL TÂN PHÚ',              tenNCC:'CÔNG TY TNHH AEON VIỆT NAM',                                          chuThich:'mới',                      tenNccKey:'AE TÂN PHÚ',           congTrinh:'AEON VIỆT NAM',        maCTHopDong:'JP AE TAN PHU', tienThueKy:44000000 },
+    { ma:'JPSWPQ',  ten:'JP MN SUNWORLD PHÚ QUỐC',              tenNCC:'CHI NHÁNH CÔNG TY TNHH MẶT TRỜI PHÚ QUỐC TẠI HÒN THƠM',             chuThich:'mới CSE 50%-50%',          tenNccKey:'SUN H THƠM',           congTrinh:'MẶT TRỜI PHÚ QUỐC TẠI HÒN THƠM - CSE', maCTHopDong:'PQ SUN HTHOM JPHCM' },
+    { ma:'FLMPT',   ten:'Farm Phan Thiết',                       tenNCC:'CÔNG TY CỔ PHẦN TRUNG TÂM THƯƠNG MẠI LOTTE VIỆT NAM - CHI NHÁNH BÌNH THUẬN', chuThich:'mới',             tenNccKey:'LOTTE BÌNH THUẬN',     congTrinh:'LOTTE VIỆT NAM - CHI NHÁNH BÌNH THUẬN', maCTHopDong:'LOTTE PHAN THIET' },
+    { ma:'TTAMTA',  ten:'TUTU MN AEON MALL TÂN AN',             tenNCC:'CÔNG TY TNHH AEON VIỆT NAM - CHI NHÁNH LONG AN',                     chuThich:'mới',                      tenNccKey:'',                     congTrinh:'AEON TÂN AN - AEON VIỆT NAM - CHI NHÁNH LONG AN' },
+    { ma:'TTETL',   ten:'TUTU MN ESTELLA',                       tenNCC:'CÔNG TY TNHH LIÊN DOANH ESTELLA',                                     chuThich:'mới CSE',                  tenNccKey:'ESTELLA',              congTrinh:'LIÊN DOANH ESTELLA - CSE', maCTHopDong:'ESTELLA PHN' },
+    { ma:'VRAMTA',  ten:'FZ MN VR AEON MALL TÂN AN',            tenNCC:'CÔNG TY TNHH AEON VIỆT NAM - CHI NHÁNH LONG AN',                     chuThich:'mới',                      tenNccKey:'',                     congTrinh:'AEON TÂN AN - AEON VIỆT NAM - CHI NHÁNH LONG AN' },
+    { ma:'PBAMTP',  ten:'PINBALL MN AMTP',                       tenNCC:'CÔNG TY TNHH AEON VIỆT NAM',                                          chuThich:'mới',                      tenNccKey:'',                      congTrinh:'AEON VIỆT NAM' },
+  ];
+
+  // Group KVC-MTD KH Mới gian by NCC
+  const kvcMoiGroupMap = new Map();
+  KVC_MTD_MOI_GIAN.forEach((g) => {
+    // Lookup MST using tenNccKey (exact short name from records) as primary method
+    const keyUpper = g.tenNccKey ? g.tenNccKey.toUpperCase() : "";
+    const mstByKey = keyUpper ? (tenNccToMst.get(keyUpper) || "") : "";
+    const info = lookupByMa(g.ma);
+    const mst = mstByKey || (info && info.mst) || lookupMst(g.tenNCC) || "";
+    // Get maCongTrinh from records for display
+    const maCongTrinhKhMoi = keyUpper ? (tenNccToMaCT.get(keyUpper) || "") : "";
+    const tenNccDisplay = g.tenNCC || (info && info.tenNCC) || "(Không rõ NCC)";
+    const key = tenNccDisplay;
+    if (!kvcMoiGroupMap.has(key)) {
+      kvcMoiGroupMap.set(key, { tenNCC: key, mst, tenNccKey: g.tenNccKey || "", gianList: [] });
+    }
+    // If this group now has mst and didn't before, update it
+    if (mst && !kvcMoiGroupMap.get(key).mst) kvcMoiGroupMap.get(key).mst = mst;
+    // Collect invoices with "tiền thuê" in description for this gian.
+    // Matching strategy (applied when gian has maCTHopDong):
+    //   1st: match by maCongTrinh (most accurate — exact field match)
+    //   2nd: match by invoice total amount ≈ tienThueKy (for invoices without proper maCT)
+    //   Fallback: show all tiền thuê from NCC (when no specific matches found)
+    const allInvoices = g.tenNccKey ? (tenNccKeyToInvoices.get(g.tenNccKey) || []) : [];
+    const candidateTT = allInvoices.filter(r => {
+      const dg = (r.dienGiai || '').toLowerCase();
+      return dg.includes('tiền thuê') || dg.includes('tien thue');
+    });
+    // Helper: parse Vietnamese number string "255.600.000" → 255600000
+    const parseVnd = (s) => {
+      if (!s) return 0;
+      if (typeof s === 'number') return s;
+      return parseInt(String(s).replace(/[^0-9]/g, ''), 10) || 0;
+    };
+    const tienThueInvoices = (() => {
+      if (!g.maCTHopDong && !g.tienThueKy) return candidateTT; // no filter defined, show all
+      const maCTKey = g.maCTHopDong ? g.maCTHopDong.trim().toUpperCase() : null;
+      // Combine maCT match OR amount match (both active simultaneously)
+      const matched = candidateTT.filter(r => {
+        // Primary: exact maCongTrinh match
+        if (maCTKey && (r.maCongTrinh || '').trim().toUpperCase() === maCTKey) return true;
+        // Secondary: amount-based match (for invoices with missing/generic maCT)
+        if (g.tienThueKy) {
+          const inv = parseVnd(r.soTienTong || r.soTienTongRaw);
+          return Math.abs(inv - g.tienThueKy) < 1000; // within 1000 VNĐ tolerance
+        }
+        return false;
+      });
+      if (matched.length > 0) return matched; // found specific invoices for this gian
+      return candidateTT; // fallback: show all tiền thuê from NCC only if nothing matched
+    })().sort((a, b) => (b.thang || '').localeCompare(a.thang || ''));
+    kvcMoiGroupMap.get(key).gianList.push({ ...g, mst, maCTFound: g.congTrinh || '', tienThueInvoices });
+  });
+  const kvcMoiGroups = Array.from(kvcMoiGroupMap.values())
+    .sort((a, b) => a.tenNCC.localeCompare(b.tenNCC, 'vi'));
+
   res.render("phapdanh-unc-tien-thue", {
     title: "UNC Tiền Thuê",
     activeCompany: store.activeCompany || 'kh_cu',
     COMPANIES,
     groupsKhCu,
     groupsKhMoi,
+    kvcMoiGroups,
     userName: req.session && req.session.userName,
     success: req.query.success,
     error: req.query.error,
