@@ -1860,10 +1860,13 @@ router.post("/phap-danh/hop-dong-thue-gian-tong/cap-nhat-tu-sheet", requireAdmin
 // ?ncc=SAN+BAY to filter by tenNCC keyword
 router.get("/phap-danh/unc-debug", (req, res) => {
   const store = load();
-  let rows = (store.ho_so_tien_thue || []).filter(r => r.company === 'kh_moi');
+  const allR = store.ho_so_tien_thue || [];
+  let rows = allR.filter(r => r.company === 'kh_moi');
+  let rowsCu = allR.filter(r => !r.company || r.company === 'kh_cu');
   const nccFilter = (req.query.ncc || '').trim().toLowerCase();
   if (nccFilter) {
     rows = rows.filter(r => (r.tenNCC||'').toLowerCase().includes(nccFilter) || (r.maCongTrinh||'').toLowerCase().includes(nccFilter) || (r.gian||'').toLowerCase().includes(nccFilter));
+    rowsCu = rowsCu.filter(r => (r.tenNCC||'').toLowerCase().includes(nccFilter) || (r.maCongTrinh||'').toLowerCase().includes(nccFilter));
   }
   const sample = (nccFilter ? rows : rows.slice(0, 5)).map(r => ({
     maNCC: r.maNCC, tenNCC: r.tenNCC, maSoThueNCC: r.maSoThueNCC,
@@ -1871,9 +1874,13 @@ router.get("/phap-danh/unc-debug", (req, res) => {
     thang: r.thang, soHoaDon: r.soHoaDon, dienGiai: r.dienGiai, soTienTong: r.soTienTong,
     fields: Object.keys(r).join(', ')
   }));
+  const sampleCu = (nccFilter ? rowsCu : rowsCu.slice(0, 5)).map(r => ({
+    company: r.company, maNCC: r.maNCC, tenNCC: r.tenNCC, maSoThueNCC: r.maSoThueNCC,
+    thang: r.thang, soHoaDon: r.soHoaDon, dienGiai: r.dienGiai, soTienTong: r.soTienTong
+  }));
   const nccDir = (store.danh_muc_ma_nha_cung_cap_moi || []).slice(0, 10);
   const nccDirCu = (store.danh_muc_ma_nha_cung_cap_cu || []).slice(0, 5);
-  res.json({ totalKhMoi: rows.length, nccFilter, sample, nccDir, nccDirCu });
+  res.json({ totalKhMoi: rows.length, totalKhCu: rowsCu.length, nccFilter, sample, sampleCu, nccDir, nccDirCu });
 });
 
 // Luyen, 2026-09-24: "thêm 1 tab dưới pháp nhân hợp đồng thuê gian là UNC tiền thuê"
