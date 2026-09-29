@@ -48,7 +48,7 @@ router.post("/tien-mat/them", requireDataEntry, (req, res) => {
     return res.redirect("/tien-mat?error=Thiếu+thông+tin+bắt+buộc");
   }
 
-  const id = nextId(data.tienMat);
+  const id = nextId(data, "tienMat");
   data.tienMat.push({
     id,
     company: activeCompany,
