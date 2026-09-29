@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <%- include('partials/head') %>
+  <title>Tiền Mặt – K&H</title>
+  <style>
+    .page-card { background:#fff; border-radius:10px; box-shadow:0 2px 12px rgba(0,0,0,.08); padding:1.25rem 1.5rem; margin-bottom:1.25rem; }
+    .add-form { display:flex; flex-wrap:wrap; gap:.6rem; align-items:flex-end; }
+    .add-form label { display:block; font-size:.78em; font-weight:600; color:#64748b; margin-bottom:.2rem; }
+    .add-form input, .add-form select { padding:.38rem .6rem; border:1px solid #cbd5e1; border-radius:6px; font-size:.88em; background:#fff; }
+    .btn-add { background:#1e3a5f; color:#fff; border:none; border-radius:6px; padding:.42rem 1rem; font-size:.88em; font-weight:600; cursor:pointer; white-space:nowrap; }
+    .btn-add:hover { background:#2563eb; }
+    .filter-bar { display:flex; gap:.6rem; align-items:center; flex-wrap:wrap; margin-bottom:1rem; }
+    .filter-bar input, .filter-bar select { padding:.35rem .6rem; border:1px solid #cbd5e1; border-radius:6px; font-size:.85em; }
+    .ct-table { width:100%; border-collapse:collapse; font-size:.88em; }
+    .ct-table th { background:#1e3a5f; color:#fff; padding:.5rem .75rem; text-align:left; white-space:nowrap; position:sticky; top:0; z-index:5; }
+    .ct-table td { padding:.45rem .75rem; border-bottom:1px solid #e2e8f0; vertical-align:middle; }
+    .ct-table tbody tr:hover td { background:#f8fafc; }
+    .badge-thu { display:inline-block; background:#dcfce7; color:#166534; border-radius:10px; padding:.1rem .55rem; font-size:.78em; font-weight:700; }
+    .badge-chi { display:inline-block; background:#fee2e2; color:#991b1b; border-radius:10px; padding:.1rem .55rem; font-size:.78em; font-weight:700; }
+    .so-tien-thu { font-weight:600; color:#15803d; white-space:nowrap; }
+    .so-tien-chi { font-weight:600; color:#dc2626; white-space:nowrap; }
+    .btn-xoa { background:none; border:none; color:#94a3b8; cursor:pointer; font-size:1rem; padding:.1rem .3rem; border-radius:4px; }
+    .btn-xoa:hover { color:#dc2626; background:#fee2e2; }
+    .alert { padding:.65rem 1rem; border-radius:8px; margin-bottom:1rem; font-size:.88em; }
+    .alert-success { background:#dcfce7; color:#166534; border:1px solid #bbf7d0; }
+    .alert-error { background:#fee2e2; color:#991b1b; border:1px solid #fecaca; }
+    .empty-state { text-align:center; padding:2.5rem; color:#94a3b8; }
+    .count-label { font-size:.82em; color:#64748b; margin-bottom:.75rem; }
+    .tong-bar { display:flex; gap:1.5rem; padding:.75rem 1.25rem; background:#f8fafc; border-radius:8px; margin-bottom:1rem; font-size:.88em; font-weight:600; }
+    .tong-bar span { color:#64748b; font-weight:400; font-size:.9em; }
+  </style>
+</head>
+<body>
+  <%- include('partials/nav') %>
+  <div class="container" style="max-width:1100px;margin:0 auto;padding:1.5rem 1rem;">
+
+    <h2 style="font-size:1.15rem;font-weight:700;color:#1e3a5f;margin-bottom:1.25rem;">💵 Tiền Mặt — <%= COMPANIES[activeCompany].fullName %></h2>
+
+    <% if (success) { %><div class="alert alert-success">✅ <%= success %></div><% } %>
+    <% if (error) { %><div class="alert alert-error">⚠️ <%= error %></div><% } %>
+
+    <!-- Form thêm mới -->
+    <div class="page-card">
+      <form method="POST" action="/tien-mat/them">
+        <div class="add-form">
+          <div>
+            <label>Loại <span style="color:#dc2626">*</span></label>
+            <select name="loai" style="min-width:90px;">
+              <option value="Thu">💚 Thu</option>
+              <option value="Chi">❤️ Chi</option>
+            </select>
+          </div>
+          <div>
+            <label>Ngày <span style="color:#dc2626">*</span></label>
+            <input type="date" name="ngay" style="min-width:130px;" required />
+          </div>
+          <div>
+            <label>Số tiền (đ) <span style="color:#dc2626">*</span></label>
+            <input type="text" name="soTien" placeholder="VD: 5.000.000" style="min-width:130px;" required />
+          </div>
+          <div style="flex:1;min-width:200px;">
+            <label>Diễn giải</label>
+            <input type="text" name="diGiai" placeholder="Nội dung khoản tiền..." style="width:100%;" />
+          </div>
+          <div style="min-width:150px;">
+            <label>Nguồn / Người nộp</label>
+            <input type="text" name="nguon" placeholder="Tên người, gian..." style="width:100%;" />
+          </div>
+          <div style="flex:1;min-width:150px;">
+            <label>Ghi chú</label>
+            <input type="text" name="ghiChu" placeholder="Ghi chú thêm..." style="width:100%;" />
+          </div>
+          <div>
+            <label>&nbsp;</label>
+            <button type="submit" class="btn-add">+ Thêm</button>
+          </div>
+        </div>
+      </form>
+    </div>
+
+    <!-- Filter -->
+    <div class="filter-bar">
+      <form method="GET" action="/tien-mat" style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;">
+        <input type="text" name="q" value="<%= q %>" placeholder="🔍 Tìm diễn giải, nguồn..." style="min-width:200px;" />
+        <select name="loai" onchange="this.form.submit()">
+          <option value="" <%- loaiFilter==='' ? 'selected' : '' %>>Tất cả loại</option>
+          <option value="Thu" <%- loaiFilter==='Thu' ? 'selected' : '' %>>💚 Thu</option>
+          <option value="Chi" <%- loaiFilter==='Chi' ? 'selected' : '' %>>❤️ Chi</option>
+        </select>
+        <input type="month" name="thang" value="<%= thangFilter %>" onchange="this.form.submit()" />
+        <button type="submit" style="padding:.35rem .75rem;border:1px solid #cbd5e1;border-radius:6px;background:#fff;cursor:pointer;font-size:.85em;">Lọc</button>
+        <% if (q || loaiFilter || thangFilter) { %><a href="/tien-mat" style="font-size:.82em;color:#64748b;">× Bỏ lọc</a><% } %>
+      </form>
+    </div>
+
+    <% if (rows.length > 0) {
+      const totalThu = rows.filter(r=>r.loai==='Thu').reduce((s,r)=>s+Number(r.soTien||0),0);
+      const totalChi = rows.filter(r=>r.loai==='Chi').reduce((s,r)=>s+Number(r.soTien||0),0);
+    %>
+    <div class="tong-bar">
+      <div>💚 Tổng Thu: <strong class="so-tien-thu"><%= totalThu.toLocaleString('vi-VN') %>đ</strong></div>
+      <div>❤️ Tổng Chi: <strong class="so-tien-chi"><%= totalChi.toLocaleString('vi-VN') %>đ</strong></div>
+      <div>📊 Còn lại: <strong style="color:<%= totalThu-totalChi>=0?'#15803d':'#dc2626' %>"><%= (totalThu-totalChi).toLocaleString('vi-VN') %>đ</strong></div>
+    </div>
+    <% } %>
+
+    <!-- Table -->
+    <div class="page-card" style="padding:0;overflow-x:auto;">
+      <% if (rows.length === 0) { %>
+        <div class="empty-state">
+          <div style="font-size:2.5rem;margin-bottom:.75rem;">💵</div>
+          <p>Chưa có dữ liệu tiền mặt.<% if (q || loaiFilter || thangFilter) { %> Thử bỏ bộ lọc.<% } %></p>
+        </div>
+      <% } else { %>
+        <div class="count-label" style="padding:.75rem 1.25rem 0;"><%= rows.length %> bản ghi</div>
+        <table class="ct-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Loại</th>
+              <th>Ngày</th>
+              <th>Số tiền</th>
+              <th>Diễn giải</th>
+              <th>Nguồn / Người nộp</th>
+              <th>Ghi chú</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <% rows.forEach((r, i) => { %>
+            <tr>
+              <td style="color:#94a3b8;font-size:.8em;"><%= i+1 %></td>
+              <td><span class="badge-<%= r.loai==='Thu' ? 'thu' : 'chi' %>"><%= r.loai %></span></td>
+              <td style="white-space:nowrap;"><%= r.ngay ? r.ngay.split('-').reverse().join('/') : '—' %></td>
+              <td class="<%= r.loai==='Thu' ? 'so-tien-thu' : 'so-tien-chi' %>">
+                <%= r.soTien ? Number(r.soTien).toLocaleString('vi-VN') + 'đ' : '—' %>
+              </td>
+              <td><%= r.diGiai || '—' %></td>
+              <td style="font-size:.85em;color:#475569;"><%= r.nguon || '—' %></td>
+              <td style="font-size:.83em;color:#475569;"><%= r.ghiChu || '' %></td>
+              <td>
+                <form method="POST" action="/tien-mat/<%= r.id %>/xoa" onsubmit="return confirm('Xóa bản ghi này?')">
+                  <button type="submit" class="btn-xoa" title="Xóa">🗑</button>
+                </form>
+              </td>
+            </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      <% } %>
+    </div>
+
+  </div>
+</body>
+</html>

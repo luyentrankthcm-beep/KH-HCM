@@ -2134,25 +2134,25 @@ router.get("/phap-danh/unc-tien-thue", (req, res) => {
 
   // Static gian list — KVC-MTD KH Cũ (from user Excel)
   const KVC_MTD_CU_GIAN = [
-    { ma:'TTAMBD',  ten:'TUTU MN AEON MALL BÌNH DƯƠNG',        tenNCC:'CHI NHÁNH CÔNG TY TNHH AEONMALL VIỆT NAM TẠI BÌNH DƯƠNG',                                                      tenNccKey:'AE BD',            congTrinh:'AEON BÌNH DƯƠNG' },
+    { ma:'TTAMBD',  ten:'TUTU MN AEON MALL BÌNH DƯƠNG',        tenNCC:'CHI NHÁNH CÔNG TY TNHH AEONMALL VIỆT NAM TẠI BÌNH DƯƠNG',                                                      tenNccKey:'AE BD',            congTrinh:'AEON BÌNH DƯƠNG',         tienThueKy: 28636364 },
     { ma:'TTLMGV',  ten:'TUTU MN LOTTE MART GÒ VẤP',           tenNCC:'CÔNG TY CỔ PHẦN TRUNG TÂM THƯƠNG MẠI LOTTE VIỆT NAM',                                                          tenNccKey:'LOTTE VIỆT NAM',   congTrinh:'LOTTE VIỆT NAM - CHI NHÁNH GÒ VẤP' },
     { ma:'TTAMTP',  ten:'TUTU MN AEON MALL TÂN PHÚ',           tenNCC:'CÔNG TY TNHH AEON VIỆT NAM',                                                                                   tenNccKey:'AE TÂN PHÚ',       congTrinh:'AEON VIỆT NAM - AEON TÂN PHÚ' },
     { ma:'TTAMBT',  ten:'TUTU MN AEON MALL BÌNH TÂN',          tenNCC:'CHI NHÁNH CÔNG TY TNHH AEONMALL VIỆT NAM TẠI THÀNH PHỐ HỒ CHÍ MINH',                                         tenNccKey:'AE BÌNH TÂN',      congTrinh:'AEON HỒ CHÍ MINH - CSE',      tienThueKy: 33000000 },
-    { ma:'FZVRBD',  ten:'FZ MN VR AEON MALL BÌNH DƯƠNG',       tenNCC:'CHI NHÁNH CÔNG TY TNHH AEONMALL VIỆT NAM TẠI BÌNH DƯƠNG',                                                      tenNccKey:'AE BD',            congTrinh:'AEON BÌNH DƯƠNG' },
+    { ma:'FZVRBD',  ten:'FZ MN VR AEON MALL BÌNH DƯƠNG',       tenNCC:'CHI NHÁNH CÔNG TY TNHH AEONMALL VIỆT NAM TẠI BÌNH DƯƠNG',                                                      tenNccKey:'AE BD',            congTrinh:'AEON BÌNH DƯƠNG',         tienThueKy: 20394000 },
     { ma:'FZNBVT',  ten:'FZ MN NHÀ BÓNG LOTTE MART VŨNG TÀU', tenNCC:'CÔNG TY CỔ PHẦN TRUNG TÂM THƯƠNG MẠI LOTTE VIỆT NAM - CHI NHÁNH BÀ RỊA VŨNG TÀU',                           tenNccKey:'LOTTE VŨNG TÀU',   congTrinh:'LOTTE VIỆT NAM - CHI NHÁNH BÀ RỊA VŨNG TÀU' },
     { ma:'FZFFVV',  ten:'FZ MN FUNFEST SC VIVO',                tenNCC:'CÔNG TY CỔ PHẦN PHÁT TRIỂN KHU PHỨC HỢP THƯƠNG MẠI VIETSIN',                                                   tenNccKey:'VIETSIN VIVO',     congTrinh:'SC VIVO (PHỨC HỢP THƯƠNG MẠI VIETSIN) - CSE' },
     { ma:'FZADVVV', ten:'FZ MN ADV SC VIVO',                    tenNCC:'CÔNG TY CỔ PHẦN PHÁT TRIỂN KHU PHỨC HỢP THƯƠNG MẠI VIETSIN',                                                   tenNccKey:'VIETSIN VIVO',     congTrinh:'SC VIVO (PHỨC HỢP THƯƠNG MẠI VIETSIN)',      tienThueKy: 14850000 },
     { ma:'FZADVTP', ten:'FZ MN ADV AEON MALL TÂN PHÚ',         tenNCC:'CÔNG TY TNHH AEON VIỆT NAM',                                                                                   tenNccKey:'AE TÂN PHÚ',       congTrinh:'AEON VIỆT NAM - AEON TÂN PHÚ' },
-    { ma:'EVGHBD',  ten:'EVMN GHOST MN AEON MALL BÌNH DƯƠNG',  tenNCC:'CHI NHÁNH CÔNG TY TNHH AEONMALL VIỆT NAM TẠI BÌNH DƯƠNG',                                                      tenNccKey:'AE BD',            congTrinh:'AEON BÌNH DƯƠNG - CSE' },
+    { ma:'EVGHBD',  ten:'EVMN GHOST MN AEON MALL BÌNH DƯƠNG',  tenNCC:'CHI NHÁNH CÔNG TY TNHH AEONMALL VIỆT NAM TẠI BÌNH DƯƠNG',                                                      tenNccKey:'AE BD',            congTrinh:'AEON BÌNH DƯƠNG - CSE', dienGiaiKey:'doanh thu' },
     { ma:'EVSNTP',  ten:'EV MN SNOW MN AEON MALL TÂN PHÚ',     tenNCC:'CÔNG TY TNHH AEON VIỆT NAM',                                                                                   tenNccKey:'AE TÂN PHÚ',       congTrinh:'AEON VIỆT NAM - AEON TÂN PHÚ' },
     { ma:'EVGHBR',  ten:'EVMN GHOST MN GO BÀ RỊA',             tenNCC:'CHI NHÁNH CÔNG TY CỔ PHẦN BẤT ĐỘNG SẢN VIỆT- NHẬT TẠI BÀ RỊA',                                               tenNccKey:'BÀ RỊA',           congTrinh:'GO BÀ RỊA (VIỆT- NHẬT TẠI BÀ RỊA)' },
-    { ma:'EVSNBD',  ten:'EVMN SNOW AEON MALL BÌNH DƯƠNG',       tenNCC:'CHI NHÁNH CÔNG TY TNHH AEONMALL VIỆT NAM TẠI BÌNH DƯƠNG',                                                      tenNccKey:'AE BD',            congTrinh:'AEON BÌNH DƯƠNG - CSE' },
+    { ma:'EVSNBD',  ten:'EVMN SNOW AEON MALL BÌNH DƯƠNG',       tenNCC:'CHI NHÁNH CÔNG TY TNHH AEONMALL VIỆT NAM TẠI BÌNH DƯƠNG',                                                      tenNccKey:'AE BD',            congTrinh:'AEON BÌNH DƯƠNG - CSE', tienThueKy: 50000000 },
     { ma:'EVADVGAL',ten:'EVENT MN ADV GO AN LẠC',               tenNCC:'CÔNG TY TRÁCH NHIỆM HỮU HẠN THƯƠNG MẠI VÀ DỊCH VỤ SIÊU THỊ AN LẠC',                                         tenNccKey:'SIÊU THỊ AN LẠC',  congTrinh:'GO AN LẠC (SIÊU THỊ AN LẠC)' },
     { ma:'50CMPL',  ten:'POSH MN COOPMART PHÚ LÂM',            tenNCC:'CÔNG TY TNHH MỘT THÀNH VIÊN SÀI GÒN CO.OP PHÚ LÂM',                                                           tenNccKey:'CO.OP PHÚ LÂM',    congTrinh:'COOPMART PHÚ LÂM' },
     { ma:'50CMBD',  ten:'POSH MN COOPMART BÌNH DƯƠNG',         tenNCC:'CHI NHÁNH LIÊN HIỆP HỢP TÁC XÃ THƯƠNG MẠI TP. HỒ CHÍ MINH - CO.OPMART BÌNH DƯƠNG 2',                        tenNccKey:'CO.OP BD',         congTrinh:'COOPMART BÌNH DƯƠNG' },
     { ma:'50VPPQ',  ten:'POSH MN VINPEARL PHÚ QUỐC',           tenNCC:'CHI NHÁNH KIÊN GIANG - CÔNG TY CỔ PHẦN VINPEARL',                                                             tenNccKey:'PHÚ QUỐC',         congTrinh:'VINWONDER PHÚ QUỐC (CỔ PHẦN VINPEARL)' },
     { ma:'JPAMBT',  ten:'JP MN AEON MALL BÌNH TÂN',            tenNCC:'CHI NHÁNH CÔNG TY TNHH AEONMALL VIỆT NAM TẠI THÀNH PHỐ HỒ CHÍ MINH',                                         tenNccKey:'AE BÌNH TÂN',      congTrinh:'AEON HỒ CHÍ MINH',            tienThueKy: 11550000 },
-    { ma:'JPAMBD',  ten:'JP MN AEON MALL BÌNH DƯƠNG',          tenNCC:'CHI NHÁNH CÔNG TY TNHH AEONMALL VIỆT NAM TẠI BÌNH DƯƠNG',                                                      tenNccKey:'AE BD',            congTrinh:'AEON BÌNH DƯƠNG' },
+    { ma:'JPAMBD',  ten:'JP MN AEON MALL BÌNH DƯƠNG',          tenNCC:'CHI NHÁNH CÔNG TY TNHH AEONMALL VIỆT NAM TẠI BÌNH DƯƠNG',                                                      tenNccKey:'AE BD',            congTrinh:'AEON BÌNH DƯƠNG',         tienThueKy: 14600250 },
     { ma:'JPVWPQ',  ten:'JP MN VINWONDER PHÚ QUỐC',            tenNCC:'CHI NHÁNH KIÊN GIANG - CÔNG TY CỔ PHẦN VINPEARL',                                                             tenNccKey:'PHÚ QUỐC',         congTrinh:'VINWONDER PHÚ QUỐC (cổ phần Vinpearl)' },
     { ma:'JPSBPQ',  ten:'JP MN SÂN BAY PHÚ QUỐC',             tenNCC:'CÔNG TY CỔ PHẦN CẢNG HÀNG KHÔNG MẶT TRỜI- CHI NHÁNH CẢNG HÀNG KHÔNG QUỐC TẾ PHÚ QUỐC SUN GROUP',           tenNccKey:'CHKQT PHÚ QUỐC',   congTrinh:'CN CHK QUỐC TẾ PHÚ QUỐC - CSE' },
   ];
@@ -2177,6 +2177,7 @@ router.get("/phap-danh/unc-tien-thue", (req, res) => {
       return dg.includes('thuê') || dg.includes('thue');
     });
     // Filter by tienThueKy if set (amount-based per-gian matching from contract data)
+    // Or by dienGiaiKey if set (keyword match on dienGiai for variable-amount gians)
     let gianInvoicesCu = candidateTTCu;
     if (g.tienThueKy && g.tienThueKy > 0) {
       const tol = g.tienThueKy * 0.12; // 12% tolerance to handle VAT rounding
@@ -2184,11 +2185,29 @@ router.get("/phap-danh/unc-tien-thue", (req, res) => {
         const inv = parseInt(String(r.soTienTong || '0').replace(/\./g, '').replace(/,/g, '.').replace(/[^0-9]/g, ''), 10);
         return Math.abs(inv - g.tienThueKy) <= tol;
       });
+    } else if (g.dienGiaiKey) {
+      const keyLower = g.dienGiaiKey.toLowerCase();
+      gianInvoicesCu = candidateTTCu.filter(r => (r.dienGiai || '').toLowerCase().includes(keyLower));
     }
     kvcCuGroupMap.get(key).gianList.push({ ...g, mst, maCTFound: g.congTrinh || '', tienThueInvoices: gianInvoicesCu });
   });
   const kvcCuGroups = Array.from(kvcCuGroupMap.values())
     .sort((a, b) => a.tenNCC.localeCompare(b.tenNCC, 'vi'));
+
+  // Build gianInfoLookup: tenCongTrinh.UPPER → {chuThich, maCTHopDong, tienThueKy, maNB, tenGian}
+  const gianInfoLookup = {};
+  [...KVC_MTD_CU_GIAN, ...KVC_MTD_MOI_GIAN].forEach(function(g) {
+    if (g.congTrinh) {
+      const k = g.congTrinh.trim().toUpperCase();
+      if (!gianInfoLookup[k]) gianInfoLookup[k] = {
+        chuThich: g.chuThich || '',
+        maCTHopDong: g.maCTHopDong || '',
+        tienThueKy: g.tienThueKy || 0,
+        maNB: g.ma || '',
+        tenGian: g.ten || '',
+      };
+    }
+  });
 
   res.render("phapdanh-unc-tien-thue", {
     title: "UNC Tiền Thuê",
@@ -2198,6 +2217,7 @@ router.get("/phap-danh/unc-tien-thue", (req, res) => {
     groupsKhMoi,
     kvcMoiGroups,
     kvcCuGroups,
+    gianInfoLookup,
     userName: req.session && req.session.userName,
     success: req.query.success,
     error: req.query.error,

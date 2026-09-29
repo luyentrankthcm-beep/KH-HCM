@@ -75,7 +75,7 @@
       <a href="/ho-so/phi-cang-phu-quoc" class="tab-btn">🚢 Phí Cảng Phú Quốc</a>
       <a href="/ho-so/doanh-thu-chia-se" class="tab-btn">📊 Doanh Thu Chia Sẻ</a>
       <a href="/ho-so/tien-thue" class="tab-btn">🏠 Tiền Thuê</a>
-      <a href="/ho-so/chung-tu" class="tab-btn">📋 Chứng Từ</a>
+      <a href="/ho-so/chung-tu" class="tab-btn">📄 Hợp Đồng</a>
     </div>
 
     <% if (typeof error !== 'undefined' && error) { %><div class="alert-error"><%= error %></div><% } %>
@@ -396,11 +396,21 @@
 
       // Chứng từ liên quan (NCC level)
       html += '<div class="section-title">📁 Chứng từ liên quan (biên bản, báo giá…)</div>';
+      // Hiển thị chứng từ đã lưu dạng card (giống BBGN)
+      html += '<div id="ctCards_' + gi + '">';
+      if (g.chungTu) {
+        html += '<div class="hd-card" style="border-left:3px solid #f59e0b;">';
+        html += '<div class="hd-meta" style="white-space:pre-wrap;">' + escHtml(g.chungTu) + '</div>';
+        if (g.ghiChuNCC) html += '<div style="font-size:.82em;color:#475569;margin-top:.2rem;">📝 ' + escHtml(g.ghiChuNCC) + '</div>';
+        html += '</div>';
+      }
+      html += '</div>';
+      // Form nhập chứng từ mới (luôn để trống)
       html += '<div class="chungtu-box">';
       html += '<label style="font-size:.82em;font-weight:600;color:#475569;">Link / danh sách chứng từ</label>';
-      html += '<textarea id="ctInput" rows="3" placeholder="VD: Biên bản nghiệm thu tháng 8: https://drive.google.com/...\nBáo giá số 001: https://...">' + escHtml(g.chungTu) + '</textarea>';
+      html += '<textarea id="ctInput" rows="3" placeholder="VD: Biên bản nghiệm thu tháng 8: https://drive.google.com/...\nBáo giá số 001: https://..."></textarea>';
       html += '<label style="font-size:.82em;font-weight:600;color:#475569;">Ghi chú</label>';
-      html += '<input type="text" id="ctGhiChu" value="' + escAttr(g.ghiChuNCC) + '" placeholder="Ghi chú thêm về NCC này..." />';
+      html += '<input type="text" id="ctGhiChu" value="" placeholder="Ghi chú thêm về NCC này..." />';
       html += '<div style="display:flex;align-items:center;gap:.5rem;">';
       html += '<button class="btn-save-ct" onclick="saveChungTu(' + gi + ')">💾 Lưu chứng từ</button>';
       html += '<button class="btn-save-ct" style="background:#7c3aed;" onclick="openXuatChungTuModal(' + gi + ')">📄 Xuất chứng từ mẫu</button>';
@@ -423,6 +433,19 @@
       }).then(function(r) { return r.json(); }).then(function() {
         GROUPS[gi].chungTu = ct;
         GROUPS[gi].ghiChuNCC = gc;
+        // Xóa form sau khi lưu
+        if (document.getElementById('ctInput')) document.getElementById('ctInput').value = '';
+        if (document.getElementById('ctGhiChu')) document.getElementById('ctGhiChu').value = '';
+        // Cập nhật card hiển thị
+        var cardsCont = document.getElementById('ctCards_' + gi);
+        if (cardsCont) {
+          function esc(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+          if (ct) {
+            cardsCont.innerHTML = '<div class="hd-card" style="border-left:3px solid #f59e0b;"><div class="hd-meta" style="white-space:pre-wrap;">' + esc(ct) + '</div>' + (gc ? '<div style="font-size:.82em;color:#475569;margin-top:.2rem;">📝 ' + esc(gc) + '</div>' : '') + '</div>';
+          } else {
+            cardsCont.innerHTML = '';
+          }
+        }
         var ok = document.getElementById('saveOk');
         if (ok) { ok.style.display = 'inline'; setTimeout(function(){ ok.style.display='none'; }, 2000); }
       });

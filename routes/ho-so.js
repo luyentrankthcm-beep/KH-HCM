@@ -105,6 +105,18 @@ router.get("/api/ho-so/all", express.json(), (req, res) => {
   });
 });
 
+router.get("/ho-so/hoa-don-ncc/api/missing-ten", (req, res) => {
+  const keyOk = INTERNAL_SYNC_KEY && req.headers["x-internal-key"] === INTERNAL_SYNC_KEY;
+  if (!keyOk) return res.status(401).json({ error: "Unauthorized" });
+  const store = load();
+  ensureHoSo(store);
+  const company = req.query.company || null;
+  const records = store.ho_so_hoa_don.filter(r =>
+    (!company || r.company === company) && (!r.tenDayDuNCC || r.tenDayDuNCC === "")
+  );
+  res.json({ count: records.length, records: records.map(r => ({ driveId: r.driveId, fileName: r.fileName, company: r.company })) });
+});
+
 router.post("/ho-so/hoa-don-ncc/bulk-upsert", express.json(), (req, res) => {
   const keyOk = INTERNAL_SYNC_KEY && req.headers["x-internal-key"] === INTERNAL_SYNC_KEY;
   if (!keyOk && !(req.session && req.session.role === "admin")) {

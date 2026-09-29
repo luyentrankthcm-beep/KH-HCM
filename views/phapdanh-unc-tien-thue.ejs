@@ -56,6 +56,25 @@
     }
     .section-kh-cu  .summary-bar strong { color: #1e3a5f; }
     .section-kh-moi .summary-bar strong { color: #065f46; }
+    /* ---- Gian sub-groups (KH Cũ / KH Mới tabs) ---- */
+    .gian-subheader {
+      display: flex; align-items: center; gap: .75rem; flex-wrap: wrap;
+      padding: .5rem 1rem; background: #f1f5f9; border-top: 1px solid #e2e8f0;
+      cursor: pointer; font-size: .87rem;
+    }
+    .gian-subheader:hover { background: #e2e8f0; }
+    .section-kh-cu  .gian-subheader { border-left: 4px solid #93c5fd; }
+    .section-kh-moi .gian-subheader { border-left: 4px solid #6ee7b7; }
+    .gian-sub-toggle { font-size: .85rem; color: #64748b; transition: transform .2s; flex-shrink: 0; }
+    .gian-sub-name { font-weight: 700; color: #1e3a5f; flex: 1; min-width: 160px; }
+    .section-kh-moi .gian-sub-name { color: #065f46; }
+    .gian-sub-count { color: #64748b; font-size: .8rem; white-space: nowrap; }
+    .gian-sub-total { margin-left: auto; font-weight: 700; color: #1e3a5f; white-space: nowrap; font-size: .9rem; }
+    .section-kh-moi .gian-sub-total { color: #065f46; }
+    .gian-sub-note { color: #b45309; font-size: .76rem; font-style: italic; white-space: nowrap; background: #fef3c7; border-radius: 4px; padding: 1px 5px; }
+    .gian-sub-manb  { font-family: monospace; color: #64748b; font-size: .79rem; }
+    .gian-subbody { display: none; }
+    .gian-subbody.open { display: block; }
   </style>
 </head>
 <body>
@@ -74,6 +93,22 @@
     function fmtVnd(n) {
       if (!n && n !== 0) return '';
       return Number(n).toLocaleString('vi-VN') + ' đ';
+    }
+    function groupByGian(rows) {
+      var map = new Map();
+      rows.forEach(function(r) {
+        var key = (r.tenCongTrinh || r.maCongTrinh || r.gian || '(Không rõ gian)').trim();
+        if (!map.has(key)) map.set(key, { rows: [], total: 0 });
+        var g = map.get(key);
+        g.rows.push(r);
+        var amt = r.soTienTongRaw !== undefined ? Number(r.soTienTongRaw) : (r.soTienRaw !== undefined ? Number(r.soTienRaw) : 0);
+        g.total += amt || 0;
+      });
+      return Array.from(map.entries()).map(function(e) { return { gian: e[0], rows: e[1].rows, total: e[1].total }; });
+    }
+    function lookupGianInfo(gianName) {
+      if (!gianInfoLookup) return {};
+      return gianInfoLookup[(gianName || '').trim().toUpperCase()] || {};
     }
   %>
 
@@ -98,14 +133,14 @@
     <% if (groupsKhCu.length === 0) { %>
       <div class="empty-note">Chưa có dữ liệu tiền thuê KH Cũ.</div>
     <% } else {
-      const tongKhCu = groupsKhCu.reduce((s, g) => s + g.tongTien, 0);
+      var tongKhCu = groupsKhCu.reduce(function(s, g) { return s + g.tongTien; }, 0);
     %>
     <div class="summary-bar">
       <span>Tổng NCC: <strong><%= groupsKhCu.length %></strong></span>
-      <span>Tổng hóa đơn: <strong><%= groupsKhCu.reduce((s,g)=>s+g.rows.length,0) %></strong></span>
+      <span>Tổng hóa đơn: <strong><%= groupsKhCu.reduce(function(s,g){return s+g.rows.length;},0) %></strong></span>
       <span>Tổng tiền: <strong><%= fmtVnd(tongKhCu) %></strong></span>
     </div>
-    <% groupsKhCu.forEach(function(g) { %>
+    <% groupsKhCu.forEach(function(g, gi) { %>
     <div class="ncc-card">
       <div class="ncc-header" onclick="toggleNcc(this)">
         <span class="ncc-toggle">▶</span>
@@ -118,26 +153,41 @@
         <span class="ncc-tong"><%= fmtVnd(g.tongTien) %></span>
       </div>
       <div class="ncc-body">
-        <table class="ncc-table">
-          <thead><tr>
-            <th>Tháng</th><th>Gian</th><th>Số HĐ</th><th>Ngày HĐ</th><th>Diễn giải</th>
-            <th class="text-right">Tiền trước thuế</th><th class="text-right">Thuế GTGT</th><th class="text-right">Tổng cộng</th>
-          </tr></thead>
-          <tbody>
-            <% g.rows.forEach(function(r) { %>
-            <tr>
-              <td><span class="badge-thang"><%= r.thang || '—' %></span></td>
-              <td><%= r.tenCongTrinh || r.maCongTrinh || r.gian || '—' %></td>
-              <td style="font-family:monospace"><%= r.soHoaDon || '—' %></td>
-              <td><%= r.ngayHoaDon || '—' %></td>
-              <td style="color:#475569"><%= r.dienGiai || '—' %></td>
-              <td class="text-right"><%= r.soTien || (r.soTienRaw ? Number(r.soTienRaw).toLocaleString('vi-VN') : '—') %></td>
-              <td class="text-right"><%= r.thueGtgt || '—' %></td>
-              <td class="text-right" style="font-weight:600"><%= r.soTienTong || (r.soTienTongRaw ? Number(r.soTienTongRaw).toLocaleString('vi-VN') : '—') %></td>
-            </tr>
-            <% }); %>
-          </tbody>
-        </table>
+        <% var gianGrpsCu = groupByGian(g.rows);
+           gianGrpsCu.forEach(function(gg, ggi) {
+             var gianId = 'gian-cu-' + gi + '-' + ggi;
+             var gInfo = lookupGianInfo(gg.gian);
+        %>
+        <div class="gian-subheader" onclick="toggleGianSub('<%- gianId %>')">
+          <span class="gian-sub-toggle" id="toggle-<%- gianId %>">▶</span>
+          <span class="gian-sub-name"><%= gg.gian %></span>
+          <% if (gInfo.maNB) { %><span class="gian-sub-manb"><%= gInfo.maNB %></span><% } %>
+          <% if (gInfo.chuThich) { %><span class="gian-sub-note">📝 <%= gInfo.chuThich %></span><% } %>
+          <span class="gian-sub-count"><%= gg.rows.length %> HĐ</span>
+          <span class="gian-sub-total"><%= fmtVnd(gg.total) %></span>
+        </div>
+        <div id="<%- gianId %>" class="gian-subbody">
+          <table class="ncc-table" style="background:#fff">
+            <thead><tr>
+              <th>Tháng</th><th>Số HĐ</th><th>Ngày HĐ</th><th>Diễn giải</th>
+              <th class="text-right">Tiền trước thuế</th><th class="text-right">Thuế GTGT</th><th class="text-right">Tổng cộng</th>
+            </tr></thead>
+            <tbody>
+              <% gg.rows.forEach(function(r) { %>
+              <tr>
+                <td><span class="badge-thang"><%= r.thang || '—' %></span></td>
+                <td style="font-family:monospace"><%= r.soHoaDon || '—' %></td>
+                <td><%= r.ngayHoaDon || '—' %></td>
+                <td style="color:#475569"><%= r.dienGiai || '—' %></td>
+                <td class="text-right"><%= r.soTien || (r.soTienRaw ? Number(r.soTienRaw).toLocaleString('vi-VN') : '—') %></td>
+                <td class="text-right"><%= r.thueGtgt || '—' %></td>
+                <td class="text-right" style="font-weight:600"><%= r.soTienTong || (r.soTienTongRaw ? Number(r.soTienTongRaw).toLocaleString('vi-VN') : '—') %></td>
+              </tr>
+              <% }); %>
+            </tbody>
+          </table>
+        </div>
+        <% }); %>
       </div>
     </div>
     <% }); %>
@@ -149,14 +199,14 @@
     <% if (groupsKhMoi.length === 0) { %>
       <div class="empty-note">Chưa có dữ liệu tiền thuê KH Mới.</div>
     <% } else {
-      const tongKhMoi = groupsKhMoi.reduce((s, g) => s + g.tongTien, 0);
+      var tongKhMoi = groupsKhMoi.reduce(function(s, g) { return s + g.tongTien; }, 0);
     %>
     <div class="summary-bar">
       <span>Tổng NCC: <strong><%= groupsKhMoi.length %></strong></span>
-      <span>Tổng hóa đơn: <strong><%= groupsKhMoi.reduce((s,g)=>s+g.rows.length,0) %></strong></span>
+      <span>Tổng hóa đơn: <strong><%= groupsKhMoi.reduce(function(s,g){return s+g.rows.length;},0) %></strong></span>
       <span>Tổng tiền: <strong><%= fmtVnd(tongKhMoi) %></strong></span>
     </div>
-    <% groupsKhMoi.forEach(function(g) { %>
+    <% groupsKhMoi.forEach(function(g, gi) { %>
     <div class="ncc-card">
       <div class="ncc-header" onclick="toggleNcc(this)">
         <span class="ncc-toggle">▶</span>
@@ -169,26 +219,41 @@
         <span class="ncc-tong"><%= fmtVnd(g.tongTien) %></span>
       </div>
       <div class="ncc-body">
-        <table class="ncc-table">
-          <thead><tr>
-            <th>Tháng</th><th>Gian</th><th>Số HĐ</th><th>Ngày HĐ</th><th>Diễn giải</th>
-            <th class="text-right">Tiền trước thuế</th><th class="text-right">Thuế GTGT</th><th class="text-right">Tổng cộng</th>
-          </tr></thead>
-          <tbody>
-            <% g.rows.forEach(function(r) { %>
-            <tr>
-              <td><span class="badge-thang"><%= r.thang || '—' %></span></td>
-              <td><%= r.tenCongTrinh || r.maCongTrinh || r.gian || '—' %></td>
-              <td style="font-family:monospace"><%= r.soHoaDon || '—' %></td>
-              <td><%= r.ngayHoaDon || '—' %></td>
-              <td style="color:#475569"><%= r.dienGiai || '—' %></td>
-              <td class="text-right"><%= r.soTien || (r.soTienRaw ? Number(r.soTienRaw).toLocaleString('vi-VN') : '—') %></td>
-              <td class="text-right"><%= r.thueGtgt || '—' %></td>
-              <td class="text-right" style="font-weight:600"><%= r.soTienTong || (r.soTienTongRaw ? Number(r.soTienTongRaw).toLocaleString('vi-VN') : '—') %></td>
-            </tr>
-            <% }); %>
-          </tbody>
-        </table>
+        <% var gianGrpsMoi = groupByGian(g.rows);
+           gianGrpsMoi.forEach(function(gg, ggi) {
+             var gianId = 'gian-moi-' + gi + '-' + ggi;
+             var gInfo = lookupGianInfo(gg.gian);
+        %>
+        <div class="gian-subheader" onclick="toggleGianSub('<%- gianId %>')">
+          <span class="gian-sub-toggle" id="toggle-<%- gianId %>">▶</span>
+          <span class="gian-sub-name"><%= gg.gian %></span>
+          <% if (gInfo.maNB) { %><span class="gian-sub-manb"><%= gInfo.maNB %></span><% } %>
+          <% if (gInfo.chuThich) { %><span class="gian-sub-note">📝 <%= gInfo.chuThich %></span><% } %>
+          <span class="gian-sub-count"><%= gg.rows.length %> HĐ</span>
+          <span class="gian-sub-total"><%= fmtVnd(gg.total) %></span>
+        </div>
+        <div id="<%- gianId %>" class="gian-subbody">
+          <table class="ncc-table" style="background:#f0fdf4">
+            <thead><tr>
+              <th>Tháng</th><th>Số HĐ</th><th>Ngày HĐ</th><th>Diễn giải</th>
+              <th class="text-right">Tiền trước thuế</th><th class="text-right">Thuế GTGT</th><th class="text-right">Tổng cộng</th>
+            </tr></thead>
+            <tbody>
+              <% gg.rows.forEach(function(r) { %>
+              <tr>
+                <td><span class="badge-thang"><%= r.thang || '—' %></span></td>
+                <td style="font-family:monospace"><%= r.soHoaDon || '—' %></td>
+                <td><%= r.ngayHoaDon || '—' %></td>
+                <td style="color:#475569"><%= r.dienGiai || '—' %></td>
+                <td class="text-right"><%= r.soTien || (r.soTienRaw ? Number(r.soTienRaw).toLocaleString('vi-VN') : '—') %></td>
+                <td class="text-right"><%= r.thueGtgt || '—' %></td>
+                <td class="text-right" style="font-weight:600;color:#065f46"><%= r.soTienTong || (r.soTienTongRaw ? Number(r.soTienTongRaw).toLocaleString('vi-VN') : '—') %></td>
+              </tr>
+              <% }); %>
+            </tbody>
+          </table>
+        </div>
+        <% }); %>
       </div>
     </div>
     <% }); %>
@@ -385,6 +450,14 @@ function toggleGianHD(rowId) {
   const isOpen = row.style.display !== 'none';
   row.style.display = isOpen ? 'none' : 'table-row';
   if (btn) btn.textContent = (isOpen ? '▼ ' : '▲ ') + btn.textContent.replace(/[▼▲]\s*/,'');
+}
+function toggleGianSub(id) {
+  const body = document.getElementById(id);
+  const tog = document.getElementById('toggle-' + id);
+  if (!body) return;
+  const isOpen = body.classList.contains('open');
+  body.classList.toggle('open', !isOpen);
+  if (tog) tog.style.transform = isOpen ? '' : 'rotate(90deg)';
 }
 </script>
 </body>
