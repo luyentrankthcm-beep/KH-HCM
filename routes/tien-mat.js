@@ -1,13 +1,14 @@
 const express = require("express");
 const { load, save, nextId } = require("../store");
 const { requireLogin, requireDataEntry } = require("../middleware/auth");
+const { getCompany, COMPANIES } = require("../utils/companies");
 
 const router = express.Router();
 router.use(requireLogin);
 
 // GET /tien-mat
 router.get("/tien-mat", (req, res) => {
-  const { activeCompany, COMPANIES } = req;
+  const activeCompany = getCompany(req);
   const q = (req.query.q || "").trim().toLowerCase();
   const loaiFilter = req.query.loai || "";
   const thangFilter = req.query.thang || "";
@@ -39,7 +40,7 @@ router.get("/tien-mat", (req, res) => {
 
 // POST /tien-mat/them
 router.post("/tien-mat/them", requireDataEntry, (req, res) => {
-  const { activeCompany } = req;
+  const activeCompany = getCompany(req);
   const data = load();
   if (!data.tienMat) data.tienMat = [];
 
@@ -66,7 +67,7 @@ router.post("/tien-mat/them", requireDataEntry, (req, res) => {
 
 // POST /tien-mat/:id/xoa
 router.post("/tien-mat/:id/xoa", requireDataEntry, (req, res) => {
-  const { activeCompany } = req;
+  const activeCompany = getCompany(req);
   const id = parseInt(req.params.id, 10);
   const data = load();
   if (!data.tienMat) return res.redirect("/tien-mat");
